@@ -651,7 +651,18 @@ async function loadFromAPI() {
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const payload = await res.json();
-    if (payload.error) throw new Error(payload.error);
+    if (payload.error) {
+      // Auth errors → clear session and back to login
+      const authErr = ['Invalid OAuth token','Missing OAuth token','Access denied','Unauthorized'];
+      if (authErr.includes(payload.error)) {
+        accessToken = null; tokenExpiry = 0;
+        try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        return false;
+      }
+      throw new Error(payload.error);
+    }
     const days = payload.health?.days || [];
     if (!days.length) throw new Error('Keine Gesundheitsdaten empfangen');
     allData = days;
