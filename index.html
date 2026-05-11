@@ -3103,6 +3103,11 @@ function setDarkMode(isDark) {
 async function refreshData() {
   const btn = document.getElementById('refresh-btn');
   if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  // 1. Apps Script: Drive → Sheet aktualisieren
+  try { await fetch(REFRESH_URL, { mode: 'no-cors' }); } catch(_) {}
+  // 2. Kurz warten bis Sheet bereit ist
+  await new Promise(r => setTimeout(r, 4000));
+  // 3. Daten neu aus Sheet laden
   workoutData = {}; workoutIndexReady = false; workoutSheetReady = false;
   await loadFromAPI();
   if (btn) { btn.disabled = false; btn.classList.remove('spinning'); }
