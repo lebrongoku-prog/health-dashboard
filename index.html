@@ -468,7 +468,7 @@ function signIn() {
     + '?client_id='    + encodeURIComponent(CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
     + '&response_type=token'
-    + '&scope=https://www.googleapis.com/auth/spreadsheets.readonly'
+    + '&scope=' + encodeURIComponent('https://www.googleapis.com/auth/spreadsheets.readonly email')
     + '&prompt=select_account';
 }
 function signOut() {
