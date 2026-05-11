@@ -455,11 +455,12 @@ body.dark .ew-row{border-bottom-color:#334155}
 </div>
 
 <script>
-// ── GitHub Pages – OAuth2 + Apps Script API ────────────────────
-const CLIENT_ID       = '185114707171-tto1teeec25d9sgkeobme666ndpdip7k.apps.googleusercontent.com';
-const REDIRECT_URI    = 'https://lebrongoku-prog.github.io/health-dashboard/';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnV2MuUrfDPGxA2G0ItWGV8N_3oKTk0SYO2ZHwydt6kANp7qOwB-tsgOXF9cgJow_p/exec';
-const SCRIPT_TOKEN    = 'r8KWq8e5ktOiwHWCUyMCxhTLwA95MKiziZmLruABJDQ';
+// ── GitHub Pages – OAuth2 + Sheets API (wie Tesla Dashboard) ──
+const CLIENT_ID        = '185114707171-tto1teeec25d9sgkeobme666ndpdip7k.apps.googleusercontent.com';
+const REDIRECT_URI     = 'https://lebrongoku-prog.github.io/health-dashboard/';
+const HEALTH_SHEET_ID  = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
+const WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
+const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbwnV2MuUrfDPGxA2G0ItWGV8N_3oKTk0SYO2ZHwydt6kANp7qOwB-tsgOXF9cgJow_p/exec?refresh=true&token=r8KWq8e5ktOiwHWCUyMCxhTLwA95MKiziZmLruABJDQ';
 
 let accessToken = null, tokenExpiry = 0;
 
@@ -468,7 +469,7 @@ function signIn() {
     + '?client_id='    + encodeURIComponent(CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
     + '&response_type=token'
-    + '&scope=' + encodeURIComponent('https://www.googleapis.com/auth/spreadsheets.readonly email')
+    + '&scope='        + encodeURIComponent('https://www.googleapis.com/auth/spreadsheets.readonly')
     + '&prompt=select_account';
 }
 function signOut() {
@@ -643,33 +644,66 @@ const showErr = m => {
 
 // ── Daten von Apps Script API laden ───────────────────
 let csvHeaders = [];
+// Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
+async function _fetchSheet(sheetId) {
+  const metaRes = await fetch(
+    'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '?fields=sheets.properties.title',
+    { headers: { 'Authorization': 'Bearer ' + accessToken } }
+  );
+  if (metaRes.status === 401) return { authError: true };
+  if (!metaRes.ok) throw new Error('Sheets API Fehler ' + metaRes.status + ': ' + await metaRes.text());
+  const meta = await metaRes.json();
+  const tabName = meta.sheets[0].properties.title;
+  const dataRes = await fetch(
+    'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/' + encodeURIComponent(tabName),
+    { headers: { 'Authorization': 'Bearer ' + accessToken } }
+  );
+  if (!dataRes.ok) throw new Error('Daten-Abruf fehlgeschlagen: ' + dataRes.status);
+  const json = await dataRes.json();
+  return { values: json.values || [] };
+}
+
 async function loadFromAPI() {
   try {
-    const url = APPS_SCRIPT_URL
-      + '?token='  + encodeURIComponent(SCRIPT_TOKEN)
-      + '&oauth='  + encodeURIComponent(accessToken);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const payload = await res.json();
-    if (payload.error) {
-      // Auth errors → clear session and back to login
-      const authErr = ['Invalid OAuth token','Missing OAuth token','Access denied','Unauthorized'];
-      if (authErr.includes(payload.error)) {
-        accessToken = null; tokenExpiry = 0;
-        try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
-        return false;
-      }
-      throw new Error(payload.error);
+    // 1. Gesundheitsdaten direkt von Google Sheets laden
+    const health = await _fetchSheet(HEALTH_SHEET_ID);
+    if (health.authError) {
+      accessToken = null; tokenExpiry = 0;
+      try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      return false;
     }
-    const days = payload.health?.days || [];
-    if (!days.length) throw new Error('Keine Gesundheitsdaten empfangen');
-    allData = days;
+    if (!health.values || health.values.length < 2) throw new Error('Keine Gesundheitsdaten im Sheet gefunden');
+    const hHeaders = health.values[0].map(h => h.trim());
+    const strCols = new Set(['date','sleepStart','sleepEnd']);
+    allData = health.values.slice(1).map(row => {
+      const obj = {};
+      hHeaders.forEach((h, i) => {
+        const v = (row[i] ?? '').toString().trim();
+        if (v === '') { obj[h] = null; return; }
+        obj[h] = strCols.has(h) ? v : (isNaN(v) ? v : parseFloat(v));
+      });
+      return obj;
+    }).filter(r => r.date);
     allData.sort((a, b) => a.date.localeCompare(b.date));
     csvHeaders = Object.keys(allData[0] || {});
     referenceDate = allData[allData.length - 1].date;
-    if (payload.workout?.length) _parseWorkoutRows(payload.workout);
+
+    // 2. Workout-Daten laden
+    try {
+      const workout = await _fetchSheet(WORKOUT_SHEET_ID);
+      if (!workout.authError && workout.values && workout.values.length > 1) {
+        const wHeaders = workout.values[0].map(h => h.trim());
+        const wRows = workout.values.slice(1).map(row => {
+          const obj = {};
+          wHeaders.forEach((h, i) => { obj[h] = (row[i] ?? '').toString().trim(); });
+          return obj;
+        });
+        _parseWorkoutRows(wRows);
+      }
+    } catch(_) {} // Workout-Fehler sind nicht kritisch
+
   } catch(e) { showErr('Fehler beim Laden: ' + e.message); return false; }
   return true;
 }
