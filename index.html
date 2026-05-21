@@ -608,6 +608,8 @@ function _buildCalHTML(year, month) {
 // ── Workout-Daten aus API-Response parsen ──────────────
 const _typeIcons = {'Outdoor Ausführen':'🏃','Laufen':'🏃','Radfahren':'🚴','Schwimmen':'🏊','Wandern':'🥾','Krafttraining':'💪','HIIT':'⚡','Yoga':'🧘','Radfahren, drinnen':'🚴','Funktionstraining':'🏋️','Trail-Laufen':'🏔️'};
 function _parseWorkoutRows(rows) {
+  // Sheet values arrive as strings via .toString() – parse to numbers explicitly
+  const pN = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
   rows.forEach(r => {
     const date = r['Date'] || r['date'];
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
@@ -615,15 +617,15 @@ function _parseWorkoutRows(rows) {
     const icon = _typeIcons[typeRaw] || '🏋️';
     workoutData[date] = {
       date, typeRaw, typeLabel: icon + ' ' + (typeRaw || 'Workout'), icon,
-      durationMin:    r['Duration (min)']  ?? null,
-      distanceKm:     r['Distance (km)']   ?? null,
-      avgHR:          r['Avg HR']          ?? null,
-      maxHR:          r['Max HR']          ?? null,
-      avgSpeedKph:    r['Speed (km/h)']    ?? null,
-      elevationM:     r['Elevation (m)']   ?? null,
-      activeEnergyKJ: r['Energy (kJ)']     ?? null,
-      cadence:        r['Cadence']         ?? null,
-      stepCount:      r['Steps']           ?? null
+      durationMin:    pN(r['Duration (min)']),
+      distanceKm:     pN(r['Distance (km)']),
+      avgHR:          pN(r['Avg HR']),
+      maxHR:          pN(r['Max HR']),
+      avgSpeedKph:    pN(r['Speed (km/h)']),
+      elevationM:     pN(r['Elevation (m)']),
+      activeEnergyKJ: pN(r['Energy (kJ)']),
+      cadence:        pN(r['Cadence']),
+      stepCount:      pN(r['Steps'])
     };
   });
   workoutSheetReady = true;
@@ -1628,7 +1630,7 @@ function pgOverview() {
   const wocheHR = woche7.map(r=>r.restHR);
   const wocheHV = woche7.map(r=>r.hrv);
   // _hasWoDur: true wenn Workout Data sheet durationMin-Werte hat (einzige Quelle für Trainingsminuten)
-  const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin != null);
+  const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin > 0);
   // Trainingsminuten: 0 für vergangene Tage ohne Training, null für Tage ohne Daten (Zukunft)
   const wocheTrRaw = _hasWoDur
     ? woche7.map(r=>_byDateWoche[r.date] ? (workoutData[r.date]?.durationMin??0) : null)
