@@ -33,7 +33,7 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:row}
-#sidebar{width:196px;min-width:196px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left)}
+#sidebar{width:196px;min-width:196px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding-top:env(safe-area-inset-top)}
 .sb-logo{padding:1rem .85rem .85rem;display:flex;align-items:center;gap:.5rem;border-bottom:1px solid var(--border)}
 .sb-icon{width:32px;height:32px;background:linear-gradient(135deg,#EF4444,#F97316);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.07rem;flex-shrink:0}
 .sb-brand{font-weight:800;font-size:.86rem;line-height:1.2}
@@ -373,10 +373,7 @@ body.dark .ew-row{border-bottom-color:#334155}
 #sidebar.sb-collapsed .nav-a{justify-content:center;padding:.38rem 0}
 #sidebar.sb-collapsed .sb-logo{justify-content:center;padding:.75rem 0}
 #sidebar.sb-collapsed .sb-foot{justify-content:center;padding:.5rem 0}
-#sidebar.sb-collapsed .sb-toggle-btn{padding:.65rem 0;justify-content:center;min-height:48px;font-size:1rem;font-weight:700}
-#sidebar.sb-collapsed{cursor:pointer}
-#sidebar.sb-collapsed:hover{background:rgba(0,0,0,.02)}
-body[class*="th-"] #sidebar.sb-collapsed:hover{background:rgba(255,255,255,.08)}
+#sidebar.sb-collapsed .sb-toggle-btn{padding:.45rem 0;justify-content:center}
 .sb-toggle-btn{display:flex;align-items:center;justify-content:center;gap:.38rem;width:100%;background:none;border:none;border-bottom:1px solid var(--border);padding:.45rem .85rem;cursor:pointer;color:var(--txt3);font-size:.74rem;transition:color .15s;font-weight:600;flex-shrink:0}
 .sb-toggle-btn:hover{color:var(--txt)}
 /* ── Pattern Insight Cards ────────────────────────────── */
@@ -439,13 +436,14 @@ body[class*="th-"] #sidebar.sb-collapsed:hover{background:rgba(255,255,255,.08)}
   body.dark .tbg{background:rgba(255,255,255,.05)}
   .tbg::-webkit-scrollbar{display:none}
   /* Filter-Buttons – Themen-Topbar überschreiben die normale Style,
-     deshalb hier mit höherer Spezifität bzw. !important auf Mobil */
+     deshalb hier mit höherer Spezifität bzw. !important auf Mobil.
+     min-height: 44pt = Apples HIG-Empfehlung für Touch-Targets. */
   .tbtn,
   body[class*="th-"] .tbtn{
     flex-shrink:0;
-    padding:.45rem .9rem;
-    font-size:.74rem;
-    min-height:36px;
+    padding:.6rem 1.05rem;
+    font-size:.78rem;
+    min-height:44px;
     background:var(--card) !important;
     color:var(--txt2) !important;
     border:1px solid var(--border) !important;
@@ -635,45 +633,6 @@ body[class*="th-"] #sidebar.sb-collapsed:hover{background:rgba(255,255,255,.08)}
   .nav-a .ni-txt{font-size:.55rem}
 }
 
-/* ─────────────────────────────────────────────────────────
-   📱 Landscape iPhone (kurze Höhe, beliebige Breite)
-   ─────────────────────────────────────────────────────── */
-@media (orientation: landscape) and (max-height: 500px) {
-  /* Übersicht: alle Karten stapeln, außer Muster & Zusammenhänge (2 Spalten).
-     Die HTML-Klasse ist .ov-row (flex). */
-  .ov-row{flex-direction:column !important;gap:.55rem !important;height:auto !important}
-  .ov-row>*{flex:1 1 auto !important;min-width:0;width:100%}
-  .ov-col-narrow,.ov-col-wide{flex:1 1 auto !important}
-  .pi-grid{grid-template-columns:repeat(2,1fr) !important}
-
-  /* Sidebar-Toggle in der iOS-Geste-Reserve unerreichbar – nach unten schieben */
-  #sidebar{padding-top:max(env(safe-area-inset-top),36px) !important}
-  .sb-toggle-btn{min-height:40px}
-
-  /* Topbar im Landscape ebenfalls weit genug nach unten */
-  #topbar{padding-top:max(.5rem,env(safe-area-inset-top),24px)}
-
-  /* Collapsed Sidebar im Landscape: muss neben dem Notch tappbar bleiben.
-     Standardbreite ist 44px – das Padding für die Notch (≈50–60px) macht
-     den Toggle-Button sonst unsichtbar. Daher Breite explizit erweitern. */
-  #sidebar.sb-collapsed{
-    width:calc(44px + env(safe-area-inset-left)) !important;
-    min-width:calc(44px + env(safe-area-inset-left)) !important;
-  }
-}
-
-/* Mobile-Layout + Landscape: kompaktere Bottom-Tab-Bar */
-@media (max-width: 640px) and (orientation: landscape) {
-  .nav-a{
-    flex-direction:row !important;
-    min-height:40px !important;
-    padding:.25rem .35rem !important;
-    gap:.35rem !important;
-  }
-  .nav-a .ni{font-size:1rem}
-  .nav-a .ni-txt{font-size:.6rem}
-  #content{padding-bottom:calc(52px + env(safe-area-inset-bottom)) !important}
-}
 </style>
 </head>
 <body>
@@ -3364,30 +3323,22 @@ document.getElementById('refresh-btn').addEventListener('click', refreshData);
 document.getElementById('dark-toggle').addEventListener('click', function() {
   setDarkMode(!document.body.classList.contains('dark'));
 });
-// Sidebar toggle
-function _setSidebarCollapsed(collapsed) {
+// Sidebar toggle (Desktop-only Layout)
+document.getElementById('sb-toggle').addEventListener('click', function() {
   const sb = document.getElementById('sidebar');
-  sb.classList.toggle('sb-collapsed', collapsed);
-  const toggleBtn = document.getElementById('sb-toggle');
-  if (toggleBtn) {
-    const lbl = toggleBtn.querySelector('.ni-txt');
-    if (lbl) lbl.textContent = collapsed ? 'Ausklappen' : 'Einklappen';
-    toggleBtn.childNodes[0].textContent = collapsed ? '› ' : '‹ ';
+  const collapsed = sb.classList.toggle('sb-collapsed');
+  const lbl = this.querySelector('.ni-txt');
+  if(lbl) lbl.textContent = collapsed ? 'Ausklappen' : 'Einklappen';
+  this.childNodes[0].textContent = collapsed ? '› ' : '‹ ';
+});
+
+// Orientation Lock auf Portrait (PWA-Mode). Im Manifest bereits gesetzt,
+// hier als Fallback für Browser-/Geräte-Versionen, die das unterstützen.
+try {
+  if (screen.orientation && typeof screen.orientation.lock === 'function') {
+    screen.orientation.lock('portrait').catch(()=>{});
   }
-}
-document.getElementById('sb-toggle').addEventListener('click', function(e) {
-  e.stopPropagation();
-  const sb = document.getElementById('sidebar');
-  _setSidebarCollapsed(!sb.classList.contains('sb-collapsed'));
-});
-// Click anywhere on a collapsed sidebar (außer auf einem Nav-Item) klappt sie aus.
-// Hintergrund: der Toggle-Button im collapsed Zustand ist im Landscape iPhone
-// schwer zu treffen (Edge-Gesten, kleine Trefferfläche).
-document.getElementById('sidebar').addEventListener('click', function(e) {
-  if (!this.classList.contains('sb-collapsed')) return;
-  if (e.target.closest('.nav-a')) return;
-  _setSidebarCollapsed(false);
-});
+} catch(_) {}
 // Gespeicherte Präferenz laden
 try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e) {}
 
