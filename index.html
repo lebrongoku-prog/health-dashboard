@@ -373,7 +373,10 @@ body.dark .ew-row{border-bottom-color:#334155}
 #sidebar.sb-collapsed .nav-a{justify-content:center;padding:.38rem 0}
 #sidebar.sb-collapsed .sb-logo{justify-content:center;padding:.75rem 0}
 #sidebar.sb-collapsed .sb-foot{justify-content:center;padding:.5rem 0}
-#sidebar.sb-collapsed .sb-toggle-btn{padding:.45rem 0;justify-content:center}
+#sidebar.sb-collapsed .sb-toggle-btn{padding:.65rem 0;justify-content:center;min-height:48px;font-size:1rem;font-weight:700}
+#sidebar.sb-collapsed{cursor:pointer}
+#sidebar.sb-collapsed:hover{background:rgba(0,0,0,.02)}
+body[class*="th-"] #sidebar.sb-collapsed:hover{background:rgba(255,255,255,.08)}
 .sb-toggle-btn{display:flex;align-items:center;justify-content:center;gap:.38rem;width:100%;background:none;border:none;border-bottom:1px solid var(--border);padding:.45rem .85rem;cursor:pointer;color:var(--txt3);font-size:.74rem;transition:color .15s;font-weight:600;flex-shrink:0}
 .sb-toggle-btn:hover{color:var(--txt)}
 /* ── Pattern Insight Cards ────────────────────────────── */
@@ -505,6 +508,29 @@ body.dark .ew-row{border-bottom-color:#334155}
     color:#F1F5F9 !important;
   }
 
+  /* Tab-Bar-Labels (.nav-a) – exakt derselbe Bug wie bei .tbtn:
+     Theme-Rule setzt rgba(255,255,255,.75), mein Override macht die
+     Sidebar weiß, also weiße Schrift auf weißem Hintergrund. */
+  .nav-a,
+  body[class*="th-"] .nav-a{
+    color:var(--txt2) !important;
+  }
+  .nav-a.active,
+  body[class*="th-"] .nav-a.active{
+    color:var(--accent) !important;
+    background:rgba(79,70,229,.12) !important;
+    font-weight:700;
+  }
+  body.dark .nav-a,
+  body.dark[class*="th-"] .nav-a{
+    color:rgba(255,255,255,.7) !important;
+  }
+  body.dark .nav-a.active,
+  body.dark[class*="th-"] .nav-a.active{
+    color:#fff !important;
+    background:rgba(255,255,255,.15) !important;
+  }
+
   /* Inhalt: Platz schaffen für die Bottom-Tab-Bar (Höhe ~62px + safe-area) */
   #content{
     padding:.7rem .8rem calc(72px + env(safe-area-inset-bottom));
@@ -512,7 +538,8 @@ body.dark .ew-row{border-bottom-color:#334155}
 
   /* Sidebar wird zur Bottom-Tab-Bar.
      Wichtig: padding-top/-left aus dem Desktop-CSS resetten – sonst entsteht
-     wertvoller Leerraum AM OBEREN Rand der unten verankerten Tab-Bar. */
+     wertvoller Leerraum AM OBEREN Rand der unten verankerten Tab-Bar.
+     Volle Deckkraft statt Backdrop-Blur, damit Theme-Gradient nicht durchscheint. */
   #sidebar{
     width:100%;
     min-width:0;
@@ -526,15 +553,15 @@ body.dark .ew-row{border-bottom-color:#334155}
     padding-left:0 !important;
     padding-bottom:env(safe-area-inset-bottom);
     z-index:100;
-    backdrop-filter:saturate(180%) blur(14px);
-    -webkit-backdrop-filter:saturate(180%) blur(14px);
-    background:rgba(255,255,255,.92) !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    background:#FFFFFF !important;
     transition:none;
   }
-  body.dark #sidebar{background:rgba(15,23,42,.92) !important}
+  body.dark #sidebar{background:#0F172A !important;border-top-color:#334155 !important}
   /* Theme-Gradient-Sidebar im Mobile-Bottom-Tab überschreiben */
-  body[class*="th-"] #sidebar{background:rgba(255,255,255,.92) !important}
-  body[class*="th-"].dark #sidebar{background:rgba(15,23,42,.92) !important}
+  body[class*="th-"] #sidebar{background:#FFFFFF !important;border-top-color:var(--border) !important}
+  body.dark[class*="th-"] #sidebar{background:#0F172A !important;border-top-color:#334155 !important}
 
   /* Sidebar-Innenstruktur auf Tab-Bar umstellen */
   #sidebar.sb-collapsed{width:100%;min-width:0}
@@ -583,6 +610,9 @@ body.dark .ew-row{border-bottom-color:#334155}
   .ov-row{flex-direction:column !important;gap:.55rem !important;height:auto !important}
   .ov-row>*{flex:1 1 auto !important;min-width:0;width:100%}
   .ov-col-narrow,.ov-col-wide{flex:1 1 auto !important}
+  /* Muster & Zusammenhänge: auto-fit minmax in iOS Safari unzuverlässig –
+     explizit auf 1 Karte/Zeile zwingen */
+  .pi-grid{grid-template-columns:1fr !important}
 
   /* Chart-Karten leicht enger */
   .chart-card{padding:.7rem .75rem}
@@ -3335,12 +3365,28 @@ document.getElementById('dark-toggle').addEventListener('click', function() {
   setDarkMode(!document.body.classList.contains('dark'));
 });
 // Sidebar toggle
-document.getElementById('sb-toggle').addEventListener('click', function() {
+function _setSidebarCollapsed(collapsed) {
   const sb = document.getElementById('sidebar');
-  const collapsed = sb.classList.toggle('sb-collapsed');
-  const lbl = this.querySelector('.ni-txt');
-  if(lbl) lbl.textContent = collapsed ? 'Ausklappen' : 'Einklappen';
-  this.childNodes[0].textContent = collapsed ? '› ' : '‹ ';
+  sb.classList.toggle('sb-collapsed', collapsed);
+  const toggleBtn = document.getElementById('sb-toggle');
+  if (toggleBtn) {
+    const lbl = toggleBtn.querySelector('.ni-txt');
+    if (lbl) lbl.textContent = collapsed ? 'Ausklappen' : 'Einklappen';
+    toggleBtn.childNodes[0].textContent = collapsed ? '› ' : '‹ ';
+  }
+}
+document.getElementById('sb-toggle').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const sb = document.getElementById('sidebar');
+  _setSidebarCollapsed(!sb.classList.contains('sb-collapsed'));
+});
+// Click anywhere on a collapsed sidebar (außer auf einem Nav-Item) klappt sie aus.
+// Hintergrund: der Toggle-Button im collapsed Zustand ist im Landscape iPhone
+// schwer zu treffen (Edge-Gesten, kleine Trefferfläche).
+document.getElementById('sidebar').addEventListener('click', function(e) {
+  if (!this.classList.contains('sb-collapsed')) return;
+  if (e.target.closest('.nav-a')) return;
+  _setSidebarCollapsed(false);
 });
 // Gespeicherte Präferenz laden
 try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e) {}
