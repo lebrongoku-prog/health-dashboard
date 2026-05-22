@@ -414,6 +414,12 @@ function setR(r) {
   document.querySelectorAll('.tbtn[data-range]').forEach(b => {
     b.classList.toggle('active', b.dataset.range === r);
   });
+  // Datums-Nav bei "Heute"-Filter ausblenden (oder Overview, das ist schon in _applyTabState)
+  const dateNavEl = document.querySelector('.date-nav');
+  if (dateNavEl) {
+    const hide = currentScreen === 'overview' || r === 'heute';
+    dateNavEl.style.display = hide ? 'none' : 'flex';
+  }
   updateNavUI();
   _refreshAfterStateChange();
 }
@@ -1256,10 +1262,9 @@ function pgOverview() {
                 <circle id="hs-arc" cx="60" cy="60" r="48" fill="none" stroke="${hsColor}" stroke-width="9"
                   stroke-dasharray="0 302" stroke-linecap="round" transform="rotate(-90 60 60)"
                   style="transition:stroke-dasharray .9s ease"/>
+                <text id="hs-num" x="60" y="60" text-anchor="middle" dominant-baseline="central"
+                  font-size="38" font-weight="800" fill="currentColor" style="letter-spacing:-0.04em">—</text>
               </svg>
-              <div class="ov-score-lbl">
-                <div class="ov-score-num" id="hs-num">—</div>
-              </div>
             </div>
             <div class="hs-ring-tt">
               <div class="hs-tt-title">Score-Zusammensetzung</div>
@@ -1428,7 +1433,7 @@ function pgOverview() {
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
     <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem">📊 Muster & Zusammenhänge</div>
-    <div class="pi-grid" style="grid-template-columns:repeat(${Math.ceil(patternIns.length/2)},1fr)">
+    <div class="pi-grid">
       ${patternIns.map(p=>{
         let txt=p.text;
         if(p.hl)p.hl.forEach(h=>{txt=txt.replace(h.phrase,`<span style="color:${h.c};font-weight:700">${h.phrase}</span>`);});
@@ -2583,11 +2588,13 @@ function _applyTabState(name) {
   if (navEl) navEl.classList.add('active');
   const _isDark = document.body.classList.contains('dark');
   document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
-  // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht
+  // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht.
+  // Zusätzlich: bei Filter "Heute" macht eine Datums-Navigation keinen Sinn → ausblenden.
   const isOverview = name === 'overview';
   const dateNavEl = document.querySelector('.date-nav');
   const tbgEl = document.querySelector('.tbg');
-  if (dateNavEl) dateNavEl.style.display = isOverview ? 'none' : 'flex';
+  const hideDateNav = isOverview || timeRange === 'heute';
+  if (dateNavEl) dateNavEl.style.display = hideDateNav ? 'none' : 'flex';
   if (tbgEl) tbgEl.style.display = isOverview ? 'none' : 'flex';
   if (!_renderedTabs.has(name)) {
     _renderTab(name);
