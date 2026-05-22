@@ -114,8 +114,8 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 .stats-list{display:flex;flex-direction:column;gap:.2rem}
 .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:.22rem 0;border-bottom:1px solid #F8FAFC}
 .stat-row:last-child{border:none}
-.stat-lbl{font-size:.7rem;color:var(--txt2)}
-.stat-val{font-size:.77rem;font-weight:700}
+.stat-lbl{font-size:.68rem;color:var(--txt2)}
+.stat-val{font-size:.74rem;font-weight:700}
 .fit-bar-wrap{margin:.6rem 0}
 .fit-bar{height:10px;border-radius:5px;background:linear-gradient(90deg,#EF4444 0%,#F97316 20%,#EAB308 40%,#84CC16 60%,#10B981 80%,#2563EB 100%);position:relative}
 .fit-marker{position:absolute;top:-3px;width:4px;height:16px;background:var(--txt);border-radius:2px;transform:translateX(-50%)}
@@ -155,8 +155,8 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 .zone-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:.5rem 0}
 .zone-seg{height:100%}
 .badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}
-.info-box{background:#F8FAFC;border-radius:10px;padding:.7rem .9rem;margin-bottom:.7rem;border-left:3px solid var(--accent)}
-.info-box p{font-size:.73rem;color:var(--txt2);line-height:1.55}
+.info-box{background:#F8FAFC;border-radius:10px;padding:.65rem .85rem;margin-bottom:.7rem;border-left:3px solid var(--accent)}
+.info-box p{font-size:.68rem;color:var(--txt2);line-height:1.55}
 /* ── Dark Mode ───────────────── */
 body.dark{
   --bg:#0F172A;--card:#1E293B;--border:#334155;
@@ -309,8 +309,8 @@ body[class*="th-"] #dark-toggle{color:rgba(255,255,255,.8);border-color:rgba(255
 /* ── Coaching / Recommendation Card ──────────────────── */
 .rec-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);border-left:4px solid var(--rec-color,#0891B2);display:flex;flex-direction:column}
 .rec-status{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;font-size:.73rem;font-weight:700;margin-bottom:.5rem}
-.rec-title{font-size:.84rem;font-weight:800;margin-bottom:.3rem}
-.rec-text{font-size:.76rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
+.rec-title{font-size:.82rem;font-weight:800;margin-bottom:.3rem}
+.rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
 .rec-action{font-size:.74rem;font-weight:600;padding:.45rem .75rem;border-radius:9px;background:#F8FAFC;border:1px solid var(--border);line-height:1.5}
 body.dark .rec-action{background:#0F172A}
 /* ── Score Drivers ────────────────────────────────────── */
@@ -383,13 +383,13 @@ body.dark .ew-row{border-bottom-color:#334155}
 .pi-head{display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem}
 .pi-icon{font-size:1.03rem;flex-shrink:0}
 .pi-conf{font-size:.64rem;font-weight:700;color:var(--txt2)}
-.pi-text{font-size:.72rem;color:var(--txt2);line-height:1.55}
+.pi-text{font-size:.68rem;color:var(--txt2);line-height:1.55}
 /* ── Coaching Hint ────────────────────────────────────── */
 .ch-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #7C3AED}
-.ch-card h4{font-size:.77rem;font-weight:700;margin-bottom:.3rem}
-.ch-card p{font-size:.73rem;color:var(--txt2);line-height:1.6}
+.ch-card h4{font-size:.75rem;font-weight:700;margin-bottom:.3rem}
+.ch-card p{font-size:.68rem;color:var(--txt2);line-height:1.6}
 /* ── Page intro question ─────────────────────────────── */
-.page-question{font-size:.77rem;color:var(--txt2);font-style:italic;margin-bottom:.6rem;padding:.45rem .8rem;background:var(--card);border-radius:8px;box-shadow:var(--shadow);border-left:3px solid rgba(var(--thc,100,116,139),.45)}
+.page-question{font-size:.72rem;color:var(--txt2);font-style:italic;margin-bottom:.6rem;padding:.45rem .8rem;background:var(--card);border-radius:8px;box-shadow:var(--shadow);border-left:3px solid rgba(var(--thc,100,116,139),.45)}
 
 /* ─────────────────────────────────────────────────────────
    📱 Mobile / iPhone (≤ 640 px) – Bottom-Tab-Layout
@@ -435,20 +435,37 @@ body.dark .ew-row{border-bottom-color:#334155}
   }
   body.dark .tbg{background:rgba(255,255,255,.05)}
   .tbg::-webkit-scrollbar{display:none}
-  .tbtn{
+  /* Filter-Buttons – Themen-Topbar überschreiben die normale Style,
+     deshalb hier mit höherer Spezifität bzw. !important auf Mobil */
+  .tbtn,
+  body[class*="th-"] .tbtn{
     flex-shrink:0;
     padding:.45rem .9rem;
-    font-size:.78rem;
+    font-size:.74rem;
     min-height:36px;
-    background:var(--card);
-    border:1px solid var(--border);
+    background:var(--card) !important;
+    color:var(--txt2) !important;
+    border:1px solid var(--border) !important;
     box-shadow:0 1px 2px rgba(0,0,0,.04);
   }
-  .tbtn.active{
-    background:var(--accent);
-    color:#fff;
-    border-color:var(--accent);
+  .tbtn.active,
+  body[class*="th-"] .tbtn.active{
+    background:var(--accent) !important;
+    color:#fff !important;
+    border-color:var(--accent) !important;
     box-shadow:0 2px 6px rgba(79,70,229,.3);
+  }
+  body.dark .tbtn,
+  body.dark[class*="th-"] .tbtn{
+    background:#0F172A !important;
+    color:#94A3B8 !important;
+    border-color:#334155 !important;
+  }
+  body.dark .tbtn.active,
+  body.dark[class*="th-"] .tbtn.active{
+    background:var(--accent) !important;
+    color:#fff !important;
+    border-color:var(--accent) !important;
   }
 
   /* Inhalt: Platz schaffen für die Bottom-Tab-Bar (Höhe ~62px + safe-area) */
@@ -540,6 +557,36 @@ body.dark .ew-row{border-bottom-color:#334155}
 @media (max-width: 360px) {
   .kpi-grid-3,.kpi-grid-4,.kpi-grid-5,.kpi-grid-6{grid-template-columns:1fr}
   .nav-a .ni-txt{font-size:.55rem}
+}
+
+/* ─────────────────────────────────────────────────────────
+   📱 Landscape iPhone (kurze Höhe, beliebige Breite)
+   ─────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Übersicht: alle Karten stapeln, außer Muster & Zusammenhänge (2 Spalten) */
+  .ov-grid-top,.ov-grid-mid{grid-template-columns:1fr !important;gap:.55rem !important}
+  .ov-col-narrow,.ov-col-wide{flex:1 1 auto !important}
+  .pi-grid{grid-template-columns:repeat(2,1fr) !important}
+
+  /* Sidebar-Toggle in der iOS-Geste-Reserve unerreichbar – nach unten schieben */
+  #sidebar{padding-top:max(env(safe-area-inset-top),36px) !important}
+  .sb-toggle-btn{min-height:40px}
+
+  /* Topbar im Landscape ebenfalls weit genug nach unten */
+  #topbar{padding-top:max(.5rem,env(safe-area-inset-top),24px)}
+}
+
+/* Mobile-Layout + Landscape: kompaktere Bottom-Tab-Bar */
+@media (max-width: 640px) and (orientation: landscape) {
+  .nav-a{
+    flex-direction:row !important;
+    min-height:40px !important;
+    padding:.25rem .35rem !important;
+    gap:.35rem !important;
+  }
+  .nav-a .ni{font-size:1rem}
+  .nav-a .ni-txt{font-size:.6rem}
+  #content{padding-bottom:calc(52px + env(safe-area-inset-bottom)) !important}
 }
 </style>
 </head>
