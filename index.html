@@ -468,12 +468,51 @@ body.dark .ew-row{border-bottom-color:#334155}
     border-color:var(--accent) !important;
   }
 
+  /* Topbar-Symbole (Refresh, Dark-Toggle, Datum-Pfeile) sind im Theme-Modus
+     standardmäßig in Weiß auf dunklem Gradient. Da wir die Topbar auf Mobil
+     hell halten, müssen wir das Theme zurücksetzen. */
+  .nav-arrow,
+  body[class*="th-"] .nav-arrow{
+    color:var(--txt2) !important;
+    border-color:var(--border) !important;
+  }
+  .nav-arrow:hover:not(:disabled),
+  body[class*="th-"] .nav-arrow:hover:not(:disabled){
+    background:#F8FAFC !important;
+    color:var(--txt) !important;
+  }
+  #nav-label,
+  body[class*="th-"] #nav-label{
+    color:var(--txt) !important;
+  }
+  #dark-toggle,
+  body[class*="th-"] #dark-toggle{
+    color:var(--txt2) !important;
+    border-color:var(--border) !important;
+  }
+  body.dark #dark-toggle,
+  body.dark[class*="th-"] #dark-toggle{
+    color:#FBBF24 !important;
+  }
+  /* Dark Mode: weiterhin gut sichtbar */
+  body.dark .nav-arrow,
+  body.dark[class*="th-"] .nav-arrow{
+    color:#94A3B8 !important;
+    border-color:#334155 !important;
+  }
+  body.dark #nav-label,
+  body.dark[class*="th-"] #nav-label{
+    color:#F1F5F9 !important;
+  }
+
   /* Inhalt: Platz schaffen für die Bottom-Tab-Bar (Höhe ~62px + safe-area) */
   #content{
     padding:.7rem .8rem calc(72px + env(safe-area-inset-bottom));
   }
 
-  /* Sidebar wird zur Bottom-Tab-Bar */
+  /* Sidebar wird zur Bottom-Tab-Bar.
+     Wichtig: padding-top/-left aus dem Desktop-CSS resetten – sonst entsteht
+     wertvoller Leerraum AM OBEREN Rand der unten verankerten Tab-Bar. */
   #sidebar{
     width:100%;
     min-width:0;
@@ -483,14 +522,19 @@ body.dark .ew-row{border-bottom-color:#334155}
     flex-direction:row;
     border-right:none;
     border-top:1px solid var(--border);
+    padding-top:0 !important;
+    padding-left:0 !important;
     padding-bottom:env(safe-area-inset-bottom);
     z-index:100;
     backdrop-filter:saturate(180%) blur(14px);
     -webkit-backdrop-filter:saturate(180%) blur(14px);
-    background:rgba(255,255,255,.92);
+    background:rgba(255,255,255,.92) !important;
     transition:none;
   }
-  body.dark #sidebar{background:rgba(15,23,42,.92)}
+  body.dark #sidebar{background:rgba(15,23,42,.92) !important}
+  /* Theme-Gradient-Sidebar im Mobile-Bottom-Tab überschreiben */
+  body[class*="th-"] #sidebar{background:rgba(255,255,255,.92) !important}
+  body[class*="th-"].dark #sidebar{background:rgba(15,23,42,.92) !important}
 
   /* Sidebar-Innenstruktur auf Tab-Bar umstellen */
   #sidebar.sb-collapsed{width:100%;min-width:0}
@@ -533,9 +577,11 @@ body.dark .ew-row{border-bottom-color:#334155}
 
   /* Two-column-Cards stapeln vertikal */
   .two-col-eq{grid-template-columns:1fr !important}
-  /* Übersichts-Spezialgrids: Score+Empfehlung sowie Monatstrend+Wochenverlauf
-     müssen ebenfalls vertikal stapeln, sonst läuft Text aus den Karten raus */
-  .ov-grid-top,.ov-grid-mid{grid-template-columns:1fr !important;gap:.55rem !important}
+  /* Übersichts-Spezialcontainer: Score+Empfehlung sowie Monatstrend+Wochenverlauf.
+     Die HTML-Klasse heisst .ov-row (display:flex), nicht .ov-grid-top.
+     Auf Mobil vertikal stapeln, fixe Höhen-Inlines aufheben. */
+  .ov-row{flex-direction:column !important;gap:.55rem !important;height:auto !important}
+  .ov-row>*{flex:1 1 auto !important;min-width:0;width:100%}
   .ov-col-narrow,.ov-col-wide{flex:1 1 auto !important}
 
   /* Chart-Karten leicht enger */
@@ -563,8 +609,10 @@ body.dark .ew-row{border-bottom-color:#334155}
    📱 Landscape iPhone (kurze Höhe, beliebige Breite)
    ─────────────────────────────────────────────────────── */
 @media (orientation: landscape) and (max-height: 500px) {
-  /* Übersicht: alle Karten stapeln, außer Muster & Zusammenhänge (2 Spalten) */
-  .ov-grid-top,.ov-grid-mid{grid-template-columns:1fr !important;gap:.55rem !important}
+  /* Übersicht: alle Karten stapeln, außer Muster & Zusammenhänge (2 Spalten).
+     Die HTML-Klasse ist .ov-row (flex). */
+  .ov-row{flex-direction:column !important;gap:.55rem !important;height:auto !important}
+  .ov-row>*{flex:1 1 auto !important;min-width:0;width:100%}
   .ov-col-narrow,.ov-col-wide{flex:1 1 auto !important}
   .pi-grid{grid-template-columns:repeat(2,1fr) !important}
 
@@ -574,6 +622,14 @@ body.dark .ew-row{border-bottom-color:#334155}
 
   /* Topbar im Landscape ebenfalls weit genug nach unten */
   #topbar{padding-top:max(.5rem,env(safe-area-inset-top),24px)}
+
+  /* Collapsed Sidebar im Landscape: muss neben dem Notch tappbar bleiben.
+     Standardbreite ist 44px – das Padding für die Notch (≈50–60px) macht
+     den Toggle-Button sonst unsichtbar. Daher Breite explizit erweitern. */
+  #sidebar.sb-collapsed{
+    width:calc(44px + env(safe-area-inset-left)) !important;
+    min-width:calc(44px + env(safe-area-inset-left)) !important;
+  }
 }
 
 /* Mobile-Layout + Landscape: kompaktere Bottom-Tab-Bar */
