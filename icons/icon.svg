@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EF4444"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- Heart path, centered, ~60% width of canvas -->
+  <path fill="#ffffff" d="
+    M512 820
+    C 480 800, 200 640, 200 440
+    C 200 340, 280 270, 370 270
+    C 440 270, 490 310, 512 360
+    C 534 310, 584 270, 654 270
+    C 744 270, 824 340, 824 440
+    C 824 640, 544 800, 512 820 Z
+  "/>
+</svg>

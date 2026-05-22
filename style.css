@@ -279,7 +279,7 @@ body.dark #bottom-nav {
 .two-col>*{min-width:0;overflow:hidden}
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .two-col-eq>*{min-width:0;overflow:visible}
-.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7rem;margin-bottom:.7rem}
+.three-col{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .three-col>*{min-width:0;overflow:hidden}
 
 /* Score / Ring widgets */
@@ -533,6 +533,39 @@ body.dark .debt-bar-bg { background: #334155; }
   .ov-mini-grid { grid-template-columns: 1fr; }
   .ti-metrics { grid-template-columns: 1fr 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Unified Typography
+   Alle Schriften im App-Bereich werden auf eine einheitliche
+   Größe und Schriftart gesetzt. Ausnahmen:
+   • Bottom-Nav-Labels (.nav-btn span) – iOS-Tab-typisch klein
+   • Chart.js-Canvas – rendert eigene Schrift, von CSS unberührt
+   ═══════════════════════════════════════════════════════════ */
+#topbar, #topbar *,
+.screen, .screen *,
+.overlay-screen, .overlay-screen * {
+  font-size: 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif !important;
+  letter-spacing: 0 !important;
+  font-weight: inherit;
+}
+
+/* Heading- und Bold-Texte behalten weiterhin ihre Strichstärke,
+   aber alle gleiche Größe wie der Rest */
+h1, h2, h3, h4, h5, h6,
+.kpi-val, .kpi-title, .ov-score-num, .ov-score-cat,
+.ov-mini-val, .ti-metric-val, .ring-num, .pg-banner-title {
+  font-size: 14px !important;
+  line-height: 1.4;
+}
+
+/* Bottom-Nav Tab-Labels bleiben klein (Apple HIG: Tabs sind kompakt) */
+#bottom-nav .nav-btn,
+#bottom-nav .nav-btn span {
+  font-size: 10px !important;
+}
+
+/* Chart.js Tooltips und Legenden rendern auf Canvas – CSS hat dort keinen Einfluss */
 
 /* ═══════════════════════════════════════════════════════════
    Desktop / wide viewports (≥ 768 px):

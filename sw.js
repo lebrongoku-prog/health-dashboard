@@ -7,7 +7,7 @@
 //    'hcc-v1' → 'hcc-v2' → 'hcc-v3' …
 // ═══════════════════════════════════════════════════════════
 
-const CACHE = 'hcc-v3';
+const CACHE = 'hcc-v4';
 
 // Lokale Shell-Assets, die vorab gecacht werden
 const ASSETS = [
@@ -16,12 +16,15 @@ const ASSETS = [
   './style.css',
   './app.js',
   './manifest.json',
-  './apple-touch-icon.png',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-256.png',
-  './icon-384.png',
-  './icon-1024.png'
+  './icons/icon.svg',
+  './icons/icon-32.png',
+  './icons/icon-120.png',
+  './icons/icon-152.png',
+  './icons/icon-167.png',
+  './icons/icon-180.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-1024.png'
 ];
 
 // Hosts, die NICHT gecacht werden (Auth, Sheets-API, Apps-Script-Refresh)
