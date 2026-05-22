@@ -2583,6 +2583,12 @@ function _applyTabState(name) {
   if (navEl) navEl.classList.add('active');
   const _isDark = document.body.classList.contains('dark');
   document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
+  // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht
+  const isOverview = name === 'overview';
+  const dateNavEl = document.querySelector('.date-nav');
+  const tbgEl = document.querySelector('.tbg');
+  if (dateNavEl) dateNavEl.style.display = isOverview ? 'none' : 'flex';
+  if (tbgEl) tbgEl.style.display = isOverview ? 'none' : 'flex';
   if (!_renderedTabs.has(name)) {
     _renderTab(name);
     _renderedTabs.add(name);

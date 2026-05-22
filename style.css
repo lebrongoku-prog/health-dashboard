@@ -356,9 +356,11 @@ body.dark #bottom-nav {
 .info-box{background:#F8FAFC;border-radius:10px;padding:.65rem .85rem;margin-bottom:.7rem;border-left:3px solid var(--accent)}
 .info-box p{font-size:.68rem;color:var(--txt2);line-height:1.55}
 
-/* Overview-specific (.ov-*) – ov-row stacks vertically by default in mobile-only layout */
-.ov-row{display:flex;flex-direction:column;gap:.55rem;margin-bottom:.7rem;height:auto}
-.ov-row>*{flex:1 1 auto;min-width:0;width:100%}
+/* Overview-specific (.ov-*) – ov-row stacks vertically by default in mobile-only layout.
+   !important overschreibt das inline style="height:290px" auf der Monatstrend+Wochenverlauf-Row,
+   sonst clippt der Container und die Karten überlappen mit dem Muster-Bereich darunter. */
+.ov-row{display:flex !important;flex-direction:column !important;gap:.55rem;margin-bottom:.7rem;height:auto !important}
+.ov-row>*{flex:1 1 auto !important;min-width:0;width:100%}
 .ov-col-narrow,.ov-col-wide{flex:1 1 auto}
 .ov-ti-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .ov-ti-card h3{font-size:.84rem;font-weight:700;margin-bottom:.45rem;flex-shrink:0}
