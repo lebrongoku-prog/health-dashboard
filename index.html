@@ -10,8 +10,15 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Health Command Center</title>
+<!-- ── PWA / iOS Home-Screen ────────────────────────────── -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Health">
+<meta name="theme-color" content="#EF4444">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
 <style>
 :root{
@@ -383,6 +390,139 @@ body.dark .ew-row{border-bottom-color:#334155}
 .ch-card p{font-size:.73rem;color:var(--txt2);line-height:1.6}
 /* ── Page intro question ─────────────────────────────── */
 .page-question{font-size:.77rem;color:var(--txt2);font-style:italic;margin-bottom:.6rem;padding:.45rem .8rem;background:var(--card);border-radius:8px;box-shadow:var(--shadow);border-left:3px solid rgba(var(--thc,100,116,139),.45)}
+
+/* ─────────────────────────────────────────────────────────
+   📱 Mobile / iPhone (≤ 640 px) – Bottom-Tab-Layout
+   ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Body wechselt von row zu column, damit Sidebar unten landet */
+  body{flex-direction:column}
+
+  /* Topbar darf in mehrere Zeilen wrappen, oben Safe-Area beachten */
+  #topbar{
+    flex-wrap:wrap;
+    gap:.4rem .6rem;
+    padding:.5rem .75rem;
+    padding-top:calc(.5rem + env(safe-area-inset-top));
+    backdrop-filter:saturate(180%) blur(14px);
+    -webkit-backdrop-filter:saturate(180%) blur(14px);
+    background:rgba(255,255,255,.85);
+    position:sticky;top:0;z-index:50;
+  }
+  body.dark #topbar{background:rgba(15,23,42,.85)}
+  body[class*="th-"] #topbar{background:rgba(255,255,255,.85)}
+  body[class*="th-"].dark #topbar{background:rgba(15,23,42,.85)}
+
+  .tb-left{flex:1;min-width:0}
+  .date-nav{gap:.3rem}
+  #nav-label{min-width:0;font-size:.78rem}
+  .nav-arrow{width:36px;height:36px;font-size:1rem}
+
+  /* Filter-Reihe: ganze Breite, horizontal scrollbar */
+  .tbg{
+    order:99;
+    flex:0 0 100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+    flex-wrap:nowrap;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:.15rem;
+  }
+  .tbg::-webkit-scrollbar{display:none}
+  .tbtn{
+    flex-shrink:0;
+    padding:.45rem .8rem;
+    font-size:.78rem;
+    min-height:36px;
+  }
+
+  /* Inhalt: Platz schaffen für die Bottom-Tab-Bar (Höhe ~62px + safe-area) */
+  #content{
+    padding:.7rem .8rem calc(72px + env(safe-area-inset-bottom));
+  }
+
+  /* Sidebar wird zur Bottom-Tab-Bar */
+  #sidebar{
+    width:100%;
+    min-width:0;
+    height:auto;
+    position:fixed;
+    bottom:0;left:0;right:0;
+    flex-direction:row;
+    border-right:none;
+    border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom);
+    z-index:100;
+    backdrop-filter:saturate(180%) blur(14px);
+    -webkit-backdrop-filter:saturate(180%) blur(14px);
+    background:rgba(255,255,255,.92);
+    transition:none;
+  }
+  body.dark #sidebar{background:rgba(15,23,42,.92)}
+
+  /* Sidebar-Innenstruktur auf Tab-Bar umstellen */
+  #sidebar.sb-collapsed{width:100%;min-width:0}
+  .sb-toggle-btn,.sb-logo,.sb-sec,.sb-foot{display:none !important}
+  .sb-nav{
+    display:flex;
+    flex-direction:row;
+    width:100%;
+    padding:0;
+    flex:1;
+  }
+  .nav-a{
+    flex:1;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    gap:.15rem;
+    padding:.55rem .15rem;
+    margin:0;
+    border-radius:0;
+    min-height:54px;
+    font-size:.62rem;
+    text-align:center;
+    line-height:1.1;
+  }
+  .nav-a:hover{background:transparent;color:var(--txt2)}
+  .nav-a.active{background:transparent;color:var(--accent);font-weight:700}
+  .nav-a.active .ni{transform:scale(1.08)}
+  .nav-a .ni{width:auto;font-size:1.2rem;transition:transform .15s}
+  .nav-a .ni-txt{display:inline !important;font-size:.6rem}
+
+  /* KPI-Grids stapeln: max 2 Spalten auf Mobil */
+  .kpi-grid-3,.kpi-grid-4,.kpi-grid-5,.kpi-grid-6{
+    grid-template-columns:repeat(2,1fr);
+    gap:.45rem;
+  }
+  .kpi-grid-1{grid-template-columns:1fr}
+  .kpi-grid-2{grid-template-columns:repeat(2,1fr);gap:.45rem}
+  .kpi{padding:.65rem .7rem}
+
+  /* Two-column-Cards stapeln vertikal */
+  .two-col-eq{grid-template-columns:1fr !important}
+
+  /* Chart-Karten leicht enger */
+  .chart-card{padding:.7rem .75rem}
+  .chart-card h3{font-size:.85rem}
+
+  /* Übersichts-Score-Karte: Inhalt nicht so wuchtig */
+  .ov-score-num{font-size:1.85rem}
+  .ov-score-ring{width:104px;height:104px}
+
+  /* Touch-Targets: alle Steuer-Buttons mindestens 36px hoch (Apples 44px relax't, da kompakte Topbar wichtig ist) */
+  button{touch-action:manipulation}
+
+  /* iOS-Status-Bar (translucent) darf kurz über die Topbar greifen */
+  html,body{overflow:hidden}
+}
+
+/* Sehr schmal (< 360 px) – etwas mehr Komfort */
+@media (max-width: 360px) {
+  .kpi-grid-3,.kpi-grid-4,.kpi-grid-5,.kpi-grid-6{grid-template-columns:1fr}
+  .nav-a .ni-txt{font-size:.55rem}
+}
 </style>
 </head>
 <body>
