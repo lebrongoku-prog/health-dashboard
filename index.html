@@ -377,12 +377,6 @@ body.dark .ew-row{border-bottom-color:#334155}
 .pi-icon{font-size:1.03rem;flex-shrink:0}
 .pi-conf{font-size:.64rem;font-weight:700;color:var(--txt2)}
 .pi-text{font-size:.72rem;color:var(--txt2);line-height:1.55}
-/* ── Readiness Page ───────────────────────────────────── */
-.rd-status-box{border-radius:var(--r);padding:1rem 1.2rem;margin-bottom:.7rem;display:flex;align-items:center;gap:1rem}
-.rd-score-big{font-size:3.21rem;font-weight:800;line-height:1;letter-spacing:-.05em}
-.rd-rec-box{flex:1}
-.rd-rec-title{font-size:.8rem;font-weight:700;margin-bottom:.2rem}
-.rd-rec-text{font-size:.73rem;line-height:1.55;opacity:.88}
 /* ── Coaching Hint ────────────────────────────────────── */
 .ch-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #7C3AED}
 .ch-card h4{font-size:.77rem;font-weight:700;margin-bottom:.3rem}
@@ -438,7 +432,6 @@ body.dark .ew-row{border-bottom-color:#334155}
     </div>
     <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
       <button id="refresh-btn" class="nav-arrow" title="Daten aus Google Sheets neu laden" style="font-size:1rem;width:28px">↻</button>
-      <button id="logout-btn" class="nav-arrow" title="Abmelden" style="font-size:.75rem;width:28px">⏏</button>
       <button id="dark-toggle" class="nav-arrow" title="Dark Mode umschalten" style="font-size:.85rem;width:28px">🌙</button>
     </div>
     <div class="tbg">
@@ -460,7 +453,7 @@ const CLIENT_ID        = '185114707171-tto1teeec25d9sgkeobme666ndpdip7k.apps.goo
 const REDIRECT_URI     = 'https://lebrongoku-prog.github.io/health-dashboard/';
 const HEALTH_SHEET_ID  = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
-const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbzVZKWGjeJjvaEfoLaNzuJ6XhDgG2Butaz0XwHrrvgkvJzBgozu7qyG7xjS9fOCfYgF/exec?refresh=true&token=r8KWq8e5ktOiwHWCUyMCxhTLwA95MKiziZmLruABJDQ';
+const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbyN4HSh5ai3ZBpCkGjuxHVlE0IagpLtUT-gyLgzRfAXZT4wPahzRJUbZTMvUiaT0djA/exec?refresh=true&token=I4C1c9csK02bAvQbF2cLnUuEsgfJbtWjzzGAPaHnd-Vn';
 
 let accessToken = null, tokenExpiry = 0;
 
@@ -471,13 +464,6 @@ function signIn() {
     + '&response_type=token'
     + '&scope='        + encodeURIComponent('https://www.googleapis.com/auth/spreadsheets.readonly')
     + '&prompt=select_account';
-}
-function signOut() {
-  accessToken = null; tokenExpiry = 0;
-  try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
-  document.getElementById('main').style.display    = 'none';
-  document.getElementById('sidebar').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
 }
 function _checkHashToken() {
   const hash = window.location.hash;
@@ -648,6 +634,13 @@ const showErr = m => {
 let csvHeaders = [];
 // Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
 async function _fetchSheet(sheetId) {
+  // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, sauber neu anmelden
+  // statt erst auf den 401 vom Server zu warten.
+  if (!accessToken || Date.now() > tokenExpiry - 60_000) {
+    try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
+    signIn();
+    return { authError: true };
+  }
   const metaRes = await fetch(
     'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '?fields=sheets.properties.title',
     { headers: { 'Authorization': 'Bearer ' + accessToken } }
@@ -1046,17 +1039,6 @@ function scoreCat(s) {
   if(s>=40)return['Ausbaufähig','#F97316'];
   return['Niedrig','#EF4444'];
 }
-function computeReadiness(days) {
-  if(days.length<3)return 70;
-  const t=days[days.length-1];
-  const p7=days.slice(Math.max(0,days.length-8),days.length-1);
-  if(!t)return 70;
-  let s=70;
-  const hA=av(p7,'hrv'); if(t.hrv&&hA) s+=(t.hrv/hA-1)*30;
-  const rA=av(p7,'restHR'); if(t.restHR&&rA) s-=(t.restHR/rA-1)*20;
-  if(t.sleepTotal){if(t.sleepTotal>=7.5)s+=10;else if(t.sleepTotal<6)s-=15;}
-  return Math.min(100,Math.max(0,Math.round(s)));
-}
 function generateInsights(D,P) {
   const ins=[];
   const hvD=av(D,'hrv'),hvP=av(P,'hrv');
@@ -1092,30 +1074,6 @@ function calculateBaseline(field, nDays) {
 function calculateDeviation(current, baseline) {
   if (current == null || baseline == null || baseline === 0) return null;
   return ((current - baseline) / baseline) * 100;
-}
-
-// Interpret HRV deviation (higher = good)
-function interpretHRVDev(pct) {
-  if (pct == null) return {txt:'—',cls:'neu'};
-  if (pct >= 5)  return {txt:'Positiv ↑',cls:'pos'};
-  if (pct >= -5) return {txt:'Stabil →',cls:'neu'};
-  return {txt:'Erhöhte Belastung ↓',cls:'neg'};
-}
-
-// Interpret HR deviation (lower = good)
-function interpretHRDev(pct) {
-  if (pct == null) return {txt:'—',cls:'neu'};
-  if (pct <= -3)  return {txt:'Positiv ↓',cls:'pos'};
-  if (pct <= 3)   return {txt:'Stabil →',cls:'neu'};
-  return {txt:'Erhöht ↑',cls:'neg'};
-}
-
-// Interpret sleep deviation (higher = good)
-function interpretSleepDev(pct) {
-  if (pct == null) return {txt:'—',cls:'neu'};
-  if (pct >= 5)  return {txt:'Über Baseline ↑',cls:'pos'};
-  if (pct >= -8) return {txt:'Im Normbereich →',cls:'neu'};
-  return {txt:'Unter Baseline ↓',cls:'neg'};
 }
 
 // Sleep debt: target minus actual, in hours
@@ -1534,9 +1492,6 @@ function workoutDe(t) {
 
 // ── Übersicht ──────────────────────────────────────────
 function pgOverview() {
-  const D = filtered();
-  const P = prevPeriod();
-
   // Last day + 7-day window for mini-cards
   const lastDay = allData[allData.length-1] || {};
   const priorDays = allData.slice(-8,-1); // 7 days before last
@@ -1550,8 +1505,8 @@ function pgOverview() {
   // Last 14 days for sparklines
   const last14 = allData.slice(-14);
 
-  // Health score
-  const hs = computeHealthScore(D.length ? D : [lastDay]);
+  // Health score (immer der Score des aktuellen Tages – unabhängig vom Zeitfilter)
+  const hs = computeHealthScore([lastDay]);
   const prev7hs = computeHealthScore(priorDays.length ? priorDays : [lastDay]);
   const [hsCat, hsColor] = scoreCat(hs);
   const hsDelta = hs - prev7hs;
@@ -1563,8 +1518,8 @@ function pgOverview() {
   // Pattern insights
   const patternIns = generatePatternInsights();
 
-  // Score component breakdown for tooltip
-  const _hsDays = D.length ? D : [lastDay];
+  // Score component breakdown for tooltip (immer aktueller Tag, passend zum Score)
+  const _hsDays = [lastDay];
   const _hsSl=av(_hsDays,'sleepTotal');
   const _hsHv=av(_hsDays,'hrv'), _hsHvA=av(allData,'hrv');
   const _hsHr=av(_hsDays,'restHR');
@@ -1947,7 +1902,7 @@ function pgOverview() {
     const v=ctx.raw;
     if(lbl==='Schlaf (h)')return`Schlaf: ${toHM(v)}`;
     if(lbl===_wocheTrLabel){
-      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${_wocheTrLabel}: ${mins} min${is6m?' Ø/Tag':''}`;};
+      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${_wocheTrLabel}: ${mins} min${is6m?' Ø/Woche':''}`;};
       return`${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}${is6m?' Ø/Tag':''}`;
     }
     return lbl+': '+(v!=null?v.toFixed(1):'')+(is6m?' Ø':'');
@@ -1994,7 +1949,7 @@ function pgOverview() {
       const data=months.map(({y,m})=>{
         const rows=allData.filter(r=>{if(!r.date)return false;const d=new Date(r.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m;});
         return{sl:_avNul(rows,'sleepTotal'),hr:_avNul(rows,'restHR'),hv:_avNul(rows,'hrv'),
-          tr:_hasWoDur?(()=>{const v=rows.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})():_avNul(rows,'steps')};
+          tr:_hasWoDur?(()=>{const v=rows.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);if(!v.length)return null;const total=v.reduce((a,b)=>a+b,0);const weeks=rows.length?rows.length/7:1;return total/weeks;})():_avNul(rows,'steps')};
       });
       return{sl:data.map(d=>d.sl),hr:data.map(d=>d.hr),hv:data.map(d=>d.hv),
         tr:data.map(d=>_hasWoDur&&d.tr!=null?d.tr/60:d.tr),
@@ -3023,7 +2978,7 @@ function pgVO2() {
     const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
     mkC('c-vo2',{type:'line',data:{labels:tL,datasets:[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}]},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
+        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
         scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,
           ticks:{...gy.ticks,stepSize:_v2Step}}}}});
   }
@@ -3114,7 +3069,6 @@ async function refreshData() {
   nav(curPage);
 }
 document.getElementById('refresh-btn').addEventListener('click', refreshData);
-document.getElementById('logout-btn').addEventListener('click', signOut);
 
 document.getElementById('dark-toggle').addEventListener('click', function() {
   setDarkMode(!document.body.classList.contains('dark'));
