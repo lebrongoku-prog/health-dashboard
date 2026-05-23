@@ -350,7 +350,7 @@ function fmtDayShort(d) {
   const dt = new Date(d+'T00:00:00');
   return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+String(dt.getFullYear()).slice(-2);
 }
-function fmtMonthYear(dt) { return MO_SHORT[dt.getMonth()]+" '"+String(dt.getFullYear()).slice(-2); }
+function fmtMonthYear(dt) { return MO_SHORT[dt.getMonth()]+' '+String(dt.getFullYear()).slice(-2); }
 
 function navDateLabel() {
   if (!referenceDate) return '–';
@@ -426,7 +426,7 @@ function setR(r) {
 
 // ── Helpers ────────────────────────────────────────────
 const MO = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MO[m-1]+" '"+String(y).slice(-2); }
+function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MO[m-1]+' '+String(y).slice(-2); }
 function fn(v, dec=1) { return v == null ? '—' : Number(v).toFixed(dec); }
 function pct(curr, prev) { if (curr==null||prev==null||prev===0) return null; return ((curr-prev)/Math.abs(prev))*100; }
 function av(arr, field) {
@@ -1254,7 +1254,7 @@ function pgOverview() {
       <div class="ov-score-card ov-col-narrow">
         <h3 style="font-size:.78rem;font-weight:700;margin-bottom:.6rem">Gesundheits-Score</h3>
         <div class="ov-score-body">
-        <div class="ov-score-top">
+        <div class="ov-score-left">
           <div class="ov-ring-wrap">
             <div class="ov-score-ring">
               <svg width="120" height="120" viewBox="0 0 120 120">
@@ -1275,19 +1275,16 @@ function pgOverview() {
               <div class="hs-ring-tt-row"><span>🫁 VO₂max</span><span style="color:var(--txt3)">10%</span></div>
             </div>
           </div>
-          <div class="ov-score-right">
-            <div class="ov-score-cat" style="color:${hsColor}">${hsCat}</div>
-            <div class="ov-score-delta">${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt</div>
-            <div class="ov-score-interp">${(()=>{
-              if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
-              if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
-              if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
-              if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
-              return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
-            })()}</div>
-          </div>
+          <div class="ov-score-cat" style="color:${hsColor}">${hsCat}</div>
+          <div class="ov-score-delta">${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt</div>
+          <div class="ov-score-interp">${(()=>{
+            if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
+            if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
+            if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
+            if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
+            return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
+          })()}</div>
         </div>
-        <div style="border-top:1px solid var(--border);margin:.7rem -.1rem .6rem"></div>
         <div class="hs-komp-rows">
         <div class="hs-komp-title">Score-Komponenten</div>
         ${(()=>{
@@ -1518,7 +1515,7 @@ function pgOverview() {
       if(is6m){
         const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(1); refD.setMonth(refD.getMonth()+off);
         const end=new Date(refD), start=new Date(refD); start.setMonth(start.getMonth()-5);
-        const fm=d=>_MONTHS_DE[d.getMonth()]+' \''+String(d.getFullYear()).slice(2);
+        const fm=d=>_MONTHS_DE[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
         return fm(start)+' – '+fm(end);
       }else{
         const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(refD.getDate()+off*7);

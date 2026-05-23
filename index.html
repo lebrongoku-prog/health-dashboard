@@ -58,18 +58,18 @@
   <p class="err-msg" id="err-txt"></p>
 </div>
 
-<!-- Top-Bar: globale Controls (Datums-Nav + Refresh + Dark + Filter) -->
+<!-- Top-Bar: globale Controls (Refresh+Dark links, Datums-Nav+Filter rechts) -->
 <header id="topbar">
   <div class="tb-row tb-row-main">
+    <div class="tb-actions">
+      <button id="refresh-btn" class="nav-arrow" title="Daten neu laden" aria-label="Refresh">🔄</button>
+      <button id="dark-toggle" class="nav-arrow" title="Hell/Dunkel" aria-label="Theme">🌙</button>
+    </div>
     <div class="date-nav">
       <button class="nav-arrow" id="nav-prev" aria-label="Zurück">‹</button>
       <span id="nav-label">–</span>
       <button class="nav-arrow" id="nav-next" aria-label="Vor">›</button>
       <button class="nav-arrow" id="nav-today" title="Heute" aria-label="Heute">↺</button>
-    </div>
-    <div class="tb-actions">
-      <button id="refresh-btn" class="nav-arrow" title="Daten neu laden" aria-label="Refresh">↻</button>
-      <button id="dark-toggle" class="nav-arrow" title="Hell/Dunkel" aria-label="Theme">🌙</button>
     </div>
   </div>
   <div class="tbg">
@@ -110,15 +110,15 @@
     <span>Schlaf</span>
   </button>
   <button class="nav-btn" id="nav-aktivitaet" data-tab="aktivitaet" aria-label="Aktivität">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.5"/><path d="m4 19 4-4 2 2 3-7 4 4h4M8 15l3-6"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16h2l3-3 3 1 4-3 4 1 3 2v2l-1 1H4Z"/><path d="M8 14v2M12 14v2M16 13v3"/></svg>
     <span>Aktivität</span>
   </button>
   <button class="nav-btn" id="nav-training" data-tab="training" aria-label="Training">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8v8M9 5v14M15 5v14M18 8v8M3 10v4M21 10v4"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4.5" r="1.8"/><path d="m15 7-2 4 3 3v4l-3 4M13 11l-3 1-1 4M16 14l3 1.5"/></svg>
     <span>Training</span>
   </button>
   <button class="nav-btn" id="nav-vo2" data-tab="vo2" aria-label="VO₂max">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M6 9a4 4 0 0 1 4-4h0v15c-4 0-4-4-4-6Zm12 0c0-2.2-1.8-4-4-4h0v15c4 0 4-4 4-6Z"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="15" text-anchor="middle" font-size="11" font-weight="800" fill="currentColor" stroke="none">O₂</text></svg>
     <span>VO₂max</span>
   </button>
 </nav>
