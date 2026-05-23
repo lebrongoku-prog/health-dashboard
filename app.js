@@ -1263,7 +1263,7 @@ function pgOverview() {
                   stroke-dasharray="0 302" stroke-linecap="round" transform="rotate(-90 60 60)"
                   style="transition:stroke-dasharray .9s ease"/>
                 <text id="hs-num" x="60" y="60" text-anchor="middle" dominant-baseline="central"
-                  font-size="17" font-weight="800" fill="currentColor">—</text>
+                  font-size="34" font-weight="800" fill="currentColor" style="letter-spacing:-0.04em">—</text>
               </svg>
             </div>
             <div class="hs-ring-tt">

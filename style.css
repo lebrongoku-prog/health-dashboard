@@ -535,31 +535,121 @@ body.dark .debt-bar-bg { background: #334155; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Unified Typography
-   Alle Schriften im App-Bereich werden auf eine einheitliche
-   Größe und Schriftart gesetzt. Ausnahmen:
-   • Bottom-Nav-Labels (.nav-btn span) – iOS-Tab-typisch klein
-   • Chart.js-Canvas – rendert eigene Schrift, von CSS unberührt
+   Type Scale
+   Klare Hierarchie statt einer einheitlichen Größe:
+   • Display L  (2rem)    – Score-Zahl, KPI-Werte
+   • Display M  (1.2rem)  – Mini-Werte, Banner-Titel, Score-Kategorie
+   • Title      (1rem)    – Card-Titel, Empfehlungs-Titel
+   • Body       (.85rem)  – Beschreibungstexte, Insights, Info-Boxen
+   • Label      (.75rem)  – Stat-Zeilen, Komponenten-Rows
+   • Caption    (.65rem)  – Uppercase-Mini-Labels, Einheiten, Hints
+   Bottom-Nav (10px) und Chart.js (Canvas) sind separat.
    ═══════════════════════════════════════════════════════════ */
 #topbar, #topbar *,
 .screen, .screen *,
 .overlay-screen, .overlay-screen * {
-  font-size: 14px !important;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif !important;
-  letter-spacing: 0 !important;
-  font-weight: inherit;
+  letter-spacing: 0;
 }
 
-/* Heading- und Bold-Texte behalten weiterhin ihre Strichstärke,
-   aber alle gleiche Größe wie der Rest */
-h1, h2, h3, h4, h5, h6,
-.kpi-val, .kpi-title, .ov-score-num, .ov-score-cat,
-.ov-mini-val, .ti-metric-val, .ring-num, .pg-banner-title {
-  font-size: 14px !important;
+/* Display L – große, plakative Zahlen */
+.kpi-val,
+.ov-score-num,
+.ring-num {
+  font-size: 2rem !important;
+  line-height: 1.1;
+  letter-spacing: -.02em !important;
+}
+
+/* Display M – Mini-Werte, Banner-Titel, Score-Kategorie */
+.ov-mini-val,
+.ti-metric-val,
+.ov-score-cat,
+.pg-banner-title {
+  font-size: 1.2rem !important;
+  line-height: 1.2;
+}
+
+/* Title – Card-Titel und H3 in den Sections */
+h1, h2, h3, h4, h5,
+.chart-card h3,
+.ov-ti-card h3,
+.rec-title,
+.ov-combo-rec .rec-title,
+.hs-komp-title,
+.ch-card h4,
+.bl-card h3,
+.score-wrap h3,
+.warn-title,
+.ring-cat,
+.fit-cat-badge,
+.pi-head {
+  font-size: 1rem !important;
+  line-height: 1.3;
+}
+
+/* Body – Beschreibungstexte, Insight-Rows */
+.info-box p,
+.pi-text,
+.ch-card p,
+.rec-text, .ov-combo-rec .rec-text,
+.ti-row, .ti-txt,
+.warn-text,
+.no-data,
+.ins-title,
+.ins-desc {
+  font-size: .85rem !important;
+  line-height: 1.5;
+}
+
+/* Label – Stat-Zeilen, Komponenten-Rows, Sub-Werte */
+.stat-lbl, .stat-val,
+.mt-lbl, .mt-val,
+.hs-komp-row, .hs-komp-lbl, .hs-komp-val,
+.goal-lbl, .goal-val, .goal-num,
+.ew-val, .ew-lbl,
+.sd-lbl, .sd-row,
+.debt-tt-row,
+.rec-action, .ov-combo-rec .rec-action,
+.kpi-unit, .kpi-delta, .kpi-sub,
+.ov-mini-unit,
+.ov-score-delta, .ov-score-interp,
+.bl-lbl, .bl-val,
+.lw-table td {
+  font-size: .75rem !important;
   line-height: 1.4;
 }
 
-/* Bottom-Nav Tab-Labels bleiben klein (Apple HIG: Tabs sind kompakt) */
+/* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
+.kpi-lbl,
+.ov-mini-lbl,
+.ti-metric-lbl,
+.ti-metric-delta,
+.ov-mini-delta,
+.ring-sub,
+.hs-tt-title,
+.hs-ring-tt-row,
+.pi-conf,
+.pl-item,
+.cl-item,
+.fit-labels,
+.field-hint,
+.pg-banner-sub,
+.ew-note,
+.bl-dev, .bl-badge,
+.debt-tt-title, .debt-tt-hd,
+.page-question,
+.lw-table th,
+.mt-arrow,
+.rec-status,
+.warn-sig,
+.warn-signals,
+.badge {
+  font-size: .65rem !important;
+  line-height: 1.4;
+}
+
+/* Bottom-Nav Tab-Labels bleiben klein – iOS-Tab-Konvention */
 #bottom-nav .nav-btn,
 #bottom-nav .nav-btn span {
   font-size: 10px !important;
