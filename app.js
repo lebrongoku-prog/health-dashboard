@@ -1277,14 +1277,6 @@ function pgOverview() {
             </div>
           </div>
           <div class="ov-score-cat" style="color:${hsColor}">${hsCat}</div>
-          <div class="ov-score-delta">${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt</div>
-          <div class="ov-score-interp">${(()=>{
-            if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
-            if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
-            if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
-            if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
-            return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
-          })()}</div>
         </div>
         <div class="hs-komp-rows">
         <div class="hs-komp-title">Score-Komponenten</div>
@@ -1320,6 +1312,16 @@ function pgOverview() {
         })()}
         </div>
         </div><!-- /ov-score-body -->
+        <div class="ov-score-footer">
+          <div class="ov-score-delta">${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt</div>
+          <div class="ov-score-interp">${(()=>{
+            if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
+            if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
+            if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
+            if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
+            return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
+          })()}</div>
+        </div>
       </div>
       <!-- Kombinierte Kachel: Empfehlung + Tagesinsights -->
       <div class="ov-combo-card ov-col-wide">
