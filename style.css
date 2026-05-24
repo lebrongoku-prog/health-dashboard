@@ -36,9 +36,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 html, body { height: 100%; overflow: hidden; }
-/* html bekommt denselben Background wie body als Fallback,
-   damit am unteren Bildschirmrand kein weißer Subpixel-Streifen sichtbar wird. */
-html { background: var(--bg); }
+/* html-Background = dunkler Default, wird per JS pro Tab überschrieben.
+   Damit auf iOS am Bildschirmrand garantiert kein weißes Subpixel sichtbar wird. */
+html { background: #0F172A; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -60,13 +60,8 @@ body.theme-schlaf     { --tab-color: #7C3AED; background-color: #1E3A8A; backgro
 body.theme-aktivitaet { --tab-color: #10B981; background-color: #064E3B; background-image: linear-gradient(135deg, #064E3B, #10B981); background-attachment: fixed; }
 body.theme-training   { --tab-color: #F97316; background-color: #7C2D12; background-image: linear-gradient(135deg, #7C2D12, #F97316); background-attachment: fixed; }
 body.theme-vo2        { --tab-color: #F59E0B; background-color: #78350F; background-image: linear-gradient(135deg, #78350F, #F59E0B); background-attachment: fixed; }
-/* html-Background pro Tab synchronisieren – kein weißer Rand mehr */
-html:has(body.theme-overview)   { background: #0C4A6E; }
-html:has(body.theme-herz)       { background: #7F1D1D; }
-html:has(body.theme-schlaf)     { background: #1E3A8A; }
-html:has(body.theme-aktivitaet) { background: #064E3B; }
-html:has(body.theme-training)   { background: #7C2D12; }
-html:has(body.theme-vo2)        { background: #78350F; }
+/* html-Background wird per JS dynamisch pro Tab gesetzt (siehe _setStatusBarColor),
+   weil :has() in iOS-PWA-Mode nicht zuverlässig greift. Default-Fallback: dunkel. */
 
 /* ── Top-Bar (global controls) ──────────────────────────── */
 #topbar {

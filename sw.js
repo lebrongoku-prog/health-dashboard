@@ -7,7 +7,7 @@
 //    'hcc-v1' → 'hcc-v2' → 'hcc-v3' …
 // ═══════════════════════════════════════════════════════════
 
-const CACHE = 'hcc-v15';
+const CACHE = 'hcc-v16';
 
 // Lokale Shell-Assets, die vorab gecacht werden
 const ASSETS = [

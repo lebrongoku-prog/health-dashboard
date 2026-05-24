@@ -2604,10 +2604,24 @@ const TAB_THEME_COLORS = {
   training:   '#F97316',
   vo2:        '#F59E0B'
 };
+// Dunkle Start-Farbe jedes Tab-Gradients – wird auf <html> gelegt,
+// damit kein weißer Streifen am Bildschirmrand sichtbar wird, falls der
+// Body-Gradient durch iOS-Subpixel-Rendering nicht ganz bis zur Kante reicht.
+const TAB_DARK_COLORS = {
+  overview:   '#0C4A6E',
+  herz:       '#7F1D1D',
+  schlaf:     '#1E3A8A',
+  aktivitaet: '#064E3B',
+  training:   '#7C2D12',
+  vo2:        '#78350F'
+};
 function _setStatusBarColor(name) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta && TAB_THEME_COLORS[name]) {
     meta.setAttribute('content', TAB_THEME_COLORS[name]);
+  }
+  if (TAB_DARK_COLORS[name]) {
+    document.documentElement.style.background = TAB_DARK_COLORS[name];
   }
 }
 
