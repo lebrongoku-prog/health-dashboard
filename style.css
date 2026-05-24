@@ -47,13 +47,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Per-tab accent + page banner gradient (set on body, applied during swipe) */
-body.theme-overview   { --tab-color: #0891B2; }
-body.theme-herz       { --tab-color: #EF4444; }
-body.theme-schlaf     { --tab-color: #7C3AED; }
-body.theme-aktivitaet { --tab-color: #10B981; }
-body.theme-training   { --tab-color: #F97316; }
-body.theme-vo2        { --tab-color: #F59E0B; }
+/* Per-tab Accent + Background-Gradient direkt auf body.
+   Wichtig: background-attachment:fixed verhindert, dass der Gradient mitscrollt;
+   außerdem deckt der body-bg jeden iOS-Safe-Area-Bereich konsistent ab,
+   sodass auch beim Auto-Hide der Bottom-Nav kein sichtbarer Balken entsteht
+   (der unter der versteckten Nav freiwerdende Bereich zeigt denselben Gradient). */
+body.theme-overview   { --tab-color: #0891B2; background: linear-gradient(135deg, #0C4A6E, #0891B2); background-attachment: fixed; }
+body.theme-herz       { --tab-color: #EF4444; background: linear-gradient(135deg, #7F1D1D, #EF4444); background-attachment: fixed; }
+body.theme-schlaf     { --tab-color: #7C3AED; background: linear-gradient(135deg, #1E3A8A, #7C3AED); background-attachment: fixed; }
+body.theme-aktivitaet { --tab-color: #10B981; background: linear-gradient(135deg, #064E3B, #10B981); background-attachment: fixed; }
+body.theme-training   { --tab-color: #F97316; background: linear-gradient(135deg, #7C2D12, #F97316); background-attachment: fixed; }
+body.theme-vo2        { --tab-color: #F59E0B; background: linear-gradient(135deg, #78350F, #F59E0B); background-attachment: fixed; }
 
 /* ── Top-Bar (global controls) ──────────────────────────── */
 #topbar {
@@ -136,10 +140,11 @@ body.dark #dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  /* Kein Bottom-Padding – Content reicht bis zum Bildschirmrand.
-     iOS-Home-Indicator kann minimal über das letzte Item overlayen,
-     das ist Standard-iOS-Verhalten und erzeugt keinen sichtbaren Balken. */
-  padding: 12px 12px 0;
+  /* Padding-Bottom muss die Bottom-Nav und die iOS-Safe-Area abdecken,
+     sonst klebt der letzte Card-Inhalt UNTER der Nav.
+     Beim Auto-Hide der Nav wird darunter der body-Background sichtbar – der
+     trägt nun denselben Theme-Gradient, also kein sichtbarer Balken mehr. */
+  padding: 12px 12px calc(var(--nav-h) + var(--safe-b) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
