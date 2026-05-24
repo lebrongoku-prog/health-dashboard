@@ -136,7 +136,10 @@ body.dark #dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  padding: 12px 12px calc(var(--nav-h) + var(--safe-b) + 16px);
+  /* Bottom-Padding nur für iOS-Home-Indicator. Tab-Bar liegt im iOS-Pattern
+     ÜBER dem Content (mit Backdrop-Blur). Beim Auto-Hide bleibt damit kein
+     Leerbalken zurück, weil keine 110px-Reserve mehr existiert. */
+  padding: 12px 12px calc(var(--safe-b) + 8px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
