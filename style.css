@@ -36,6 +36,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 html, body { height: 100%; overflow: hidden; }
+/* html bekommt denselben Background wie body als Fallback,
+   damit am unteren Bildschirmrand kein weißer Subpixel-Streifen sichtbar wird. */
+html { background: var(--bg); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -49,26 +52,34 @@ body {
 }
 
 /* Per-tab Accent + Background-Gradient direkt auf body.
-   Wichtig: background-attachment:fixed verhindert, dass der Gradient mitscrollt;
-   außerdem deckt der body-bg jeden iOS-Safe-Area-Bereich konsistent ab,
-   sodass auch beim Auto-Hide der Bottom-Nav kein sichtbarer Balken entsteht
-   (der unter der versteckten Nav freiwerdende Bereich zeigt denselben Gradient). */
-body.theme-overview   { --tab-color: #0891B2; background: linear-gradient(135deg, #0C4A6E, #0891B2); background-attachment: fixed; }
-body.theme-herz       { --tab-color: #EF4444; background: linear-gradient(135deg, #7F1D1D, #EF4444); background-attachment: fixed; }
-body.theme-schlaf     { --tab-color: #7C3AED; background: linear-gradient(135deg, #1E3A8A, #7C3AED); background-attachment: fixed; }
-body.theme-aktivitaet { --tab-color: #10B981; background: linear-gradient(135deg, #064E3B, #10B981); background-attachment: fixed; }
-body.theme-training   { --tab-color: #F97316; background: linear-gradient(135deg, #7C2D12, #F97316); background-attachment: fixed; }
-body.theme-vo2        { --tab-color: #F59E0B; background: linear-gradient(135deg, #78350F, #F59E0B); background-attachment: fixed; }
+   Solid background-color als Fallback (gegen weißen Subpixel-Streifen am Bildschirmrand),
+   darüber das Gradient-Image. background-attachment: fixed verhindert Mitscrollen. */
+body.theme-overview   { --tab-color: #0891B2; background-color: #0C4A6E; background-image: linear-gradient(135deg, #0C4A6E, #0891B2); background-attachment: fixed; }
+body.theme-herz       { --tab-color: #EF4444; background-color: #7F1D1D; background-image: linear-gradient(135deg, #7F1D1D, #EF4444); background-attachment: fixed; }
+body.theme-schlaf     { --tab-color: #7C3AED; background-color: #1E3A8A; background-image: linear-gradient(135deg, #1E3A8A, #7C3AED); background-attachment: fixed; }
+body.theme-aktivitaet { --tab-color: #10B981; background-color: #064E3B; background-image: linear-gradient(135deg, #064E3B, #10B981); background-attachment: fixed; }
+body.theme-training   { --tab-color: #F97316; background-color: #7C2D12; background-image: linear-gradient(135deg, #7C2D12, #F97316); background-attachment: fixed; }
+body.theme-vo2        { --tab-color: #F59E0B; background-color: #78350F; background-image: linear-gradient(135deg, #78350F, #F59E0B); background-attachment: fixed; }
+/* html-Background pro Tab synchronisieren – kein weißer Rand mehr */
+html:has(body.theme-overview)   { background: #0C4A6E; }
+html:has(body.theme-herz)       { background: #7F1D1D; }
+html:has(body.theme-schlaf)     { background: #1E3A8A; }
+html:has(body.theme-aktivitaet) { background: #064E3B; }
+html:has(body.theme-training)   { background: #7C2D12; }
+html:has(body.theme-vo2)        { background: #78350F; }
 
 /* ── Top-Bar (global controls) ──────────────────────────── */
 #topbar {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  /* Beginnt UNTERHALB der iOS-Status-Bar, damit der Body-Gradient hinter der
+     Status-Bar sichtbar wird und sie pro Tab eingefärbt aussieht. */
+  top: var(--safe-t);
+  left: 0; right: 0;
   z-index: 100;
   background: color-mix(in srgb, var(--tab-color) 12%, var(--card) 88%);
   color: var(--txt);
   border-bottom: 1px solid var(--border);
-  padding: calc(var(--safe-t) + 8px) 12px 8px;
+  padding: 8px 12px;
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
   will-change: transform;
@@ -174,10 +185,9 @@ body.dark #dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  /* Top-Padding reserviert Platz für die fixed Topbar – ist Teil des Scroll-Bereichs,
-     scrollt mit, sodass beim Auto-Hide der Topbar kein leerer Balken zurückbleibt.
-     Bottom-Padding deckt Bottom-Nav + iOS-Safe-Area ab, damit Content nicht hinter der Nav klebt. */
-  padding: calc(var(--topbar-h, 110px) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
+  /* Top-Padding reserviert Platz für iOS-Status-Bar + Topbar.
+     Topbar startet ab safe-area-top, also: safe-area + topbar-h + Puffer. */
+  padding: calc(var(--safe-t) + var(--topbar-h, 88px) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
