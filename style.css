@@ -149,10 +149,9 @@ body.dark #dark-toggle { color: #FBBF24; }
   position: relative;
   overflow: hidden;
   min-height: 0;
-  /* Reserve Platz für die position:fixed Topbar oben.
-     --topbar-h wird per JS dynamisch gesetzt, weil sich die Höhe ändert
-     (Filter+Datum sichtbar/versteckt). Fallback 110px für ersten Render. */
-  padding-top: var(--topbar-h, 110px);
+  /* KEIN padding-top hier – die Topbar-Reserve sitzt auf .screen,
+     damit sie beim Scrollen mit nach oben rutscht und beim Auto-Hide
+     der Topbar kein leerer Balken zurückbleibt. */
 }
 #tab-container {
   width: 100%; height: 100%;
@@ -175,11 +174,10 @@ body.dark #dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  /* Padding-Bottom muss die Bottom-Nav und die iOS-Safe-Area abdecken,
-     sonst klebt der letzte Card-Inhalt UNTER der Nav.
-     Beim Auto-Hide der Nav wird darunter der body-Background sichtbar – der
-     trägt nun denselben Theme-Gradient, also kein sichtbarer Balken mehr. */
-  padding: 12px 12px calc(var(--nav-h) + var(--safe-b) + 12px);
+  /* Top-Padding reserviert Platz für die fixed Topbar – ist Teil des Scroll-Bereichs,
+     scrollt mit, sodass beim Auto-Hide der Topbar kein leerer Balken zurückbleibt.
+     Bottom-Padding deckt Bottom-Nav + iOS-Safe-Area ab, damit Content nicht hinter der Nav klebt. */
+  padding: calc(var(--topbar-h, 110px) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
@@ -424,8 +422,8 @@ body.dark .ov-score-footer{border-top-color:#334155}
 .ov-combo-rec .rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.35rem}
 .ov-combo-rec .rec-action{font-size:.74rem;font-weight:600;padding:.4rem .7rem;border-radius:9px;background:#F8FAFC;border:1px solid var(--border);line-height:1.5}
 body.dark .ov-combo-rec .rec-action{background:#0F172A}
-.ov-score-ring{position:relative;width:80px;height:80px;flex-shrink:0}
-.ov-score-ring svg{position:absolute;inset:0}
+.ov-score-ring{position:relative;width:80px;height:80px;flex-shrink:0;overflow:hidden}
+.ov-score-ring svg{position:absolute;inset:0;width:100%;height:100%}
 .ov-score-lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem}
 .ov-score-num{font-size:1.85rem;font-weight:800;letter-spacing:-.04em;line-height:1}
 .ov-score-right{display:flex;flex-direction:column;align-items:center;gap:.1rem;text-align:center}
