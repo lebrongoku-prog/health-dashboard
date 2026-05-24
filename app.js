@@ -1426,7 +1426,7 @@ function pgOverview() {
           <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HFV (ms)</div>
           <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Trainingsmin.':'Aktivität'}</div>
         </div>
-        <div class="chart-wrap" style="flex:1;min-height:360px"><canvas id="c-woche"></canvas></div>
+        <div class="chart-wrap" style="flex:1;min-height:252px"><canvas id="c-woche"></canvas></div>
       </div>
     </div>
 
