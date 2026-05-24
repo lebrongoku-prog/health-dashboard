@@ -2594,6 +2594,23 @@ function _updateTopbarHeight() {
   });
 }
 
+// Pro-Tab Status-Bar-Tönung (theme-color meta) – iOS 16+ PWA respektiert das,
+// iOS wählt automatisch passende Schriftfarbe für Uhr/Akku.
+const TAB_THEME_COLORS = {
+  overview:   '#0891B2',
+  herz:       '#EF4444',
+  schlaf:     '#7C3AED',
+  aktivitaet: '#10B981',
+  training:   '#F97316',
+  vo2:        '#F59E0B'
+};
+function _setStatusBarColor(name) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && TAB_THEME_COLORS[name]) {
+    meta.setAttribute('content', TAB_THEME_COLORS[name]);
+  }
+}
+
 // Tab-State setzen (Bottom-Nav-Active, Body-Theme-Klasse, ggf. lazy rendern)
 function _applyTabState(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -2601,6 +2618,7 @@ function _applyTabState(name) {
   if (navEl) navEl.classList.add('active');
   const _isDark = document.body.classList.contains('dark');
   document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
+  _setStatusBarColor(name);
   // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht.
   // Zusätzlich: bei Filter "Heute" macht eine Datums-Navigation keinen Sinn → ausblenden.
   const isOverview = name === 'overview';
@@ -2672,6 +2690,7 @@ function initTabScrollSync() {
         if (navEl) navEl.classList.add('active');
         const _isDark = document.body.classList.contains('dark');
         document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
+        _setStatusBarColor(name);
         lastReported = name;
       }
       if (settleTimer) clearTimeout(settleTimer);
