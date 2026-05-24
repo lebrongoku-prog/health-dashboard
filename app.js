@@ -421,6 +421,7 @@ function setR(r) {
     dateNavEl.style.display = hide ? 'none' : 'flex';
   }
   updateNavUI();
+  _updateTopbarHeight();
   _refreshAfterStateChange();
 }
 
@@ -2578,6 +2579,19 @@ function _renderTab(name) {
   }
 }
 
+// Topbar-Höhe in CSS-Variable schreiben (für #app padding-top).
+// Muss nach jeder Änderung der Topbar-Inhalte aufgerufen werden.
+function _updateTopbarHeight() {
+  const tb = document.getElementById('topbar');
+  if (!tb) return;
+  // Doppeltes rAF, damit die Layout-Engine die neuen Style-Änderungen verarbeitet hat
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
+    });
+  });
+}
+
 // Tab-State setzen (Bottom-Nav-Active, Body-Theme-Klasse, ggf. lazy rendern)
 function _applyTabState(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -2598,7 +2612,11 @@ function _applyTabState(name) {
     _renderedTabs.add(name);
   }
   const nav = document.getElementById('bottom-nav');
+  const topbar = document.getElementById('topbar');
   if (nav) nav.classList.remove('nav-hidden');
+  if (topbar) topbar.classList.remove('nav-hidden');
+  // Topbar-Höhe neu berechnen, da .date-nav/.tbg display sich geändert hat
+  _updateTopbarHeight();
 }
 
 // Programmatischer Tab-Wechsel (Klick auf Bottom-Nav-Button)
@@ -2676,11 +2694,12 @@ function initTabScrollSync() {
   });
 }
 
-// Auto-Hide Bottom-Nav beim Runterscrollen
+// Auto-Hide Bottom-Nav + Topbar beim Runterscrollen (synchron)
 let _navLastScrollY = 0;
 function initScrollHideNav() {
   const nav = document.getElementById('bottom-nav');
-  if (!nav) return;
+  const topbar = document.getElementById('topbar');
+  if (!nav || !topbar) return;
   const tickingByTab = new Map();
   TAB_ORDER.forEach(tabName => {
     const screenEl = document.getElementById('screen-'+tabName);
@@ -2693,8 +2712,13 @@ function initScrollHideNav() {
         tickingByTab.set(tabName, false);
         const y = screenEl.scrollTop;
         const dy = y - _navLastScrollY;
-        if (y > 60 && dy > 4) nav.classList.add('nav-hidden');
-        else if (dy < -4 || y < 30) nav.classList.remove('nav-hidden');
+        if (y > 60 && dy > 4) {
+          nav.classList.add('nav-hidden');
+          topbar.classList.add('nav-hidden');
+        } else if (dy < -4 || y < 30) {
+          nav.classList.remove('nav-hidden');
+          topbar.classList.remove('nav-hidden');
+        }
         _navLastScrollY = y;
       });
     }, { passive: true });
@@ -2767,6 +2791,9 @@ initTabScrollSync();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');
+// Topbar-Höhe initial setzen und bei Window-Resize aktualisieren
+_updateTopbarHeight();
+window.addEventListener('resize', _updateTopbarHeight);
 
 })();
 

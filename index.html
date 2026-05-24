@@ -58,19 +58,18 @@
   <p class="err-msg" id="err-txt"></p>
 </div>
 
-<!-- Top-Bar: globale Controls (Refresh+Dark links, Datums-Nav+Filter rechts) -->
+<!-- Top-Bar: Datums-Nav + Refresh links, Dark-Toggle ganz rechts (max. Abstand). -->
 <header id="topbar">
   <div class="tb-row tb-row-main">
-    <div class="tb-actions">
-      <button id="refresh-btn" class="nav-arrow" title="Daten neu laden" aria-label="Refresh">🔄</button>
-      <button id="dark-toggle" class="nav-arrow" title="Hell/Dunkel" aria-label="Theme">🌙</button>
-    </div>
     <div class="date-nav">
       <button class="nav-arrow" id="nav-prev" aria-label="Zurück">‹</button>
       <span id="nav-label">–</span>
       <button class="nav-arrow" id="nav-next" aria-label="Vor">›</button>
       <button class="nav-arrow" id="nav-today" title="Heute" aria-label="Heute">↺</button>
     </div>
+    <button id="refresh-btn" class="nav-arrow tb-refresh" title="Daten neu laden" aria-label="Refresh">🔄</button>
+    <div class="tb-spacer"></div>
+    <button id="dark-toggle" class="nav-arrow tb-dark" title="Hell/Dunkel" aria-label="Theme">🌙</button>
   </div>
   <div class="tbg">
     <button class="tbtn" data-range="heute">Heute</button>
@@ -110,11 +109,11 @@
     <span>Schlaf</span>
   </button>
   <button class="nav-btn" id="nav-aktivitaet" data-tab="aktivitaet" aria-label="Aktivität">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16h2l3-3 3 1 4-3 4 1 3 2v2l-1 1H4Z"/><path d="M8 14v2M12 14v2M16 13v3"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="8" cy="5.5" rx="2.4" ry="3"/><ellipse cx="7.5" cy="11" rx="1.5" ry="1.5"/><ellipse cx="16" cy="11" rx="2.4" ry="3"/><ellipse cx="15.5" cy="16.5" rx="1.5" ry="1.5"/></svg>
     <span>Aktivität</span>
   </button>
   <button class="nav-btn" id="nav-training" data-tab="training" aria-label="Training">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4.5" r="1.8"/><path d="m15 7-2 4 3 3v4l-3 4M13 11l-3 1-1 4M16 14l3 1.5"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13c2-4 5-4 7 0s5 4 7 0 4-2 4-2"/></svg>
     <span>Training</span>
   </button>
   <button class="nav-btn" id="nav-vo2" data-tab="vo2" aria-label="VO₂max">

@@ -43,7 +43,8 @@ body {
   color: var(--txt);
   display: flex;
   flex-direction: column;
-  padding-top: var(--safe-t);
+  /* Topbar ist position:fixed und beinhaltet eigenes safe-area-padding,
+     deshalb hier KEIN body padding-top mehr. */
   -webkit-font-smoothing: antialiased;
 }
 
@@ -61,18 +62,43 @@ body.theme-vo2        { --tab-color: #F59E0B; background: linear-gradient(135deg
 
 /* ── Top-Bar (global controls) ──────────────────────────── */
 #topbar {
-  position: relative;
-  z-index: 50;
-  flex-shrink: 0;
-  background: var(--card);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: color-mix(in srgb, var(--tab-color) 12%, var(--card) 88%);
   color: var(--txt);
   border-bottom: 1px solid var(--border);
-  padding: 8px 12px;
+  padding: calc(var(--safe-t) + 8px) 12px 8px;
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+  will-change: transform;
 }
-.tb-row { display: flex; align-items: center; gap: 8px; min-height: 36px; }
-.tb-row-main { justify-content: space-between; margin-bottom: 6px; }
+#topbar.nav-hidden { transform: translateY(-100%); }
+body.dark #topbar {
+  background: color-mix(in srgb, var(--tab-color) 22%, #1E293B 78%);
+  border-bottom-color: #334155;
+}
+.tb-row { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.tb-row-main { justify-content: flex-start; margin-bottom: 6px; }
+.tb-spacer { flex: 1; min-width: 8px; }
 .date-nav { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.tb-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* Refresh + Dark-Toggle: deutlich unterscheidbare Tönung gegen versehentliche Verwechslung */
+.tb-refresh {
+  background: rgba(37, 99, 235, 0.18) !important;
+  border-color: rgba(37, 99, 235, 0.42) !important;
+}
+.tb-dark {
+  background: rgba(251, 191, 36, 0.22) !important;
+  border-color: rgba(251, 191, 36, 0.50) !important;
+}
+body.dark .tb-refresh {
+  background: rgba(37, 99, 235, 0.30) !important;
+  border-color: rgba(37, 99, 235, 0.60) !important;
+}
+body.dark .tb-dark {
+  background: rgba(251, 191, 36, 0.30) !important;
+  border-color: rgba(251, 191, 36, 0.60) !important;
+}
 #nav-label {
   font-size: 14px; font-weight: 600;
   min-width: 130px; text-align: center;
@@ -96,7 +122,7 @@ body.dark #dark-toggle { color: #FBBF24; }
   overflow-x: auto; overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .tbg::-webkit-scrollbar { display: none; }
 .tbtn {
@@ -118,7 +144,16 @@ body.dark #dark-toggle { color: #FBBF24; }
 }
 
 /* ── App container: horizontal snap-scroller ────────────── */
-#app { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+#app {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  /* Reserve Platz für die position:fixed Topbar oben.
+     --topbar-h wird per JS dynamisch gesetzt, weil sich die Höhe ändert
+     (Filter+Datum sichtbar/versteckt). Fallback 110px für ersten Render. */
+  padding-top: var(--topbar-h, 110px);
+}
 #tab-container {
   width: 100%; height: 100%;
   display: flex;
@@ -182,17 +217,17 @@ body.dark #dark-toggle { color: #FBBF24; }
 #bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0;
   height: calc(var(--nav-h) + var(--safe-b));
-  background: rgba(255,255,255,0.94);
+  background: color-mix(in srgb, var(--tab-color) 12%, var(--card) 88%);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   display: flex; align-items: flex-start;
   padding-top: 8px; padding-bottom: var(--safe-b);
   z-index: 100;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
   will-change: transform;
 }
 body.dark #bottom-nav {
-  background: rgba(15,23,42,0.92);
+  background: color-mix(in srgb, var(--tab-color) 22%, #1E293B 78%);
   border-top-color: #334155;
 }
 #bottom-nav.nav-hidden { transform: translateY(110%); }
@@ -350,7 +385,7 @@ body.dark #bottom-nav {
 .hs-komp-row{display:flex;align-items:center;gap:.5rem;padding:.15rem 0;font-size:.72rem}
 .hs-komp-lbl{flex:0 0 90px;color:var(--txt2);white-space:nowrap}
 .hs-komp-val{flex:0 0 46px;font-weight:700;text-align:right}
-.hs-komp-bar-wrap{flex:1;height:6px;background:#E2E8F0;border-radius:4px;cursor:default;position:relative}
+.hs-komp-bar-wrap{flex:1;min-width:30px;height:6px;background:#E2E8F0;border-radius:4px;cursor:default;position:relative}
 .hs-komp-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;opacity:.45}
 .hs-komp-bar-wrap::after{content:attr(data-tt);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;font-size:.65rem;font-weight:600;padding:.3rem .65rem;border-radius:7px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:200}
 .hs-komp-bar-wrap:hover::after{opacity:1}
@@ -378,8 +413,8 @@ body.dark #bottom-nav {
 .ov-ti-card h3{font-size:.84rem;font-weight:700;margin-bottom:.45rem;flex-shrink:0}
 .ti-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
 .ov-score-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.ov-score-body{display:flex;flex-direction:row;gap:1rem;align-items:center}
-.ov-score-left{display:flex;flex-direction:column;align-items:center;gap:.3rem;flex-shrink:0}
+.ov-score-body{display:flex;flex-direction:row;gap:.6rem;align-items:center}
+.ov-score-left{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;flex-shrink:0;margin-left:-.3rem}
 .hs-komp-rows{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.2rem;min-width:0}
 .ov-combo-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.45rem}
 .ov-combo-rec{border-left:3px solid #0891B2;padding-left:.75rem;margin-bottom:.1rem}
@@ -387,7 +422,7 @@ body.dark #bottom-nav {
 .ov-combo-rec .rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.35rem}
 .ov-combo-rec .rec-action{font-size:.74rem;font-weight:600;padding:.4rem .7rem;border-radius:9px;background:#F8FAFC;border:1px solid var(--border);line-height:1.5}
 body.dark .ov-combo-rec .rec-action{background:#0F172A}
-.ov-score-ring{position:relative;width:104px;height:104px;flex-shrink:0}
+.ov-score-ring{position:relative;width:88px;height:88px;flex-shrink:0}
 .ov-score-ring svg{position:absolute;inset:0}
 .ov-score-lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem}
 .ov-score-num{font-size:1.85rem;font-weight:800;letter-spacing:-.04em;line-height:1}
@@ -683,12 +718,15 @@ h1, h2, h3, h4, h5,
   body.dark { background: #0A1120; }
 
   #topbar {
+    left: 50%;
+    right: auto;
+    width: 600px;
     max-width: 600px;
-    width: 100%;
-    margin: 0 auto;
+    transform: translateX(-50%);
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
   }
+  #topbar.nav-hidden { transform: translateX(-50%) translateY(-100%); }
 
   #app {
     max-width: 600px;
