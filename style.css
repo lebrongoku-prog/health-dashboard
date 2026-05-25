@@ -35,40 +35,32 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
 }
-html, body { overflow: hidden; }
-/* Body füllt die volle physische Viewport-Höhe inkl. Safe-Areas.
-   100dvh = dynamic viewport height; auf iOS PWA reicht das garantiert bis zum
-   Home-Indicator hinunter, damit kein Streifen unter dem Body-Gradient sichtbar wird. */
-html { height: 100%; background: transparent; }
+html, body { height: 100%; overflow: hidden; }
 body {
-  height: 100dvh;
-  min-height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
   background: var(--bg);
   color: var(--txt);
   display: flex;
   flex-direction: column;
-  /* Topbar ist position:fixed und beinhaltet eigenes safe-area-padding,
-     deshalb hier KEIN body padding-top mehr. */
   -webkit-font-smoothing: antialiased;
 }
 
-/* Per-tab Accent + Background-Gradient direkt auf body.
-   Solid background-color als Fallback (gegen weißen Subpixel-Streifen am Bildschirmrand),
-   darüber das Gradient-Image. background-attachment: fixed verhindert Mitscrollen. */
-body.theme-overview   { --tab-color: #0891B2; background-color: #0C4A6E; background-image: linear-gradient(135deg, #0C4A6E, #0891B2); background-attachment: fixed; }
-body.theme-herz       { --tab-color: #EF4444; background-color: #7F1D1D; background-image: linear-gradient(135deg, #7F1D1D, #EF4444); background-attachment: fixed; }
-body.theme-schlaf     { --tab-color: #7C3AED; background-color: #1E3A8A; background-image: linear-gradient(135deg, #1E3A8A, #7C3AED); background-attachment: fixed; }
-body.theme-aktivitaet { --tab-color: #10B981; background-color: #064E3B; background-image: linear-gradient(135deg, #064E3B, #10B981); background-attachment: fixed; }
-body.theme-training   { --tab-color: #F97316; background-color: #7C2D12; background-image: linear-gradient(135deg, #7C2D12, #F97316); background-attachment: fixed; }
-body.theme-vo2        { --tab-color: #F59E0B; background-color: #78350F; background-image: linear-gradient(135deg, #78350F, #F59E0B); background-attachment: fixed; }
+/* Per-Tab Accent – setzt nur die CSS-Variable für Topbar/Bottom-Nav-Tönung.
+   Der Body-Hintergrund bleibt neutral (var(--bg)); per-Tab Gradient lebt auf
+   .screen (siehe unten), damit beim Swipe der nächste Tab schon visuell durchscheint. */
+body.theme-overview   { --tab-color: #0891B2; }
+body.theme-herz       { --tab-color: #EF4444; }
+body.theme-schlaf     { --tab-color: #7C3AED; }
+body.theme-aktivitaet { --tab-color: #10B981; }
+body.theme-training   { --tab-color: #F97316; }
+body.theme-vo2        { --tab-color: #F59E0B; }
 
 /* ── Top-Bar (global controls) ──────────────────────────── */
 #topbar {
   position: fixed;
-  /* Beginnt UNTERHALB der iOS-Status-Bar, damit der Body-Gradient hinter der
-     Status-Bar sichtbar wird und sie pro Tab eingefärbt aussieht. */
+  /* iOS-Status-Bar-Style ist "default" → safe-t = 0 in PWA-Mode;
+     in Safari mit Notch fungiert var(--safe-t) als Sicherheits-Offset. */
   top: var(--safe-t);
   left: 0; right: 0;
   z-index: 100;
@@ -182,16 +174,10 @@ body.dark #dark-toggle { color: #FBBF24; }
   scroll-snap-align: start;
   scroll-snap-stop: always;
   /* Top-Padding reserviert Platz für iOS-Status-Bar + Topbar.
-     Topbar startet ab safe-area-top, also: safe-area + topbar-h + Puffer.
-     Bottom-Padding: Nav-Höhe + Safe-Area + Puffer; wird beim Auto-Hide reduziert. */
+     Topbar startet ab safe-area-top, also: safe-area + topbar-h + Puffer. */
   padding: calc(var(--safe-t) + var(--topbar-h, 88px) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
-  transition: padding-bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-/* Wenn die Bottom-Nav auto-hidden ist, gewinnen wir den Nav-Bereich für Content zurück. */
-body.nav-hidden .screen {
-  padding-bottom: calc(var(--safe-b) + 12px);
 }
 
 /* Per-tab gradient backgrounds – visible during swipe */

@@ -2618,9 +2618,8 @@ function _applyTabState(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const navEl = document.getElementById('nav-'+name);
   if (navEl) navEl.classList.add('active');
-  // Theme-Klasse austauschen, ABER andere Klassen (dark, nav-hidden) behalten.
-  TAB_ORDER.forEach(t => document.body.classList.remove('theme-' + t));
-  document.body.classList.add('theme-' + name);
+  const _isDark = document.body.classList.contains('dark');
+  document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
   _setStatusBarColor(name);
   // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht.
   // Zusätzlich: bei Filter "Heute" macht eine Datums-Navigation keinen Sinn → ausblenden.
@@ -2638,7 +2637,6 @@ function _applyTabState(name) {
   const topbar = document.getElementById('topbar');
   if (nav) nav.classList.remove('nav-hidden');
   if (topbar) topbar.classList.remove('nav-hidden');
-  document.body.classList.remove('nav-hidden');
   // Topbar-Höhe neu berechnen, da .date-nav/.tbg display sich geändert hat
   _updateTopbarHeight();
 }
@@ -2692,9 +2690,8 @@ function initTabScrollSync() {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         const navEl = document.getElementById('nav-'+name);
         if (navEl) navEl.classList.add('active');
-        // Theme-Klasse austauschen, andere Body-Klassen (dark, nav-hidden) behalten.
-        TAB_ORDER.forEach(t => document.body.classList.remove('theme-' + t));
-        document.body.classList.add('theme-' + name);
+        const _isDark = document.body.classList.contains('dark');
+        document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
         _setStatusBarColor(name);
         lastReported = name;
       }
@@ -2741,11 +2738,9 @@ function initScrollHideNav() {
         if (y > 60 && dy > 4) {
           nav.classList.add('nav-hidden');
           topbar.classList.add('nav-hidden');
-          document.body.classList.add('nav-hidden');
         } else if (dy < -4 || y < 30) {
           nav.classList.remove('nav-hidden');
           topbar.classList.remove('nav-hidden');
-          document.body.classList.remove('nav-hidden');
         }
         _navLastScrollY = y;
       });
