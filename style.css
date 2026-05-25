@@ -37,6 +37,11 @@
 }
 html, body { height: 100%; overflow: hidden; }
 body {
+  /* min-height: 100vh erzwingt volle Viewport-Höhe auf iOS PWA, falls height: 100%
+     auf bestimmten iOS-Versionen unzuverlässig wird. Body-Hintergrund ist solid
+     (kein Gradient, kein background-attachment: fixed), damit unter der transluzenten
+     Status-Bar und über dem Home-Indicator keine Rendering-Lücken entstehen. */
+  min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
   background: var(--bg);
@@ -638,6 +643,7 @@ h1, h2, h3, h4, h5,
 .pi-text,
 .ch-card p,
 .rec-text, .ov-combo-rec .rec-text,
+.rec-action, .ov-combo-rec .rec-action,
 .ti-row, .ti-txt,
 .warn-text,
 .no-data,
@@ -655,7 +661,6 @@ h1, h2, h3, h4, h5,
 .ew-val, .ew-lbl,
 .sd-lbl, .sd-row,
 .debt-tt-row,
-.rec-action, .ov-combo-rec .rec-action,
 .kpi-unit, .kpi-delta, .kpi-sub,
 .ov-mini-unit,
 .ov-score-delta, .ov-score-interp,
