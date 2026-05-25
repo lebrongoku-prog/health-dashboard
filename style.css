@@ -8,6 +8,9 @@
   --nav-h: 60px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  /* Landscape-Safe-Areas für die Notch-Seite (links oder rechts, je nach Drehung) */
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
   --bg: #F1F5F9;
   --card: #ffffff;
   --border: #E2E8F0;
@@ -173,9 +176,9 @@ body.dark .dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  /* Top-Padding reserviert nur noch Platz für die iOS-Status-Bar (Safe-Area).
-     Die Topbar ist Teil des Inhalts und scrollt mit. */
-  padding: calc(var(--safe-t) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
+  /* Padding: Top = Safe-Area (Status-Bar), L/R = Safe-Area+12px (Landscape-Notch),
+     Bottom = Nav-Höhe + Safe-Area + Puffer. Topbar ist Teil des Inhalts und scrollt mit. */
+  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
@@ -217,7 +220,8 @@ body.dark .dark-toggle { color: #FBBF24; }
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   display: flex; align-items: flex-start;
-  padding-top: 8px; padding-bottom: var(--safe-b);
+  /* L/R-Padding fängt Notch im Landscape ab. */
+  padding: 8px var(--safe-r) var(--safe-b) var(--safe-l);
   z-index: 100;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
   will-change: transform;
@@ -702,12 +706,35 @@ h1, h2, h3, h4, h5,
 /* Chart.js Tooltips und Legenden rendern auf Canvas – CSS hat dort keinen Einfluss */
 
 /* ═══════════════════════════════════════════════════════════
-   Desktop / wide viewports (≥ 768 px):
-   FitTrack-Layout beibehalten, aber Inhalt auf 600px cappen
-   und mittig zentrieren. Wirkt wie eine Phone-App im Browser-
-   Fenster, statt die ganze Bildschirmbreite auszufüllen.
+   Landscape-Modus (Phone gedreht):
+   Topbar zieht sich in eine Zeile zusammen, damit vertikaler
+   Platz nicht doppelt für zwei Topbar-Zeilen draufgeht.
    ═══════════════════════════════════════════════════════════ */
-@media (min-width: 768px) {
+@media (orientation: landscape) {
+  .topbar-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .topbar-inline .tb-row-main {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+  }
+  .topbar-inline .tbg {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Desktop / wide viewports (≥ 768 px UND ≥ 600 px hoch):
+   FitTrack-Layout beibehalten, aber Inhalt auf 600px cappen
+   und mittig zentrieren. Min-height verhindert, dass die Regel
+   auf Landscape-iPhones (~375–430 px hoch) greift und dort den
+   600-px-Cap zerstörerisch aktiviert.
+   ═══════════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (min-height: 600px) {
   body {
     /* Soft Hintergrund für die "Wings" links/rechts der App */
     background: #E8EEF5;

@@ -23,15 +23,17 @@ function _checkHashToken() {
   if (!t) return false;
   const exp = parseInt(p.get('expires_in') || '3600');
   accessToken = t; tokenExpiry = Date.now() + (exp - 60) * 1000;
-  try { sessionStorage.setItem('g_token', accessToken); sessionStorage.setItem('g_expiry', String(tokenExpiry)); } catch(_) {}
+  // localStorage statt sessionStorage: Token überlebt PWA-Schließen/Restart.
+  // Nach ~1h Ablauf wird er bei der nächsten Anfrage wegen 401 automatisch verworfen.
+  try { localStorage.setItem('g_token', accessToken); localStorage.setItem('g_expiry', String(tokenExpiry)); } catch(_) {}
   history.replaceState(null, '', location.pathname + location.search);
   return true;
 }
 function _initAuth() {
   if (_checkHashToken()) return true;
   try {
-    const t = sessionStorage.getItem('g_token');
-    const exp = parseInt(sessionStorage.getItem('g_expiry') || '0');
+    const t = localStorage.getItem('g_token');
+    const exp = parseInt(localStorage.getItem('g_expiry') || '0');
     if (t && Date.now() < exp) { accessToken = t; tokenExpiry = exp; return true; }
   } catch(_) {}
   return false;
@@ -129,9 +131,9 @@ function _buildCalHTML(year, month) {
   }
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-    <button class="nav-arrow" style="width:20px;height:20px;font-size:.7rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
+    <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
     <span style="font-size:.65rem;font-weight:700;color:var(--txt)">${monthStr}</span>
-    <button class="nav-arrow" style="width:20px;height:20px;font-size:.7rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
+    <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:.3rem">
     ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
@@ -186,7 +188,7 @@ async function _fetchSheet(sheetId) {
   // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, sauber neu anmelden
   // statt erst auf den 401 vom Server zu warten.
   if (!accessToken || Date.now() > tokenExpiry - 60_000) {
-    try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
+    try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
     signIn();
     return { authError: true };
   }
@@ -213,7 +215,7 @@ async function loadFromAPI() {
     const health = await _fetchSheet(HEALTH_SHEET_ID);
     if (health.authError) {
       accessToken = null; tokenExpiry = 0;
-      try { sessionStorage.removeItem('g_token'); sessionStorage.removeItem('g_expiry'); } catch(_) {}
+      try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
       document.getElementById('loading').style.display = 'none';
       document.getElementById('login-screen').style.display = 'flex';
       return false;
@@ -2812,13 +2814,8 @@ async function refreshData() {
   updateNavUI();
   _refreshAfterStateChange();
 }
-// Orientation Lock auf Portrait (PWA-Mode). Im Manifest bereits gesetzt,
-// hier als Fallback für Browser-/Geräte-Versionen, die das unterstützen.
-try {
-  if (screen.orientation && typeof screen.orientation.lock === 'function') {
-    screen.orientation.lock('portrait').catch(()=>{});
-  }
-} catch(_) {}
+// Orientation: keine Lock mehr – App darf in beide Richtungen gedreht werden.
+// Im Manifest steht "any". Tab-Snap-Sync reagiert via resize-Listener auf den Wechsel.
 // Gespeicherte Präferenz laden
 try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e) {}
 
