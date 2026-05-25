@@ -371,22 +371,23 @@ function navDateLabel() {
 }
 
 function updateNavUI() {
-  const lbl = document.getElementById('nav-label');
-  if (lbl) lbl.textContent = navDateLabel();
+  const label = navDateLabel();
+  document.querySelectorAll('.nav-label').forEach(el => { el.textContent = label; });
   if (!allData.length) return;
   const minDate = allData[0].date;
   const maxDate = allData[allData.length-1].date;
-  const pb = document.getElementById('nav-prev');
-  const nb = document.getElementById('nav-next');
+  let prevDis, nextDis;
   if (is7D()) {
     const days = weekDays7();
-    if (pb) pb.disabled = days[0] <= minDate;
-    if (nb) nb.disabled = days[6] >= maxDate;
+    prevDis = days[0] <= minDate;
+    nextDis = days[6] >= maxDate;
   } else {
     const mw = moWindow();
-    if (pb) pb.disabled = mw ? mw.s <= minDate : addMonths(referenceDate,-1) < minDate;
-    if (nb) nb.disabled = mw ? mw.e >= maxDate : referenceDate >= maxDate;
+    prevDis = mw ? mw.s <= minDate : addMonths(referenceDate,-1) < minDate;
+    nextDis = mw ? mw.e >= maxDate : referenceDate >= maxDate;
   }
+  document.querySelectorAll('.nav-prev').forEach(b => { b.disabled = prevDis; });
+  document.querySelectorAll('.nav-next').forEach(b => { b.disabled = nextDis; });
 }
 
 function navPrev() {
@@ -413,14 +414,13 @@ function setR(r) {
   document.querySelectorAll('.tbtn[data-range]').forEach(b => {
     b.classList.toggle('active', b.dataset.range === r);
   });
-  // Datums-Nav bei "Heute"-Filter ausblenden (oder Overview, das ist schon in _applyTabState)
-  const dateNavEl = document.querySelector('.date-nav');
-  if (dateNavEl) {
+  // Datums-Nav bei "Heute"-Filter ausblenden (oder Overview, das ist schon in _applyTabState).
+  // Hier alle Instanzen (eine pro Tab) durchgehen.
+  document.querySelectorAll('.date-nav').forEach(el => {
     const hide = currentScreen === 'overview' || r === 'heute';
-    dateNavEl.style.display = hide ? 'none' : 'flex';
-  }
+    el.style.display = hide ? 'none' : 'flex';
+  });
   updateNavUI();
-  _updateTopbarHeight();
   _refreshAfterStateChange();
 }
 
@@ -2553,6 +2553,45 @@ let _currentRenderingTab = null;
 const _renderedTabs = new Set();
 const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[], vo2:[] };
 
+// Topbar-HTML pro Tab. Wird beim Render in jede .screen-Fläche injiziert.
+// IDs sind absichtlich Klassen, weil es sechs Instanzen geben kann.
+function _topbarHTML(forOverview) {
+  const r = timeRange;
+  const isOverview = !!forOverview;
+  const hideDateNav = isOverview || r === 'heute';
+  const dateLabel = navDateLabel();
+  const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  const pills = [
+    ['heute','Heute'],['7d','7D'],['1m','1M'],
+    ['3m','3M'],['6m','6M'],['12m','12M'],['24m','24M']
+  ].map(([k,lbl]) => `<button class="tbtn${k===r?' active':''}" data-range="${k}">${lbl}</button>`).join('');
+  return `<header class="topbar-inline">
+    <div class="tb-row tb-row-main">
+      <div class="date-nav" style="display:${hideDateNav?'none':'flex'}">
+        <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
+        <span class="nav-label">${dateLabel}</span>
+        <button class="nav-arrow nav-next" aria-label="Vor">›</button>
+        <button class="nav-arrow nav-today" title="Heute" aria-label="Heute">↺</button>
+      </div>
+      <button class="nav-arrow tb-refresh refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button>
+      <div class="tb-spacer"></div>
+      <button class="nav-arrow tb-dark dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button>
+    </div>
+    <div class="tbg" style="display:${isOverview?'none':'flex'}">${pills}</div>
+  </header>`;
+}
+
+// Topbar in eine .screen-Fläche prependen (entfernt vorherige Instanz, falls vorhanden)
+function _injectTopbar(name) {
+  const screenEl = document.getElementById('screen-'+name);
+  if (!screenEl) return;
+  const existing = screenEl.querySelector(':scope > .topbar-inline');
+  if (existing) existing.remove();
+  screenEl.insertAdjacentHTML('afterbegin', _topbarHTML(name === 'overview'));
+  // Disable-State der Pfeile gleich nach Inject korrekt setzen
+  updateNavUI();
+}
+
 // Render einen Tab (oder gibt zurück, wenn schon gerendert)
 function _renderTab(name) {
   _currentRenderingTab = name;
@@ -2566,24 +2605,15 @@ function _renderTab(name) {
   try {
     const r = fn();
     if (r && typeof r.then === 'function') {
-      r.catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`; });
+      r.then(() => _injectTopbar(name))
+       .catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`; _injectTopbar(name); });
+    } else {
+      _injectTopbar(name);
     }
   } catch(e) {
     document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`;
+    _injectTopbar(name);
   }
-}
-
-// Topbar-Höhe in CSS-Variable schreiben (für #app padding-top).
-// Muss nach jeder Änderung der Topbar-Inhalte aufgerufen werden.
-function _updateTopbarHeight() {
-  const tb = document.getElementById('topbar');
-  if (!tb) return;
-  // Doppeltes rAF, damit die Layout-Engine die neuen Style-Änderungen verarbeitet hat
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
-    });
-  });
 }
 
 // Pro-Tab Status-Bar-Tönung (theme-color meta) – iOS 16+ PWA respektiert das,
@@ -2613,24 +2643,13 @@ function _applyTabState(name) {
   const _isDark = document.body.classList.contains('dark');
   document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
   _setStatusBarColor(name);
-  // Datums-Nav und Zeitfilter nur in Deep Dives anzeigen, nicht auf Übersicht.
-  // Zusätzlich: bei Filter "Heute" macht eine Datums-Navigation keinen Sinn → ausblenden.
-  const isOverview = name === 'overview';
-  const dateNavEl = document.querySelector('.date-nav');
-  const tbgEl = document.querySelector('.tbg');
-  const hideDateNav = isOverview || timeRange === 'heute';
-  if (dateNavEl) dateNavEl.style.display = hideDateNav ? 'none' : 'flex';
-  if (tbgEl) tbgEl.style.display = isOverview ? 'none' : 'flex';
   if (!_renderedTabs.has(name)) {
     _renderTab(name);
     _renderedTabs.add(name);
   }
+  // Bottom-Nav (falls auto-hidden) wieder einblenden
   const nav = document.getElementById('bottom-nav');
-  const topbar = document.getElementById('topbar');
   if (nav) nav.classList.remove('nav-hidden');
-  if (topbar) topbar.classList.remove('nav-hidden');
-  // Topbar-Höhe neu berechnen, da .date-nav/.tbg display sich geändert hat
-  _updateTopbarHeight();
 }
 
 // Programmatischer Tab-Wechsel (Klick auf Bottom-Nav-Button)
@@ -2709,12 +2728,12 @@ function initTabScrollSync() {
   });
 }
 
-// Auto-Hide Bottom-Nav + Topbar beim Runterscrollen (synchron)
+// Auto-Hide nur noch für Bottom-Nav (Topbar ist jetzt Teil des Scroll-Inhalts
+// und rollt natürlich nach oben raus, keine separate Animation nötig).
 let _navLastScrollY = 0;
 function initScrollHideNav() {
   const nav = document.getElementById('bottom-nav');
-  const topbar = document.getElementById('topbar');
-  if (!nav || !topbar) return;
+  if (!nav) return;
   const tickingByTab = new Map();
   TAB_ORDER.forEach(tabName => {
     const screenEl = document.getElementById('screen-'+tabName);
@@ -2727,13 +2746,8 @@ function initScrollHideNav() {
         tickingByTab.set(tabName, false);
         const y = screenEl.scrollTop;
         const dy = y - _navLastScrollY;
-        if (y > 60 && dy > 4) {
-          nav.classList.add('nav-hidden');
-          topbar.classList.add('nav-hidden');
-        } else if (dy < -4 || y < 30) {
-          nav.classList.remove('nav-hidden');
-          topbar.classList.remove('nav-hidden');
-        }
+        if (y > 60 && dy > 4) nav.classList.add('nav-hidden');
+        else if (dy < -4 || y < 30) nav.classList.remove('nav-hidden');
         _navLastScrollY = y;
       });
     }, { passive: true });
@@ -2741,16 +2755,29 @@ function initScrollHideNav() {
 }
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────
-document.getElementById('nav-prev').addEventListener('click', navPrev);
-document.getElementById('nav-next').addEventListener('click', navNext);
-document.getElementById('nav-today').addEventListener('click', function() {
-  referenceDate = allData[allData.length-1].date;
-  updateNavUI();
-  _refreshAfterStateChange();
+// Topbar-Buttons werden per Delegation auf document.body verkabelt,
+// weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
+document.body.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.closest('.nav-prev')) { navPrev(); return; }
+  if (t.closest('.nav-next')) { navNext(); return; }
+  if (t.closest('.nav-today')) {
+    if (allData.length) {
+      referenceDate = allData[allData.length-1].date;
+      updateNavUI();
+      _refreshAfterStateChange();
+    }
+    return;
+  }
+  if (t.closest('.refresh-btn')) { refreshData(); return; }
+  if (t.closest('.dark-toggle')) {
+    setDarkMode(!document.body.classList.contains('dark'));
+    return;
+  }
+  const pill = t.closest('.tbtn[data-range]');
+  if (pill) { setR(pill.dataset.range); return; }
 });
-document.querySelectorAll('.tbtn[data-range]').forEach(btn => {
-  btn.addEventListener('click', () => setR(btn.dataset.range));
-});
+// Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => showScreen(btn.dataset.tab));
 });
@@ -2760,8 +2787,10 @@ function applyDarkMode(isDark) {
   document.body.classList.toggle('dark', isDark);
   Chart.defaults.borderColor = GRID_COLOR;
   Chart.defaults.color       = isDark ? '#94A3B8' : '#94A3B8';
-  const btn = document.getElementById('dark-toggle');
-  if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  // Dark-Toggle-Emoji in allen Topbar-Instanzen aktualisieren
+  document.querySelectorAll('.dark-toggle').forEach(btn => {
+    btn.textContent = isDark ? '☀️' : '🌙';
+  });
   try { localStorage.setItem('hcc_dark', isDark ? '1' : '0'); } catch(e) {}
 }
 function setDarkMode(isDark) {
@@ -2770,8 +2799,8 @@ function setDarkMode(isDark) {
 }
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
-  const btn = document.getElementById('refresh-btn');
-  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  const btns = document.querySelectorAll('.refresh-btn');
+  btns.forEach(b => { b.disabled = true; b.classList.add('spinning'); });
   // 1. Apps Script: Drive → Sheet aktualisieren
   try { await fetch(REFRESH_URL, { mode: 'no-cors' }); } catch(_) {}
   // 2. Kurz warten bis Sheet bereit ist
@@ -2779,15 +2808,10 @@ async function refreshData() {
   // 3. Daten neu aus Sheet laden
   workoutData = {}; workoutIndexReady = false; workoutSheetReady = false;
   await loadFromAPI();
-  if (btn) { btn.disabled = false; btn.classList.remove('spinning'); }
+  document.querySelectorAll('.refresh-btn').forEach(b => { b.disabled = false; b.classList.remove('spinning'); });
   updateNavUI();
   _refreshAfterStateChange();
 }
-document.getElementById('refresh-btn').addEventListener('click', refreshData);
-
-document.getElementById('dark-toggle').addEventListener('click', function() {
-  setDarkMode(!document.body.classList.contains('dark'));
-});
 // Orientation Lock auf Portrait (PWA-Mode). Im Manifest bereits gesetzt,
 // hier als Fallback für Browser-/Geräte-Versionen, die das unterstützen.
 try {
@@ -2801,14 +2825,11 @@ try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e)
 document.getElementById('loading').style.display = 'none';
 updateNavUI();
 
-// Tab-Snap-Sync + Auto-Hide-Nav initialisieren
+// Tab-Snap-Sync + Auto-Hide-Bottom-Nav initialisieren
 initTabScrollSync();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');
-// Topbar-Höhe initial setzen und bei Window-Resize aktualisieren
-_updateTopbarHeight();
-window.addEventListener('resize', _updateTopbarHeight);
 
 })();
 

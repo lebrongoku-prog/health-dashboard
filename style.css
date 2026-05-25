@@ -61,26 +61,21 @@ body.theme-aktivitaet { --tab-color: #10B981; }
 body.theme-training   { --tab-color: #F97316; }
 body.theme-vo2        { --tab-color: #F59E0B; }
 
-/* ── Top-Bar (global controls) ──────────────────────────── */
-#topbar {
-  position: fixed;
-  /* iOS-Status-Bar-Style ist "default" → safe-t = 0 in PWA-Mode;
-     in Safari mit Notch fungiert var(--safe-t) als Sicherheits-Offset. */
-  top: var(--safe-t);
-  left: 0; right: 0;
-  z-index: 100;
+/* ── Topbar pro Tab (inline) ─────────────────────────────
+   Die Topbar wird per JS in jede .screen-Fläche injiziert und scrollt
+   mit dem Inhalt. Kein position:fixed, kein Auto-Hide. */
+.topbar-inline {
   background: color-mix(in srgb, var(--tab-color) 12%, var(--card) 88%);
   color: var(--txt);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
   padding: 8px 12px;
-  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
-  will-change: transform;
+  margin-bottom: .7rem;
+  box-shadow: var(--shadow);
 }
-#topbar.nav-hidden { transform: translateY(-100%); }
-body.dark #topbar {
+body.dark .topbar-inline {
   background: color-mix(in srgb, var(--tab-color) 22%, #1E293B 78%);
-  border-bottom-color: #334155;
+  border-color: #334155;
 }
 .tb-row { display: flex; align-items: center; gap: 6px; min-height: 36px; }
 .tb-row-main { justify-content: flex-start; margin-bottom: 6px; }
@@ -103,7 +98,7 @@ body.dark .tb-dark {
   background: rgba(251, 191, 36, 0.30) !important;
   border-color: rgba(251, 191, 36, 0.60) !important;
 }
-#nav-label {
+.nav-label {
   font-size: 14px; font-weight: 600;
   min-width: 130px; text-align: center;
   color: var(--txt); white-space: nowrap;
@@ -118,7 +113,7 @@ body.dark .tb-dark {
 }
 .nav-arrow:hover:not(:disabled) { background: #F8FAFC; color: var(--txt); }
 .nav-arrow:disabled { opacity: 0.3; cursor: default; }
-body.dark #dark-toggle { color: #FBBF24; }
+body.dark .dark-toggle { color: #FBBF24; }
 
 /* Filter pills (horizontal scrollable) */
 .tbg {
@@ -178,9 +173,9 @@ body.dark #dark-toggle { color: #FBBF24; }
   -webkit-overflow-scrolling: touch;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  /* Top-Padding reserviert Platz für iOS-Status-Bar + Topbar.
-     Topbar startet ab safe-area-top, also: safe-area + topbar-h + Puffer. */
-  padding: calc(var(--safe-t) + var(--topbar-h, 88px) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
+  /* Top-Padding reserviert nur noch Platz für die iOS-Status-Bar (Safe-Area).
+     Die Topbar ist Teil des Inhalts und scrollt mit. */
+  padding: calc(var(--safe-t) + 8px) 12px calc(var(--nav-h) + var(--safe-b) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
@@ -287,7 +282,7 @@ body.dark #bottom-nav {
 @keyframes spin-btn { to { transform: rotate(360deg); } }
 .ld-txt { color: var(--txt2); font-size: 14px; }
 .err-msg { color: #EF4444; font-size: 14px; max-width: 480px; line-height: 1.5; }
-#refresh-btn.spinning {
+.refresh-btn.spinning {
   animation: spin-btn 0.8s linear infinite;
   opacity: 0.6; pointer-events: none;
 }
@@ -595,7 +590,6 @@ body.dark .debt-bar-bg { background: #334155; }
    • Caption    (.65rem)  – Uppercase-Mini-Labels, Einheiten, Hints
    Bottom-Nav (10px) und Chart.js (Canvas) sind separat.
    ═══════════════════════════════════════════════════════════ */
-#topbar, #topbar *,
 .screen, .screen *,
 .overlay-screen, .overlay-screen * {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif !important;
@@ -720,17 +714,6 @@ h1, h2, h3, h4, h5,
   }
   body.dark { background: #0A1120; }
 
-  #topbar {
-    left: 50%;
-    right: auto;
-    width: 600px;
-    max-width: 600px;
-    transform: translateX(-50%);
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-  }
-  #topbar.nav-hidden { transform: translateX(-50%) translateY(-100%); }
-
   #app {
     max-width: 600px;
     width: 100%;
@@ -739,8 +722,7 @@ h1, h2, h3, h4, h5,
     border-right: 1px solid var(--border);
     box-shadow: 0 0 24px rgba(0,0,0,.06);
   }
-  body.dark #app,
-  body.dark #topbar { border-color: #334155; }
+  body.dark #app { border-color: #334155; }
 
   #bottom-nav {
     left: 50%;
