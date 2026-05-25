@@ -49,9 +49,9 @@ let workoutSheetReady = false; // true once consolidated Workout Data sheet has 
 // ── Training Calendar helper ───────────────────────────
 function _buildCalHTML(year, month) {
   // month: 0-indexed (JS Date convention)
-  // minF removed – durationMin comes exclusively from Workout Data sheet (workoutData)
-  const distF = ['distKm','distanceWalkingRunning','distance','totalDistance','distanceKm','runningDistance'].find(f=>allData.some(r=>r[f]!=null));
-  const trainDays = new Set(allData.filter(r=>r.runSpeed!=null).map(r=>r.date));
+  // Trainingstage werden ausschließlich aus dem Workout-Sheet abgeleitet.
+  // Health-CSV-Felder (runSpeed/distanceWalkingRunning/…) werden hier nicht mehr genutzt.
+  const trainDays = new Set(Object.keys(workoutData));
   const minDate = allData.length ? allData[0].date : null;
   const maxDate = allData.length ? allData[allData.length-1].date : null;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -100,15 +100,14 @@ function _buildCalHTML(year, month) {
   };
   window._calHideTip=()=>{ const t=document.getElementById('cal-tip'); if(t) t.style.display='none'; };
 
-  // Per-day data lookup
+  // Per-day data lookup – Dauer und Distanz beide aus workoutData.
   const dayData={};
-  allData.forEach(r=>{
-    if(trainDays.has(r.date)){
-      dayData[r.date]={
-        min:workoutData[r.date]?.durationMin!=null?Math.round(workoutData[r.date].durationMin):null,
-        dist:distF&&r[distF]!=null?r[distF]:null
-      };
-    }
+  Object.keys(workoutData).forEach(date=>{
+    const w=workoutData[date];
+    dayData[date]={
+      min:w?.durationMin!=null?Math.round(w.durationMin):null,
+      dist:w?.distanceKm!=null?w.distanceKm:null
+    };
   });
 
   // Build cells — each cell is a flex container so circle is centered within the 1fr column
@@ -1986,14 +1985,11 @@ function pgSchlaf() {
 async function pgTraining() {
   const D=filtered(), P=prevPeriod();
 
-  // ── Load workout data for training days in current period ──
-  // Include dates with runSpeed in health data OR any date that has a workoutData entry
-  // (indoor workouts don't generate runSpeed in health CSV but still have distance/HR data)
+  // ── Trainingstage im aktuellen Filterzeitraum ──
+  // Quelle ist ausschließlich das Workout-Sheet (workoutData). Tage mit runSpeed
+  // in Health-CSV, die NICHT im Workout-Sheet stehen, zählen nicht mehr als Training.
   const _healthDates=new Set(D.map(r=>r.date));
-  const trainDates=[...new Set([
-    ...D.filter(r=>r.runSpeed!=null).map(r=>r.date),
-    ...Object.keys(workoutData).filter(d=>_healthDates.has(d))
-  ])].sort();
+  const trainDates=Object.keys(workoutData).filter(d=>_healthDates.has(d)).sort();
   // 1) Wait for consolidated sheet (primary source)
   if(!workoutSheetReady){
     document.getElementById("screen-training").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;height:180px;color:var(--txt3);font-size:.8rem">⏳ Workout-Daten werden geladen…</div>`;
@@ -2095,8 +2091,8 @@ async function pgTraining() {
   const minTotal=_woMinD.length?_woMinD.reduce((a,b)=>a+b,0):null;
   const distTotal=distField?D.filter(r=>r[distField]!=null).reduce((a,r)=>a+(r[distField]||0),0):null;
 
-  // Active days (days with >0 exercise minutes or >100 calories)
-  const activeDays=D.filter(r=>(workoutData[r.date]?.durationMin>0)||(calField&&r[calField]>100)).length;
+  // Aktive Tage = Tage mit Workout-Sheet-Eintrag und durationMin > 0.
+  const activeDays=D.filter(r=>workoutData[r.date]?.durationMin>0).length;
   const totalDays=D.length||1;
   const activePct=(activeDays/totalDays*100).toFixed(0);
   const avgPerWeek=D.length>0?(activeDays/(D.length/7)).toFixed(1):null;
@@ -2159,13 +2155,13 @@ async function pgTraining() {
     _moDays.forEach((d,i)=>{if(new Date(d+'T00:00:00').getDay()===1)_1mMoIdx.add(i);});
   }
 
-  const hasAny=calD!=null||minD!=null||loadD!=null||distD!=null;
+  // hasAny stützt sich allein auf das Workout-Sheet – keine Health-CSV-Felder mehr.
+  const hasAny=trainDates.length>0;
 
   const noDataCard=`<div class="no-data">
     <strong>⚠️ Keine Trainingsdaten gefunden</strong>
-    Alle Spalten in deiner CSV:
-    <div class="field-hint">${csvHeaders.map(h=>`<code>${h}</code>`).join(' ')}</div>
-    <div class="field-hint" style="margin-top:.4rem">Erwartete Felder: <code>exerciseMinutes</code> <code>activeEnergyBurned</code> <code>activeCalories</code> <code>distanceWalkingRunning</code> <code>workoutMinutes</code></div>
+    Im aktuellen Zeitraum ist kein Eintrag im Workout-Sheet vorhanden.
+    <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet · erwartete Spalten: <code>Date</code> <code>Type</code> <code>Duration (min)</code> <code>Distance (km)</code> <code>Avg HR</code> <code>Speed (km/h)</code></div>
   </div>`;
 
   document.getElementById("screen-training").innerHTML=`
@@ -2177,11 +2173,7 @@ async function pgTraining() {
     </div>
     <div class="three-col">
       <div class="chart-card" style="margin-bottom:0">
-        <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.5rem">
-          <h3 style="margin:0;flex:1">🏋️ Trainingskalender</h3>
-          <button onclick="window._calPrev()" style="background:var(--card2);border:1px solid var(--border);color:var(--txt2);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;padding:0;line-height:1${timeRange==='1m'?';opacity:.35;pointer-events:none':''}" ${timeRange==='1m'?'disabled':''}>‹</button>
-          <button onclick="window._calNext()" style="background:var(--card2);border:1px solid var(--border);color:var(--txt2);border-radius:4px;width:22px;height:22px;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;padding:0;line-height:1${timeRange==='1m'?';opacity:.35;pointer-events:none':''}" ${timeRange==='1m'?'disabled':''}>›</button>
-        </div>
+        <h3 style="margin:0 0 .5rem">🏋️ Trainingskalender</h3>
         <div id="cal-training">${_calDate?_buildCalHTML(_calDate.y,_calDate.m):''}</div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
