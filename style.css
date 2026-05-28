@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
    Health Command Center – iOS PWA Stylesheet
    Pattern: FitTrack horizontal-swipe + bottom-nav.
-   Portrait-only via manifest orientation lock.
+   Orientation: frei (Manifest "any") – Landscape via resize-Listener.
    ═══════════════════════════════════════════════════════════ */
 
 :root {
@@ -322,28 +322,10 @@ body.dark #bottom-nav {
 .chart-wrap{position:relative}
 
 /* Multi-column layouts */
-.two-col{display:grid;grid-template-columns:210px 1fr;gap:.7rem;margin-bottom:.7rem;align-items:start}
-.two-col>*{min-width:0;overflow:hidden}
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .two-col-eq>*{min-width:0;overflow:visible}
 .three-col{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .three-col>*{min-width:0;overflow:hidden}
-
-/* Score / Ring widgets */
-.score-wrap{background:var(--card);border-radius:var(--r);padding:1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center}
-.score-wrap h3{font-size:.8rem;font-weight:700;align-self:flex-start;margin-bottom:.6rem}
-.ring-outer{position:relative;width:130px;height:130px}
-.ring-lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.ring-num{font-size:2.14rem;font-weight:800;line-height:1;letter-spacing:-.04em}
-.ring-sub{font-size:.66rem;color:var(--txt3);margin-top:.1rem}
-.ring-cat{font-size:.74rem;font-weight:700;margin-top:.5rem}
-
-/* Insights */
-.ins-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-bottom:.7rem}
-.ins{background:var(--card);border-radius:var(--r);padding:.7rem .8rem;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:.5rem;border-left:3px solid var(--border)}
-.ins-ic{font-size:1.17rem;flex-shrink:0;margin-top:.05rem}
-.ins-title{font-size:.74rem;font-weight:700;margin-bottom:.1rem}
-.ins-desc{font-size:.67rem;color:var(--txt2);line-height:1.45}
 
 /* Stats rows */
 .stats-list{display:flex;flex-direction:column;gap:.2rem}
@@ -397,8 +379,6 @@ body.dark #bottom-nav {
 .field-hint code{font-family:monospace;font-size:.73rem;color:var(--accent);background:#EEF2FF;padding:.05rem .25rem;border-radius:3px}
 
 /* Misc */
-.zone-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:.5rem 0}
-.zone-seg{height:100%}
 .badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}
 .info-box{background:#F8FAFC;border-radius:10px;padding:.65rem .85rem;margin-bottom:.7rem;border-left:3px solid var(--accent)}
 .info-box p{font-size:.68rem;color:var(--txt2);line-height:1.55}
@@ -426,22 +406,9 @@ body.dark .ov-score-footer{border-top-color:#334155}
 body.dark .ov-combo-rec .rec-action{background:#0F172A}
 .ov-score-ring{position:relative;width:80px;height:80px;flex-shrink:0;overflow:hidden}
 .ov-score-ring svg{position:absolute;inset:0;width:100%;height:100%}
-.ov-score-lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem}
-.ov-score-num{font-size:1.85rem;font-weight:800;letter-spacing:-.04em;line-height:1}
-.ov-score-right{display:flex;flex-direction:column;align-items:center;gap:.1rem;text-align:center}
 .ov-score-cat{font-size:1.13rem;font-weight:800;line-height:1.1}
 .ov-score-delta{font-size:.7rem;color:var(--txt3)}
 .ov-score-interp{font-size:.63rem;color:var(--txt3);margin-top:.1rem;text-align:center;max-width:100%;line-height:1.4;word-break:break-word}
-.ov-mini-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.55rem;margin-bottom:.7rem}
-.ov-mini{background:var(--card);border-radius:var(--r);padding:.65rem .75rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.1rem}
-.ov-mini-hd{display:flex;align-items:center;gap:.3rem;margin-bottom:.15rem}
-.ov-mini-icon{font-size:.96rem}
-.ov-mini-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)}
-.ov-mini-val{font-size:1.23rem;font-weight:800;letter-spacing:-.025em;line-height:1.1}
-.ov-mini-unit{font-size:.7rem;font-weight:500;color:var(--txt2);margin-left:.15rem}
-.ov-mini-spark{margin:.25rem 0;height:28px;overflow:hidden}
-.ov-mini-delta{font-size:.64rem;font-weight:600}
-.ov-mini-delta.pos{color:#10B981}.ov-mini-delta.neg{color:#EF4444}.ov-mini-delta.neu{color:var(--txt3)}
 .ov-grid-mid{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .ov-grid-mid>*{min-width:0;overflow:hidden}
 

@@ -40,12 +40,10 @@ function _initAuth() {
 }
 
 (async () => {
-let allData = [], timeRange = '7d', referenceDate = '', curPage = 'overview';
+let allData = [], timeRange = '7d', referenceDate = '';
 const charts = {};
 let _calDate = null; // persists calendar month across re-renders
-let workoutIndex = {};      // date (YYYY-MM-DD) → Google Drive fileId
 let workoutData  = {};      // date → parsed workout row (cached after load)
-let workoutIndexReady = false;
 let workoutSheetReady = false; // true once consolidated Workout Data sheet has been loaded
 
 // ── Training Calendar helper ───────────────────────────
@@ -166,7 +164,6 @@ function _parseWorkoutRows(rows) {
     };
   });
   workoutSheetReady = true;
-  workoutIndexReady = true;
 }
 
 Chart.defaults.color = '#94A3B8';
@@ -599,26 +596,6 @@ function scoreCat(s) {
   if(s>=55)return['Ordentlich','#EAB308'];
   if(s>=40)return['Ausbaufähig','#F97316'];
   return['Niedrig','#EF4444'];
-}
-function generateInsights(D,P) {
-  const ins=[];
-  const hvD=av(D,'hrv'),hvP=av(P,'hrv');
-  if(hvD!=null){const p=pct(hvD,hvP),g=hvD>(hvP||hvD);
-    ins.push({ic:g?'💚':'⚠️',color:g?'#10B981':'#F97316',title:'HRV '+(g?'verbessert':'gesunken'),
-      desc:'Ø HRV '+fn(hvD,0)+' ms'+(p!=null?' ('+(p>0?'+':'')+p.toFixed(1)+'% '+trendLabel()+')':'')});}
-  const slD=av(D,'sleepTotal'),slP=av(P,'sleepTotal');
-  if(slD!=null){const g=slD>=7,p=pct(slD,slP);
-    ins.push({ic:g?'😴':'🌙',color:g?'#7C3AED':'#F97316',title:g?'Schlaf im Zielbereich':'Schlaf unter 7h',
-      desc:'Ø '+fn(slD,1)+' Std'+(p!=null?' · '+(p>0?'+':'')+p.toFixed(1)+'% '+trendLabel():'')});}
-  const stD=av(D,'steps'),stP=av(P,'steps');
-  if(stD!=null){const g=stD>=8000,p=pct(stD,stP);
-    ins.push({ic:g?'🚶':'👟',color:g?'#059669':'#94A3B8',title:g?'Schrittziel erreicht':'Schritte unter Ziel',
-      desc:'Ø '+Math.round(stD||0).toLocaleString('de-CH')+' /Tag'+(p!=null?' ('+(p>0?'+':'')+p.toFixed(1)+'%)':'')});}
-  const v2D=av(D.filter(r=>r.vo2max),'vo2max');
-  if(v2D!=null){const cat=v2D>=55?'Exzellent':v2D>=47?'Über-Ø':v2D>=42?'Durchschnittlich':'Verbesserungsbedarf';
-    ins.push({ic:'🫁',color:'#D97706',title:'VO₂max: '+cat,desc:'Aktuell '+fn(v2D,1)+' ml/kg/min'});}
-  while(ins.length<4) ins.push({ic:'📊',color:'#94A3B8',title:'Daten werden gesammelt',desc:'Mehr Insights sobald ausreichend Daten vorhanden.'});
-  return ins.slice(0,4);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1063,9 +1040,6 @@ function pgOverview() {
     steps: av(priorDays,'steps'),
     vo2:   av(priorDays.filter(r=>r.vo2max),'vo2max')
   };
-  // Last 14 days for sparklines
-  const last14 = allData.slice(-14);
-
   // Health score (immer der Score des aktuellen Tages – unabhängig vom Zeitfilter)
   const hs = computeHealthScore([lastDay]);
   const prev7hs = computeHealthScore(priorDays.length ? priorDays : [lastDay]);
@@ -1112,29 +1086,6 @@ function pgOverview() {
   }
   function miniDeltaClass(d) { return d==null?'neu':d>0?'pos':d<0?'neg':'neu'; }
 
-  // Sparkline data (last 14 days)
-  const slSpark = last14.map(r=>r.sleepTotal);
-  const hrSpark = last14.map(r=>r.restHR);
-  const hvSpark = last14.map(r=>r.hrv);
-  const stSpark = last14.map(r=>r.steps);
-  const v2Spark = last14.filter(r=>r.vo2max).map(r=>r.vo2max);
-
-  // Last workout
-  const calField = findField(allData,'activeCal','activeEnergyBurned','activeCalories','calories','activeEnergy','caloriesBurned','workoutCalories');
-  // minField removed – durationMin comes exclusively from Workout Data sheet (workoutData)
-  const distField = findField(allData,'distKm','distanceWalkingRunning','distance','totalDistance','distanceKm','runningDistance');
-  const typeField = csvHeaders.find(h=>['workoutType','activityType','type','sport','sportType'].includes(h.toLowerCase())||h.toLowerCase().includes('workout')||h.toLowerCase().includes('activity'));
-  const lastWo = [...allData].reverse().find(r => (calField&&r[calField]>0)||(workoutData[r.date]?.durationMin>0));
-  const lwSport = workoutDe(lastWo && typeField ? lastWo[typeField] : null);
-  const lwMin = lastWo ? (workoutData[lastWo.date]?.durationMin ?? null) : null;
-  const lwDist = lastWo && distField ? lastWo[distField] : null;
-  const lwCal = lastWo && calField ? lastWo[calField] : null;
-  const lwPace = lwMin && lwDist && lwDist > 0 ? lwMin/lwDist : null;
-  function fmtPace(p) { if(!p) return '–'; const m=Math.floor(p),s=Math.round((p%1)*60); return m+':'+String(s).padStart(2,'0')+' /km'; }
-  function fmtMin(m) { if(!m) return '–'; const h=Math.floor(m/60),mn=Math.round(m%60); return h>0?h+':'+String(mn).padStart(2,'0'):''+Math.round(m); }
-  const lwDate = lastWo ? lastWo.date : null;
-  function fmtDateDE(d) { if(!d) return '–'; const dt=new Date(d+'T00:00:00'); const MO2=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']; return dt.getDate()+'. '+MO2[dt.getMonth()]+' '+dt.getFullYear(); }
-
   // Wochenverlauf: Mon–Sun of current reference week
   const _wocheMon = getWeekMonday(referenceDate);
   const _wocheDates = Array.from({length:7},(_,i)=>{ const d=new Date(_wocheMon+'T00:00:00'); d.setDate(d.getDate()+i); return toLocalDateStr(d); });
@@ -1178,14 +1129,6 @@ function pgOverview() {
 
   // Monatstrend: last 30 days avg per metric
   const last30 = allData.slice(-30);
-  function trendArrow(data, field) {
-    const vals = data.filter(r=>r[field]!=null).map(r=>r[field]);
-    if (vals.length < 4) return 'eq';
-    const h1 = vals.slice(0, Math.floor(vals.length/2));
-    const h2 = vals.slice(Math.floor(vals.length/2));
-    const d = av(h2,null) - av(h1,null);
-    return Math.abs(d)<0.5*av(vals,null)*0.05 ? 'eq' : d>0 ? 'up' : 'dn';
-  }
   function trendArrowRaw(vals) {
     if (vals.length < 4) return 'eq';
     const h1 = vals.slice(0,Math.floor(vals.length/2));
@@ -1559,10 +1502,6 @@ function pgOverview() {
       if(nxt){nxt.disabled=off>=0;nxt.style.opacity=off>=0?'.3':'1';}
       if(tod){tod.disabled=off>=0;tod.style.opacity=off>=0?'.3':'1';}
     }
-
-    // Override _applyWoche to also sync buttons
-    const _applyWocheOrig=_applyWoche;
-    // (inline: _applyWoche already calls nxt sync, extend to today too)
 
     // Init nav label + disable next+today at offset 0
     const _wNavLbl=document.getElementById('woche-nav-lbl');
@@ -2015,23 +1954,6 @@ async function pgTraining() {
   const woElev=wRows.filter(w=>w.elevationM!=null);
   const woTotalElev=woElev.length ? Math.round(woElev.reduce((s,w)=>s+w.elevationM,0)) : null;
 
-  // ── Real HR zone distribution ──
-  const allMaxHRs=Object.values(workoutData).filter(w=>w?.maxHR).map(w=>w.maxHR);
-  const personalMaxHR=allMaxHRs.length ? Math.max(...allMaxHRs) : null;
-  let zoneCounts=[0,0,0,0,0];
-  if(personalMaxHR&&hasWD){
-    wRowsHR.forEach(w=>{
-      const p=(w.avgHR/personalMaxHR)*100;
-      if(p<60) zoneCounts[0]++;
-      else if(p<70) zoneCounts[1]++;
-      else if(p<80) zoneCounts[2]++;
-      else if(p<90) zoneCounts[3]++;
-      else zoneCounts[4]++;
-    });
-  }
-  const zTot=zoneCounts.reduce((a,b)=>a+b,0)||1;
-  const zP=zoneCounts.map(c=>Math.round(c/zTot*100));
-
   // Chart data for Leistungs-Trend (per training day, chronological)
   const trendDates=trainDates.slice().sort();
   const trendLabels=trendDates.map(d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'});});
@@ -2063,15 +1985,12 @@ async function pgTraining() {
     'runningDistance','walkingDistance','distanceKm',
     'HKQuantityTypeIdentifierDistanceWalkingRunning'
   );
-  const loadField=findField(D,'trainingLoad','workoutLoad','trainingImpulse','load');
-
   const calD=calField?av(D,calField):null, calP=calField?av(P,calField):null;
   const _woMinD=D.map(r=>workoutData[r.date]?.durationMin).filter(v=>v!=null);
   const _woMinP=P.map(r=>workoutData[r.date]?.durationMin).filter(v=>v!=null);
   const minD=_woMinD.length?_woMinD.reduce((a,b)=>a+b,0)/_woMinD.length:null;
   const minP=_woMinP.length?_woMinP.reduce((a,b)=>a+b,0)/_woMinP.length:null;
   const distD=distField?av(D,distField):null, distP=distField?av(P,distField):null;
-  const loadD=loadField?av(D,loadField):null, loadP=loadField?av(P,loadField):null;
 
   // New chart data — durationMin + distanceKm from CSV workout files
   const trendMin=trendDates.map(d=>workoutData[d]?.durationMin??null);
@@ -2120,15 +2039,7 @@ async function pgTraining() {
     _calDate={y:refD.getFullYear(),m:refD.getMonth()};
   }
 
-  const {labels:tL,align:tA,alignSum:tAS,hasData:tHD}=timeDim(D);
-  const tdL=timeDim(D,true);
-  const calMa=calField?tA(calField):tL.map(()=>null);
-  const minMa=tL.map(()=>null); // durationMin comes exclusively from workoutData (see minSm_wo below)
-  const distMaL=distField?tdL.align(distField):tdL.labels.map(()=>null);
-  const distMa=distField?tA(distField):tL.map(()=>null);
-  const calSm=calField?tAS(calField):tL.map(()=>null);
-  const minSm=tL.map(()=>null); // durationMin comes exclusively from workoutData (see minSm_wo below)
-  const distSm=distField?tAS(distField):tL.map(()=>null);
+  const {labels:tL}=timeDim(D);
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
   // NOTE: _woByDate was removed — it filtered to runSpeed-dates only, excluding indoor workouts
@@ -2141,7 +2052,6 @@ async function pgTraining() {
   const _train1m=timeRange==='1m';
   const minSmD=_train1m?minSm_wo.map(v=>v!=null&&v>0?v:null):minSm_wo;
   const distSmD=_train1m?distSm_wo.map((v,i)=>minSmD[i]!=null?v:null):distSm_wo;
-  const calSmD=_train1m?calSm.map((v,i)=>minSmD[i]!=null?v:null):calSm;
 
   // 1M: build full calendar-month arrays + Monday indices for week gridlines
   let _1mLabels=tL, _1mMinData=minSmD, _1mDistData=distSmD, _1mMoIdx=new Set();
@@ -2353,14 +2263,14 @@ function pgAktivitaet() {
   const stMin=stRows.length?Math.min(...stRows.map(r=>r.steps)):null;
 
   // Week vs weekend
-  const weekRows=stRows.filter(r=>{const wd=new Date(r.date).getDay();return wd>=1&&wd<=5;});
-  const wkndRows=stRows.filter(r=>{const wd=new Date(r.date).getDay();return wd===0||wd===6;});
+  const weekRows=stRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;});
+  const wkndRows=stRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;});
   const stWeek=av(weekRows,'steps');
   const stWknd=av(wkndRows,'steps');
 
   // Calorie weekday/weekend averages
-  const calWeekRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date).getDay();return wd>=1&&wd<=5;}):[];
-  const calWkndRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date).getDay();return wd===0||wd===6;}):[];
+  const calWeekRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;}):[];
+  const calWkndRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;}):[];
   const calWeek=calField&&calWeekRows.length?av(calWeekRows,calField):null;
   const calWknd=calField&&calWkndRows.length?av(calWkndRows,calField):null;
 
@@ -2374,10 +2284,8 @@ function pgAktivitaet() {
   const calDisplayAvg=calD!=null?Math.round(calD):null;
   const calDisplayLbl='/Tag';
 
-  const {labels:tL,align:tA,alignSum:tAS,hasData:tHD}=timeDim(D);
-  const tdL=timeDim(D,true);
+  const {labels:tL,align:tA,hasData:tHD}=timeDim(D);
   const stMa=tA('steps');   // Ø pro Tag (Durchschnitt der Tageswerte pro Zeitbucket)
-  const calMaL=calField?tdL.align(calField):null;
   const calMaAct=calField?tA(calField):tL.map(()=>null);  // Ø pro Tag
 
   // Init calendar to latest data month if not yet set
@@ -2658,7 +2566,6 @@ function _applyTabState(name) {
 function showScreen(name) {
   if (!TAB_ORDER.includes(name)) return;
   currentScreen = name;
-  curPage = name; // backward-compat alias
   const container = document.getElementById('tab-container');
   if (container) {
     const idx = TAB_ORDER.indexOf(name);
@@ -2718,7 +2625,6 @@ function initTabScrollSync() {
         }
         if (currentScreen !== name) {
           currentScreen = name;
-          curPage = name;
           _applyTabState(name);
         }
       }, 90);
@@ -2808,7 +2714,7 @@ async function refreshData() {
   // 2. Kurz warten bis Sheet bereit ist
   await new Promise(r => setTimeout(r, 4000));
   // 3. Daten neu aus Sheet laden
-  workoutData = {}; workoutIndexReady = false; workoutSheetReady = false;
+  workoutData = {}; workoutSheetReady = false;
   await loadFromAPI();
   document.querySelectorAll('.refresh-btn').forEach(b => { b.disabled = false; b.classList.remove('spinning'); });
   updateNavUI();
