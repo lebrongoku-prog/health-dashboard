@@ -1159,43 +1159,6 @@ function pgOverview() {
   const slTr = trendArrowRaw(slVals30); const hrTr = trendArrowRaw(hrVals30);
   const hvTr = trendArrowRaw(hvVals30); const stTr = trendArrowRaw(stVals30);
 
-  // Tagesinsights
-  function tiRows(ld, a7) {
-    const rows = [];
-    if (ld.sleepTotal != null && a7.sleep != null) {
-      const d = ld.sleepTotal - a7.sleep;
-      rows.push({dir: d>0.15?'up':d<-0.15?'dn':'eq',
-        txt: d>0.15 ? `Dein Schlaf hat sich verbessert und liegt über deinem Wochendurchschnitt.`
-           : d<-0.15 ? `Dein Schlaf liegt leicht unter deinem Wochendurchschnitt.`
-           : `Dein Schlaf ist stabil und im Wochendurchschnitt.`});
-    }
-    if (ld.restHR != null && a7.hr != null) {
-      const d = ld.restHR - a7.hr;
-      rows.push({dir: d<-1?'up':d>2?'dn':'eq',
-        txt: Math.abs(d)<=1 ? `Dein Ruhepuls ist stabil und im optimalen Bereich.`
-           : d<0 ? `Dein Ruhepuls ist gesunken – ein positives Erholungszeichen.`
-           : `Dein Ruhepuls liegt leicht über dem Wochenmittel.`});
-    }
-    if (ld.hrv != null && a7.hrv != null) {
-      const d = ld.hrv - a7.hrv;
-      rows.push({dir: d>3?'up':d<-5?'dn':'eq',
-        txt: Math.abs(d)<=3 ? `Deine Herzfrequenzvariabilität ist stabil und im Wochendurchschnitt.`
-           : d>0 ? `Deine HRV ist gestiegen – ein positives Zeichen für Erholung und Stresstoleranz.`
-           : `Deine HRV liegt leicht unter dem Wochenmittel – Erholung im Blick behalten.`});
-    }
-    if (ld.steps != null && a7.steps != null) {
-      const d = ld.steps - a7.steps;
-      rows.push({dir: d>200?'up':d<-200?'dn':'eq',
-        txt: d<-200 ? `Deine Aktivität ist etwas niedriger als im Durchschnitt der letzten 7 Tage.`
-           : d>200 ? `Deine Aktivität liegt über dem Wochendurchschnitt – gut gemacht!`
-           : `Deine Aktivität entspricht dem Wochendurchschnitt.`});
-    }
-    while(rows.length < 4) rows.push({dir:'eq', txt:'Weiter Daten sammeln für mehr personalisierte Insights.'});
-    return rows.slice(0,4);
-  }
-  const tiData = tiRows(lastDay, avg7d);
-  const ARROW_CHAR = {up:'↑',dn:'↓',eq:'→'};
-  const ARROW_COL  = {up:'#10B981',dn:'#EF4444',eq:'#F97316'};
 
   document.getElementById("screen-overview").innerHTML = `
     <!-- Warning signals (only shown when triggered) -->
@@ -1289,12 +1252,6 @@ function pgOverview() {
           <div class="rec-text" style="margin-bottom:.5rem">${dailyRec.text}</div>
           <div class="rec-action">💡 ${dailyRec.action}</div>
         </div>` : ''}
-        <div class="ti-rows-wrap">
-        ${tiData.map(r=>`<div class="ti-row">
-          <div class="ti-arrow" style="color:${ARROW_COL[r.dir]}">${ARROW_CHAR[r.dir]}</div>
-          <div class="ti-txt">${r.txt}</div>
-        </div>`).join('')}
-        </div>
         <div class="ti-metrics">
           ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
             <div class="ti-metric-lbl">🌙 Schlaf</div>
@@ -1331,8 +1288,7 @@ function pgOverview() {
     <!-- Zeile 2: Monatstrend | Wochenverlauf -->
     <div class="ov-row" style="height:290px">
       <div class="chart-card ov-col-narrow" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3>Monatstrend</h3>
-        <p style="font-size:.63rem;color:var(--txt2);margin-bottom:.3rem;line-height:1.45;flex-shrink:0">Die Sparklines zeigen den Verlauf der letzten 30 Tage. Der Wert daneben ist der 30-Tage-Durchschnitt. Der Pfeil zeigt, ob sich der Wert im Vergleich zu den 30 Tagen davor verbessert <span style="color:#10B981">↑</span>, verschlechtert <span style="color:#EF4444">↓</span> oder kaum verändert <span style="color:#94A3B8">→</span> hat.</p>
+        <h3>30 Tage-Trend</h3>
         <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
         <div class="mt-row">
           <div class="mt-dot" style="background:#7C3AED"></div>
