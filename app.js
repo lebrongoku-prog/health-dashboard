@@ -1788,10 +1788,10 @@ function pgSchlaf() {
       <div class="chart-card" style="margin-bottom:0">
         <h3>📊 Schlafqualität-Verteilung</h3>
         <div style="margin:.4rem 0">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5 Std</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">· ${(nOver85/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5 Std</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">· ${(n7to85/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7 Std</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">· ${(n6to7/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6 Std</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">· ${(nBelow6/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">· ${(nOver85/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">· ${(n7to85/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">· ${(n6to7/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">· ${(nBelow6/nTot*100).toFixed(0)}%</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.5rem">
           <div class="stat-row"><span class="stat-lbl">Beste Nacht</span><span class="stat-val" style="color:#10B981">${toHM(slMax)}</span></div>
@@ -1808,7 +1808,7 @@ function pgSchlaf() {
           <div class="stat-row"><span class="stat-lbl">Akkumuliert (14 Nächte)</span><span class="stat-val" style="color:${sleepDebt.week!=null?(sleepDebt.week>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.week!=null?(sleepDebt.week>0?'-'+toHM(sleepDebt.week):'+'+toHM(-sleepDebt.week)):'—'}</span></div>
         </div>
         <div class="debt-bar-wrap">
-          ${sleepDebt.week!=null?`<div style="font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">Schuld: ${sleepDebt.week>0?toHM(Math.min(sleepDebt.week,SLEEP_TARGET_H*14)):0}h von max. ${toHM(SLEEP_TARGET_H*14/2)}h (7 Nächte)</div>
+          ${sleepDebt.week!=null?`<div style="font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">Schuld: ${sleepDebt.week>0?toHM(Math.min(sleepDebt.week,SLEEP_TARGET_H*14)):'0h'} von max. ${toHM(SLEEP_TARGET_H*14/2)} (7 Nächte)</div>
           <div class="debt-tt-wrap">
             <div class="debt-bar-bg"><div class="debt-bar-fill" style="width:${Math.min(100,Math.max(0,(sleepDebt.week/7)*100))}%;background:${sleepDebt.week>4?'#EF4444':sleepDebt.week>1.5?'#F97316':'#10B981'}"></div></div>
             <div class="debt-tt">
@@ -1839,7 +1839,7 @@ function pgSchlaf() {
         <div class="stats-list" style="margin-top:.6rem">
           ${awD!=null?`<div class="stat-row"><span class="stat-lbl">Wach</span><span class="stat-val">${toHM(awD)} – ${awPct}%</span></div>`:''}
           ${remD!=null?`<div class="stat-row"><span class="stat-lbl">REM-Schlaf</span><span class="stat-val">${toHM(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> (Ziel: 20–25%)</span></div>`:''}
-          ${lD!=null?`<div class="stat-row"><span class="stat-lbl">Leichtschlaf</span><span class="stat-val">${toHM(lD)} – ${lPct}% (restliche Zeit)</span></div>`:''}
+          ${lD!=null?`<div class="stat-row"><span class="stat-lbl">Leichtschlaf</span><span class="stat-val">${toHM(lD)} – ${lPct}%</span></div>`:''}
           ${dpD!=null?`<div class="stat-row"><span class="stat-lbl">Tiefschlaf</span><span class="stat-val">${toHM(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> (Ziel: 15–20%)</span></div>`:''}
         </div>
       </div>`:''}
