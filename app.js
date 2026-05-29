@@ -2513,8 +2513,9 @@ function _renderTab(name) {
   tabCharts[name] = [];
   const fn = PAGE_FNS[name];
   if (!fn) return;
+  let r;
   try {
-    const r = fn();
+    r = fn();
     if (r && typeof r.then === 'function') {
       r.then(() => _injectTopbar(name))
        .catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`; _injectTopbar(name); });
@@ -2525,6 +2526,34 @@ function _renderTab(name) {
     document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`;
     _injectTopbar(name);
   }
+  return r; // Promise bei async-Tabs (Training), sonst undefined – fürs sequentielle Vorrendern
+}
+
+// ── Tabs im Hintergrund vorrendern, damit beim Wischen kein leeres Panel erscheint ──
+// Rendert die übergebenen Tabs (sofern noch nicht gerendert) je einen pro Frame.
+// Bei async-Tabs wird auf den Abschluss gewartet, bevor der nächste startet – so
+// bleibt _currentRenderingTab korrekt und der Main-Thread wird nicht blockiert.
+function _neighborTabs(name) {
+  const i = TAB_ORDER.indexOf(name);
+  if (i < 0) return [];
+  return [TAB_ORDER[i-1], TAB_ORDER[i+1]].filter(Boolean);
+}
+function _prerenderTabs(names) {
+  const queue = names.filter(n => n && !_renderedTabs.has(n));
+  if (!queue.length) return;
+  let i = 0;
+  function step() {
+    if (i >= queue.length) return;
+    const n = queue[i++];
+    let p;
+    if (!_renderedTabs.has(n)) {          // erneut prüfen (könnte zwischenzeitlich gerendert sein)
+      p = _renderTab(n);
+      _renderedTabs.add(n);
+    }
+    if (p && typeof p.then === 'function') p.then(() => requestAnimationFrame(step), () => requestAnimationFrame(step));
+    else requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 // Pro-Tab Status-Bar-Tönung (theme-color meta) – iOS 16+ PWA respektiert das,
@@ -2630,6 +2659,9 @@ function _refreshAfterStateChange() {
   _renderedTabs.clear();
   _renderTab(currentScreen);
   _renderedTabs.add(currentScreen);
+  // Nach Filter-/Datumswechsel nur die Nachbar-Tabs vorrendern (Kosten gering halten);
+  // der Rest rendert bei Bedarf nach.
+  _prerenderTabs(_neighborTabs(currentScreen));
 }
 
 // Snap-Sync: Wisch erkennen, Theme/Renderer aktualisieren
@@ -2794,6 +2826,9 @@ initTabScrollSync();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');
+// Übrige Tabs direkt danach im Hintergrund vorrendern (deferred, einer pro Frame),
+// damit beim Wischen kein leeres Panel mehr erscheint.
+_prerenderTabs(TAB_ORDER);
 
 })();
 
