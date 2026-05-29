@@ -132,7 +132,7 @@ function _buildCalHTML(year, month) {
     const dd=dayData[ds]||{};
     const tip=isTrain?`onmouseenter="window._calShowTip(event,'${ds}',${dd.min??'null'},${dd.dist!=null?`'${parseFloat(dd.dist).toFixed(2)}'`:'null'})" onmouseleave="window._calHideTip()"`:'' ;
     cells+=`<div style="display:flex;align-items:center;justify-content:center;height:26px" ${tip}>
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.55rem;font-weight:${fw};${ring}${isTrain?'cursor:pointer;':''}">${d}</div>
+      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.68rem;font-weight:${fw};${ring}${isTrain?'cursor:pointer;':''}">${d}</div>
     </div>`;
   }
 
