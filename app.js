@@ -1180,8 +1180,8 @@ function pgOverview() {
       const d = ld.hrv - a7.hrv;
       rows.push({dir: d>3?'up':d<-5?'dn':'eq',
         txt: Math.abs(d)<=3 ? `Deine Herzfrequenzvariabilität ist stabil und im Wochendurchschnitt.`
-           : d>0 ? `Deine HFV ist gestiegen – ein positives Zeichen für Erholung und Stresstoleranz.`
-           : `Deine HFV liegt leicht unter dem Wochenmittel – Erholung im Blick behalten.`});
+           : d>0 ? `Deine HRV ist gestiegen – ein positives Zeichen für Erholung und Stresstoleranz.`
+           : `Deine HRV liegt leicht unter dem Wochenmittel – Erholung im Blick behalten.`});
     }
     if (ld.steps != null && a7.steps != null) {
       const d = ld.steps - a7.steps;
@@ -1307,7 +1307,7 @@ function pgOverview() {
             ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${hvLast!=null?`<div class="ti-metric" style="border-top:3px solid #2563EB;background:rgba(37,99,235,.05)">
-            <div class="ti-metric-lbl">💙 HFV</div>
+            <div class="ti-metric-lbl">💙 HRV</div>
             <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
@@ -1350,7 +1350,7 @@ function pgOverview() {
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#2563EB"></div>
-          <div class="mt-lbl">HFV (ms)</div>
+          <div class="mt-lbl">HRV (ms)</div>
           <div class="mt-spark">${sparkSVG(hvVals30,'#2563EB',160,24)}</div>
           <div class="mt-val">${av(last30,'hrv')!=null?fn(av(last30,'hrv'),0)+' ms':'—'}</div>
           <div class="mt-arrow ${hvTr}">${hvTr==='up'?'↑':hvTr==='dn'?'↓':'→'}</div>
@@ -1381,7 +1381,7 @@ function pgOverview() {
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf (h)</div>
           <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Ruhepuls (bpm)</div>
-          <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HFV (ms)</div>
+          <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV (ms)</div>
           <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Trainingsmin.':'Aktivität'}</div>
         </div>
         <div class="chart-wrap" style="flex:1;min-height:252px"><canvas id="c-woche"></canvas></div>
@@ -1421,6 +1421,9 @@ function pgOverview() {
       if(_hasWoDur){const mins=Math.round((v??0)*60);return`${_wocheTrLabel}: ${mins} min${is6m?' Ø/Woche':''}`;};
       return`${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}${is6m?' Ø/Tag':''}`;
     }
+    // Einheit immer anzeigen; "Ø " nur in der 6M-Ansicht (dort gemittelt, 7D = Tageswerte).
+    if(lbl==='Ruhepuls') return `${is6m?'Ø ':''}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
+    if(lbl==='HRV')      return `${is6m?'Ø ':''}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
     return lbl+': '+(v!=null?v.toFixed(1):'')+(is6m?' Ø':'');
   }
 
@@ -1429,7 +1432,7 @@ function pgOverview() {
       data:{labels:wocheLabels,datasets:[
         {type:'bar',label:'Schlaf (h)',data:wocheSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:4,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wocheHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR'},
-        {type:'line',label:'HFV',data:wocheHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR'},
+        {type:'line',label:'HRV',data:wocheHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR'},
         {type:'line',label:_wocheTrLabel,data:wocheTr,borderColor:'#F97316',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#F97316',yAxisID:'yL'}
       ]},
       options:{responsive:true,maintainAspectRatio:false,
@@ -1681,6 +1684,18 @@ function pgHerz() {
   if(tHD){
     const hrAvgLine=hrMaL.map(()=>hrD);
     const hvAvgLine=hvMaL.map(()=>hvD);
+    // Beide Y-Achsen synchronisieren: identischer Min/Max/Schritt → gleicher Zahlenwert
+    // liegt auf gleicher Höhe (60 bpm links = 60 ms rechts). Schritte in 5ern oder 10ern.
+    const _hrhv=[...hrMaL,...hvMaL].filter(v=>v!=null);
+    let _yMin=40,_yMax=90,_yStep=10;
+    if(_hrhv.length){
+      const _lo=Math.min(..._hrhv), _hi=Math.max(..._hrhv);
+      _yStep=(_hi-_lo)>45?10:5;                 // großer Bereich → 10er-, sonst 5er-Schritte
+      _yMin=Math.floor(_lo/_yStep)*_yStep;       // auf Schritt abrunden
+      _yMax=Math.ceil(_hi/_yStep)*_yStep;        // auf Schritt aufrunden
+      if(_yMin===_yMax)_yMax=_yMin+_yStep;
+    }
+    const _yAxis=extra=>({min:_yMin,max:_yMax,ticks:{color:'#94A3B8',font:{size:9},stepSize:_yStep,callback:v=>Math.round(v)},...extra});
     mkC('c-herz',{type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
@@ -1689,8 +1704,9 @@ function pgHerz() {
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
         filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV'}},
-      scales:{x:gx,yL:{position:'left',...gy,ticks:{...gy.ticks,callback:v=>Math.round(v)}},
-        yR:{position:'right',grid:{display:false},ticks:{color:'#94A3B8',font:{size:9},callback:v=>Math.round(v)}}}}});
+      scales:{x:gx,
+        yL:_yAxis({position:'left',grid:{color:GRID_COLOR}}),
+        yR:_yAxis({position:'right',grid:{display:false}})}}});
   }
 }
 
