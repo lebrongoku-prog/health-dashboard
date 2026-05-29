@@ -380,8 +380,6 @@ body.dark #bottom-nav {
 
 /* Misc */
 .badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}
-.info-box{background:#F8FAFC;border-radius:10px;padding:.65rem .85rem;margin-bottom:.7rem;border-left:3px solid var(--accent)}
-.info-box p{font-size:.68rem;color:var(--txt2);line-height:1.55}
 
 /* Overview-specific (.ov-*) – ov-row stacks vertically by default in mobile-only layout.
    !important overschreibt das inline style="height:290px" auf der Monatstrend+Wochenverlauf-Row,
@@ -530,7 +528,6 @@ body.dark {
   --shadow-hov: 0 8px 24px rgba(0,0,0,.55);
 }
 body.dark .tbtn:hover { background: #0F172A; }
-body.dark .info-box { background: #0F172A; }
 body.dark .stat-row { border-bottom-color: #334155; }
 body.dark .goal-bar-bg { background: #334155; }
 body.dark .field-hint { background: #0F172A; }
@@ -604,7 +601,6 @@ h1, h2, h3, h4, h5,
 }
 
 /* Body – Beschreibungstexte, Insight-Rows */
-.info-box p,
 .pi-text,
 .ch-card p,
 .rec-text, .ov-combo-rec .rec-text,

@@ -1635,9 +1635,6 @@ function pgHerz() {
         <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
           Ø ${fn(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
-        <div class="info-box" style="margin-bottom:.5rem">
-          <p>Ein niedriger Ruhepuls deutet auf ein effizientes Herz hin. Sportliche Personen liegen oft unter 60 bpm. Erhöhte Werte können auf Stress, Schlafmangel oder Übertraining hinweisen. Langfristig sinkende Werte sind ein positives Zeichen.</p>
-        </div>
         <div style="margin:.4rem 0">
           <div class="goal-row"><span class="goal-lbl" style="color:#10B981">Athlet (&lt;50)</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nAthlete/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nAthlete}</span><span style="color:var(--txt3)">· ${(nAthlete/nTot*100).toFixed(0)}%</span></span></div>
           <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">Sehr gut (50–65)</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nGood/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nGood}</span><span style="color:var(--txt3)">· ${(nGood/nTot*100).toFixed(0)}%</span></span></div>
@@ -1656,9 +1653,6 @@ function pgHerz() {
         <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
           Ø ${fn(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
-        <div class="info-box" style="margin-bottom:.5rem">
-          <p>HRV misst die Schwankung zwischen aufeinanderfolgenden Herzschlägen. Eine <strong>höhere HRV</strong> deutet auf bessere Erholung und Stresstoleranz hin. Sie steigt mit regelmäßigem Training und ausreichend Schlaf.</p>
-        </div>
         <div style="margin:.4rem 0">
           <div class="goal-row"><span class="goal-lbl" style="color:#10B981">Sehr gut (≥70)</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVHigh/nHVTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nHVHigh}</span><span style="color:var(--txt3)">· ${(nHVHigh/nHVTot*100).toFixed(0)}%</span></span></div>
           <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">Gut (50–70)</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVGood/nHVTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nHVGood}</span><span style="color:var(--txt3)">· ${(nHVGood/nHVTot*100).toFixed(0)}%</span></span></div>
@@ -1836,9 +1830,6 @@ function pgSchlaf() {
       </div>
       <div class="chart-card" style="margin-bottom:0">
         <h3>🌙 Schlafschuld (letzte 14 Nächte)</h3>
-        <div class="info-box" style="margin-bottom:.5rem">
-          <p>Schlafschuld entsteht, wenn du weniger schläfst als dein Körper benötigt (Ziel: ${toHM(SLEEP_TARGET_H)}/Nacht). Akkumulierte Schlafschuld beeinträchtigt Erholung, Konzentration und Trainingsleistung.</p>
-        </div>
         <div class="stats-list">
           <div class="stat-row"><span class="stat-lbl">Zielschlaf pro Nacht</span><span class="stat-val">${toHM(SLEEP_TARGET_H)}</span></div>
           <div class="stat-row"><span class="stat-lbl">Heute</span><span class="stat-val" style="color:${sleepDebt.today!=null?(sleepDebt.today>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.today!=null?(sleepDebt.today>0?'-'+toHM(sleepDebt.today):'+'+toHM(-sleepDebt.today)):'—'}</span></div>
@@ -1872,7 +1863,6 @@ function pgSchlaf() {
       </div>
       ${hasPhases?`<div class="chart-card" style="margin-bottom:0">
         <h3>💤 Schlafphasen-Aufteilung (Ø pro Nacht)</h3>
-        <div class="info-box" style="margin-bottom:.5rem"><p>Tiefschlaf (Ziel: 15–20%) regeneriert Muskeln und Immunsystem.<br><br>REM-Schlaf (Ziel: 20–25%) ist wichtig für Gedächtnis und emotionale Verarbeitung.</p></div>
         ${phaseBar}
         <div class="stats-list" style="margin-top:.6rem">
           ${awD!=null?`<div class="stat-row"><span class="stat-lbl">Wach</span><span class="stat-val">${toHM(awD)} – ${awPct}%</span></div>`:''}
@@ -2426,9 +2416,6 @@ function pgVO2() {
       </div>
       <div class="chart-card" style="margin-bottom:0">
         <h3>ℹ️ Einordnung</h3>
-        <div class="info-box" style="margin-bottom:.5rem">
-          <p>VO₂max ist ein Maß für die maximale Sauerstoffaufnahme des Körpers. Ein höherer Wert bedeutet eine bessere kardiovaskuläre Fitness und ist mit längerer Lebenserwartung assoziiert.</p>
-        </div>
         <div class="stats-list">
           <div class="stat-row"><span class="stat-lbl">&gt; 55 ml/kg/min</span><span class="stat-val" style="color:#2563EB">Exzellent</span></div>
           <div class="stat-row"><span class="stat-lbl">47 – 55</span><span class="stat-val" style="color:#10B981">Überdurchschnittlich</span></div>
@@ -2701,7 +2688,17 @@ document.body.addEventListener('click', (e) => {
 });
 // Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
-  btn.addEventListener('click', () => showScreen(btn.dataset.tab));
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    // Tippt man den bereits offenen Tab erneut an, sanft nach oben scrollen
+    // (iOS-Verhalten) statt nichts zu tun – kein erneutes Rendern.
+    if (tab === currentScreen) {
+      const screenEl = document.getElementById('screen-' + tab);
+      if (screenEl) screenEl.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    showScreen(tab);
+  });
 });
 
 // ── Dark Mode ──────────────────────────────────────────
