@@ -39,24 +39,33 @@
   -webkit-tap-highlight-color: transparent;
 }
 html, body { height: 100%; overflow: hidden; }
+/* Solider Fallback-Hintergrund liegt auf <html>, damit der Body transparent sein
+   kann und die fixierten .bg-fade-layer (z-index:-1) durchscheinen. */
+html { background: var(--bg); }
 body {
   /* min-height: 100vh erzwingt volle Viewport-Höhe auf iOS PWA, falls height: 100%
-     auf bestimmten iOS-Versionen unzuverlässig wird. Body-Hintergrund ist solid
-     (kein Gradient, kein background-attachment: fixed), damit unter der transluzenten
-     Status-Bar und über dem Home-Indicator keine Rendering-Lücken entstehen. */
+     auf bestimmten iOS-Versionen unzuverlässig wird. Body ist transparent – der
+     Tab-Gradient lebt auf den fixierten Crossfade-Layern dahinter (KEIN
+     background-attachment: fixed, das friert iOS ein). */
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
-  background: var(--bg);
+  background: transparent;
   color: var(--txt);
   display: flex;
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
+  /* Weicher Akzent-Übergang beim Tab-Wechsel (greift via @property --tab-color). */
+  transition: --tab-color 0.45s cubic-bezier(0.4, 0, 0.6, 1);
 }
 
-/* Per-Tab Accent – setzt nur die CSS-Variable für Topbar/Bottom-Nav-Tönung.
-   Der Body-Hintergrund bleibt neutral (var(--bg)); per-Tab Gradient lebt auf
-   .screen (siehe unten), damit beim Swipe der nächste Tab schon visuell durchscheint. */
+/* --tab-color als <color> registrieren, damit der Wert beim Tab-Wechsel weich
+   interpoliert (statt hart umzuspringen). Safari 16.4+; ältere Browser schalten
+   hart um (sauberer Fallback). Treibt Nav-Icons + Topbar/Nav-Tönung. */
+@property --tab-color { syntax: '<color>'; inherits: true; initial-value: #0891B2; }
+
+/* Per-Tab Accent – setzt die CSS-Variable für Icons + Topbar/Bottom-Nav-Tönung.
+   Der vollflächige Tab-Gradient lebt auf den .bg-fade-layer-Schichten (Crossfade). */
 body.theme-overview   { --tab-color: #0891B2; }
 body.theme-herz       { --tab-color: #EF4444; }
 body.theme-schlaf     { --tab-color: #7C3AED; }
@@ -183,13 +192,14 @@ body.dark .dark-toggle { color: #FBBF24; }
   overscroll-behavior-x: contain;
 }
 
-/* Per-tab gradient backgrounds – visible during swipe */
-#screen-overview   { background: linear-gradient(135deg, #0C4A6E, #0891B2); }
-#screen-herz       { background: linear-gradient(135deg, #7F1D1D, #EF4444); }
-#screen-schlaf     { background: linear-gradient(135deg, #1E3A8A, #7C3AED); }
-#screen-aktivitaet { background: linear-gradient(135deg, #064E3B, #10B981); }
-#screen-training   { background: linear-gradient(135deg, #7C2D12, #F97316); }
-#screen-vo2        { background: linear-gradient(135deg, #78350F, #F59E0B); }
+/* Tab-Gradient: zwei vollflächige, fixierte Layer hinter dem App-Inhalt.
+   Der "von"-Layer (a) bleibt deckend, der "nach"-Layer (b) blendet beim Swipe
+   fingergebunden ein (Opacity per JS pro Frame gesetzt). Kein
+   transition: background-image (auf iOS unzuverlässig). */
+.bg-fade-layer { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0; }
+.bg-fade-layer.no-anim { transition: none; }
+/* Startzustand = Übersicht, schon vor dem ersten JS-Frame sichtbar (kein Flash). */
+#bg-fade-a { background-image: linear-gradient(135deg, #0C4A6E, #0891B2); opacity: 1; }
 
 /* Page banner: transparent on top of tab's gradient */
 .pg-banner {
@@ -698,11 +708,9 @@ h1, h2, h3, h4, h5,
    600-px-Cap zerstörerisch aktiviert.
    ═══════════════════════════════════════════════════════════ */
 @media (min-width: 768px) and (min-height: 600px) {
-  body {
-    /* Soft Hintergrund für die "Wings" links/rechts der App */
-    background: #E8EEF5;
-  }
-  body.dark { background: #0A1120; }
+  /* Body bleibt transparent: die "Wings" links/rechts zeigen den vollflächigen
+     Crossfade-Gradient (sonst würde ein deckender Body die Layer verdecken und
+     die weiße Banner-Schrift stünde auf hellem Grau). */
 
   #app {
     max-width: 600px;

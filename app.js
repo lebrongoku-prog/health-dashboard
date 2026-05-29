@@ -2546,6 +2546,49 @@ function _setStatusBarColor(name) {
   // height:100dvh deckt jetzt die volle physische Viewport-Fläche ab.
 }
 
+// ── Farb-Crossfade: vollflächiger Hintergrund-Gradient pro Tab ──────────
+// Literale Hex-Werte verwenden (KEINE var()-Referenzen – iOS friert
+// var()-Gradients beim ersten Render ein). Reihenfolge passt zu TAB_ORDER.
+const THEME_GRADIENTS = {
+  overview:   'linear-gradient(135deg, #0C4A6E, #0891B2)',
+  herz:       'linear-gradient(135deg, #7F1D1D, #EF4444)',
+  schlaf:     'linear-gradient(135deg, #1E3A8A, #7C3AED)',
+  aktivitaet: 'linear-gradient(135deg, #064E3B, #10B981)',
+  training:   'linear-gradient(135deg, #7C2D12, #F97316)',
+  vo2:        'linear-gradient(135deg, #78350F, #F59E0B)'
+};
+// Pro Wisch-Frame aufrufen. progress = container.scrollLeft / clientWidth
+// (z.B. 2.37 = zwischen Tab 2 und 3). Layer a ("von") bleibt deckend, Layer b
+// ("nach") blendet fingergebunden ein → sauberer Crossfade ohne html-Durchscheinen.
+function updateBackgroundForSwipe(progress) {
+  const a = document.getElementById('bg-fade-a');
+  const b = document.getElementById('bg-fade-b');
+  if (!a || !b) return;
+  const lastIdx = TAB_ORDER.length - 1;
+  const fromIdx = Math.max(0, Math.min(lastIdx, Math.floor(progress)));
+  const toIdx   = Math.max(0, Math.min(lastIdx, Math.ceil(progress)));
+  const t = progress - fromIdx; // 0..1 zwischen den beiden Tabs
+  const fromName = TAB_ORDER[fromIdx], toName = TAB_ORDER[toIdx];
+  a.classList.add('no-anim'); b.classList.add('no-anim');
+  // backgroundImage nur neu setzen, wenn sich das Theme des Layers ändert (Performance)
+  if (a.dataset.theme !== fromName) { a.style.backgroundImage = THEME_GRADIENTS[fromName] || ''; a.dataset.theme = fromName; }
+  if (b.dataset.theme !== toName)   { b.style.backgroundImage = THEME_GRADIENTS[toName]   || ''; b.dataset.theme = toName;   }
+  a.style.opacity = '1';
+  b.style.opacity = String(t);
+}
+// Sofort-Variante für nicht-gewischte Wechsel (Tableisten-Klick, App-Start, Resize).
+function setTabBackgroundInstant(name) {
+  const a = document.getElementById('bg-fade-a');
+  const b = document.getElementById('bg-fade-b');
+  if (!a || !b) return;
+  a.classList.add('no-anim'); b.classList.add('no-anim');
+  a.style.backgroundImage = THEME_GRADIENTS[name] || '';
+  a.dataset.theme = name;
+  a.style.opacity = THEME_GRADIENTS[name] ? '1' : '0';
+  b.style.backgroundImage = ''; b.style.opacity = '0'; b.dataset.theme = '';
+  void a.offsetWidth; // Reflow erzwingen, damit der Sofort-Wechsel sicher greift
+}
+
 // Tab-State setzen (Bottom-Nav-Active, Body-Theme-Klasse, ggf. lazy rendern)
 function _applyTabState(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -2575,6 +2618,7 @@ function showScreen(name) {
     container.scrollTo({ left: target, behavior: 'auto' });
     requestAnimationFrame(() => { requestAnimationFrame(() => { _suppressScrollSync = false; }); });
   }
+  setTabBackgroundInstant(name); // Hintergrund sofort setzen (kein Wisch-Fortschritt)
   _applyTabState(name);
 }
 
@@ -2603,6 +2647,8 @@ function initTabScrollSync() {
       ticking = false;
       const w = container.clientWidth;
       if (w <= 0) return;
+      // Hintergrund-Gradient fingergebunden an den Scroll-Fortschritt koppeln.
+      updateBackgroundForSwipe(container.scrollLeft / w);
       const idx = Math.round(container.scrollLeft / w);
       const clamped = Math.max(0, Math.min(TAB_ORDER.length-1, idx));
       const name = TAB_ORDER[clamped];

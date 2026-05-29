@@ -30,6 +30,11 @@
 </head>
 <body class="theme-overview">
 
+<!-- Vollflächige Hintergrund-Layer für den fingergebundenen Farb-Crossfade beim Tab-Swipe.
+     Liegen hinter dem App-Inhalt (z-index:-1); Body ist transparent, html trägt den soliden Fallback. -->
+<div class="bg-fade-layer" id="bg-fade-a"></div>
+<div class="bg-fade-layer" id="bg-fade-b"></div>
+
 <!-- Login-Overlay (vor OAuth) -->
 <div id="login-screen" class="overlay-screen" style="display:none">
   <div class="overlay-icon">❤️</div>
