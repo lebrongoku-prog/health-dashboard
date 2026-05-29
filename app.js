@@ -42,6 +42,14 @@ function _initAuth() {
 (async () => {
 let allData = [], timeRange = '7d', referenceDate = '';
 const charts = {};
+// Cache für allData-abhängige Auswertungen (Baselines, Tages-Empfehlung,
+// Warnsignale, Muster-Insights). Wird in loadFromAPI geleert, sobald sich
+// allData ändert. So entfällt das Neuberechnen bei jedem Tab-Render/Filterwechsel.
+let _analyticsCache = {};
+function _memo(key, fn) {
+  if (!(key in _analyticsCache)) _analyticsCache[key] = fn();
+  return _analyticsCache[key];
+}
 let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
 let workoutSheetReady = false; // true once consolidated Workout Data sheet has been loaded
@@ -232,6 +240,7 @@ async function loadFromAPI() {
     allData.sort((a, b) => a.date.localeCompare(b.date));
     csvHeaders = Object.keys(allData[0] || {});
     referenceDate = allData[allData.length - 1].date;
+    _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
 
     // 2. Workout-Daten laden
     try {
@@ -602,10 +611,12 @@ function scoreCat(s) {
 // ── Coaching Helpers ───────────────────────────────────
 // ─────────────────────────────────────────────────────────
 
-// Calculate average of a field over the last N days of allData
+// Calculate average of a field over the last N days of allData (memoisiert)
 function calculateBaseline(field, nDays) {
-  const rows = allData.slice(-nDays).filter(r => r[field] != null);
-  return rows.length ? rows.reduce((s,r) => s+r[field], 0)/rows.length : null;
+  return _memo('baseline:'+field+':'+nDays, () => {
+    const rows = allData.slice(-nDays).filter(r => r[field] != null);
+    return rows.length ? rows.reduce((s,r) => s+r[field], 0)/rows.length : null;
+  });
 }
 
 // % deviation of current from baseline (positive = above baseline)
@@ -647,7 +658,8 @@ const COACHING_THRESHOLDS = {
   sleepGoodH:    7.5, // ≥7.5h → good sleep
   sleepBadH:     6.0, // <6.0h → bad sleep
 };
-function getDailyRecommendation() {
+function getDailyRecommendation() { return _memo('dailyRec', _computeDailyRecommendation); }
+function _computeDailyRecommendation() {
   const last = allData[allData.length-1];
   if (!last) return null;
   const bl30 = {
@@ -708,7 +720,8 @@ function getDailyRecommendation() {
 // ── Multi-signal Warning Logic ─────────────────────────
 // Returns null or {signals:[], text}
 // A warning triggers when ≥3 of the following signals are present simultaneously
-function detectWarningSignals() {
+function detectWarningSignals() { return _memo('warningSignals', _computeWarningSignals); }
+function _computeWarningSignals() {
   const last = allData[allData.length-1];
   if (!last) return null;
   const bl30 = {
@@ -742,7 +755,8 @@ function calculateTrainingLoad(rows) {
 }
 
 // ── Pattern Insights (correlation-based text insights) ─
-function generatePatternInsights() {
+function generatePatternInsights() { return _memo('patternInsights', _computePatternInsights); }
+function _computePatternInsights() {
   const insights = [];
   if (allData.length < 14) return insights;
 
@@ -2703,7 +2717,11 @@ function applyDarkMode(isDark) {
 }
 function setDarkMode(isDark) {
   applyDarkMode(isDark);
-  _refreshAfterStateChange(); // Charts neu rendern
+  // Theme-Wechsel ändert keine Daten und keinen Text – Karten/Schrift folgen den
+  // CSS-Variablen via body.dark. Statt den ganzen Tab (innerHTML + Analytik +
+  // Chart-Neuaufbau) zu regenerieren, werden nur die bestehenden Chart-Instanzen
+  // neu gezeichnet. Das macht den Dark-Mode-Toggle praktisch instant.
+  Object.values(charts).forEach(c => { try { c.update('none'); } catch(_) {} });
 }
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
