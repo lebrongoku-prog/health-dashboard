@@ -373,7 +373,7 @@ body.dark #bottom-nav {
 .chart-card.split2>h3,.chart-card.split2>p{grid-column:1 / -1}
 .chart-card.split2 .stats-list{margin-top:.4rem !important;gap:.12rem}
 .chart-card.split2 .goal-row{margin:.28rem 0;gap:.4rem}
-.chart-card.split2 .goal-lbl{flex:0 0 58px;font-size:.62rem}
+.chart-card.split2 .goal-lbl{flex:0 0 68px;font-size:.62rem;white-space:nowrap}
 .chart-card.split2 .goal-val{font-size:.62rem;grid-template-columns:1.4rem 2.4rem;column-gap:.3rem}
 .chart-card.split2 .stat-row{padding:.18rem 0}
 .chart-card.split2 .stat-lbl{font-size:.62rem}
