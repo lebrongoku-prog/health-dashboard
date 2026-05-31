@@ -1595,16 +1595,16 @@ function pgHerz() {
           Ø ${fn(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
         <div style="margin:.4rem 0">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">Athlet</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nAthlete/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nAthlete}</span><span style="color:var(--txt3)">· ${(nAthlete/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">Sehr gut</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nGood/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nGood}</span><span style="color:var(--txt3)">· ${(nGood/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">Normal</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nNorm/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nNorm}</span><span style="color:var(--txt3)">· ${(nNorm/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">Erhöht</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHigh/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHigh}</span><span style="color:var(--txt3)">· ${(nHigh/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&lt; 50 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nAthlete/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nAthlete}</span><span style="color:var(--txt3)">${(nAthlete/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">50–65 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nGood/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nGood}</span><span style="color:var(--txt3)">${(nGood/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">65–75 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nNorm/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nNorm}</span><span style="color:var(--txt3)">${(nNorm/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&gt; 75 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHigh/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHigh}</span><span style="color:var(--txt3)">${(nHigh/nTot*100).toFixed(0)}%</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.6rem">
-          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hrf.length}d · ${D.length>0?(hrf.length/D.length*100).toFixed(0):'—'}%</span></div>
           ${hrWeek!=null||hrWknd!=null?`<div class="stat-row"><span class="stat-lbl">Wochentag</span><span class="stat-val">${hrWeek!=null?fn(hrWeek,0)+' bpm':'—'}</span></div>
           <div class="stat-row"><span class="stat-lbl">Wochenende</span><span class="stat-val">${hrWknd!=null?fn(hrWknd,0)+' bpm':'—'}</span></div>
           ${hrWeek!=null&&hrWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${hrWknd<hrWeek?'#10B981':'#F97316'}">${hrWknd<hrWeek?'':'+'}${fn(hrWknd-hrWeek,0)} bpm</span></div>`:``}`:''}
+          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hrf.length}d <span style="color:var(--txt3)">${D.length>0?(hrf.length/D.length*100).toFixed(0):'—'}%</span></span></div>
         </div>
       </div>
       <div class="chart-card split2" style="margin-bottom:0">
@@ -1613,16 +1613,16 @@ function pgHerz() {
           Ø ${fn(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
         <div style="margin:.4rem 0">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">Sehr gut</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVHigh/nHVTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nHVHigh}</span><span style="color:var(--txt3)">· ${(nHVHigh/nHVTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">Gut</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVGood/nHVTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nHVGood}</span><span style="color:var(--txt3)">· ${(nHVGood/nHVTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">Mittel</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVMid/nHVTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nHVMid}</span><span style="color:var(--txt3)">· ${(nHVMid/nHVTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">Niedrig</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVLow/nHVTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHVLow}</span><span style="color:var(--txt3)">· ${(nHVLow/nHVTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 70 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVHigh/nHVTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nHVHigh}</span><span style="color:var(--txt3)">${(nHVHigh/nHVTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">50–70 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVGood/nHVTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nHVGood}</span><span style="color:var(--txt3)">${(nHVGood/nHVTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">30–50 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVMid/nHVTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nHVMid}</span><span style="color:var(--txt3)">${(nHVMid/nHVTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 30 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVLow/nHVTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHVLow}</span><span style="color:var(--txt3)">${(nHVLow/nHVTot*100).toFixed(0)}%</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.6rem">
-          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hvf.length}d · ${D.length>0?(hvf.length/D.length*100).toFixed(0):'—'}%</span></div>
           ${hvWeek!=null||hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Wochentag</span><span class="stat-val">${hvWeek!=null?fn(hvWeek,0)+' ms':'—'}</span></div>
           <div class="stat-row"><span class="stat-lbl">Wochenende</span><span class="stat-val">${hvWknd!=null?fn(hvWknd,0)+' ms':'—'}</span></div>
           ${hvWeek!=null&&hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${hvWknd>hvWeek?'#10B981':'#F97316'}">${hvWknd>hvWeek?'+':''}${fn(hvWknd-hvWeek,0)} ms</span></div>`:``}`:''}
+          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hvf.length}d <span style="color:var(--txt3)">${D.length>0?(hvf.length/D.length*100).toFixed(0):'—'}%</span></span></div>
         </div>
       </div>
     </div>
@@ -1634,6 +1634,11 @@ function pgHerz() {
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV (ms, rechts)${hvD!=null?` · Ø <strong>${fn(hvD,0)} ms</strong>`:''}</div>
       </div>
       <div class="chart-wrap" style="height:210px"><canvas id="c-herz"></canvas></div>
+      <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        ${hrWeek!=null||hvWeek!=null?`<div class="stat-row"><span class="stat-lbl">Durchschn. Wochentag (Mo–Fr)</span><span class="stat-val"><span style="color:var(--heart)">${hrWeek!=null?fn(hrWeek,0)+' bpm':'—'}</span> · <span style="color:var(--hrv)">${hvWeek!=null?fn(hvWeek,0)+' ms':'—'}</span></span></div>`:''}
+        ${hrWknd!=null||hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Durchschn. Wochenende (Sa–So)</span><span class="stat-val"><span style="color:var(--heart)">${hrWknd!=null?fn(hrWknd,0)+' bpm':'—'}</span> · <span style="color:var(--hrv)">${hvWknd!=null?fn(hvWknd,0)+' ms':'—'}</span></span></div>`:''}
+        ${(hrWeek!=null&&hrWknd!=null)||(hvWeek!=null&&hvWknd!=null)?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val"><span style="color:${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'#10B981':'#F97316'):'var(--txt3)'}">${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+fn(hrWknd-hrWeek,0)+' bpm':'—'}</span> · <span style="color:${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'#10B981':'#F97316'):'var(--txt3)'}">${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+fn(hvWknd-hvWeek,0)+' ms':'—'}</span></span></div>`:''}
+      </div>
     </div>
 `;
 
@@ -1788,16 +1793,16 @@ function pgSchlaf() {
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>📊 Schlafqualität-Verteilung</h3>
         <div style="margin:.4rem 0">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">· ${(nOver85/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">· ${(n7to85/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">· ${(n6to7/nTot*100).toFixed(0)}%</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">· ${(nBelow6/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">${(nOver85/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">${(n7to85/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">${(n6to7/nTot*100).toFixed(0)}%</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">${(nBelow6/nTot*100).toFixed(0)}%</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.5rem">
           <div class="stat-row"><span class="stat-lbl">Beste Nacht</span><span class="stat-val" style="color:#10B981">${toHM(slMax)}</span></div>
           <div class="stat-row"><span class="stat-lbl">Kürzeste Nacht</span><span class="stat-val" style="color:#EF4444">${toHM(slMin)}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${slRows.length}d · ${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%</span></div>
           <div class="stat-row"><span class="stat-lbl">Konsistenz</span><span class="stat-val" style="color:${consColor}">${consLabel}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${slRows.length}d <span style="color:var(--txt3)">${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%</span></span></div>
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0">
@@ -2071,6 +2076,7 @@ async function pgTraining() {
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
           ${minWeek!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${Math.round(minWeek)} min</span></div>`:''}
           ${minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${Math.round(minWknd)} min</span></div>`:''}
+          ${minWeek!=null&&minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${minWknd>minWeek?'#10B981':'#F97316'}">${minWknd>minWeek?'+':''}${Math.round(minWknd-minWeek)} min</span></div>`:''}
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
@@ -2080,6 +2086,7 @@ async function pgTraining() {
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
           ${distWkdAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${fn(distWkdAvg,2)} km</span></div>`:''}
           ${distWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${fn(distWkndAvg,2)} km</span></div>`:''}
+          ${distWkdAvg!=null&&distWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${distWkndAvg>distWkdAvg?'#10B981':'#F97316'}">${distWkndAvg>distWkdAvg?'+':''}${fn(distWkndAvg-distWkdAvg,2)} km</span></div>`:''}
         </div>
       </div>
     </div>
@@ -2277,16 +2284,16 @@ function pgAktivitaet() {
     <div class="chart-card split2">
       <h3>🎯 Schritteziel-Erreichung</h3>
       <div style="margin:.4rem 0">
-        <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">· ${(n10k/nTot*100).toFixed(0)}%</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">· ${(n8k/nTot*100).toFixed(0)}%</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">5k – 8k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n5k/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n5k}</span><span style="color:var(--txt3)">· ${(n5k/nTot*100).toFixed(0)}%</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 5.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nU5k/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nU5k}</span><span style="color:var(--txt3)">· ${(nU5k/nTot*100).toFixed(0)}%</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">${(n10k/nTot*100).toFixed(0)}%</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">${(n8k/nTot*100).toFixed(0)}%</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">5k – 8k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n5k/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n5k}</span><span style="color:var(--txt3)">${(n5k/nTot*100).toFixed(0)}%</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 5.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nU5k/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nU5k}</span><span style="color:var(--txt3)">${(nU5k/nTot*100).toFixed(0)}%</span></span></div>
       </div>
       <div class="stats-list" style="margin-top:.5rem">
         <div class="stat-row"><span class="stat-lbl">Bester Tag</span><span class="stat-val" style="color:#10B981">${stMax!=null?Math.round(stMax).toLocaleString('de-CH'):'—'}</span></div>
         <div class="stat-row"><span class="stat-lbl">Schlechtester Tag</span><span class="stat-val" style="color:#EF4444">${stMin!=null?Math.round(stMin).toLocaleString('de-CH'):'—'}</span></div>
         <div class="stat-row"><span class="stat-lbl">Längste Streak</span><span class="stat-val">${maxStreak} Tage</span></div>
-        <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${stRows.length}d · ${D.length>0?(stRows.length/D.length*100).toFixed(0):'—'}%</span></div>
+        <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${stRows.length}d <span style="color:var(--txt3)">${D.length>0?(stRows.length/D.length*100).toFixed(0):'—'}%</span></span></div>
       </div>
     </div>
 
