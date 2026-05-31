@@ -588,15 +588,13 @@ const gy = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:9}}};
 function computeHealthScore(days) {
   let s=0,w=0;
   const sl=av(days,'sleepTotal');
-  if(sl!=null){const v=sl>=7&&sl<=9?100:sl<4?0:sl<7?((sl-4)/3)*100:Math.max(0,100-(sl-9)*20);s+=Math.min(100,Math.max(0,v))*30;w+=30;}
+  if(sl!=null){const v=sl>=7&&sl<=9?100:sl<4?0:sl<7?((sl-4)/3)*100:Math.max(0,100-(sl-9)*20);s+=Math.min(100,Math.max(0,v))*35;w+=35;}
   const hv=av(days,'hrv'),hvA=av(allData,'hrv');
-  if(hv!=null&&hvA){s+=Math.min(100,(hv/hvA)*100)*25;w+=25;}
+  if(hv!=null&&hvA){s+=Math.min(100,(hv/hvA)*100)*30;w+=30;}
   const hr=av(days,'restHR');
   if(hr!=null){const v=hr<=50?100:hr>=80?0:((80-hr)/30)*100;s+=v*20;w+=20;}
   const st=av(days,'steps');
   if(st!=null){s+=Math.min(100,(st/10000)*100)*15;w+=15;}
-  const v2=av(days.filter(d=>d.vo2max),'vo2max');
-  if(v2!=null){const v=v2>=55?100:v2<=25?0:((v2-25)/30)*100;s+=v*10;w+=10;}
   return w ? Math.round(s/w) : 70;
 }
 function scoreCat(s) {
@@ -1073,13 +1071,11 @@ function pgOverview() {
   const _hsHv=av(_hsDays,'hrv'), _hsHvA=av(allData,'hrv');
   const _hsHr=av(_hsDays,'restHR');
   const _hsSt=av(_hsDays,'steps');
-  const _hsV2=av(_hsDays.filter(d=>d.vo2max),'vo2max');
   function _scoreBar(v){const n=Math.round(v||0);const c=n>=70?'#10B981':n>=50?'#EAB308':'#EF4444';return `<span style="color:${c};font-weight:800">${n}</span>`;}
   const _slScore=_hsSl!=null?Math.min(100,Math.max(0,_hsSl>=7&&_hsSl<=9?100:_hsSl<4?0:_hsSl<7?((_hsSl-4)/3)*100:Math.max(0,100-(_hsSl-9)*20))):null;
   const _hvScore=_hsHv!=null&&_hsHvA?Math.min(100,(_hsHv/_hsHvA)*100):null;
   const _hrScore=_hsHr!=null?(_hsHr<=50?100:_hsHr>=80?0:(80-_hsHr)/30*100):null;
   const _stScore=_hsSt!=null?Math.min(100,(_hsSt/10000)*100):null;
-  const _v2Score=_hsV2!=null?Math.min(100,Math.max(0,_hsV2>=55?100:_hsV2<=25?0:((_hsV2-25)/30)*100)):null;
 
 
 
@@ -1190,11 +1186,10 @@ function pgOverview() {
             </div>
             <div class="hs-ring-tt">
               <div class="hs-tt-title">Score-Zusammensetzung</div>
-              <div class="hs-ring-tt-row"><span>🌙 Schlaf</span><span style="color:var(--txt3)">30%</span></div>
-              <div class="hs-ring-tt-row"><span>💙 HRV</span><span style="color:var(--txt3)">25%</span></div>
+              <div class="hs-ring-tt-row"><span>🌙 Schlaf</span><span style="color:var(--txt3)">35%</span></div>
+              <div class="hs-ring-tt-row"><span>💙 HRV</span><span style="color:var(--txt3)">30%</span></div>
               <div class="hs-ring-tt-row"><span>❤️ Ruhepuls</span><span style="color:var(--txt3)">20%</span></div>
               <div class="hs-ring-tt-row"><span>🚶 Schritte</span><span style="color:var(--txt3)">15%</span></div>
-              <div class="hs-ring-tt-row"><span>🫁 VO₂max</span><span style="color:var(--txt3)">10%</span></div>
             </div>
           </div>
           <div class="ov-score-cat" style="color:${hsColor}">${hsCat}</div>
@@ -1227,8 +1222,7 @@ function pgOverview() {
             kompRow('🌙','Schlaf',_slScore,slPts),
             kompRow('💙','HRV',_hvScore,hvPts),
             kompRow('❤️','Ruhepuls',_hrScore,hrPts),
-            kompRow('🚶','Schritte',_stScore,stPts),
-            kompRow('🫁','VO₂max',_v2Score,null)
+            kompRow('🚶','Schritte',_stScore,stPts)
           ].join('');
         })()}
         </div>
