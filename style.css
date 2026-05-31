@@ -382,7 +382,7 @@ body.dark #bottom-nav {
 /* Health Score tooltip / komponenten */
 .hs-tt-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:.45rem}
 .ov-ring-wrap{position:relative;display:inline-block}
-.hs-ring-tt{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:200px;background:#1E293B;color:#fff;border-radius:10px;padding:.7rem .85rem;opacity:0;pointer-events:none;transition:opacity .15s;z-index:300;white-space:nowrap}
+.hs-ring-tt{position:absolute;top:calc(100% + 8px);left:0;width:200px;background:#1E293B;color:#fff;border-radius:10px;padding:.7rem .85rem;opacity:0;pointer-events:none;transition:opacity .15s;z-index:300;white-space:nowrap}
 .ov-ring-wrap:hover .hs-ring-tt{opacity:1}
 .hs-ring-tt .hs-tt-title{color:rgba(255,255,255,.55)}
 .hs-ring-tt-row{display:flex;justify-content:space-between;font-size:.72rem;padding:.15rem 0}
