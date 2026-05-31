@@ -132,20 +132,20 @@ function _buildCalHTML(year, month) {
     const dd=dayData[ds]||{};
     const tip=isTrain?`onmouseenter="window._calShowTip(event,'${ds}',${dd.min??'null'},${dd.dist!=null?`'${parseFloat(dd.dist).toFixed(2)}'`:'null'})" onmouseleave="window._calHideTip()"`:'' ;
     cells+=`<div style="display:flex;align-items:center;justify-content:center;height:26px" ${tip}>
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.68rem;font-weight:${fw};${ring}${isTrain?'cursor:pointer;':''}">${d}</div>
+      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.74rem;font-weight:${fw};${ring}${isTrain?'cursor:pointer;':''}">${d}</div>
     </div>`;
   }
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
     <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
-    <span style="font-size:.65rem;font-weight:700;color:var(--txt)">${monthStr}</span>
+    <span style="font-size:.72rem;font-weight:700;color:var(--txt)">${monthStr}</span>
     <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:.3rem">
-    ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
+    ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
     ${cells}
   </div>
-  <div style="font-size:.58rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">🏋️ ${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
+  <div style="font-size:.64rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">🏋️ ${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
