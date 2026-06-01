@@ -2712,6 +2712,13 @@ function initScrollHideNav() {
       });
     }, { passive: true });
   });
+  // Tippen auf den Tab-Hintergrund (alles außer echten Bedienelementen wie Buttons,
+  // Links, Eingabefeldern, Selects und der oberen Filterleiste) → Bottom-Nav aus-/einblenden.
+  const _tapContainer = document.getElementById('tab-container');
+  if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, input, select, textarea, label, .topbar-inline')) return;
+    nav.classList.toggle('nav-hidden');
+  });
 }
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────
