@@ -2603,9 +2603,8 @@ function _applyTabState(name) {
     _renderTab(name);
     _renderedTabs.add(name);
   }
-  // Bottom-Nav (falls auto-hidden) wieder einblenden
-  const nav = document.getElementById('bottom-nav');
-  if (nav) nav.classList.remove('nav-hidden');
+  // Bottom-Nav-Sichtbarkeit bleibt beim Tab-Wechsel erhalten: ausgeblendet bleibt
+  // ausgeblendet, bis sie per Hintergrund-Tipp oder Hochscrollen zurückgeholt wird.
 }
 
 // Programmatischer Tab-Wechsel (Klick auf Bottom-Nav-Button)
