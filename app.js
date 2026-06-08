@@ -179,6 +179,28 @@ Chart.defaults.borderColor = '#E8EDF2';
 Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
 Chart.defaults.font.size = 10;
 
+// Wisch-Plugin für den Datums-Navigator: verschiebt beim Navigieren NUR die
+// Datenfläche (auf chartArea geclippt), sodass X- und Y-Achse/Gitter fix bleiben.
+// Aktiv ausschließlich, solange chart.$navslide gesetzt ist – sonst null Overhead.
+Chart.register({
+  id: 'navslide',
+  beforeDatasetsDraw(chart){
+    const s = chart.$navslide; if(!s) return;
+    const a = chart.chartArea; if(!a) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(a.left, a.top, a.right - a.left, a.bottom - a.top);
+    ctx.clip();
+    ctx.translate(s.offset, 0);
+    ctx.globalAlpha = s.alpha;
+    chart.$navslideOn = true;
+  },
+  afterDatasetsDraw(chart){
+    if(chart.$navslideOn){ chart.ctx.restore(); chart.$navslideOn = false; }
+  }
+});
+
 const showErr = m => {
   document.getElementById('loading').style.display = 'none';
   const e = document.getElementById('err-screen');
@@ -404,8 +426,10 @@ function navPrev() {
   if (nr < allData[0].date) return;
   referenceDate = nr;
   updateNavUI();
+  _navSliding = true;
   _refreshAfterStateChange();
-  _animNavSlide(-1); // zurück: Diagramm wischt nach rechts
+  _navSliding = false;
+  _animNavSlide(-1); // zurück: Daten wischen nach rechts
 }
 
 function navNext() {
@@ -415,40 +439,42 @@ function navNext() {
   if (nr > maxDate) return;
   referenceDate = nr;
   updateNavUI();
+  _navSliding = true;
   _refreshAfterStateChange();
-  _animNavSlide(1); // vor: Diagramm wischt nach links
+  _navSliding = false;
+  _animNavSlide(1); // vor: Daten wischen nach links
 }
 
-// Wisch-Animation beim Pfeil-Navigator: nur die Chart-Flächen (Canvas) gleiten
-// seitlich, Titel + Filter-Control bleiben fix. dir=-1 (zurück) → Inhalt kommt
-// von links herein (Bewegung nach rechts); dir=+1 (vor) → von rechts.
-// Läuft nach dem Re-Render; greift nur auf bereits gezeichnete Canvas zu
-// (async-Tab Training ohne Animation – unkritisch). Respektiert reduce-motion.
+// Wisch-Animation beim Pfeil-Navigator. Verschiebt via navslide-Plugin NUR die
+// Datenfläche jedes Charts (Achsen/Gitter bleiben stehen). dir=-1 (zurück) →
+// Daten kommen von links herein (Bewegung nach rechts); dir=+1 (vor) → von rechts.
+// Sanftes, etwas längeres Ease-Out + Einblendung. Respektiert reduce-motion.
+let _navSliding = false;
+let _navSlideRAF = null;
 function _animNavSlide(dir) {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const screenId = 'screen-' + currentScreen;
-  const startX = dir < 0 ? -56 : 56;
+  if (_navSlideRAF) { cancelAnimationFrame(_navSlideRAF); _navSlideRAF = null; }
   requestAnimationFrame(() => {
-    const screen = document.getElementById(screenId);
-    if (!screen) return;
-    const cvs = Array.from(screen.querySelectorAll('.chart-wrap > canvas'));
-    if (!cvs.length) return;
-    cvs.forEach(cv => {
-      cv.style.transition = 'none';
-      cv.style.transform  = `translateX(${startX}px)`;
-      cv.style.opacity    = '0.25';
-    });
-    requestAnimationFrame(() => {
-      cvs.forEach(cv => {
-        cv.style.transition = 'transform .32s cubic-bezier(.22,.61,.36,1), opacity .3s ease';
-        cv.style.transform  = 'translateX(0)';
-        cv.style.opacity    = '1';
+    const list = (tabCharts[currentScreen] || [])
+      .map(id => charts[id]).filter(c => c && c.chartArea);
+    if (!list.length) return;
+    const dur = 560;                          // sanfter: länger
+    const ease = t => 1 - Math.pow(1 - t, 3); // easeOutCubic – weiches Auslaufen
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const e = ease(t);
+      list.forEach(c => {
+        if (!c.chartArea) return;
+        const w = c.chartArea.right - c.chartArea.left;
+        const dist = Math.min(w * 0.42, 110);
+        c.$navslide = { offset: dir * dist * (1 - e), alpha: 0.25 + 0.75 * e };
+        try { c.draw(); } catch (_) {}
       });
-      // Inline-Styles nach dem Lauf entfernen, damit nichts kleben bleibt.
-      setTimeout(() => {
-        cvs.forEach(cv => { cv.style.transition=''; cv.style.transform=''; cv.style.opacity=''; });
-      }, 400);
-    });
+      if (t < 1) { _navSlideRAF = requestAnimationFrame(step); }
+      else { list.forEach(c => { delete c.$navslide; try { c.draw(); } catch (_) {} }); _navSlideRAF = null; }
+    };
+    _navSlideRAF = requestAnimationFrame(step);
   });
 }
 
@@ -570,6 +596,9 @@ function mkC(id, cfg) {
   const el = document.getElementById(id);
   if (!el) return null;
   if (charts[id]) { try { charts[id].destroy(); } catch(e){} }
+  // Während einer Pfeil-Navigation die Aufbau-Animation abschalten – die seitliche
+  // Wisch-Bewegung übernimmt _animNavSlide (sonst zwei konkurrierende Animationen).
+  if (_navSliding) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
   charts[id] = new Chart(el, cfg);
   // Track chart per tab (for per-tab destroy on re-render)
   if (_currentRenderingTab && tabCharts[_currentRenderingTab]) {
@@ -1280,11 +1309,21 @@ function pgOverview() {
         </div>
       </div>
     </div>
-    <!-- Zeile 2: Monatstrend | Wochenverlauf -->
-    <div class="ov-row" style="height:290px">
-      <div class="chart-card ov-col-narrow" style="margin-bottom:0;display:flex;flex-direction:column">
-        <div class="chart-head"><h3>${_trendTitle}</h3>${chartFilterHTML()}</div>
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
+    <!-- Zeile 2: Verlauf (oberhalb des Trends) -->
+    <div class="chart-card" style="margin-bottom:.7rem">
+      <h3 style="margin-bottom:.35rem">Verlauf</h3>
+      <div class="chart-legend" style="margin-bottom:.3rem">
+        <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf (h)</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Ruhepuls (bpm)</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV (ms)</div>
+        <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Trainingsmin.':'Schritte'}</div>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="c-woche"></canvas></div>
+    </div>
+    <!-- Zeile 3: Monats-Trend (unterhalb des Verlaufs) -->
+    <div class="chart-card" style="margin-bottom:.7rem">
+      <div class="chart-head"><h3>${_trendTitle}</h3>${chartFilterHTML()}</div>
+      <div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#7C3AED"></div>
           <div class="mt-lbl">Schlaf (h)</div>
@@ -1313,17 +1352,6 @@ function pgOverview() {
           <div class="mt-val">${av(D,'steps')!=null?Math.round(av(D,'steps')).toLocaleString('de-CH')+'/d':'—'}</div>
           <div class="mt-arrow ${stTr}">${stTr==='up'?'↑':stTr==='dn'?'↓':'→'}</div>
         </div>
-        </div><!-- end flex-rows-wrap -->
-      </div>
-      <div class="chart-card ov-col-wide" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3 style="margin-bottom:.35rem">Verlauf</h3>
-        <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf (h)</div>
-          <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Ruhepuls (bpm)</div>
-          <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV (ms)</div>
-          <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Trainingsmin.':'Schritte'}</div>
-        </div>
-        <div class="chart-wrap" style="flex:1;min-height:252px"><canvas id="c-woche"></canvas></div>
       </div>
     </div>
 
@@ -2355,7 +2383,7 @@ function chartFilterHTML() {
   // ↺ (aktuellster Zeitraum) bewusst GANZ LINKS, getrennt vom ›-Pfeil – sonst
   // wird es leicht aus Versehen statt des Vorwärts-Pfeils getroffen.
   return `<div class="chart-filter">
-    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${hideNav?'none':'inline-flex'}">↺</button>
+    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${hideNav?'none':'inline-flex'}">Heute</button>
     <select class="range-select" aria-label="Zeitraum">${opts}</select>
     <div class="date-nav" style="display:${hideNav?'none':'inline-flex'}">
       <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
