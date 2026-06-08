@@ -1865,17 +1865,6 @@ async function pgTraining() {
   const trendLabels=trendDates.map(d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'});});
   const trendDist=trendDates.map(d=>(workoutData[d]?.distanceKm??null));
   const trendHR=trendDates.map(d=>(workoutData[d]?.avgHR??null));
-  const acuteLoad7  = calculateTrainingLoad(allData.slice(-7));
-  const chronicLoad28 = calculateTrainingLoad(allData.slice(-28));
-  const acwr = (acuteLoad7&&chronicLoad28&&chronicLoad28>0) ? (acuteLoad7/(chronicLoad28/4)) : null;
-  const trainCoachHint = (() => {
-    const rec = getDailyRecommendation();
-    if (!rec) return 'Noch zu wenig Daten für eine Trainingsempfehlung.';
-    if (rec.negativeCount>=3) return 'Mehrere Erholungssignale aktiv. Heute auf Training verzichten oder nur sanfte Bewegung.';
-    if (acwr!=null&&acwr>1.5) return 'Hohe akute Belastung im Verhältnis zur chronischen. Intensität heute reduzieren.';
-    if (acwr!=null&&acwr<0.6) return 'Wenig Belastung zuletzt. Eine Qualitätseinheit wäre gut möglich, wenn Erholung und Schlaf stimmen.';
-    return rec.action;
-  })();
   // Very broad field detection
   const calField=findField(D,
     'activeCal',
@@ -1982,13 +1971,24 @@ async function pgTraining() {
     <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet · erwartete Spalten: <code>Date</code> <code>Type</code> <code>Duration (min)</code> <code>Distance (km)</code> <code>Avg HR</code> <code>Speed (km/h)</code></div>
   </div>`;
 
+  // ── VO₂max (vormals eigener Tab → jetzt zuunterst im Training) ──
+  const v2r=D.filter(r=>r.vo2max!=null);
+  const v2D=av(v2r,'vo2max'), v2P=av(P.filter(r=>r.vo2max!=null),'vo2max');
+  const v2Trend=v2D&&v2P?pct(v2D,v2P):null;
+  const _vo2Cat=(v)=>{
+    if(v==null)return['Keine Daten','#94A3B8',0];
+    if(v>=55)return['Exzellent','#2563EB',92];
+    if(v>=47)return['Überdurchschnittlich','#10B981',74];
+    if(v>=42)return['Durchschnittlich','#84CC16',55];
+    if(v>=35)return['Unterdurchschnittlich','#F97316',35];
+    return['Niedrig','#EF4444',15];
+  };
+  const [v2cat,v2catColor,v2pctPos]=_vo2Cat(v2D);
+  const {labels:_v2tL,align:_v2tA,hasData:_v2tHD}=timeDim(D,true,true);
+  const v2MaFull=_v2tA('vo2max');
+
   document.getElementById("screen-training").innerHTML=`
     ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?','#7C2D12','#F97316')}
-    <div class="ch-card">
-      <h4>🎯 Trainingscoaching</h4>
-      <p>${trainCoachHint}</p>
-      ${acwr!=null?`<div style="margin-top:.4rem;font-size:.63rem;color:var(--txt3)">Akut/Chronisch-Verhältnis: <strong style="color:${acwr>1.5?'#EF4444':acwr>1.3?'#F97316':'#10B981'}">${acwr.toFixed(2)}</strong> (Zielbereich 0.8–1.3)</div>`:''}
-    </div>
     <div class="three-col">
       <div class="chart-card" style="margin-bottom:0">
         <h3 style="margin:0 0 .5rem">🏋️ Trainingskalender</h3>
@@ -2032,7 +2032,27 @@ async function pgTraining() {
         ${paceWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${fmtPace(paceWkndAvg)} min/km</span></div>`:''}
       </div>
     </div>
-    ${!hasAny?noDataCard:''}`;
+    ${!hasAny?noDataCard:''}
+    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
+    <div class="chart-card">
+      <h3>📊 Fitness-Einordnung</h3>
+      <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.6rem">VO₂max aktuell: <strong>${fn(v2D,1)} ml/kg/min</strong> – <span style="color:${v2catColor};font-weight:700">${v2cat}</span></p>
+      <div class="fit-bar-wrap">
+        <div class="fit-bar"><div class="fit-marker" style="left:${v2pctPos}%"></div></div>
+        <div class="fit-labels"><span>Niedrig<br>&lt;35</span><span>Unter-Ø<br>35–42</span><span>Ø<br>42–47</span><span>Über-Ø<br>47–55</span><span>Top<br>&gt;55</span></div>
+      </div>
+      <span class="fit-cat-badge" style="background:${v2catColor}20;color:${v2catColor}">${v2cat}</span>
+      <div class="stats-list" style="margin-top:.8rem">
+        <div class="stat-row"><span class="stat-lbl">Trend</span><span class="stat-val" style="color:${v2Trend!=null&&v2Trend>0?'#10B981':v2Trend!=null&&v2Trend<0?'#EF4444':'#94A3B8'}">${v2Trend!=null?(v2Trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}</span></div>
+        <div class="stat-row"><span class="stat-lbl">Veränderung</span><span class="stat-val">${v2Trend!=null?(v2Trend>0?'+':'')+v2Trend.toFixed(1)+'%':'—'}</span></div>
+        <div class="stat-row"><span class="stat-lbl">Messungen</span><span class="stat-val">${v2r.length}</span></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:0">
+      <h3>🫁 VO₂max-Verlauf</h3>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max [ml/kg/min]${v2D!=null?` · Ø <strong>${fn(v2D,1)}</strong>`:''}</div></div>
+      <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
+    </div>`;
 
   // Calendar navigation callbacks
   window._calPrev=()=>{
@@ -2147,6 +2167,22 @@ async function pgTraining() {
       scales:{x:{...gx,ticks:{...gx.ticks,maxRotation:45,minRotation:30}},
         y:{...gy,min:_pMin,max:_pMax,
           ticks:{...gy.ticks,callback:v=>fmtPace(v)}}}}});
+  }
+
+  // ── VO₂max-Verlauf (vormals eigener Tab) ──
+  if(_v2tHD&&v2MaFull.some(v=>v!=null)){
+    let _v2Min=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.min(a,b),Infinity);
+    let _v2Max=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.max(a,b),-Infinity);
+    if(v2D!=null){ _v2Min=Math.min(_v2Min,v2D); _v2Max=Math.max(_v2Max,v2D); } // Ø-Linie im Sichtbereich halten
+    const _v2Step=2;
+    const _v2YMin=Math.floor(_v2Min/_v2Step)*_v2Step;
+    const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
+    const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
+    if(v2D!=null) _v2Dsets.push({label:'Ø VO₂max',data:_v2tL.map(()=>v2D),borderColor:'rgba(217,119,6,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,fill:false,spanGaps:true});
+    mkC('c-vo2',{type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!(item.dataset.label||'').startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
+        scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,ticks:{...gy.ticks,stepSize:_v2Step}}}}});
   }
 }
 
@@ -2275,83 +2311,11 @@ function pgAktivitaet() {
   }
 }
 
-// ── VO₂max ────────────────────────────────────────────
-function pgVO2() {
-  const D=filtered(), P=prevPeriod();
-  const v2r=D.filter(r=>r.vo2max!=null);
-  const v2D=av(v2r,'vo2max'), v2P=av(P.filter(r=>r.vo2max!=null),'vo2max');
-  const trend=v2D&&v2P?pct(v2D,v2P):null;
-
-  function vo2Cat(v) {
-    if(v==null)return['Keine Daten','#94A3B8',0];
-    if(v>=55)return['Exzellent','#2563EB',92];
-    if(v>=47)return['Überdurchschnittlich','#10B981',74];
-    if(v>=42)return['Durchschnittlich','#84CC16',55];
-    if(v>=35)return['Unterdurchschnittlich','#F97316',35];
-    return['Niedrig','#EF4444',15];
-  }
-  const [cat,catColor,pctPos]=vo2Cat(v2D);
-  const {labels:tL,align:tA,hasData:tHD}=timeDim(D,true,true);
-  const v2MaFull=tA('vo2max');
-
-  document.getElementById("screen-vo2").innerHTML=`
-    ${pgBanner('🫁','VO₂max','Wie entwickelt sich meine Ausdauerfähigkeit?','#78350F','#F59E0B')}
-    <div class="two-col-eq">
-      <div class="chart-card" style="margin-bottom:0">
-        <h3>📊 Fitness-Einordnung</h3>
-        <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.6rem">Aktuell: <strong>${fn(v2D,1)} ml/kg/min</strong> – <span style="color:${catColor};font-weight:700">${cat}</span></p>
-        <div class="fit-bar-wrap">
-          <div class="fit-bar"><div class="fit-marker" style="left:${pctPos}%"></div></div>
-          <div class="fit-labels"><span>Niedrig<br>&lt;35</span><span>Unter-Ø<br>35–42</span><span>Ø<br>42–47</span><span>Über-Ø<br>47–55</span><span>Top<br>&gt;55</span></div>
-        </div>
-        <span class="fit-cat-badge" style="background:${catColor}20;color:${catColor}">${cat}</span>
-        <div class="stats-list" style="margin-top:.8rem">
-          <div class="stat-row"><span class="stat-lbl">Trend</span><span class="stat-val" style="color:${trend!=null&&trend>0?'#10B981':trend!=null&&trend<0?'#EF4444':'#94A3B8'}">${trend!=null?(trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Veränderung</span><span class="stat-val">${trend!=null?(trend>0?'+':'')+trend.toFixed(1)+'%':'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Messungen</span><span class="stat-val">${v2r.length}</span></div>
-        </div>
-      </div>
-      <div class="chart-card" style="margin-bottom:0">
-        <h3>ℹ️ Einordnung</h3>
-        <div class="stats-list">
-          <div class="stat-row"><span class="stat-lbl">&gt; 55 ml/kg/min</span><span class="stat-val" style="color:#2563EB">Exzellent</span></div>
-          <div class="stat-row"><span class="stat-lbl">47 – 55</span><span class="stat-val" style="color:#10B981">Überdurchschnittlich</span></div>
-          <div class="stat-row"><span class="stat-lbl">42 – 47</span><span class="stat-val" style="color:#84CC16">Durchschnittlich</span></div>
-          <div class="stat-row"><span class="stat-lbl">35 – 42</span><span class="stat-val" style="color:#F97316">Unterdurchschnittlich</span></div>
-          <div class="stat-row"><span class="stat-lbl">&lt; 35 ml/kg/min</span><span class="stat-val" style="color:#EF4444">Niedrig</span></div>
-        </div>
-      </div>
-    </div>
-    <div class="chart-card" style="margin-bottom:0">
-      <h3>🫁 VO₂max-Verlauf</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max [ml/kg/min]${v2D!=null?` · Ø <strong>${fn(v2D,1)}</strong>`:''}</div></div>
-      <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
-    </div>`;
-
-  if(tHD&&v2MaFull.some(v=>v!=null)){
-    let _v2Min=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.min(a,b),Infinity);
-    let _v2Max=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.max(a,b),-Infinity);
-    if(v2D!=null){ _v2Min=Math.min(_v2Min,v2D); _v2Max=Math.max(_v2Max,v2D); } // Ø-Linie im Sichtbereich halten
-    const _v2Step=2; // y-axis step size
-    const _v2YMin=Math.floor(_v2Min/_v2Step)*_v2Step; // round down to nearest 2
-    const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
-    // Gestrichelte Ø-Linie über den Zeitfilter (wie in den anderen Diagrammen)
-    const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
-    if(v2D!=null) _v2Dsets.push({label:'Ø VO₂max',data:tL.map(()=>v2D),borderColor:'rgba(217,119,6,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,fill:false,spanGaps:true});
-    mkC('c-vo2',{type:'line',data:{labels:tL,datasets:_v2Dsets},
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!(item.dataset.label||'').startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
-        scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,
-          ticks:{...gy.ticks,stepSize:_v2Step}}}}});
-  }
-}
-
-
 // ── Navigation ─────────────────────────────────────────
-const PAGE_TITLES={overview:'Übersicht',herz:'Herz',schlaf:'Schlaf',aktivitaet:'Schritte',training:'Training',vo2:'VO₂max'};
-const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,aktivitaet:pgAktivitaet,training:pgTraining,vo2:pgVO2};
+const PAGE_TITLES={overview:'Übersicht',herz:'Herz',schlaf:'Schlaf',aktivitaet:'Schritte',training:'Training'};
+const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,aktivitaet:pgAktivitaet,training:pgTraining};
 
-const PAGE_THEMES={overview:'th-overview',herz:'th-herz',schlaf:'th-schlaf',aktivitaet:'th-aktivitaet',training:'th-training',vo2:'th-vo2'};
+const PAGE_THEMES={overview:'th-overview',herz:'th-herz',schlaf:'th-schlaf',aktivitaet:'th-aktivitaet',training:'th-training'};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
 function pgBanner(icon,title,sub){
@@ -2363,12 +2327,12 @@ function pgBanner(icon,title,sub){
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
 // ═══════════════════════════════════════════════════════════
-const TAB_ORDER = ['overview','herz','schlaf','aktivitaet','training','vo2'];
+const TAB_ORDER = ['overview','herz','schlaf','aktivitaet','training'];
 let currentScreen = 'overview';
 let _suppressScrollSync = false;
 let _currentRenderingTab = null;
 const _renderedTabs = new Set();
-const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[], vo2:[] };
+const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[] };
 
 // Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
 // jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
@@ -2490,8 +2454,7 @@ const TAB_THEME_COLORS = {
   herz:       '#EF4444',
   schlaf:     '#7C3AED',
   aktivitaet: '#10B981',
-  training:   '#F97316',
-  vo2:        '#F59E0B'
+  training:   '#F97316'
 };
 function _setStatusBarColor(name) {
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -2510,8 +2473,7 @@ const THEME_GRADIENTS = {
   herz:       'linear-gradient(135deg, #7F1D1D, #EF4444)',
   schlaf:     'linear-gradient(135deg, #1E3A8A, #7C3AED)',
   aktivitaet: 'linear-gradient(135deg, #064E3B, #10B981)',
-  training:   'linear-gradient(135deg, #7C2D12, #F97316)',
-  vo2:        'linear-gradient(135deg, #78350F, #F59E0B)'
+  training:   'linear-gradient(135deg, #7C2D12, #F97316)'
 };
 // Pro Wisch-Frame aufrufen. progress = container.scrollLeft / clientWidth
 // (z.B. 2.37 = zwischen Tab 2 und 3). Layer a ("von") bleibt deckend, Layer b
