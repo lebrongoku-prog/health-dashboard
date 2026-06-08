@@ -419,16 +419,8 @@ function navNext() {
 
 function setR(r) {
   timeRange = r;
-  document.querySelectorAll('.tbtn[data-range]').forEach(b => {
-    b.classList.toggle('active', b.dataset.range === r);
-  });
-  // Datums-Nav bei "Heute"-Filter ausblenden (oder Overview, das ist schon in _applyTabState).
-  // Hier alle Instanzen (eine pro Tab) durchgehen.
-  document.querySelectorAll('.date-nav').forEach(el => {
-    const hide = currentScreen === 'overview' || r === 'heute';
-    el.style.display = hide ? 'none' : 'flex';
-  });
-  updateNavUI();
+  // Die Filter-Controls liegen jetzt in den Diagrammen und werden beim Re-Render
+  // (mit korrektem Bereich + Navigator-Sichtbarkeit) frisch aufgebaut.
   _refreshAfterStateChange();
 }
 
@@ -2440,29 +2432,51 @@ const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[],
 // Topbar-HTML pro Tab. Wird beim Render in jede .screen-Fläche injiziert.
 // IDs sind absichtlich Klassen, weil es sechs Instanzen geben kann.
 function _topbarHTML(forOverview) {
-  const r = timeRange;
-  const isOverview = !!forOverview;
-  const hideDateNav = isOverview || r === 'heute';
-  const dateLabel = navDateLabel();
+  // Schlanke Topbar: nur noch Refresh + Dark-Toggle. Zeitfilter + Datumsnavigator
+  // liegen jetzt in den einzelnen Diagrammen (siehe chartFilterHTML / _injectChartFilters).
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  const pills = [
-    ['heute','Heute'],['7d','7D'],['1m','1M'],
-    ['3m','3M'],['6m','6M'],['12m','12M'],['24m','24M']
-  ].map(([k,lbl]) => `<button class="tbtn${k===r?' active':''}" data-range="${k}">${lbl}</button>`).join('');
-  return `<header class="topbar-inline">
+  return `<header class="topbar-inline topbar-mini">
     <div class="tb-row tb-row-main">
-      <div class="date-nav" style="display:${hideDateNav?'none':'flex'}">
-        <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
-        <span class="nav-label">${dateLabel}</span>
-        <button class="nav-arrow nav-next" aria-label="Vor">›</button>
-        <button class="nav-arrow nav-today" title="Heute" aria-label="Heute">↺</button>
-      </div>
-      <button class="nav-arrow tb-refresh refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button>
       <div class="tb-spacer"></div>
+      <button class="nav-arrow tb-refresh refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button>
       <button class="nav-arrow tb-dark dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button>
     </div>
-    <div class="tbg" style="display:${isOverview?'none':'flex'}">${pills}</div>
   </header>`;
+}
+
+// Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
+// Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
+const _RANGE_OPTS = [
+  ['heute','Heute'],['7d','7 Tage'],['1m','1 Monat'],
+  ['3m','3 Monate'],['6m','6 Monate'],['12m','12 Monate'],['24m','24 Monate']
+];
+function chartFilterHTML() {
+  const r = timeRange;
+  const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===r?' selected':''}>${lbl}</option>`).join('');
+  const hideNav = r === 'heute';
+  return `<div class="chart-filter">
+    <select class="range-select" aria-label="Zeitraum">${opts}</select>
+    <div class="date-nav" style="display:${hideNav?'none':'inline-flex'}">
+      <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
+      <span class="nav-label">${navDateLabel()}</span>
+      <button class="nav-arrow nav-next" aria-label="Vor">›</button>
+      <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Heute">↺</button>
+    </div>
+  </div>`;
+}
+// Filter-Control in jede Diagramm-Karte (mit <canvas>) einer .screen injizieren.
+// Übersicht wird im 2. Durchgang separat behandelt.
+function _injectChartFilters(name) {
+  if (name === 'overview') return;
+  const screenEl = document.getElementById('screen-'+name);
+  if (!screenEl) return;
+  screenEl.querySelectorAll('.chart-card').forEach(card => {
+    if (!card.querySelector('canvas')) return;                 // nur echte Diagramm-Karten
+    if (card.querySelector(':scope > .chart-filter')) return;  // nicht doppelt injizieren
+    const h3 = card.querySelector(':scope > h3');
+    if (h3) h3.insertAdjacentHTML('afterend', chartFilterHTML());
+    else card.insertAdjacentHTML('afterbegin', chartFilterHTML());
+  });
 }
 
 // Topbar in eine .screen-Fläche prependen (entfernt vorherige Instanz, falls vorhanden)
@@ -2472,7 +2486,8 @@ function _injectTopbar(name) {
   const existing = screenEl.querySelector(':scope > .topbar-inline');
   if (existing) existing.remove();
   screenEl.insertAdjacentHTML('afterbegin', _topbarHTML(name === 'overview'));
-  // Disable-State der Pfeile gleich nach Inject korrekt setzen
+  _injectChartFilters(name); // Filter-Controls in die Diagramm-Karten setzen
+  // Disable-State der Pfeile + Label gleich nach Inject korrekt setzen
   updateNavUI();
 }
 
@@ -2742,6 +2757,11 @@ document.body.addEventListener('click', (e) => {
   }
   const pill = t.closest('.tbtn[data-range]');
   if (pill) { setR(pill.dataset.range); return; }
+});
+// Bereichs-Dropdown in den Diagrammen (Variante A) → setzt den globalen Zeitfilter.
+document.body.addEventListener('change', (e) => {
+  const sel = e.target;
+  if (sel && sel.classList && sel.classList.contains('range-select')) setR(sel.value);
 });
 // Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {

@@ -333,6 +333,14 @@ body.dark #bottom-nav {
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
 .chart-wrap{position:relative}
 
+/* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
+.chart-filter{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin:.1rem 0 .5rem}
+.chart-filter .range-select{font-size:.68rem;font-weight:600;color:var(--txt2);background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:.2rem .5rem;cursor:pointer;outline:none;font-family:inherit}
+.chart-filter .date-nav{align-items:center;gap:2px}
+.chart-filter .nav-arrow{width:26px;height:26px;font-size:.85rem;border-radius:7px}
+.chart-filter .nav-label{font-size:.68rem;font-weight:600;min-width:84px;text-align:center;color:var(--txt2)}
+body.dark .chart-filter .range-select{background:#0F172A}
+
 /* Multi-column layouts */
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .two-col-eq>*{min-width:0;overflow:visible}
