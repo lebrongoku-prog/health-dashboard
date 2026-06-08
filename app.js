@@ -1783,6 +1783,14 @@ function pgSchlaf() {
 
   if(tHD){
     const slAvgLine=slMa.map(()=>slD);
+    // Y-Achse flexibel: nicht ab 0, sondern an den Datenbereich angeschmiegt, damit
+    // die Variation zwischen den Nächten sichtbar wird (Schritt = 1 Std.).
+    const _slV=slMa.filter(v=>v!=null);
+    const _slY={...gy,ticks:{...gy.ticks,stepSize:1,callback:v=>Math.floor(v)+'h'}};
+    if(_slV.length){
+      _slY.min=Math.max(0, Math.floor(Math.min(..._slV) - 0.5));
+      _slY.max=Math.ceil(Math.max(..._slV) + 0.2);
+    } else { _slY.min=0; }
     mkC('c-sl-dur',{type:'bar',data:{labels:tL,datasets:[
       {data:slMa,backgroundColor:slMa.map(v=>v!=null&&v>=7.5?'rgba(124,58,237,.8)':'rgba(124,58,237,.35)'),borderRadius:5},
       {label:'Ø Schlafdauer',data:slAvgLine,type:'line',borderColor:'rgba(124,58,237,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0}
@@ -1795,7 +1803,7 @@ function pgSchlaf() {
         if(slStartArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Eingeschlafen: '+fmtHHMM(slStartArr[i])));
         if(slEndArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Aufgewacht: '+fmtHHMM(slEndArr[i])));
         return lines;
-      }}}},scales:{x:gx,y:{...gy,min:0,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}}}}});
+      }}}},scales:{x:gx,y:_slY}}});
     if(hasPhases){
       const _phDs=[
         {label:'Tiefschlaf',data:dpMa,backgroundColor:'#1E1B6E',borderRadius:3,stack:'s'},
@@ -2272,9 +2280,6 @@ function pgVO2() {
   const D=filtered(), P=prevPeriod();
   const v2r=D.filter(r=>r.vo2max!=null);
   const v2D=av(v2r,'vo2max'), v2P=av(P.filter(r=>r.vo2max!=null),'vo2max');
-  const v2Max=v2r.length?Math.max(...v2r.map(r=>r.vo2max)):null;
-  const v2Min=v2r.length?Math.min(...v2r.map(r=>r.vo2max)):null;
-  const v2All=av(allData.filter(r=>r.vo2max!=null),'vo2max');
   const trend=v2D&&v2P?pct(v2D,v2P):null;
 
   function vo2Cat(v) {
@@ -2291,10 +2296,6 @@ function pgVO2() {
 
   document.getElementById("screen-vo2").innerHTML=`
     ${pgBanner('🫁','VO₂max','Wie entwickelt sich meine Ausdauerfähigkeit?','#78350F','#F59E0B')}
-    <div class="kpi-grid kpi-grid-2">
-      ${kpiCard({icon:'🫁',label:'Ø VO₂max',value:fn(v2D,1),unit:'ml/kg/min',delta:pct(v2D,v2P),color:'var(--vo2)'})}
-      ${kpiCard({icon:'🌐',label:'Gesamtdurchschnitt',value:fn(v2All,1),unit:'ml/kg/min',delta:null,color:'var(--vo2)',sub:'über alle Daten'})}
-    </div>
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
         <h3>📊 Fitness-Einordnung</h3>
@@ -2323,19 +2324,23 @@ function pgVO2() {
     </div>
     <div class="chart-card" style="margin-bottom:0">
       <h3>🫁 VO₂max-Verlauf</h3>
-      <div class="chart-legend"><div class="cl-item" style="color:var(--txt2);font-size:.72rem">ml/kg/min</div></div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max [ml/kg/min]${v2D!=null?` · Ø <strong>${fn(v2D,1)}</strong>`:''}</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
     </div>`;
 
   if(tHD&&v2MaFull.some(v=>v!=null)){
-    const _v2Min=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.min(a,b),Infinity);
-    const _v2Max=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.max(a,b),-Infinity);
+    let _v2Min=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.min(a,b),Infinity);
+    let _v2Max=v2MaFull.filter(v=>v!=null).reduce((a,b)=>Math.max(a,b),-Infinity);
+    if(v2D!=null){ _v2Min=Math.min(_v2Min,v2D); _v2Max=Math.max(_v2Max,v2D); } // Ø-Linie im Sichtbereich halten
     const _v2Step=2; // y-axis step size
     const _v2YMin=Math.floor(_v2Min/_v2Step)*_v2Step; // round down to nearest 2
     const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
-    mkC('c-vo2',{type:'line',data:{labels:tL,datasets:[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}]},
+    // Gestrichelte Ø-Linie über den Zeitfilter (wie in den anderen Diagrammen)
+    const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
+    if(v2D!=null) _v2Dsets.push({label:'Ø VO₂max',data:tL.map(()=>v2D),borderColor:'rgba(217,119,6,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,fill:false,spanGaps:true});
+    mkC('c-vo2',{type:'line',data:{labels:tL,datasets:_v2Dsets},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
+        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!(item.dataset.label||'').startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
         scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,
           ticks:{...gy.ticks,stepSize:_v2Step}}}}});
   }
@@ -2664,7 +2669,10 @@ function initScrollHideNav() {
   // Links, Eingabefeldern, Selects und der oberen Filterleiste) → Bottom-Nav aus-/einblenden.
   const _tapContainer = document.getElementById('tab-container');
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
-    if (e.target.closest('button, a, input, select, textarea, label, .topbar-inline')) return;
+    // Nur auf "totem" Hintergrund togglen. Alles, was selbst etwas auslöst, ausnehmen:
+    // Buttons/Links/Eingaben, die Chart-Canvas (Tooltip beim Antippen), die Filterleiste
+    // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], .debt-tt-wrap, .topbar-inline')) return;
     nav.classList.toggle('nav-hidden');
   });
 }
