@@ -405,6 +405,7 @@ function navPrev() {
   referenceDate = nr;
   updateNavUI();
   _refreshAfterStateChange();
+  _animNavSlide(-1); // zurück: Diagramm wischt nach rechts
 }
 
 function navNext() {
@@ -415,6 +416,40 @@ function navNext() {
   referenceDate = nr;
   updateNavUI();
   _refreshAfterStateChange();
+  _animNavSlide(1); // vor: Diagramm wischt nach links
+}
+
+// Wisch-Animation beim Pfeil-Navigator: nur die Chart-Flächen (Canvas) gleiten
+// seitlich, Titel + Filter-Control bleiben fix. dir=-1 (zurück) → Inhalt kommt
+// von links herein (Bewegung nach rechts); dir=+1 (vor) → von rechts.
+// Läuft nach dem Re-Render; greift nur auf bereits gezeichnete Canvas zu
+// (async-Tab Training ohne Animation – unkritisch). Respektiert reduce-motion.
+function _animNavSlide(dir) {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const screenId = 'screen-' + currentScreen;
+  const startX = dir < 0 ? -56 : 56;
+  requestAnimationFrame(() => {
+    const screen = document.getElementById(screenId);
+    if (!screen) return;
+    const cvs = Array.from(screen.querySelectorAll('.chart-wrap > canvas'));
+    if (!cvs.length) return;
+    cvs.forEach(cv => {
+      cv.style.transition = 'none';
+      cv.style.transform  = `translateX(${startX}px)`;
+      cv.style.opacity    = '0.25';
+    });
+    requestAnimationFrame(() => {
+      cvs.forEach(cv => {
+        cv.style.transition = 'transform .32s cubic-bezier(.22,.61,.36,1), opacity .3s ease';
+        cv.style.transform  = 'translateX(0)';
+        cv.style.opacity    = '1';
+      });
+      // Inline-Styles nach dem Lauf entfernen, damit nichts kleben bleibt.
+      setTimeout(() => {
+        cvs.forEach(cv => { cv.style.transition=''; cv.style.transform=''; cv.style.opacity=''; });
+      }, 400);
+    });
+  });
 }
 
 function setR(r) {
@@ -1122,6 +1157,7 @@ function pgOverview() {
 
 
   document.getElementById("screen-overview").innerHTML = `
+    ${pgBanner('📊','Übersicht','Dein Gesundheitsüberblick auf einen Blick','#0C4A6E','#0891B2')}
     <!-- Warning signals (only shown when triggered) -->
     ${warnSig ? `<div class="warn-card">
       <div class="warn-icon">⚠️</div>
@@ -1253,28 +1289,28 @@ function pgOverview() {
           <div class="mt-dot" style="background:#7C3AED"></div>
           <div class="mt-lbl">Schlaf (h)</div>
           <div class="mt-spark">${sparkSVG(slValsT,'#7C3AED',160,24)}</div>
-          <div class="mt-val">${av(D,'sleepTotal')!=null?toHM(av(D,'sleepTotal')):'—'}</div>
+          <div class="mt-val">${av(D,'sleepTotal')!=null?toHM(av(D,'sleepTotal'))+'/d':'—'}</div>
           <div class="mt-arrow ${slTr}">${slTr==='up'?'↑':slTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#EF4444"></div>
           <div class="mt-lbl">Ruhepuls (bpm)</div>
           <div class="mt-spark">${sparkSVG(hrValsT,'#EF4444',160,24)}</div>
-          <div class="mt-val">${av(D,'restHR')!=null?fn(av(D,'restHR'),0)+' bpm':'—'}</div>
+          <div class="mt-val">${av(D,'restHR')!=null?fn(av(D,'restHR'),0)+' bpm/d':'—'}</div>
           <div class="mt-arrow ${hrTr}">${hrTr==='up'?'↑':hrTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#2563EB"></div>
           <div class="mt-lbl">HRV (ms)</div>
           <div class="mt-spark">${sparkSVG(hvValsT,'#2563EB',160,24)}</div>
-          <div class="mt-val">${av(D,'hrv')!=null?fn(av(D,'hrv'),0)+' ms':'—'}</div>
+          <div class="mt-val">${av(D,'hrv')!=null?fn(av(D,'hrv'),0)+' ms/d':'—'}</div>
           <div class="mt-arrow ${hvTr}">${hvTr==='up'?'↑':hvTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#059669"></div>
           <div class="mt-lbl">Schritte</div>
           <div class="mt-spark">${sparkSVG(stValsT,'#059669',160,24)}</div>
-          <div class="mt-val">${av(D,'steps')!=null?Math.round(av(D,'steps')).toLocaleString('de-CH'):'—'}</div>
+          <div class="mt-val">${av(D,'steps')!=null?Math.round(av(D,'steps')).toLocaleString('de-CH')+'/d':'—'}</div>
           <div class="mt-arrow ${stTr}">${stTr==='up'?'↑':stTr==='dn'?'↓':'→'}</div>
         </div>
         </div><!-- end flex-rows-wrap -->
@@ -1315,13 +1351,15 @@ function pgOverview() {
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){
     const lbl=ctx.dataset.label, v=ctx.raw, agg=_wocheAgg;
-    if(lbl==='Schlaf (h)')return`${agg?'Ø ':''}Schlaf: ${v!=null?toHM(v):'—'}`;
+    // Bei aggregierten Buckets (Wochen-/Monatswerte) ist der Wert ein Tagesmittel → "Ø …/d".
+    const pre=agg?'Ø ':'', per=agg?'/d':'';
+    if(lbl==='Schlaf (h)')return`${pre}Schlaf: ${v!=null?toHM(v)+per:'—'}`;
     if(lbl===_wocheTrLabel){
-      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${agg?'Ø ':''}${_wocheTrLabel}: ${mins} min`;}
-      return`${agg?'Ø ':''}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}`;
+      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${pre}${_wocheTrLabel}: ${mins} min${per}`;}
+      return`${pre}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH')+per:'—'}`;
     }
-    if(lbl==='Ruhepuls') return `${agg?'Ø ':''}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
-    if(lbl==='HRV')      return `${agg?'Ø ':''}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
+    if(lbl==='Ruhepuls') return `${pre}Ruhepuls: ${v!=null?Math.round(v)+' bpm'+per:'—'}`;
+    if(lbl==='HRV')      return `${pre}HRV: ${v!=null?Math.round(v)+' ms'+per:'—'}`;
     return lbl+': '+(v!=null?v.toFixed(1):'—');
   }
   if(wHas){
@@ -1443,7 +1481,7 @@ function pgHerz() {
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>❤️ Ruhepuls-Einordnung</h3>
         <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
-          Ø ${fn(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
+          Ø ${fn(hrD,0)} bpm/d → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
         <div style="margin:.4rem 0">
           <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&lt; 50 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nAthlete/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nAthlete}</span><span style="color:var(--txt3)">(${(nAthlete/nTot*100).toFixed(0)}%)</span></span></div>
@@ -1452,8 +1490,8 @@ function pgHerz() {
           <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&gt; 75 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHigh/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHigh}</span><span style="color:var(--txt3)">(${(nHigh/nTot*100).toFixed(0)}%)</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.6rem">
-          ${hrWeek!=null||hrWknd!=null?`<div class="stat-row"><span class="stat-lbl">Wochentag</span><span class="stat-val">${hrWeek!=null?fn(hrWeek,0)+' bpm':'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Wochenende</span><span class="stat-val">${hrWknd!=null?fn(hrWknd,0)+' bpm':'—'}</span></div>
+          ${hrWeek!=null||hrWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag</span><span class="stat-val">${hrWeek!=null?fn(hrWeek,0)+' bpm/d':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochenende</span><span class="stat-val">${hrWknd!=null?fn(hrWknd,0)+' bpm/d':'—'}</span></div>
           ${hrWeek!=null&&hrWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${hrWknd<hrWeek?'#10B981':'#F97316'}">${hrWknd<hrWeek?'':'+'}${fn(hrWknd-hrWeek,0)} bpm</span></div>`:``}`:''}
           <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hrf.length}d <span style="color:var(--txt3)">(${D.length>0?(hrf.length/D.length*100).toFixed(0):'—'}%)</span></span></div>
         </div>
@@ -1461,7 +1499,7 @@ function pgHerz() {
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>💙 HRV-Einordnung</h3>
         <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
-          Ø ${fn(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
+          Ø ${fn(hvD,0)} ms/d → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
         <div style="margin:.4rem 0">
           <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 70 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVHigh/nHVTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nHVHigh}</span><span style="color:var(--txt3)">(${(nHVHigh/nHVTot*100).toFixed(0)}%)</span></span></div>
@@ -1470,8 +1508,8 @@ function pgHerz() {
           <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 30 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVLow/nHVTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHVLow}</span><span style="color:var(--txt3)">(${(nHVLow/nHVTot*100).toFixed(0)}%)</span></span></div>
         </div>
         <div class="stats-list" style="margin-top:.6rem">
-          ${hvWeek!=null||hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Wochentag</span><span class="stat-val">${hvWeek!=null?fn(hvWeek,0)+' ms':'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Wochenende</span><span class="stat-val">${hvWknd!=null?fn(hvWknd,0)+' ms':'—'}</span></div>
+          ${hvWeek!=null||hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag</span><span class="stat-val">${hvWeek!=null?fn(hvWeek,0)+' ms/d':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochenende</span><span class="stat-val">${hvWknd!=null?fn(hvWknd,0)+' ms/d':'—'}</span></div>
           ${hvWeek!=null&&hvWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${hvWknd>hvWeek?'#10B981':'#F97316'}">${hvWknd>hvWeek?'+':''}${fn(hvWknd-hvWeek,0)} ms</span></div>`:``}`:''}
           <div class="stat-row"><span class="stat-lbl">Messpunkte</span><span class="stat-val">${hvf.length}d <span style="color:var(--txt3)">(${D.length>0?(hvf.length/D.length*100).toFixed(0):'—'}%)</span></span></div>
         </div>
@@ -1481,8 +1519,8 @@ function pgHerz() {
     <div class="chart-card">
       <h3>❤️ Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
-        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Ruhepuls (bpm, links)${hrD!=null?` · Ø <strong>${fn(hrD,0)} bpm</strong>`:''}</div>
-        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV (ms, rechts)${hvD!=null?` · Ø <strong>${fn(hvD,0)} ms</strong>`:''}</div>
+        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Ruhepuls (bpm, links)${hrD!=null?` · Ø <strong>${fn(hrD,0)} bpm</strong>/d`:''}</div>
+        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV (ms, rechts)${hvD!=null?` · Ø <strong>${fn(hvD,0)} ms</strong>/d`:''}</div>
       </div>
       <div class="chart-wrap" style="height:210px"><canvas id="c-herz"></canvas></div>
       <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
@@ -1637,7 +1675,7 @@ function pgSchlaf() {
       <h4>💬 Was bedeutet das für heute?</h4>
       <p>${slCoachHint}</p>
     </div>
-    ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:fn(scD,0),unit:'',delta:pct(scD,scP),color:'var(--sleep)'})}</div>`:''}
+    ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:fn(scD,0),unit:'/d',delta:pct(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
     <!-- Zeile 2: Schlafqualität-Verteilung | Schlafschuld -->
     <div class="two-col-eq">
@@ -1681,11 +1719,11 @@ function pgSchlaf() {
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
         <h3>🌙 ${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
-        ${slD!=null?`<div class="chart-legend" style="margin-bottom:.3rem"><div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø Schlafdauer · <strong>${toHM(slD)}</strong></div></div>`:''}
+        ${slD!=null?`<div class="chart-legend" style="margin-bottom:.3rem"><div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø Schlafdauer · <strong>${toHM(slD)}</strong>/d</div></div>`:''}
         <div class="chart-wrap" style="height:155px"><canvas id="c-sl-dur"></canvas></div>
         ${slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${slWeek!=null?toHM(slWeek):'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${slWknd!=null?toHM(slWknd):'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${slWeek!=null?toHM(slWeek)+'/d':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${slWknd!=null?toHM(slWknd)+'/d':'—'}</span></div>
           ${slWeek!=null&&slWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${slWknd>slWeek?'#10B981':'#F97316'}">${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}</span></div>`:``}
         </div>`:''}
       </div>
@@ -1724,7 +1762,7 @@ function pgSchlaf() {
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
         if(ctx.datasetIndex===1) return null;
         const _isAvg=timeRange!=='7d'&&timeRange!=='1m';
-        const lines=[`${_isAvg?'Ø ':''}${toHM(ctx.raw)}`];
+        const lines=[`${_isAvg?'Ø ':''}${toHM(ctx.raw)}${_isAvg?'/d':''}`];
         const i=ctx.dataIndex;
         if(slStartArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Eingeschlafen: '+fmtHHMM(slStartArr[i])));
         if(slEndArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Aufgewacht: '+fmtHHMM(slEndArr[i])));
@@ -1925,8 +1963,8 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          ${minWeek!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${Math.round(minWeek)} min</span></div>`:''}
-          ${minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${Math.round(minWknd)} min</span></div>`:''}
+          ${minWeek!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${Math.round(minWeek)} min/d</span></div>`:''}
+          ${minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${Math.round(minWknd)} min/d</span></div>`:''}
           ${minWeek!=null&&minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${minWknd>minWeek?'#10B981':'#F97316'}">${minWknd>minWeek?'+':''}${Math.round(minWknd-minWeek)} min</span></div>`:''}
         </div>
       </div>
@@ -1935,8 +1973,8 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          ${distWkdAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${fn(distWkdAvg,2)} km</span></div>`:''}
-          ${distWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${fn(distWkndAvg,2)} km</span></div>`:''}
+          ${distWkdAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${fn(distWkdAvg,2)} km/d</span></div>`:''}
+          ${distWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${fn(distWkndAvg,2)} km/d</span></div>`:''}
           ${distWkdAvg!=null&&distWkndAvg!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${distWkndAvg>distWkdAvg?'#10B981':'#F97316'}">${distWkndAvg>distWkdAvg?'+':''}${fn(distWkndAvg-distWkdAvg,2)} km</span></div>`:''}
         </div>
       </div>
@@ -2114,9 +2152,9 @@ function pgAktivitaet() {
 
   // Display avg: always daily average, regardless of time filter
   const stDisplayAvg=stD!=null?Math.round(stD):null;
-  const stDisplayLbl='/Tag';
+  const stDisplayLbl='/d';
   const calDisplayAvg=calD!=null?Math.round(calD):null;
-  const calDisplayLbl='/Tag';
+  const calDisplayLbl='/d';
 
   const {labels:tL,align:tA,hasData:tHD}=timeDim(D);
   const stMa=tA('steps');   // Ø pro Tag (Durchschnitt der Tageswerte pro Zeitbucket)
@@ -2158,8 +2196,8 @@ function pgAktivitaet() {
         <div class="chart-wrap" style="height:185px"><canvas id="c-steps"></canvas></div>
         ${stWeek!=null||stWknd!=null?`
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${stWeek!=null?Math.round(stWeek).toLocaleString('de-CH'):'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${stWknd!=null?Math.round(stWknd).toLocaleString('de-CH'):'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${stWeek!=null?Math.round(stWeek).toLocaleString('de-CH')+'/d':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${stWknd!=null?Math.round(stWknd).toLocaleString('de-CH')+'/d':'—'}</span></div>
           ${stWeek!=null&&stWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${stWknd>stWeek?'#10B981':'#F97316'}">${stWknd>stWeek?'+':''}${Math.round(stWknd-stWeek).toLocaleString('de-CH')}</span></div>`:``}
         </div>`:''}
       </div>
@@ -2171,8 +2209,8 @@ function pgAktivitaet() {
         <div class="chart-wrap" style="height:185px"><canvas id="c-cals"></canvas></div>
         ${calWeek!=null||calWknd!=null?`
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${calWeek!=null?Math.round(calWeek).toLocaleString('de-CH')+' kcal':'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${calWknd!=null?Math.round(calWknd).toLocaleString('de-CH')+' kcal':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${calWeek!=null?Math.round(calWeek).toLocaleString('de-CH')+' kcal/d':'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${calWknd!=null?Math.round(calWknd).toLocaleString('de-CH')+' kcal/d':'—'}</span></div>
           ${calWeek!=null&&calWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:${calWknd>calWeek?'#10B981':'#F97316'}">${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal</span></div>`:``}
         </div>`:''}
       </div>`:'<div></div>'}
@@ -2186,7 +2224,7 @@ function pgAktivitaet() {
     ];
     if(stDisplayAvg!=null) dsSteps.push({label:'Ø Schritte',data:stMa.map(()=>stDisplayAvg),borderColor:'rgba(5,150,105,.45)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,type:'line'});
     mkC('c-steps',{type:'bar',data:{labels:tL,datasets:dsSteps},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!item.dataset.label.startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' Schritte/Tag':null}}},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!item.dataset.label.startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' Schritte/d':null}}},
         scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
     // Chart 2: Aktive Kalorien (bar)
     if(calMaAct.some(v=>v!=null)){
@@ -2195,7 +2233,7 @@ function pgAktivitaet() {
       ];
       if(calDisplayAvg!=null) dsCals.push({label:'Ø Kalorien',data:calMaAct.map(()=>calDisplayAvg),borderColor:'rgba(52,211,153,.5)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,type:'line'});
       mkC('c-cals',{type:'bar',data:{labels:tL,datasets:dsCals},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!item.dataset.label.startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' kcal/Tag':null}}},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:item=>!item.dataset.label.startsWith('Ø'),callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' kcal/d':null}}},
           scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
     }
   }
@@ -2283,7 +2321,12 @@ const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,aktivitaet:pgAkt
 const PAGE_THEMES={overview:'th-overview',herz:'th-herz',schlaf:'th-schlaf',aktivitaet:'th-aktivitaet',training:'th-training',vo2:'th-vo2'};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
-function pgBanner(icon,title,sub){return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div></div></div>`;}
+function pgBanner(icon,title,sub){
+  // Refresh + Dark-Toggle sitzen jetzt rechtsbündig direkt auf der Titelzeile
+  // (keine eigene Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
+  const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div></div><div class="pg-banner-actions"><button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+}
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
 // ═══════════════════════════════════════════════════════════
@@ -2294,20 +2337,10 @@ let _currentRenderingTab = null;
 const _renderedTabs = new Set();
 const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[], vo2:[] };
 
-// Topbar-HTML pro Tab. Wird beim Render in jede .screen-Fläche injiziert.
-// IDs sind absichtlich Klassen, weil es sechs Instanzen geben kann.
-function _topbarHTML(forOverview) {
-  // Schlanke Topbar: nur noch Refresh + Dark-Toggle. Zeitfilter + Datumsnavigator
-  // liegen jetzt in den einzelnen Diagrammen (siehe chartFilterHTML / _injectChartFilters).
-  const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return `<header class="topbar-inline topbar-mini">
-    <div class="tb-row tb-row-main">
-      <button class="nav-arrow tb-refresh refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button>
-      <div class="tb-spacer"></div>
-      <button class="nav-arrow tb-dark dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button>
-    </div>
-  </header>`;
-}
+// Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
+// jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
+// Zeitfilter + Datumsnavigator liegen in den einzelnen Diagrammen
+// (siehe chartFilterHTML / _injectChartFilters).
 
 // Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
 // Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
@@ -2319,13 +2352,15 @@ function chartFilterHTML() {
   const r = timeRange;
   const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===r?' selected':''}>${lbl}</option>`).join('');
   const hideNav = r === 'heute';
+  // ↺ (aktuellster Zeitraum) bewusst GANZ LINKS, getrennt vom ›-Pfeil – sonst
+  // wird es leicht aus Versehen statt des Vorwärts-Pfeils getroffen.
   return `<div class="chart-filter">
+    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${hideNav?'none':'inline-flex'}">↺</button>
     <select class="range-select" aria-label="Zeitraum">${opts}</select>
     <div class="date-nav" style="display:${hideNav?'none':'inline-flex'}">
       <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
       <span class="nav-label">${navDateLabel()}</span>
       <button class="nav-arrow nav-next" aria-label="Vor">›</button>
-      <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Heute">↺</button>
     </div>
   </div>`;
 }
@@ -2351,13 +2386,12 @@ function _injectChartFilters(name) {
   });
 }
 
-// Topbar in eine .screen-Fläche prependen (entfernt vorherige Instanz, falls vorhanden)
+// Nach dem Render eines Tabs: Filter-Controls in die Diagramme setzen und
+// den Navigations-Zustand (Pfeile/Label) aktualisieren. (Refresh/Dark sitzen
+// jetzt im Banner, daher keine separate Topbar-Injektion mehr.)
 function _injectTopbar(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
-  const existing = screenEl.querySelector(':scope > .topbar-inline');
-  if (existing) existing.remove();
-  screenEl.insertAdjacentHTML('afterbegin', _topbarHTML(name === 'overview'));
   _injectChartFilters(name); // Filter-Controls in die Diagramm-Karten setzen
   // Disable-State der Pfeile + Label gleich nach Inject korrekt setzen
   updateNavUI();

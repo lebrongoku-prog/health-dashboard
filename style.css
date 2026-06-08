@@ -223,6 +223,23 @@ body.dark .dark-toggle { color: #FBBF24; }
   color: rgba(255,255,255,0.82);
   font-size: 12px; margin-top: 2px;
 }
+/* Refresh + Dark-Toggle: rechtsbündig auf der Titelzeile, ohne eigene Kachel.
+   Sitzen auf dem farbigen Banner-Verlauf → halbtransparentes Weiß. */
+.pg-banner-txt { flex: 1 1 auto; min-width: 0; }
+.pg-banner-actions {
+  margin-left: auto; flex: 0 0 auto;
+  display: flex; gap: 8px; align-items: center;
+}
+.pg-act {
+  width: 38px; height: 38px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; line-height: 1; font-family: inherit;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.30);
+  border-radius: 11px; cursor: pointer;
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.pg-act:active { transform: scale(0.94); }
 
 /* ── Bottom-Nav (FitTrack pattern) ──────────────────────── */
 #bottom-nav {
@@ -331,7 +348,7 @@ body.dark #bottom-nav {
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.66rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
-.chart-wrap{position:relative}
+.chart-wrap{position:relative;overflow:hidden}
 
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
@@ -454,7 +471,7 @@ body.dark .ov-combo-rec .rec-action{background:#0F172A}
 .mt-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .mt-lbl{font-size:.7rem;color:var(--txt2);flex:0 0 96px;white-space:nowrap;overflow:hidden}
 .mt-spark{flex:1;height:24px;min-width:0}
-.mt-val{font-size:.77rem;font-weight:700;flex:0 0 52px;text-align:right}
+.mt-val{font-size:.77rem;font-weight:700;flex:0 0 64px;text-align:right;white-space:nowrap}
 .mt-arrow{font-size:.74rem;font-weight:700;margin-left:.25rem;min-width:12px}
 .mt-arrow.up{color:#10B981}.mt-arrow.dn{color:#EF4444}.mt-arrow.eq{color:var(--txt3)}
 
