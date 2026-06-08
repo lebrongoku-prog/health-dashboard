@@ -1088,49 +1088,21 @@ function pgOverview() {
   }
   function miniDeltaClass(d) { return d==null?'neu':d>0?'pos':d<0?'neg':'neu'; }
 
-  // Wochenverlauf: Mon–Sun of current reference week
-  const _wocheMon = getWeekMonday(referenceDate);
-  const _wocheDates = Array.from({length:7},(_,i)=>{ const d=new Date(_wocheMon+'T00:00:00'); d.setDate(d.getDate()+i); return toLocalDateStr(d); });
-  const _byDateWoche = {}; allData.forEach(r=>{ _byDateWoche[r.date]=r; });
-  const woche7 = _wocheDates.map(dt=>_byDateWoche[dt]||{date:dt});
-  const DAYS_DE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-  const wocheLabels = woche7.map(r=>{ const d=new Date(r.date+'T00:00:00'); return DAYS_DE[d.getDay()]; });
-  const wocheSl = woche7.map(r=>r.sleepTotal);
-  const wocheHR = woche7.map(r=>r.restHR);
-  const wocheHV = woche7.map(r=>r.hrv);
-  // _hasWoDur: true wenn Workout Data sheet durationMin-Werte hat (einzige Quelle für Trainingsminuten)
+  // Verlaufs-Chart + Trend folgen jetzt dem globalen Zeitfilter (D = gewähltes Fenster).
+  const D = filtered();
   const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin > 0);
-  // Trainingsminuten: 0 für vergangene Tage ohne Training, null für Tage ohne Daten (Zukunft)
-  const wocheTrRaw = _hasWoDur
-    ? woche7.map(r=>_byDateWoche[r.date] ? (workoutData[r.date]?.durationMin??0) : null)
-    : woche7.map(r=>_byDateWoche[r.date] ? (r.steps??0) : null);
-  const wocheTr = _hasWoDur ? wocheTrRaw.map(v=>v!=null?v/60:null) : wocheTrRaw;
+  const { labels: wLabels, align: wAlign, hasData: wHas } = timeDim(D);
+  const wSl = wAlign('sleepTotal');
+  const wHR = wAlign('restHR');
+  const wHV = wAlign('hrv');
+  // Training: Ø Trainingsminuten/Tag pro Bucket (0 für Tage ohne Training) → Stunden; sonst Ø Schritte.
+  const _woRows = D.map(r => ({ date: r.date, _dur: _hasWoDur ? (workoutData[r.date]?.durationMin ?? 0) : null, steps: r.steps }));
+  const { align: _woAlign } = timeDim(_woRows);
+  const wTr = _hasWoDur ? _woAlign('_dur').map(v => v != null ? v/60 : null) : _woAlign('steps');
+  const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
+  const _wocheAgg = !(timeRange === '7d' || timeRange === '1m'); // aggregierte Buckets → "Ø" im Tooltip
 
-  // 6M: monthly averages (last 6 months from referenceDate)
-  const _MONTHS_DE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-  const _refD6m = new Date(referenceDate+'T00:00:00');
-  const _6mMonths = Array.from({length:6},(_,i)=>{
-    const d=new Date(_refD6m); d.setDate(1); d.setMonth(d.getMonth()-(5-i));
-    return {year:d.getFullYear(),month:d.getMonth()};
-  });
-  const _6mLabels = _6mMonths.map(m=>_MONTHS_DE[m.month]);
-  const _avNul=(rows,f)=>{const v=rows.map(r=>r[f]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
-  const _6mData = _6mMonths.map(({year,month})=>{
-    const rows=allData.filter(r=>{if(!r.date)return false;const d=new Date(r.date+'T00:00:00');return d.getFullYear()===year&&d.getMonth()===month;});
-    return{
-      sl:_avNul(rows,'sleepTotal'),
-      hr:_avNul(rows,'restHR'),
-      hv:_avNul(rows,'hrv'),
-      tr:_hasWoDur?(()=>{const v=rows.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})():_avNul(rows,'steps')
-    };
-  });
-  const _6mSl=_6mData.map(d=>d.sl);
-  const _6mHR=_6mData.map(d=>d.hr);
-  const _6mHV=_6mData.map(d=>d.hv);
-  const _6mTr=_6mData.map(d=>_hasWoDur&&d.tr!=null?d.tr/60:d.tr);
-
-  // Monatstrend: last 30 days avg per metric
-  const last30 = allData.slice(-30);
+  // Trend-Karte: folgt dem globalen Filter (Sparkline/Schnitt/Pfeil über das Fenster D).
   function trendArrowRaw(vals) {
     if (vals.length < 4) return 'eq';
     const h1 = vals.slice(0,Math.floor(vals.length/2));
@@ -1140,12 +1112,13 @@ function pgOverview() {
     const diff = a2-a1, threshold = Math.abs(a1)*0.02;
     return Math.abs(diff)<threshold?'eq':diff>0?'up':'dn';
   }
-  const slVals30 = last30.filter(r=>r.sleepTotal!=null).map(r=>r.sleepTotal);
-  const hrVals30 = last30.filter(r=>r.restHR!=null).map(r=>r.restHR);
-  const hvVals30 = last30.filter(r=>r.hrv!=null).map(r=>r.hrv);
-  const stVals30 = last30.filter(r=>r.steps!=null).map(r=>r.steps);
-  const slTr = trendArrowRaw(slVals30); const hrTr = trendArrowRaw(hrVals30);
-  const hvTr = trendArrowRaw(hvVals30); const stTr = trendArrowRaw(stVals30);
+  const _trendTitle = {heute:'Heute','7d':'7-Tage-Trend','1m':'1-Monats-Trend','3m':'3-Monats-Trend','6m':'6-Monats-Trend','12m':'12-Monats-Trend','24m':'24-Monats-Trend'}[timeRange] || 'Trend';
+  const slValsT = D.filter(r=>r.sleepTotal!=null).map(r=>r.sleepTotal);
+  const hrValsT = D.filter(r=>r.restHR!=null).map(r=>r.restHR);
+  const hvValsT = D.filter(r=>r.hrv!=null).map(r=>r.hrv);
+  const stValsT = D.filter(r=>r.steps!=null).map(r=>r.steps);
+  const slTr = trendArrowRaw(slValsT); const hrTr = trendArrowRaw(hrValsT);
+  const hvTr = trendArrowRaw(hvValsT); const stTr = trendArrowRaw(stValsT);
 
 
   document.getElementById("screen-overview").innerHTML = `
@@ -1274,52 +1247,40 @@ function pgOverview() {
     <!-- Zeile 2: Monatstrend | Wochenverlauf -->
     <div class="ov-row" style="height:290px">
       <div class="chart-card ov-col-narrow" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3>30 Tage-Trend</h3>
+        <div class="chart-head"><h3>${_trendTitle}</h3>${chartFilterHTML()}</div>
         <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
         <div class="mt-row">
           <div class="mt-dot" style="background:#7C3AED"></div>
           <div class="mt-lbl">Schlaf (h)</div>
-          <div class="mt-spark">${sparkSVG(slVals30,'#7C3AED',160,24)}</div>
-          <div class="mt-val">${av(last30,'sleepTotal')!=null?toHM(av(last30,'sleepTotal')):'—'}</div>
+          <div class="mt-spark">${sparkSVG(slValsT,'#7C3AED',160,24)}</div>
+          <div class="mt-val">${av(D,'sleepTotal')!=null?toHM(av(D,'sleepTotal')):'—'}</div>
           <div class="mt-arrow ${slTr}">${slTr==='up'?'↑':slTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#EF4444"></div>
           <div class="mt-lbl">Ruhepuls (bpm)</div>
-          <div class="mt-spark">${sparkSVG(hrVals30,'#EF4444',160,24)}</div>
-          <div class="mt-val">${av(last30,'restHR')!=null?fn(av(last30,'restHR'),0)+' bpm':'—'}</div>
+          <div class="mt-spark">${sparkSVG(hrValsT,'#EF4444',160,24)}</div>
+          <div class="mt-val">${av(D,'restHR')!=null?fn(av(D,'restHR'),0)+' bpm':'—'}</div>
           <div class="mt-arrow ${hrTr}">${hrTr==='up'?'↑':hrTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#2563EB"></div>
           <div class="mt-lbl">HRV (ms)</div>
-          <div class="mt-spark">${sparkSVG(hvVals30,'#2563EB',160,24)}</div>
-          <div class="mt-val">${av(last30,'hrv')!=null?fn(av(last30,'hrv'),0)+' ms':'—'}</div>
+          <div class="mt-spark">${sparkSVG(hvValsT,'#2563EB',160,24)}</div>
+          <div class="mt-val">${av(D,'hrv')!=null?fn(av(D,'hrv'),0)+' ms':'—'}</div>
           <div class="mt-arrow ${hvTr}">${hvTr==='up'?'↑':hvTr==='dn'?'↓':'→'}</div>
         </div>
         <div class="mt-row">
           <div class="mt-dot" style="background:#059669"></div>
           <div class="mt-lbl">Schritte</div>
-          <div class="mt-spark">${sparkSVG(stVals30,'#059669',160,24)}</div>
-          <div class="mt-val">${av(last30,'steps')!=null?Math.round(av(last30,'steps')).toLocaleString('de-CH'):'—'}</div>
+          <div class="mt-spark">${sparkSVG(stValsT,'#059669',160,24)}</div>
+          <div class="mt-val">${av(D,'steps')!=null?Math.round(av(D,'steps')).toLocaleString('de-CH'):'—'}</div>
           <div class="mt-arrow ${stTr}">${stTr==='up'?'↑':stTr==='dn'?'↓':'→'}</div>
         </div>
         </div><!-- end flex-rows-wrap -->
       </div>
       <div class="chart-card ov-col-wide" style="margin-bottom:0;display:flex;flex-direction:column">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
-          <h3 style="margin-bottom:0" id="woche-title">Wochenverlauf</h3>
-          <div style="display:flex;align-items:center;gap:.3rem">
-            <button id="woche-prev" style="background:none;border:1px solid var(--border);border-radius:6px;width:22px;height:22px;cursor:pointer;color:var(--txt2);font-size:.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center">‹</button>
-            <span id="woche-nav-lbl" style="font-size:.63rem;color:var(--txt3);min-width:96px;text-align:center;white-space:nowrap"></span>
-            <button id="woche-next" style="background:none;border:1px solid var(--border);border-radius:6px;width:22px;height:22px;cursor:pointer;color:var(--txt2);font-size:.9rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center">›</button>
-            <button id="woche-today" style="background:none;border:1px solid var(--border);border-radius:6px;padding:.15rem .45rem;cursor:pointer;color:var(--txt2);font-size:.62rem;font-weight:600;line-height:1;height:22px;white-space:nowrap">Heute</button>
-            <select id="woche-filter" style="font-size:.68rem;font-weight:600;color:var(--txt2);background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:.2rem .55rem;cursor:pointer;outline:none">
-              <option value="7d">7D</option>
-              <option value="6m">6M</option>
-            </select>
-          </div>
-        </div>
+        <h3 style="margin-bottom:.35rem">Verlauf</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf (h)</div>
           <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Ruhepuls (bpm)</div>
@@ -1351,37 +1312,28 @@ function pgOverview() {
     if(num)num.textContent=hs;
   },80);
 
-  // Wochenverlauf chart
-  const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
-  const hasWoche = wocheSl.some(v=>v!=null)||wocheHR.some(v=>v!=null)||wocheHV.some(v=>v!=null)||wocheTr.some(v=>v!=null);
-
-  function _wocheTooltipLabel(ctx,is6m){
-    const lbl=ctx.dataset.label;
-    const v=ctx.raw;
-    if(lbl==='Schlaf (h)')return`Schlaf: ${toHM(v)}`;
+  // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
+  function _wocheTooltipLabel(ctx){
+    const lbl=ctx.dataset.label, v=ctx.raw, agg=_wocheAgg;
+    if(lbl==='Schlaf (h)')return`${agg?'Ø ':''}Schlaf: ${v!=null?toHM(v):'—'}`;
     if(lbl===_wocheTrLabel){
-      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${_wocheTrLabel}: ${mins} min${is6m?' Ø/Woche':''}`;};
-      return`${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}${is6m?' Ø/Tag':''}`;
+      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${agg?'Ø ':''}${_wocheTrLabel}: ${mins} min`;}
+      return`${agg?'Ø ':''}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}`;
     }
-    // Einheit immer anzeigen; "Ø " nur in der 6M-Ansicht (dort gemittelt, 7D = Tageswerte).
-    if(lbl==='Ruhepuls') return `${is6m?'Ø ':''}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
-    if(lbl==='HRV')      return `${is6m?'Ø ':''}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
-    return lbl+': '+(v!=null?v.toFixed(1):'')+(is6m?' Ø':'');
+    if(lbl==='Ruhepuls') return `${agg?'Ø ':''}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
+    if(lbl==='HRV')      return `${agg?'Ø ':''}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
+    return lbl+': '+(v!=null?v.toFixed(1):'—');
   }
-
-  if(hasWoche){
-    const _wChart=mkC('c-woche',{
-      data:{labels:wocheLabels,datasets:[
-        {type:'bar',label:'Schlaf (h)',data:wocheSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:4,yAxisID:'yL'},
-        {type:'line',label:'Ruhepuls',data:wocheHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR'},
-        {type:'line',label:'HRV',data:wocheHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR'},
-        {type:'line',label:_wocheTrLabel,data:wocheTr,borderColor:'#F97316',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#F97316',yAxisID:'yL'}
+  if(wHas){
+    mkC('c-woche',{
+      data:{labels:wLabels,datasets:[
+        {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:4,yAxisID:'yL'},
+        {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
+        {type:'line',label:'HRV',data:wHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR',spanGaps:true},
+        {type:'line',label:_wocheTrLabel,data:wTr,borderColor:'#F97316',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#F97316',yAxisID:'yL',spanGaps:true}
       ]},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          title:items=>{const i=items[0].dataIndex;const r=woche7[i];if(!r||!r.date)return wocheLabels[i];const d=new Date(r.date+'T00:00:00');return wocheLabels[i]+', '+String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear();},
-          label:ctx=>_wocheTooltipLabel(ctx,false)
-        }}},
+        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>_wocheTooltipLabel(ctx)}}},
         scales:{
           x:{...gx},
           yL:{position:'left',...gy,suggestedMin:0,suggestedMax:10,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}},
@@ -1389,93 +1341,6 @@ function pgOverview() {
         }
       }
     });
-
-    // ── Zeitnavigator ──────────────────────────────────
-    let _wocheOff=0;
-
-    function _navGetW7(off){
-      const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(refD.getDate()+off*7);
-      const mon=getWeekMonday(toLocalDateStr(refD));
-      const dates=Array.from({length:7},(_,i)=>{const d=new Date(mon+'T00:00:00');d.setDate(d.getDate()+i);return toLocalDateStr(d);});
-      const rows=dates.map(dt=>_byDateWoche[dt]||{date:dt});
-      const trRaw=_hasWoDur?rows.map(r=>_byDateWoche[r.date]?(workoutData[r.date]?.durationMin??0):null):rows.map(r=>_byDateWoche[r.date]?(r.steps??0):null);
-      return{sl:rows.map(r=>r.sleepTotal??null),hr:rows.map(r=>r.restHR??null),hv:rows.map(r=>r.hrv??null),
-        tr:trRaw.map(v=>_hasWoDur&&v!=null?v/60:v),
-        labels:rows.map(r=>{const d=new Date(r.date+'T00:00:00');return DAYS_DE[d.getDay()];}),rows};
-    }
-
-    function _navGet6m(off){
-      const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(1); refD.setMonth(refD.getMonth()+off);
-      const months=Array.from({length:6},(_,i)=>{const d=new Date(refD);d.setMonth(d.getMonth()-(5-i));return{y:d.getFullYear(),m:d.getMonth()};});
-      const data=months.map(({y,m})=>{
-        const rows=allData.filter(r=>{if(!r.date)return false;const d=new Date(r.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m;});
-        return{sl:_avNul(rows,'sleepTotal'),hr:_avNul(rows,'restHR'),hv:_avNul(rows,'hrv'),
-          tr:_hasWoDur?(()=>{const v=rows.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);if(!v.length)return null;const total=v.reduce((a,b)=>a+b,0);const weeks=rows.length?rows.length/7:1;return total/weeks;})():_avNul(rows,'steps')};
-      });
-      return{sl:data.map(d=>d.sl),hr:data.map(d=>d.hr),hv:data.map(d=>d.hv),
-        tr:data.map(d=>_hasWoDur&&d.tr!=null?d.tr/60:d.tr),
-        labels:months.map(m=>_MONTHS_DE[m.m])};
-    }
-
-    function _navLbl(is6m,off){
-      if(is6m){
-        const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(1); refD.setMonth(refD.getMonth()+off);
-        const end=new Date(refD), start=new Date(refD); start.setMonth(start.getMonth()-5);
-        const fm=d=>_MONTHS_DE[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
-        return fm(start)+' – '+fm(end);
-      }else{
-        const refD=new Date(referenceDate+'T00:00:00'); refD.setDate(refD.getDate()+off*7);
-        const mon=new Date(getWeekMonday(toLocalDateStr(refD))+'T00:00:00');
-        const sun=new Date(mon); sun.setDate(sun.getDate()+6);
-        const fD=d=>String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.';
-        return fD(mon)+' – '+fD(sun)+' '+_MONTHS_DE[sun.getMonth()];
-      }
-    }
-
-    function _applyWoche(is6m,off){
-      const d=is6m?_navGet6m(off):_navGetW7(off);
-      _wChart.data.labels=d.labels;
-      _wChart.data.datasets[0].data=d.sl;
-      _wChart.data.datasets[1].data=d.hr;
-      _wChart.data.datasets[2].data=d.hv;
-      _wChart.data.datasets[3].data=d.tr;
-      _wChart.options.plugins.tooltip.callbacks.title=items=>{
-        if(is6m)return d.labels[items[0].dataIndex];
-        const r=d.rows[items[0].dataIndex];
-        if(!r||!r.date)return d.labels[items[0].dataIndex];
-        const dt=new Date(r.date+'T00:00:00');
-        return d.labels[items[0].dataIndex]+', '+String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+dt.getFullYear();
-      };
-      _wChart.options.plugins.tooltip.callbacks.label=ctx=>_wocheTooltipLabel(ctx,is6m);
-      const wTitle=document.getElementById('woche-title');
-      if(wTitle)wTitle.textContent=is6m?'Monatsdurchschnitte (6M)':'Wochenverlauf';
-      const navLbl=document.getElementById('woche-nav-lbl');
-      if(navLbl)navLbl.textContent=_navLbl(is6m,off);
-      _wChart.update();
-    }
-
-    // Helper: sync disabled/opacity state of next+today buttons
-    function _wocheSyncBtns(off){
-      const nxt=document.getElementById('woche-next');
-      const tod=document.getElementById('woche-today');
-      if(nxt){nxt.disabled=off>=0;nxt.style.opacity=off>=0?'.3':'1';}
-      if(tod){tod.disabled=off>=0;tod.style.opacity=off>=0?'.3':'1';}
-    }
-
-    // Init nav label + disable next+today at offset 0
-    const _wNavLbl=document.getElementById('woche-nav-lbl');
-    if(_wNavLbl)_wNavLbl.textContent=_navLbl(false,0);
-    _wocheSyncBtns(0);
-
-    // Event listeners
-    const _wFilt=document.getElementById('woche-filter');
-    const _wPrev=document.getElementById('woche-prev');
-    const _wNext=document.getElementById('woche-next');
-    const _wToday=document.getElementById('woche-today');
-    if(_wFilt)_wFilt.addEventListener('change',()=>{_wocheOff=0;_applyWoche(_wFilt.value==='6m',0);_wocheSyncBtns(0);});
-    if(_wPrev)_wPrev.addEventListener('click',()=>{_wocheOff--;_applyWoche(_wFilt?_wFilt.value==='6m':false,_wocheOff);_wocheSyncBtns(_wocheOff);});
-    if(_wNext)_wNext.addEventListener('click',()=>{if(_wocheOff>=0)return;_wocheOff++;_applyWoche(_wFilt?_wFilt.value==='6m':false,_wocheOff);_wocheSyncBtns(_wocheOff);});
-    if(_wToday)_wToday.addEventListener('click',()=>{if(_wocheOff>=0)return;_wocheOff=0;_applyWoche(_wFilt?_wFilt.value==='6m':false,0);_wocheSyncBtns(0);});
   }
 }
 
@@ -2437,8 +2302,8 @@ function _topbarHTML(forOverview) {
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
   return `<header class="topbar-inline topbar-mini">
     <div class="tb-row tb-row-main">
-      <div class="tb-spacer"></div>
       <button class="nav-arrow tb-refresh refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button>
+      <div class="tb-spacer"></div>
       <button class="nav-arrow tb-dark dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button>
     </div>
   </header>`;
@@ -2447,8 +2312,8 @@ function _topbarHTML(forOverview) {
 // Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
 // Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
 const _RANGE_OPTS = [
-  ['heute','Heute'],['7d','7 Tage'],['1m','1 Monat'],
-  ['3m','3 Monate'],['6m','6 Monate'],['12m','12 Monate'],['24m','24 Monate']
+  ['heute','Heute'],['7d','7T'],['1m','1M'],
+  ['3m','3M'],['6m','6M'],['12m','12M'],['24m','24M']
 ];
 function chartFilterHTML() {
   const r = timeRange;
@@ -2467,15 +2332,22 @@ function chartFilterHTML() {
 // Filter-Control in jede Diagramm-Karte (mit <canvas>) einer .screen injizieren.
 // Übersicht wird im 2. Durchgang separat behandelt.
 function _injectChartFilters(name) {
-  if (name === 'overview') return;
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
   screenEl.querySelectorAll('.chart-card').forEach(card => {
-    if (!card.querySelector('canvas')) return;                 // nur echte Diagramm-Karten
-    if (card.querySelector(':scope > .chart-filter')) return;  // nicht doppelt injizieren
+    if (!card.querySelector('canvas')) return;        // nur echte Diagramm-Karten
+    if (card.querySelector('.chart-filter')) return;  // nicht doppelt injizieren
     const h3 = card.querySelector(':scope > h3');
-    if (h3) h3.insertAdjacentHTML('afterend', chartFilterHTML());
-    else card.insertAdjacentHTML('afterbegin', chartFilterHTML());
+    if (h3) {
+      // Titel + Control in eine Flex-Kopfzeile packen: Titel links, Control rechts, eine Zeile.
+      const head = document.createElement('div');
+      head.className = 'chart-head';
+      h3.parentNode.insertBefore(head, h3);
+      head.appendChild(h3);
+      head.insertAdjacentHTML('beforeend', chartFilterHTML());
+    } else {
+      card.insertAdjacentHTML('afterbegin', chartFilterHTML());
+    }
   });
 }
 
