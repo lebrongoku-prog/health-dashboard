@@ -439,17 +439,39 @@ function importWorkoutData() {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
+  // Bestehende Zeilen einlesen. Anders als beim Health-Sheet darf hier NICHT pro Datum
+  // auf eine Zeile zusammengefasst werden – zwei Einheiten am selben Tag sind legitim.
+  // Stattdessen wird das Auffrisch-Fenster komplett neu aufgebaut.
   var lastRow = sheet.getLastRow();
-  var refreshDate = null;
+  var bestehend = [];
   if (lastRow > 1) {
-    var refreshRow = Math.max(2, lastRow - WORKOUT_DAYS_TO_REFRESH + 1);
-    var val = sheet.getRange(refreshRow, 1).getValue();
-    refreshDate = (val instanceof Date)
-      ? Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd')
-      : String(val);
-    sheet.deleteRows(refreshRow, lastRow - refreshRow + 1);
-    Logger.log('Refreshe ab: ' + refreshDate);
+    bestehend = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues()
+      .map(function(r) {
+        var v = r[0];
+        r[0] = (v instanceof Date)
+          ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+          : String(v).trim();
+        return r;
+      })
+      .filter(function(r) { return /^\d{4}-\d{2}-\d{2}$/.test(r[0]); });
   }
+
+  // Fenster über das NEUESTE Datum bestimmen, nicht über die Zeilennummer.
+  // Vorher hiess WORKOUT_DAYS_TO_REFRESH zwar "days", zählte aber ZEILEN: die letzten
+  // 30 Zeilen spannten bei unregelmässigem Training über vier Monate. Schlimmer noch:
+  // eine verspätet abgelegte Datei war älter als der so errechnete Stichtag und wurde
+  // dadurch nie eingelesen – dieselbe Lücken-Mechanik wie im Health-Sheet.
+  var daten = bestehend.map(function(r) { return r[0]; }).sort();
+  var refreshDate = daten.length
+    ? minusTage(daten[daten.length - 1], WORKOUT_DAYS_TO_REFRESH - 1)
+    : null;
+  var vorhandeneDaten = {};
+  daten.forEach(function(d) { vorhandeneDaten[d] = true; });
+  if (refreshDate) Logger.log('Refreshe ab: ' + refreshDate);
+
+  // Alles ausserhalb des Fensters bleibt unangetastet stehen.
+  var behalten = bestehend.filter(function(r) { return !refreshDate || r[0] < refreshDate; });
+
   var folder = DriveApp.getFolderById(WORKOUT_FOLDER_ID);
   var files = folder.getFiles();
   var rows = [];
@@ -459,7 +481,10 @@ function importWorkoutData() {
     var dateMatch = name.match(/(\d{4}-\d{2}-\d{2})/);
     if (!dateMatch) continue;
     var date = dateMatch[1];
-    if (refreshDate && date < refreshDate) continue;
+    // Eingelesen wird, was im Fenster liegt ODER bisher überhaupt fehlt (Nachzügler).
+    var imFenster = !refreshDate || date >= refreshDate;
+    var fehltNoch = !vorhandeneDaten[date];
+    if (!imFenster && !fehltNoch) continue;
     try {
       var parsed = readWorkoutFile(file);
       if (!parsed) continue;
@@ -482,16 +507,40 @@ function importWorkoutData() {
       Logger.log('Fehler bei Datei ' + name + ': ' + e.message);
     }
   }
-  rows.sort(function(a, b) {
+  // Leere Werte vereinheitlichen, damit der Dubletten-Vergleich unten zuverlässig greift
+  // (aus Dateien kommt null, aus dem Sheet ein leerer String).
+  var norm = function(r) { return r.map(function(v) { return (v === null || v === undefined) ? '' : v; }); };
+  var alle = behalten.map(norm).concat(rows.map(norm));
+
+  // Wortwörtlich identische Zeilen entfernen. Zwei exakt gleiche Einheiten am selben Tag
+  // gibt es praktisch nicht – das ist die Signatur einer doppelt in Drive liegenden Datei.
+  // Zwei UNTERSCHIEDLICHE Einheiten am selben Tag bleiben dagegen erhalten.
+  var gesehen = {}, eindeutig = [];
+  alle.forEach(function(r) {
+    var key = r.join('');
+    if (gesehen[key]) return;
+    gesehen[key] = true;
+    eindeutig.push(r);
+  });
+  eindeutig.sort(function(a, b) {
     return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
   });
-  if (rows.length > 0) {
-    var startRow = sheet.getLastRow() + 1;
-    sheet.getRange(startRow, 1, rows.length, HEADERS.length).setValues(rows);
-    Logger.log(rows.length + ' Einträge importiert.');
-  } else {
-    Logger.log('Keine neuen Einträge gefunden.');
+
+  // Datenbereich geschlossen neu schreiben – dadurch kann weder eine Zeile doppelt
+  // stehen bleiben noch eine Restzeile aus einem früheren, längeren Stand überleben.
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, HEADERS.length).clearContent();
+  if (eindeutig.length > 0) {
+    // setValues erweitert das Blatt nicht von selbst (anders als appendRow) – reicht der
+    // Platz nicht, bricht der Aufruf ab. Deshalb vorher aufstocken.
+    var benoetigt = eindeutig.length + 1;
+    if (benoetigt > sheet.getMaxRows()) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), benoetigt - sheet.getMaxRows());
+    }
+    sheet.getRange(2, 1, eindeutig.length, HEADERS.length).setValues(eindeutig);
   }
+  var entfernt = alle.length - eindeutig.length;
+  Logger.log('✅ ' + eindeutig.length + ' Workouts im Sheet · ' + rows.length + ' aus Dateien gelesen'
+    + (entfernt > 0 ? ' · ' + entfernt + ' Dublette(n) entfernt' : ''));
   Logger.log('Workout Sheet ID (für Dashboard): ' + ss.getId());
   return ss.getId();
 }
