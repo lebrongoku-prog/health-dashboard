@@ -42,6 +42,8 @@
 //   nodata      – letzter Tag ohne Messwerte  → Score muss "—" zeigen
 //   woerror     – Workout-Sheet wirft Fehler  → Training-Tab muss Fehlerkarte zeigen
 //   stale       – Daten enden vor 3 Tagen     → Banner muss warnen
+//   inject      – Zellen enthalten Auszeichnungscode → darf NICHT ausgeführt werden,
+//                 und Zeilen mit unsinnigem Datum müssen verworfen werden
 // ═══════════════════════════════════════════════════════════
 const SC = new URLSearchParams(location.search).get('scenario') || 'normal';
 
@@ -90,6 +92,19 @@ for (let i = N_DAYS - 1; i >= endOffset; i--) {
   }
 }
 
+// Angriffs-Szenario: bösartige Zellinhalte einschleusen. window.__pwned wird nur
+// gesetzt, wenn der Browser den Code AUSFÜHRT statt ihn anzuzeigen – der Test prüft
+// anschliessend, dass die Markierung ausgeblieben ist.
+if (SC === 'inject') {
+  const payload = '<img src=x onerror="window.__pwned=(window.__pwned||0)+1">';
+  // 1) Trainingsart im Workout-Sheet (der naheliegendste Anzeigekandidat)
+  workout.push([ymd(new Date()), payload, '42', '5.0', '140', '170', '10.0', '50', '1500']);
+  // 2) Zeile mit unsinnigem Datum im Health-Sheet – muss verworfen werden
+  health.push([payload, '7.5', '55', '60', '9000', '400', '45', '1.2', '1.6', '4.1', '0.4', '80', '', '', '', '']);
+  // 3) Datumsspalte mit Text statt Datum
+  health.push(['kein Datum', '7.0', '58', '55', '8000', '380', '45', '', '', '', '', '', '', '', '', '']);
+}
+
 const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
 const ok = body => Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
@@ -98,7 +113,11 @@ window.fetch = (url) => {
   const u = String(url);
   if (u.includes('sheets.googleapis.com')) {
     const isWorkout = u.includes(WORKOUT_ID);
-    if (isWorkout && SC === 'woerror') return Promise.reject(new Error('Simulierter Netzwerkfehler'));
+    // Die Fehlermeldung enthält bewusst Auszeichnungscode: sie landet in der
+    // Fehlerkarte des Training-Tabs und ist damit ein echter Weg von einem
+    // fremden Text auf den Bildschirm. Muss als Text erscheinen, nicht ausgeführt.
+    if (isWorkout && SC === 'woerror') return Promise.reject(
+      new Error('Simulierter Netzwerkfehler <img src=x onerror="window.__pwned=1">'));
     if (u.includes('?fields=')) return ok({ sheets:[{ properties:{ title:'Data' } }] });
     return ok({ values: isWorkout ? workout : health });
   }

@@ -136,7 +136,9 @@ function _parseWorkoutRows(rows) {
     const typeRaw = String(r['Type'] || r['type'] || '').trim();
     const icon = _typeIcons[typeRaw] || '🏋️';
     workoutData[date] = {
-      date, typeRaw, typeLabel: icon + ' ' + (typeRaw || 'Workout'), icon,
+      // typeRaw bleibt roh (dient als Schlüssel für _typeIcons); typeLabel ist die
+      // Anzeigefassung und deshalb bereits entschärft.
+      date, typeRaw, typeLabel: icon + ' ' + esc(typeRaw || 'Workout'), icon,
       durationMin:    pN(r['Duration (min)']),
       distanceKm:     pN(r['Distance (km)']),
       avgHR:          pN(r['Avg HR']),
@@ -234,7 +236,11 @@ async function loadFromAPI() {
         obj[h] = strCols.has(h) ? v : (isNaN(v) ? v : parseFloat(v));
       });
       return obj;
-    }).filter(r => r.date);
+      // Nur echte Datumszeilen übernehmen. Vorher genügte irgendein nicht-leerer
+      // Text in der Datumsspalte – der wäre bis in die Anzeige durchgereicht worden.
+      // Das Workout-Sheet prüft schon immer nach demselben Muster.
+    }).filter(r => r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+    if (!allData.length) throw new Error('Keine Zeile mit gültigem Datum (Format JJJJ-MM-TT) gefunden');
     allData.sort((a, b) => a.date.localeCompare(b.date));
     referenceDate = allData[allData.length - 1].date;
     _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
@@ -475,6 +481,21 @@ function setR(r) {
 const MO = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MO[m-1]+' '+String(y).slice(-2); }
 function fn(v, dec=1) { return v == null ? '—' : Number(v).toFixed(dec); }
+
+// ── Text aus fremder Quelle entschärfen ────────────────
+// PFLICHT für jeden Wert, der NICHT aus diesem Code stammt und als Text in eine
+// Seite eingesetzt wird: Sheet-Inhalte, Fehlermeldungen von Google, alles, was von
+// aussen kommt. Die Seiten werden über innerHTML aufgebaut – ohne diese Funktion
+// würde `<img src=x onerror=…>` in einer Zelle nicht angezeigt, sondern ausgeführt.
+// Der Schaden wäre real: solcher Code liefe innerhalb der App und käme an den
+// Google-Ausweis im Browserspeicher, also an die Sheets.
+// Zahlen und Datumsangaben brauchen das nicht – die werden beim Einlesen geprüft.
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function pct(curr, prev) { if (curr==null||prev==null||prev===0) return null; return ((curr-prev)/Math.abs(prev))*100; }
 function av(arr, field) {
   const vals = arr.map(r => field ? r[field] : r).filter(v => v != null && !isNaN(v));
@@ -1184,22 +1205,6 @@ function sparkSVG(data, color='#4F46E5', w=80, h=26) {
 }
 
 
-// ── workout typ → Deutsch ─────────────────────────────
-function workoutDe(t) {
-  if (!t) return 'Workout';
-  const s = String(t).toLowerCase();
-  if (s.includes('run')) return 'Laufen';
-  if (s.includes('cycl')||s.includes('bike')||s.includes('rad')) return 'Radfahren';
-  if (s.includes('swim')) return 'Schwimmen';
-  if (s.includes('walk')) return 'Gehen';
-  if (s.includes('strength')||s.includes('functional')||s.includes('kraft')) return 'Krafttraining';
-  if (s.includes('yoga')) return 'Yoga';
-  if (s.includes('hike')||s.includes('wander')) return 'Wandern';
-  if (s.includes('soccer')||s.includes('football')||s.includes('fussball')) return 'Fußball';
-  if (s.includes('tennis')) return 'Tennis';
-  if (s.includes('hiit')||s.includes('interval')) return 'HIIT';
-  return String(t).replace(/HKWorkoutActivityType/,'').replace(/([A-Z])/g,' $1').trim()||'Workout';
-}
 
 // ── Übersicht ──────────────────────────────────────────
 function pgOverview() {
@@ -1954,7 +1959,7 @@ async function pgTraining() {
       ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?')}
       <div class="no-data">
         <strong>⚠️ Workout-Daten nicht verfügbar</strong>
-        ${woProblem}
+        ${esc(woProblem)}
         <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Mit 🔄 oben rechts erneut versuchen.</div>
       </div>`;
     return;
@@ -2527,12 +2532,12 @@ function _renderTab(name) {
     r = fn();
     if (r && typeof r.then === 'function') {
       r.then(() => _injectTopbar(name))
-       .catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`; _injectTopbar(name); });
+       .catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${esc(e.message)}</div>`; _injectTopbar(name); });
     } else {
       _injectTopbar(name);
     }
   } catch(e) {
-    document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${e.message}</div>`;
+    document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${esc(e.message)}</div>`;
     _injectTopbar(name);
   }
   return r; // Promise bei async-Tabs (Training), sonst undefined – fürs sequentielle Vorrendern

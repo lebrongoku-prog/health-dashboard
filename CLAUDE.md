@@ -96,6 +96,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Gemeinsame Helfer statt Copy-Paste:** `splitWeekWknd(rows)` (Wochentag/Wochenende),
   `fmtPace`/`paceFromSpeed` (Pace), `dataStandHTML()` (Daten-Stand im Banner).
+- **`esc()` bei jedem Fremdtext — nicht verhandelbar.** Alles, was NICHT aus diesem Code
+  stammt und als **Text** angezeigt wird (Sheet-Zellen, Google-Fehlermeldungen), muss durch
+  `esc()`. Die Seiten entstehen per `innerHTML`; ohne `esc()` würde Auszeichnungscode in
+  einer Zelle ausgeführt statt angezeigt — und käme damit an den Google-Token im
+  `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
+  werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
+  Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart aus `runSpeed`,
   VO₂max-Sektion (zuunterst) aus `r.vo2max`.
 
