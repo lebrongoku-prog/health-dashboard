@@ -35,10 +35,14 @@ style.css         Styles
 sw.js             Service Worker — enthält die Cache-Version
 manifest.json     PWA-Manifest
 icons/            icon.svg + 8 PNGs (32 – 1024 px)
-Code.gs           Apps-Script-Backend (Referenz, nicht Teil des Deploys)
-Maintenance.gs    Apps-Script-Wartung (Referenz, nicht Teil des Deploys)
+_apps-script/     Apps-Script-Backend (Referenz, nicht Teil des Deploys)
 CLAUDE.md         Projektkontext für die Arbeit mit Claude Code
 ```
+
+> [!NOTE]
+> GitHub Pages überspringt Ordner, die mit `_` oder `.` beginnen. Deshalb liegen das
+> Apps-Script-Backend und die Entwicklungshilfen (`.claude/`) in solchen Ordnern:
+> versioniert, aber nicht über die Website abrufbar.
 
 ## Deploy
 

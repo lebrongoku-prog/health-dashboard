@@ -9,8 +9,8 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
 - **Vanilla JS**, keine Frameworks, **kein Build-Step**. `app.js` ist eine große IIFE.
 - **Chart.js 4.5.0** via CDN (in `index.html`, `defer`).
 - **PWA**: Service Worker (`sw.js`, Cache-First-Shell) + `manifest.json`.
-- **Daten**: Google Sheets, befüllt/aktualisiert über **Google Apps Script** (`Code.gs`,
-  `Maintenance.gs`). Auth: **Google OAuth**, Token in `localStorage`. `REFRESH_URL` stößt
+- **Daten**: Google Sheets, befüllt/aktualisiert über **Google Apps Script**
+  (`_apps-script/`). Auth: **Google OAuth**, Token in `localStorage`. `REFRESH_URL` stößt
   Drive→Sheet-Refresh an. (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
 
 ## Deploy
@@ -28,7 +28,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - `sw.js` — Service Worker; `const CACHE='hcc-vNN'` + `ASSETS`-Liste. Beim Umzug: `hcc-v57`.
 - `manifest.json` — PWA-Manifest (Name, Icons, `theme_color`/`background_color` `#0891B2`).
 - `icons/` — `icon.svg` + 8 PNGs (32/120/152/167/180/192/512/1024), EKG/Puls-Logo in Teal.
-- `Code.gs`, `Maintenance.gs` — Apps-Script-Backend (**Referenz**, NICHT Teil des Web-Deploys).
+- `_apps-script/Code.gs`, `_apps-script/Maintenance.gs` — Apps-Script-Backend (**Referenz**,
+  NICHT Teil des Web-Deploys). Der Unterstrich im Ordnernamen ist Absicht: GitHub Pages
+  überspringt Ordner, die mit `_` oder `.` beginnen. Vorher lagen die Dateien im Wurzel-
+  verzeichnis und waren damit öffentlich herunterladbar — samt `SECRET` und Backend-Logik.
+  **Neue Referenz-/Hilfsdateien deshalb nie ins Wurzelverzeichnis legen.**
 - `.claude/devserver.py` — lokaler Test-Server ohne Caching (`python3 .claude/devserver.py`,
   Port 8124). Nötig, weil der Browser sonst beim Prüfen weiter die alte `app.js` ausliefert.
 - `.claude/_render-test.html` — Render-Prüfstand: ersetzt OAuth und Sheets-API durch erfundene
