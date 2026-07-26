@@ -64,7 +64,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Globaler State:** `timeRange` (`heute`/`7d`/`1m`/`3m`/`6m`/`12m`/`24m`) + `referenceDate`.
   `filtered()` liefert die Zeilen des Fensters. `timeDim(D,…)` liefert
   `{labels, align, alignSum, hasData}` und aggregiert je nach Range täglich/wöchentlich/monatlich.
-- **Daten:** `allData` = Tageszeilen (aus Sheet). `workoutData` = nach Datum gekeyt (Workout-Sheet).
+- **Daten:** `allData` = Tageszeilen (aus Sheet), **pro Datum genau eine Zeile** — doppelte
+  Datumszeilen werden beim Einlesen zusammengeführt (das Apps-Script schreibt beim Refresh
+  die letzten Tage neu und kann Dubletten erzeugen; ungefiltert zählte so ein Tag in jeden
+  Durchschnitt doppelt). `workoutData` = nach Datum gekeyt, dadurch von Haus aus eindeutig.
 - **Rendering:** `_renderTab(name)` → Seiten-Funktion `pgOverview`/`pgHerz`/`pgSchlaf`/
   `pgAktivitaet`/`pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
   `mkC(id,cfg)`; danach `_injectTopbar(name)` → `_injectChartFilters` + `updateNavUI`.

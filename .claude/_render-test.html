@@ -44,6 +44,8 @@
 //   stale       – Daten enden vor 3 Tagen     → Banner muss warnen
 //   inject      – Zellen enthalten Auszeichnungscode → darf NICHT ausgeführt werden,
 //                 und Zeilen mit unsinnigem Datum müssen verworfen werden
+//   dubletten   – dieselben Tage stehen mehrfach im Sheet (so wie es das Apps-Script
+//                 beim Refresh erzeugen kann) → dürfen nur EINMAL gezählt werden
 // ═══════════════════════════════════════════════════════════
 const SC = new URLSearchParams(location.search).get('scenario') || 'normal';
 
@@ -119,6 +121,13 @@ if (SC === 'inject') {
   health.push([payload, '7.5', '55', '60', '9000', '400', '45', '1.2', '1.6', '4.1', '0.4', '80', '', '', '', '']);
   // 3) Datumsspalte mit Text statt Datum
   health.push(['kein Datum', '7.0', '58', '55', '8000', '380', '45', '', '', '', '', '', '', '', '', '']);
+}
+
+// Dubletten-Szenario: die letzten drei Tage stehen ein zweites Mal im Sheet – genau
+// das Muster aus Leonards echtem Schlafschuld-Tooltip, wo Nächte doppelt auftauchten.
+if (SC === 'dubletten') {
+  const letzte = health.slice(-3).map(r => r.slice());
+  letzte.forEach(r => health.push(r));
 }
 
 const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';

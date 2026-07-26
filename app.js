@@ -158,6 +158,15 @@ Chart.defaults.borderColor = '#E8EDF2';
 Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
 Chart.defaults.font.size = 10;
 
+// Schlankere Balken in ALLEN Diagrammen (Chart.js-Standard: 0.9 / 0.8).
+// barPercentage      = Breite des Balkens innerhalb seines Slots
+// categoryPercentage = Breite des Slots innerhalb des Kategorie-Abstands
+// maxBarThickness    = Deckel, damit Balken bei wenigen Werten (z. B. Filter "Heute")
+//                      nicht zu klobigen Blöcken aufgehen.
+Chart.defaults.datasets.bar.barPercentage      = 0.62;
+Chart.defaults.datasets.bar.categoryPercentage = 0.74;
+Chart.defaults.datasets.bar.maxBarThickness    = 26;
+
 // Wisch-Plugin für den Datums-Navigator: verschiebt beim Navigieren NUR die
 // Datenfläche (auf chartArea geclippt), sodass X- und Y-Achse/Gitter fix bleiben.
 // Aktiv ausschließlich, solange chart.$navslide gesetzt ist – sonst null Overhead.
@@ -242,6 +251,23 @@ async function loadFromAPI() {
     }).filter(r => r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
     if (!allData.length) throw new Error('Keine Zeile mit gültigem Datum (Format JJJJ-MM-TT) gefunden');
     allData.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Doppelte Datumszeilen zusammenführen.
+    // Das Apps-Script schreibt beim Refresh die letzten Tage neu; steht ein Tag danach
+    // zweimal im Sheet, zählte er bisher in JEDEN Durchschnitt doppelt – Schlaf, Puls,
+    // HRV, Schritte, Score, Baselines. Aufgefallen ist es im Schlafschuld-Tooltip, wo
+    // dieselbe Nacht mehrfach aufgelistet wurde; die Ursache lag aber im Einlesen.
+    // Zusammenführen statt Verwerfen: die spätere Zeile gewinnt, überschreibt aber
+    // keinen vorhandenen Wert mit null (eine Nachzügler-Zeile kann Felder leer lassen).
+    const _proTag = new Map();
+    allData.forEach(r => {
+      const vorhanden = _proTag.get(r.date);
+      if (!vorhanden) { _proTag.set(r.date, r); return; }
+      Object.keys(r).forEach(k => { if (r[k] != null) vorhanden[k] = r[k]; });
+    });
+    const _dubletten = allData.length - _proTag.size;
+    if (_dubletten > 0) console.info(`[Daten] ${_dubletten} doppelte Datumszeile(n) zusammengeführt.`);
+    allData = [..._proTag.values()];
     referenceDate = allData[allData.length - 1].date;
     _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
 
@@ -929,64 +955,10 @@ const COACHING_THRESHOLDS = {
   sleepGoodH:    7.5, // ≥7.5h → good sleep
   sleepBadH:     6.0, // <6.0h → bad sleep
 };
-function getDailyRecommendation() { return _memo('dailyRec', _computeDailyRecommendation); }
-function _computeDailyRecommendation() {
-  const last = allData[allData.length-1];
-  if (!last) return null;
-  const bl30 = {
-    hrv:   calculateBaseline('hrv',   30),
-    hr:    calculateBaseline('restHR',30),
-    sleep: calculateBaseline('sleepTotal',30)
-  };
-  const devHRV   = calculateDeviation(last.hrv,   bl30.hrv);
-  const devHR    = calculateDeviation(last.restHR, bl30.hr);
-  const sleepH   = last.sleepTotal;
-
-  // Score each signal: +1 good, -1 bad, 0 neutral/missing
-  let positiveCount = 0, negativeCount = 0;
-  const reasons = [];
-  if (devHRV != null) {
-    if (devHRV >= COACHING_THRESHOLDS.hvDevGood)      { positiveCount++; reasons.push({ok:true,  txt:'HRV über Baseline'}); }
-    else if (devHRV <= COACHING_THRESHOLDS.hvDevBad)  { negativeCount++; reasons.push({ok:false, txt:'HRV unter Baseline'}); }
-  }
-  if (devHR != null) {
-    if (devHR <= COACHING_THRESHOLDS.hrDevGood)       { positiveCount++; reasons.push({ok:true,  txt:'Ruhepuls unter Baseline'}); }
-    else if (devHR >= COACHING_THRESHOLDS.hrDevBad)   { negativeCount++; reasons.push({ok:false, txt:'Ruhepuls über Baseline'}); }
-  }
-  if (sleepH != null) {
-    if (sleepH >= COACHING_THRESHOLDS.sleepGoodH)     { positiveCount++; reasons.push({ok:true,  txt:'Schlaf im Zielbereich'}); }
-    else if (sleepH < COACHING_THRESHOLDS.sleepBadH)  { negativeCount++; reasons.push({ok:false, txt:'Schlafdauer unter Ziel'}); }
-  }
-
-  const total = positiveCount + negativeCount;
-
-  // Decision matrix
-  let status, statusColor, badge, text, action;
-  if (negativeCount >= 3 || (negativeCount >= 2 && total >= 2 && negativeCount > positiveCount)) {
-    status='Regeneration priorisieren'; statusColor='#EF4444'; badge='🔴';
-    text='Mehrere Erholungssignale weisen auf erhöhte Belastung hin.';
-    action='Heute nur Spaziergang, Mobility oder komplette Pause. Fokus auf Schlaf und Flüssigkeit.';
-  } else if (negativeCount >= 2) {
-    status='Vorsichtig belasten'; statusColor='#F97316'; badge='🟡';
-    text='Zwei Signale deuten auf erhöhte Belastung hin. Körper braucht noch etwas Erholung.';
-    action='Lockeres Ausdauertraining (Zone 1–2) für max. 30–45 Minuten. Keine maximale Intensität.';
-  } else if (positiveCount >= 2) {
-    status='Belastbar'; statusColor='#10B981'; badge='🟢';
-    text='Deine Werte liegen über Baseline. Der Körper ist gut erholt.';
-    action='Intensiveres Training oder ein Qualitätstraining ist heute gut möglich.';
-  } else {
-    status='Normal trainieren'; statusColor='#3B82F6'; badge='🔵';
-    text='Deine Werte sind stabil und im normalen Bereich.';
-    action='Moderate Trainingseinheit (45–60 Min.) ist heute gut möglich.';
-  }
-  // Enrich text with actual data points
-  const parts=[];
-  if (devHRV != null) parts.push(`HRV ${devHRV>=0?'+':''}${devHRV.toFixed(0)}% zur 30-Tage-Baseline`);
-  if (devHR  != null) parts.push(`Ruhepuls ${devHR>=0?'+':''}${devHR.toFixed(0)}%`);
-  if (sleepH != null) parts.push(`Schlaf ${toHM(sleepH)}`);
-  const dataStr = parts.length ? ' ('+parts.join(' · ')+').' : '.';
-  return { status, statusColor, badge, text: text + dataStr, action, reasons, positiveCount, negativeCount };
-}
+// Hinweis: getDailyRecommendation/_computeDailyRecommendation wurden entfernt –
+// die Kachel "Heutige Empfehlung" auf der Uebersicht ist auf Wunsch weggefallen und
+// war ihr einziger Aufrufer. COACHING_THRESHOLDS bleibt: die Belastungswarnung
+// (detectWarningSignals) nutzt dieselben Schwellen weiter.
 
 // ── Multi-signal Warning Logic ─────────────────────────
 // Returns null or {signals:[], text}
@@ -1332,7 +1304,6 @@ function pgOverview() {
   const hsDelta = (hs != null && prev7hs != null) ? hs - prev7hs : null;
 
   // Daily recommendation
-  const dailyRec = getDailyRecommendation();
   // Warning signals
   const warnSig = detectWarningSignals();
   // Pattern insights
@@ -1498,14 +1469,9 @@ function pgOverview() {
           })()}</div>`}
         </div>
       </div>
-      <!-- Kombinierte Kachel: Empfehlung + Tagesinsights -->
+      <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
+           wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
       <div class="ov-combo-card ov-col-wide">
-        ${dailyRec ? `<div class="ov-combo-rec" style="border-left-color:${dailyRec.statusColor}">
-          <div class="rec-status" style="background:${dailyRec.statusColor}22;color:${dailyRec.statusColor};margin-bottom:.5rem">${dailyRec.badge} ${dailyRec.status}</div>
-          <div class="rec-title" style="margin-bottom:.4rem">Heutige Empfehlung ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
-          <div class="rec-text" style="margin-bottom:.5rem">${dailyRec.text}</div>
-          <div class="rec-action">💡 ${dailyRec.action}</div>
-        </div>` : ''}
         <div class="scope-row">${scopeBadge('letzter Tag · Vergleich: Ø 7 Tage')}</div>
         <div class="ti-metrics">
           ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
