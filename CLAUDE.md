@@ -14,9 +14,11 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
   Drive→Sheet-Refresh an. (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
 
 ## Deploy
-Statische Dateien auf **GitHub Pages**. Zu deployen: `index.html`, `style.css`, `app.js`,
-`manifest.json`, `sw.js` und der komplette `icons/`-Ordner. Bisher manuell über die
-GitHub-Weboberfläche; mit Git-Remote künftig per `git push`.
+Git-Repo: `https://github.com/lebrongoku-prog/health-dashboard` (Remote `origin`, Branch `main`).
+Live via GitHub Pages aus `main` / `/ (root)`: **https://lebrongoku-prog.github.io/health-dashboard/**
+Deploy = `git push` (Auth per Personal Access Token im macOS-Keychain).
+Ausgeliefert werden `index.html`, `style.css`, `app.js`, `manifest.json`, `sw.js` und `icons/`.
+Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 
 ## Dateistruktur
 - `index.html` — Shell: Bottom-Nav (5 Tabs), `.screen`-Sections, Icon-Links mit
@@ -27,7 +29,10 @@ GitHub-Weboberfläche; mit Git-Remote künftig per `git push`.
 - `manifest.json` — PWA-Manifest (Name, Icons, `theme_color`/`background_color` `#0891B2`).
 - `icons/` — `icon.svg` + 8 PNGs (32/120/152/167/180/192/512/1024), EKG/Puls-Logo in Teal.
 - `Code.gs`, `Maintenance.gs` — Apps-Script-Backend (**Referenz**, NICHT Teil des Web-Deploys).
-- **Cruft (bereits in `.gitignore`):** `archive/` (alte Versionen), `.DS_Store`.
+- `.claude/devserver.py` — lokaler Test-Server ohne Caching (`python3 .claude/devserver.py`,
+  Port 8124). Nötig, weil der Browser sonst beim Prüfen weiter die alte `app.js` ausliefert.
+- **Cruft (bereits in `.gitignore`):** `archive/` (alte Versionen), `.DS_Store`,
+  `.claude/settings.local.json`.
 
 ## Pflicht-Workflow bei JEDER Änderung
 1. **SW-Cache bumpen:** Sobald eine gecachte Datei (`app.js`/`style.css`/`index.html`/
@@ -35,9 +40,18 @@ GitHub-Weboberfläche; mit Git-Remote künftig per `git push`.
    (`hcc-vNN` → `NN+1`). Sonst ziehen installierte PWAs die alte Version.
 2. **Bei Icon-Änderungen zusätzlich:** die `?v=N`-Query aller Icon-Links in `index.html`
    hochzählen (iOS cached Homescreen-Icons hartnäckig).
-3. **Verifizieren vor Abschluss:** `node --check app.js` (Syntax). Nach dem Entfernen von
-   Code per grep auf verwaiste Referenzen prüfen.
+3. **Verifizieren vor Abschluss:**
+   - **`node` ist auf dem Rechner NICHT installiert** — statt `node --check app.js` die App über
+     `.claude/devserver.py` im Browser laden und die Konsole auf Fehler prüfen (das deckt auch
+     Laufzeitfehler ab). Beim Testen vorher Service Worker + Caches löschen, sonst läuft alter Code.
+     Google-OAuth greift lokal nicht (`REDIRECT_URI` zeigt fest auf die Pages-URL) — es bleibt beim
+     Login-Screen. Syntax- und Ladefehler stehen trotzdem sofort in der Konsole.
+   - CSS-Klammerbalance: `python3 -c "s=open('style.css').read(); print(s.count('{'), s.count('}'))"`
+     (beide Zahlen müssen gleich sein)
+   - Nach dem Entfernen von Code per grep auf verwaiste Referenzen prüfen.
 4. **Deployen:** geänderte Dateien nach GitHub Pages (Git-Push bzw. GitHub-Web).
+   Updates greifen erst nach dem **zweiten** App-Neustart (1. Start installiert den neuen SW,
+   2. Start aktiviert ihn).
 
 ## Kern-Architektur (app.js)
 - **Globaler State:** `timeRange` (`heute`/`7d`/`1m`/`3m`/`6m`/`12m`/`24m`) + `referenceDate`.
@@ -80,7 +94,9 @@ GitHub-Weboberfläche; mit Git-Remote künftig per `git push`.
 - **Beim Entfernen von Code** grep-Check auf verwaiste Referenzen.
 
 ## Nützliche Befehle
-- `node --check app.js` — Syntaxprüfung (Pflicht vor Abschluss).
-- `python3 -m http.server` — statische Vorschau. Achtung: Google-OAuth braucht ggf. eine
-  autorisierte Origin, lokal evtl. nicht voll nutzbar.
-- Kein Test-Framework, kein Build-Prozess.
+```bash
+python3 .claude/devserver.py                                                  # Dev-Server, Port 8124
+python3 -c "s=open('style.css').read(); print(s.count('{'), s.count('}'))"    # CSS-Klammerbalance
+grep -n "hcc-v" sw.js                                                         # aktuelle Cache-Version
+```
+Kein Test-Framework, kein Build-Prozess, kein `node` auf dem Rechner.

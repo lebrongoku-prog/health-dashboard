@@ -52,6 +52,16 @@ GitHub Pages liefert den `main`-Branch aus — ein `git push` genügt.
 > `?v=N`-Query der Icon-Links in `index.html` erhöhen — iOS cacht
 > Homescreen-Icons hartnäckig.
 
-Vor jedem Deploy: `node --check app.js`.
+## Lokal testen
+
+```bash
+python3 .claude/devserver.py
+```
+
+Startet einen Server auf http://localhost:8124, der `Cache-Control: no-store` mitschickt —
+sonst liefert der Browser beim Prüfen einer Änderung weiter die alte `app.js` aus.
+Google-OAuth funktioniert lokal nicht (die `REDIRECT_URI` zeigt fest auf die Pages-URL),
+es bleibt also beim Login-Screen; für den Konsolen-Check auf Syntax- und Ladefehler
+reicht das aber. Ein Build-Schritt, ein Testframework oder Node.js werden nicht benötigt.
 
 Weitere Konventionen und Architekturdetails stehen in [`CLAUDE.md`](CLAUDE.md).

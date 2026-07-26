@@ -3,3 +3,6 @@
 
 # Alte Versionen / Backups – nicht auf GitHub Pages deployen
 archive/
+
+# Rechner-lokale Claude-Code-Einstellungen (devserver.py + launch.json bleiben versioniert)
+.claude/settings.local.json
