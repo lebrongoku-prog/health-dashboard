@@ -1322,10 +1322,9 @@ function pgOverview() {
   };
   // Health score (immer der Score des aktuellen Tages – unabhängig vom Zeitfilter)
   const hs = computeHealthScore([lastDay]);
-  const prev7hs = computeHealthScore(priorDays.length ? priorDays : [lastDay]);
   const [hsCat, hsColor] = scoreCat(hs);
-  // Delta nur bilden, wenn beide Seiten wirklich vorliegen.
-  const hsDelta = (hs != null && prev7hs != null) ? hs - prev7hs : null;
+  // Der Vergleich zum 7-Tage-Schnitt wurde auf Wunsch aus der Anzeige entfernt;
+  // damit entfallen auch die Berechnung des Vorwochen-Scores und des Deltas.
 
   // Daily recommendation
   // Warning signals
@@ -1480,14 +1479,14 @@ function pgOverview() {
         })()}
         </div>
         </div><!-- /ov-score-body -->
-        <div class="ov-score-footer">
-          <!-- Der deutende Satz ("Deutlich unter dem Wochenschnitt – Erholung empfohlen")
-               wurde auf Wunsch entfernt. Es bleibt die reine Zahl; der Hinweistext bei
-               fehlenden Daten bleibt ebenfalls, weil er erklärt statt zu bewerten. -->
-          ${hs==null
-            ? `<div class="ov-score-hinweis">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>`
-            : `<div class="ov-score-delta">${hsDelta!=null?`${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt`:'Kein Vergleichswert'}</div>`}
-        </div>
+        <!-- Fusszeile nur noch im Ausnahmefall: der deutende Satz UND die Zahl
+             "vs. 7-Tage-Schnitt" wurden auf Wunsch entfernt. Liegt ein Score vor,
+             entfällt die Fusszeile ganz – sonst bliebe eine leere Trennlinie stehen.
+             Der Hinweis bei fehlenden Messwerten bleibt, weil er erklärt statt zu
+             bewerten (Gegenstück zum früheren Platzhalter-Score 70). -->
+        ${hs==null ? `<div class="ov-score-footer">
+          <div class="ov-score-hinweis">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>
+        </div>` : ''}
       </div>
       <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
            wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
