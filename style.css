@@ -436,15 +436,19 @@ body.dark .zs-item strong{color:#FDBA74}
   font-size:.55rem;font-weight:700;font-style:italic;line-height:1;
   cursor:help;position:relative;-webkit-tap-highlight-color:transparent;
 }
-.info-i::after{
-  content:attr(data-tt);position:absolute;bottom:calc(100% + 7px);left:50%;
-  transform:translateX(-50%);width:210px;
+/* Eigenes Element statt ::after, damit openTooltip den Kasten am Bildschirmrand
+   verschieben kann. position:fixed – die Koordinaten setzt _placeTooltip. */
+.info-tt{
+  position:fixed;width:220px;max-width:calc(100vw - 24px);
   background:#1E293B;color:#fff;font-size:.63rem;font-weight:500;font-style:normal;
-  line-height:1.45;padding:.45rem .6rem;border-radius:8px;
-  opacity:0;pointer-events:none;transition:opacity .15s;z-index:400;
+  line-height:1.45;padding:.5rem .65rem;border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.09);
+  opacity:0;pointer-events:none;transition:opacity .15s;z-index:9999;
   white-space:normal;text-align:left;
 }
-.info-i:hover::after,.info-i.tt-open::after{opacity:1}
+/* Nur über .tt-open sichtbar – die Klasse setzt openTooltip gemeinsam mit der
+   Positionierung. Eine reine :hover-Regel könnte den Kasten kurz unplatziert zeigen. */
+.info-i.tt-open .info-tt{opacity:1}
 .info-i:focus-visible{outline:2px solid var(--tab-color,#0891B2);outline-offset:2px}
 
 /* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
@@ -575,8 +579,17 @@ body.dark .ov-score-footer{border-top-color:#334155}
 .ti-arrow{font-size:.91rem;font-weight:800;width:18px;text-align:center;flex-shrink:0;margin-top:.05rem}
 .ti-txt{color:var(--txt2);line-height:1.4;font-weight:500}
 .ti-metrics{display:grid;grid-template-columns:repeat(4,1fr);margin-top:.65rem;gap:.4rem}
-.ti-metric{padding:.55rem .5rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;overflow:hidden}
-.ti-metric-lbl{font-size:.66rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem}
+.ti-metric{padding:.55rem .5rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;position:relative;overflow:visible}
+/* ⓘ in die Ecke statt in den Textfluss: auf den schmalen Kacheln (~78 px) rutschte
+   es sonst in eine eigene Zeile und machte die Kacheln unterschiedlich hoch.
+   overflow:visible ist nötig, damit der Erklärungskasten nicht beschnitten wird. */
+.ti-metric .info-i{position:absolute;bottom:.4rem;right:.35rem;width:13px;height:13px}
+/* Die Beschriftung oben ist bei ~62 px Innenbreite bereits randvoll – dort hatte das
+   Symbol entweder eine zweite Zeile erzwungen oder den Text ueberlappt. Unten rechts
+   ist zuverlaessig Platz; die Abweichungszeile bekommt dafuer etwas Rand. */
+.ti-metric-delta{padding-right:15px}
+/* Beschriftung + ⓘ in einer Zeile; bei wenig Platz rutscht das Symbol nicht weg. */
+.ti-metric-lbl{font-size:.66rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
 .ti-metric-val{font-size:1.07rem;font-weight:800;color:var(--txt);line-height:1.2}
 .ti-metric-delta{font-size:.67rem;font-weight:500;margin-top:.25rem}
 .ti-metric-delta.pos{color:#10B981}

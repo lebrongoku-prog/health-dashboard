@@ -756,6 +756,13 @@ function openTooltip(el) {
     tip.innerHTML = _calTipHTML(el.dataset.day);
     tip.classList.add('visible');                       // erst sichtbar, dann messen
     _placeTooltip(tip, rect, 190, 110);
+  } else if (el.classList.contains('info-i')) {
+    // Am Bildschirmrand einklemmen: die ⓘ auf den Minikacheln sitzen ganz links und
+    // ganz rechts, ein mittig zentrierter Kasten ragte dort aus dem Bild.
+    const tt = el.querySelector('.info-tt');
+    if (!tt) { _ttOpenEl = null; return; }
+    el.classList.add('tt-open');                        // erst sichtbar, dann messen
+    _placeTooltip(tt, rect, 220, 110);
   } else {
     el.classList.add('tt-open');                        // reine CSS-Tooltips
   }
@@ -892,10 +899,28 @@ const ERKLAERUNG = {
   baseline:   'Baseline: dein eigener Durchschnitt der letzten 30 Tage. Verglichen wird also mit dir selbst, nicht mit Richtwerten.'
 };
 // Antippbares Fragezeichen. Nutzt das zentrale Tooltip-System (Maus + Finger).
-function infoI(key) {
-  const t = ERKLAERUNG[key];
-  return t ? `<span class="info-i" data-tt="${esc(t)}" tabindex="0" role="button" aria-label="Erklärung">i</span>` : '';
+// Erklärt, wie die Zahl auf einer Minikachel der Übersicht zu lesen ist.
+// Bewusst je Kennzahl formuliert statt eines allgemeinen Satzes: entscheidend ist,
+// in welche Richtung eine Abweichung gut ist – das unterscheidet sich pro Wert.
+// Bezug ist überall derselbe: Wert = letzter Tag, Ø = die sieben Tage davor.
+const ERKLAERUNG_MINI = {
+  sleepTotal: 'Oben die Schlafdauer der letzten Nacht, darunter der Abstand zum Durchschnitt der sieben Nächte davor. „+18m vs. Ø" heisst: 18 Minuten mehr als üblich. Mehr ist besser.',
+  restHR:     'Oben der Ruhepuls des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „−2 vs. Ø" heisst: 2 Schläge weniger als üblich. Weniger ist besser.',
+  hrv:        'Oben die HRV des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „+3 vs. Ø" heisst: 3 ms mehr als üblich. Mehr ist besser.',
+  steps:      'Oben die Schritte des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „+1 063 vs. Ø" heisst: gut tausend Schritte mehr als üblich. Mehr ist besser.',
+  training:   'Oben die Trainingsminuten des letzten Tages, darunter der Abstand zum Durchschnitt der Trainingstage aus den sieben Tagen davor. Tage ohne Training zählen nicht in den Durchschnitt.'
+};
+
+// Antippbares Fragezeichen. Der Text steckt als eigenes Element im Anker, damit ihn
+// openTooltip am Bildschirmrand verschieben kann – ein reiner CSS-Tooltip würde auf
+// den schmalen Minikacheln links und rechts aus dem Bild ragen.
+function _infoAnker(text) {
+  return text
+    ? `<span class="info-i" tabindex="0" role="button" aria-label="Erklärung">i<span class="info-tt">${esc(text)}</span></span>`
+    : '';
 }
+function infoI(key)     { return _infoAnker(ERKLAERUNG[key]); }
+function infoMini(key)  { return _infoAnker(ERKLAERUNG_MINI[key]); }
 
 // ── Score ──────────────────────────────────────────────
 function computeHealthScore(days) {
@@ -1495,30 +1520,30 @@ function pgOverview() {
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
           ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
-            <div class="ti-metric-lbl">🌙 Schlaf</div>
+            <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
             <div class="ti-metric-val">${toHM(slLast)}</div>
             ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${hrLast!=null?`<div class="ti-metric" style="border-top:3px solid #EF4444;background:rgba(239,68,68,.05)">
-            <div class="ti-metric-lbl">❤️ Ruhepuls</div>
+            <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
             <div class="ti-metric-val">${Math.round(hrLast)} bpm</div>
             ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${hvLast!=null?`<div class="ti-metric" style="border-top:3px solid #2563EB;background:rgba(37,99,235,.05)">
-            <div class="ti-metric-lbl">💙 HRV</div>
+            <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
             <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${(()=>{
             const trMin=workoutData[lastDay.date]?.durationMin??null;
-            const trAvg=(()=>{const v=allData.slice(-7).map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
+            const trAvg=(()=>{const v=priorDays.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
             if(trMin!=null){return`<div class="ti-metric" style="border-top:3px solid #F97316;background:rgba(249,115,22,.07)">
-              <div class="ti-metric-lbl">🏃 Training</div>
+              <div class="ti-metric-lbl">🏃 Training ${infoMini('training')}</div>
               <div class="ti-metric-val">${Math.round(trMin)} min</div>
               ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
             </div>`;}
             return`<div class="ti-metric" style="border-top:3px solid #10B981;background:rgba(16,185,129,.05)">
-              <div class="ti-metric-lbl">🚶 Schritte</div>
+              <div class="ti-metric-lbl">🚶 Schritte ${infoMini('steps')}</div>
               <div class="ti-metric-val">${stLast!=null?Math.round(stLast).toLocaleString('de-CH'):'—'}</div>
               ${stLast!=null&&avg7d.steps!=null?`<div class="ti-metric-delta ${stLast-avg7d.steps>10?'pos':stLast-avg7d.steps<-10?'neg':'neu'}">${(()=>{const d=Math.round(stLast-avg7d.steps);return(d>=0?'+':'')+d.toLocaleString('de-CH')+' vs. Ø';})()}</div>`:''}
             </div>`;

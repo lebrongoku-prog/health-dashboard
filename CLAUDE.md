@@ -99,9 +99,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   bleiben neutral grau.
 - **Keine Kunst-Einheiten:** Tagesdurchschnitte heissen `Ø 57 bpm`, nicht `57 bpm/d`
   („Schläge pro Minute pro Tag" ergibt keinen Sinn).
-- **Kennzahlen erklären:** `infoI('key')` setzt ein antippbares ⓘ mit Text aus `ERKLAERUNG`.
-  Jede Erklärung nennt *was es ist* **und** *welche Richtung gut ist* — ohne die zweite
-  Angabe lässt sich weder Farbe noch Pfeil deuten.
+- **Kennzahlen erklären:** `infoI('key')` setzt ein antippbares ⓘ mit Text aus `ERKLAERUNG`,
+  `infoMini('key')` das Gegenstück für die Minikacheln der Übersicht (`ERKLAERUNG_MINI`,
+  erklärt das Lesen des Werts **im Verhältnis zum Ø**). Jede Erklärung nennt *was es ist*
+  **und** *welche Richtung gut ist* — ohne die zweite Angabe lässt sich weder Farbe noch
+  Pfeil deuten. Der Kasten ist ein eigenes `.info-tt`-Element (kein `::after`), damit
+  `openTooltip` ihn am Bildschirmrand einklemmen kann.
 - **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
   Durchschnittswerte tragen ein Perioden-Kürzel (Tagesmittel = `/d`).
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
