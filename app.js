@@ -1481,22 +1481,19 @@ function pgOverview() {
         </div>
         </div><!-- /ov-score-body -->
         <div class="ov-score-footer">
-          ${hs==null?`<div class="ov-score-interp">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>`:`
-          <div class="ov-score-delta">${hsDelta!=null?`${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt`:'Kein Vergleichswert'}</div>
-          <div class="ov-score-interp">${(()=>{
-            if(hsDelta==null)return'Für die Vorwoche liegen zu wenige Daten für einen Vergleich vor.';
-            if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
-            if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
-            if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
-            if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
-            return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
-          })()}</div>`}
+          <!-- Der deutende Satz ("Deutlich unter dem Wochenschnitt – Erholung empfohlen")
+               wurde auf Wunsch entfernt. Es bleibt die reine Zahl; der Hinweistext bei
+               fehlenden Daten bleibt ebenfalls, weil er erklärt statt zu bewerten. -->
+          ${hs==null
+            ? `<div class="ov-score-hinweis">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>`
+            : `<div class="ov-score-delta">${hsDelta!=null?`${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt`:'Kein Vergleichswert'}</div>`}
         </div>
       </div>
       <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
            wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
       <div class="ov-combo-card ov-col-wide">
-        <div class="scope-row">${scopeBadge('letzter Tag · Vergleich: Ø 7 Tage')}</div>
+        <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
+             Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
           ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
             <div class="ti-metric-lbl">🌙 Schlaf</div>

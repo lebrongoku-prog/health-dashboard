@@ -374,7 +374,6 @@ body.dark #bottom-nav {
   border:1px solid var(--border);border-radius:999px;
   padding:.14rem .45rem;white-space:nowrap;line-height:1.4;
 }
-.scope-row{margin:.1rem 0 .45rem}
 .chart-head .scope-badge{margin-left:auto}
 body.dark .scope-badge{background:#0F172A}
 
@@ -551,7 +550,7 @@ body.dark .ov-score-footer{border-top-color:#334155}
 .ov-score-ring svg{position:absolute;inset:0;width:100%;height:100%}
 .ov-score-cat{font-size:1.13rem;font-weight:800;line-height:1.1}
 .ov-score-delta{font-size:.7rem;color:var(--txt3)}
-.ov-score-interp{font-size:.63rem;color:var(--txt3);margin-top:.1rem;text-align:center;max-width:100%;line-height:1.4;word-break:break-word}
+.ov-score-hinweis{font-size:.63rem;color:var(--txt3);margin-top:.1rem;text-align:center;max-width:100%;line-height:1.4;word-break:break-word}
 .ov-grid-mid{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .ov-grid-mid>*{min-width:0;overflow:hidden}
 
@@ -800,7 +799,7 @@ h1, h2, h3, h4, h5,
 .debt-tt-row,
 .kpi-unit, .kpi-delta, .kpi-sub,
 .ov-mini-unit,
-.ov-score-delta, .ov-score-interp,
+.ov-score-delta, .ov-score-hinweis,
 .bl-lbl, .bl-val,
 .lw-table td {
   font-size: .75rem !important;
