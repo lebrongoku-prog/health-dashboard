@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Render-Prüfstand (nur lokal)</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+</head>
+<body class="theme-overview">
+<div class="bg-fade-layer" id="bg-fade-a"></div>
+<div class="bg-fade-layer" id="bg-fade-b"></div>
+<div id="login-screen" class="overlay-screen" style="display:none"><button onclick="signIn()">Login</button></div>
+<div id="loading" class="overlay-screen"><div class="spin"></div><p class="ld-txt">lädt…</p></div>
+<div id="err-screen" class="overlay-screen" style="display:none"><p class="err-msg" id="err-txt"></p></div>
+<div id="app">
+  <div id="tab-container">
+    <section id="screen-overview"   class="screen"></section>
+    <section id="screen-herz"       class="screen"></section>
+    <section id="screen-schlaf"     class="screen"></section>
+    <section id="screen-aktivitaet" class="screen"></section>
+    <section id="screen-training"   class="screen"></section>
+  </div>
+</div>
+<nav id="bottom-nav">
+  <button class="nav-btn active" id="nav-overview"   data-tab="overview"><span>Übersicht</span></button>
+  <button class="nav-btn"        id="nav-herz"       data-tab="herz"><span>Herz</span></button>
+  <button class="nav-btn"        id="nav-schlaf"     data-tab="schlaf"><span>Schlaf</span></button>
+  <button class="nav-btn"        id="nav-aktivitaet" data-tab="aktivitaet"><span>Schritte</span></button>
+  <button class="nav-btn"        id="nav-training"   data-tab="training"><span>Training</span></button>
+</nav>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Render-Prüfstand – NUR für die lokale Entwicklung.
+// Ersetzt Google-OAuth und die Sheets-API durch erfundene Daten, damit sich die
+// Oberfläche ohne Anmeldung prüfen lässt (lokal schlägt OAuth fehl, weil die
+// REDIRECT_URI fest auf die GitHub-Pages-Adresse zeigt).
+//
+// Szenarien über ?scenario= :
+//   normal      – vollständige Daten (Standard)
+//   nodata      – letzter Tag ohne Messwerte  → Score muss "—" zeigen
+//   woerror     – Workout-Sheet wirft Fehler  → Training-Tab muss Fehlerkarte zeigen
+//   stale       – Daten enden vor 3 Tagen     → Banner muss warnen
+// ═══════════════════════════════════════════════════════════
+const SC = new URLSearchParams(location.search).get('scenario') || 'normal';
+
+localStorage.setItem('g_token', 'testtoken');
+localStorage.setItem('g_expiry', String(Date.now() + 3600e3));
+
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+// Deterministischer Pseudozufall, damit Läufe vergleichbar bleiben
+let _seed = 42;
+function rnd(){ _seed = (_seed*1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
+
+const N_DAYS = 120;
+const endOffset = SC === 'stale' ? 3 : 0;
+const health = [['date','sleepTotal','restHR','hrv','steps','activeCal','vo2max','sleepDeep','sleepRem','sleepCore','sleepAwake','sleepScore','runSpeed','distKm','sleepStart','sleepEnd']];
+const workout = [['Date','Type','Duration (min)','Distance (km)','Avg HR','Max HR','Speed (km/h)','Elevation (m)','Energy (kJ)']];
+
+for (let i = N_DAYS - 1; i >= endOffset; i--) {
+  const d = new Date(); d.setDate(d.getDate() - i);
+  const ds = ymd(d);
+  const dow = d.getDay();
+  const isLast = (i === endOffset);
+  if (isLast && SC === 'nodata') { health.push([ds,'','','','','','','','','','','','','','','']); continue; }
+
+  const sleep = 6.4 + rnd()*2.2 + (dow===0||dow===6 ? 0.5 : 0);
+  const deep = sleep*0.17, rem = sleep*0.22, core = sleep*0.55, awake = sleep*0.06;
+  const hrv   = 42 + rnd()*26 + i*0.05;
+  const restHR= 62 - rnd()*10 - i*0.01;
+  const steps = Math.round(4200 + rnd()*9000);
+  const train = rnd() < 0.4;
+  health.push([
+    ds, sleep.toFixed(2), restHR.toFixed(1), hrv.toFixed(1), steps,
+    Math.round(320 + rnd()*600), (44 + i*0.01 + rnd()*0.6).toFixed(1),
+    deep.toFixed(2), rem.toFixed(2), core.toFixed(2), awake.toFixed(2),
+    Math.round(62 + rnd()*33),
+    train ? (9.5 + rnd()*3).toFixed(2) : '',
+    train ? (4 + rnd()*8).toFixed(2) : '',
+    ds + ' 23:' + String(Math.floor(rnd()*59)).padStart(2,'0'),
+    ds + ' 07:' + String(Math.floor(rnd()*59)).padStart(2,'0')
+  ]);
+  if (train) {
+    const speed = 9.5 + rnd()*3, dur = 28 + rnd()*55;
+    workout.push([ds, ['Laufen','Krafttraining','Radfahren','Wandern'][Math.floor(rnd()*4)],
+      dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30),
+      Math.round(165+rnd()*20), speed.toFixed(2), Math.round(rnd()*260), Math.round(1200+rnd()*1600)]);
+  }
+}
+
+const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
+const WORKOUT_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
+const ok = body => Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
+
+window.fetch = (url) => {
+  const u = String(url);
+  if (u.includes('sheets.googleapis.com')) {
+    const isWorkout = u.includes(WORKOUT_ID);
+    if (isWorkout && SC === 'woerror') return Promise.reject(new Error('Simulierter Netzwerkfehler'));
+    if (u.includes('?fields=')) return ok({ sheets:[{ properties:{ title:'Data' } }] });
+    return ok({ values: isWorkout ? workout : health });
+  }
+  return ok({});
+};
+console.log('[Prüfstand] Szenario:', SC, '· Health-Zeilen:', health.length-1, '· Workouts:', workout.length-1);
+</script>
+<script src="/app.js"></script>
+</body>
+</html>

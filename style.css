@@ -223,6 +223,16 @@ body.dark .dark-toggle { color: #FBBF24; }
   color: rgba(255,255,255,0.82);
   font-size: 12px; margin-top: 2px;
 }
+/* Daten-Stand: bis wann Daten vorliegen und wann zuletzt geladen wurde.
+   Sitzt auf dem farbigen Banner, daher gedecktes Weiß statt der Text-Variablen. */
+.pg-banner-stand {
+  color: rgba(255,255,255,0.62);
+  font-size: 10.5px; margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.pg-banner-stand.stale {
+  color: #FDE68A; font-weight: 600;
+}
 /* Refresh + Dark-Toggle: rechtsbündig auf der Titelzeile, ohne eigene Kachel.
    Sitzen auf dem farbigen Banner-Verlauf → halbtransparentes Weiß. */
 .pg-banner-txt { flex: 1 1 auto; min-width: 0; }
@@ -354,6 +364,19 @@ body.dark #bottom-nav {
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
 .chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chart-head .chart-filter{margin:0;flex:0 0 auto;flex-wrap:nowrap}
+
+/* Bezugszeitraum-Etikett: markiert Kacheln, deren Zahlen NICHT dem Zeitfilter folgen.
+   Bewusst zurückhaltend – es soll einordnen, nicht um Aufmerksamkeit konkurrieren. */
+.scope-badge{
+  display:inline-block;flex:0 0 auto;
+  font-size:.58rem;font-weight:600;letter-spacing:.02em;text-transform:none;
+  color:var(--txt3);background:var(--bg);
+  border:1px solid var(--border);border-radius:999px;
+  padding:.14rem .45rem;white-space:nowrap;line-height:1.4;
+}
+.scope-row{margin:.1rem 0 .45rem}
+.chart-head .scope-badge{margin-left:auto}
+body.dark .scope-badge{background:#0F172A}
 
 /* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
 .chart-filter{display:flex;align-items:center;gap:.3rem;margin:.1rem 0 .5rem}
@@ -548,6 +571,33 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 .debt-tt-slept{font-weight:600}
 .debt-tt-d{text-align:right;font-weight:700}
 .debt-tt-d.pos{color:#10B981}.debt-tt-d.neg{color:#EF4444}
+.debt-tt-wrap:focus-visible{outline:2px solid var(--tab-color,#0891B2);outline-offset:3px;border-radius:6px}
+
+/* ── Trainingskalender-Zellen ─────────────────────────────
+   Trainingstage sind antippbar (öffnet das Tooltip), daher eigener Cursor +
+   Fokusring. Der Tap-Highlight von iOS wird unterdrückt, sonst blitzt beim
+   Antippen ein grauer Kasten über dem runden Tagesmarker auf. */
+.cal-cell{display:flex;align-items:center;justify-content:center;height:26px}
+.cal-train{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cal-train:focus-visible{outline:2px solid #F97316;outline-offset:1px;border-radius:50%}
+
+/* Kalender-Tooltip: ein gemeinsames Element am <body>, frei positioniert. */
+#cal-tip{
+  position:fixed;z-index:9999;min-width:150px;max-width:220px;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.6rem .8rem;box-shadow:0 8px 28px rgba(0,0,0,.18);
+  pointer-events:none;font-family:inherit;
+  opacity:0;transition:opacity .15s;
+}
+#cal-tip.visible{opacity:1}
+.cal-tip-title{font-weight:700;font-size:.68rem;margin-bottom:.3rem;color:var(--txt)}
+.cal-tip-row{font-size:.63rem;color:var(--txt2);margin:.1rem 0}
+
+/* Tap-Zustand der reinen CSS-Tooltips – Gegenstück zu den :hover-Regeln,
+   damit sie auch ohne Mauszeiger (iPhone) erreichbar sind. */
+.ov-ring-wrap.tt-open .hs-ring-tt{opacity:1}
+.hs-komp-bar-wrap.tt-open::after{opacity:1}
+.ov-ring-wrap,.hs-komp-bar-wrap{-webkit-tap-highlight-color:transparent}
 
 /* EW Check */
 .ew-row{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:.4rem;padding:.22rem 0;border-bottom:1px solid #F8FAFC}

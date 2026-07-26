@@ -41,6 +41,7 @@ function _initAuth() {
 
 (async () => {
 let allData = [], timeRange = '7d', referenceDate = '';
+let _lastLoadTs = null; // Zeitpunkt des letzten erfolgreichen Sheet-Abrufs (für den Daten-Stand)
 const charts = {};
 // Cache für allData-abhängige Auswertungen (Baselines, Tages-Empfehlung,
 // Warnsignale, Muster-Insights). Wird in loadFromAPI geleert, sobald sich
@@ -52,7 +53,23 @@ function _memo(key, fn) {
 }
 let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
-let workoutSheetReady = false; // true once consolidated Workout Data sheet has been loaded
+let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
+let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
+
+// Wartet begrenzt darauf, dass der Workout-Ladeversuch abgeschlossen ist.
+// Ohne Zeitlimit blieb der Training-Tab bei einem fehlgeschlagenen Sheet-Abruf
+// dauerhaft im Ladezustand – samt eines Intervalls, das nie aufgeräumt wurde und
+// sich bei jedem Filterwechsel vervielfachte.
+function _awaitWorkoutSheet(timeoutMs = 10000) {
+  if (workoutSheetReady) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const started = Date.now();
+    const iv = setInterval(() => {
+      if (workoutSheetReady)                    { clearInterval(iv); resolve(true);  }
+      else if (Date.now() - started >= timeoutMs) { clearInterval(iv); resolve(false); }
+    }, 200);
+  });
+}
 
 // ── Training Calendar helper ───────────────────────────
 function _buildCalHTML(year, month) {
@@ -69,56 +86,18 @@ function _buildCalHTML(year, month) {
   const monthStr = firstOfMonth.toLocaleDateString('de-CH',{month:'long',year:'numeric'});
   const prevMonth = new Date(year, month-1, 1);
   const nextMonth = new Date(year, month+1, 1);
-  const prevDisabled = minDate && prevMonth.toISOString().slice(0,7) < minDate.slice(0,7) ? 'disabled' : '';
-  const nextDisabled = maxDate && nextMonth.toISOString().slice(0,7) > maxDate.slice(0,7) ? 'disabled' : '';
+  // toLocalDateStr statt toISOString: toISOString rechnet nach UTC um, wodurch in
+  // Zeitzonen östlich von Greenwich (CH = UTC+1/+2) der Vortag herauskommt.
+  const prevDisabled = minDate && toLocalDateStr(prevMonth).slice(0,7) < minDate.slice(0,7) ? 'disabled' : '';
+  const nextDisabled = maxDate && toLocalDateStr(nextMonth).slice(0,7) > maxDate.slice(0,7) ? 'disabled' : '';
   let startDow = firstOfMonth.getDay();
   startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
-  const mo1=firstOfMonth.toISOString().slice(0,10), mo2=lastOfMonth.toISOString().slice(0,10);
+  const mo1=toLocalDateStr(firstOfMonth), mo2=toLocalDateStr(lastOfMonth);
   const trainCount = allData.filter(r=>r.date>=mo1&&r.date<=mo2&&trainDays.has(r.date)).length;
 
-  // Tooltip
-  if(!document.getElementById('cal-tip')){
-    const tip=document.createElement('div');
-    tip.id='cal-tip';
-    tip.style.cssText='position:fixed;z-index:999;display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.6rem .8rem;box-shadow:0 8px 28px rgba(0,0,0,.18);pointer-events:none;min-width:150px;max-width:210px;font-family:inherit';
-    document.body.appendChild(tip);
-  }
-  window._calShowTip=(e,ds,tipMin,tipDist)=>{
-    const tip=document.getElementById('cal-tip');
-    if(!tip)return;
-    const d=new Date(ds+'T00:00:00');
-    const dateStr=d.toLocaleDateString('de-CH',{weekday:'short',day:'2-digit',month:'long'});
-    const wo=workoutData[ds];
-    const titleIcon=wo?wo.icon:'🏋️';
-    let html=`<div style="font-weight:700;font-size:.68rem;margin-bottom:.3rem;color:var(--txt)">${titleIcon} ${dateStr}</div>`;
-    if(wo){
-      if(wo.avgHR) html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">💓 Ø ${Math.round(wo.avgHR)} bpm${wo.maxHR?` · Max ${wo.maxHR} bpm`:''}</div>`;
-      if(wo.distanceKm) html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">📍 ${wo.distanceKm.toFixed(2)} km${wo.avgSpeedKph?` · ${(60/wo.avgSpeedKph).toFixed(0)}'${String(Math.round(((60/wo.avgSpeedKph)%1)*60)).padStart(2,'0')}''/km`:''}`;
-      if(wo.elevationM) html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">⛰️ ${Math.round(wo.elevationM)} m ↑</div>`;
-      if(wo.durationMin) html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">⏱️ ${Math.floor(wo.durationMin)} min</div>`;
-    } else {
-      if(tipMin!=null&&tipMin!=='null') html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">⏱️ ${tipMin} Min. Training</div>`;
-      if(tipDist!=null&&tipDist!=='null') html+=`<div style="font-size:.63rem;color:var(--txt2);margin:.1rem 0">📍 ${parseFloat(tipDist).toFixed(2)} km</div>`;
-    }
-    tip.innerHTML=html;
-    tip.style.display='block';
-    const x=e.clientX+14,y=e.clientY-8;
-    tip.style.left=(x+180>window.innerWidth?e.clientX-194:x)+'px';
-    tip.style.top=(y+80>window.innerHeight?e.clientY-80:y)+'px';
-  };
-  window._calHideTip=()=>{ const t=document.getElementById('cal-tip'); if(t) t.style.display='none'; };
-
-  // Per-day data lookup – Dauer und Distanz beide aus workoutData.
-  const dayData={};
-  Object.keys(workoutData).forEach(date=>{
-    const w=workoutData[date];
-    dayData[date]={
-      min:w?.durationMin!=null?Math.round(w.durationMin):null,
-      dist:w?.distanceKm!=null?w.distanceKm:null
-    };
-  });
-
-  // Build cells — each cell is a flex container so circle is centered within the 1fr column
+  // Build cells — each cell is a flex container so circle is centered within the 1fr column.
+  // Trainingstage tragen .cal-train + data-day; Inhalt und Position des Tooltips
+  // übernimmt der zentrale Handler (Maus UND Touch, siehe initTooltips).
   let cells='';
   for(let i=0;i<startDow;i++) cells+=`<div></div>`;
   for(let d=1;d<=lastOfMonth.getDate();d++){
@@ -129,10 +108,8 @@ function _buildCalHTML(year, month) {
     const col=isTrain?'#fff':isToday?'#F97316':'var(--txt2)';
     const ring=isToday?'box-shadow:0 0 0 2px #F97316;':'';
     const fw=isTrain||isToday?'700':'400';
-    const dd=dayData[ds]||{};
-    const tip=isTrain?`onmouseenter="window._calShowTip(event,'${ds}',${dd.min??'null'},${dd.dist!=null?`'${parseFloat(dd.dist).toFixed(2)}'`:'null'})" onmouseleave="window._calHideTip()"`:'' ;
-    cells+=`<div style="display:flex;align-items:center;justify-content:center;height:26px" ${tip}>
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.74rem;font-weight:${fw};${ring}${isTrain?'cursor:pointer;':''}">${d}</div>
+    cells+=`<div class="cal-cell${isTrain?' cal-train':''}"${isTrain?` data-day="${ds}" tabindex="0" role="button" aria-label="Training am ${ds}"`:''}>
+      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.74rem;font-weight:${fw};${ring}">${d}</div>
     </div>`;
   }
 
@@ -171,7 +148,7 @@ function _parseWorkoutRows(rows) {
       stepCount:      pN(r['Steps'])
     };
   });
-  workoutSheetReady = true;
+  // workoutSheetReady wird vom Aufrufer gesetzt (auch im Fehlerfall) – siehe loadFromAPI.
 }
 
 Chart.defaults.color = '#94A3B8';
@@ -209,7 +186,6 @@ const showErr = m => {
 };
 
 // ── Daten von Apps Script API laden ───────────────────
-let csvHeaders = [];
 // Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
 async function _fetchSheet(sheetId) {
   // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, sauber neu anmelden
@@ -260,14 +236,19 @@ async function loadFromAPI() {
       return obj;
     }).filter(r => r.date);
     allData.sort((a, b) => a.date.localeCompare(b.date));
-    csvHeaders = Object.keys(allData[0] || {});
     referenceDate = allData[allData.length - 1].date;
     _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
 
-    // 2. Workout-Daten laden
+    // 2. Workout-Daten laden. Ein Fehler hier legt die übrigen Tabs nicht lahm, darf
+    //    aber nicht stillschweigend verschluckt werden: sonst wartet der Training-Tab
+    //    endlos auf Daten, die nie kommen. Deshalb Fehler merken und den Ladeversuch
+    //    in jedem Fall als abgeschlossen markieren.
+    workoutLoadError = null;
     try {
       const workout = await _fetchSheet(WORKOUT_SHEET_ID);
-      if (!workout.authError && workout.values && workout.values.length > 1) {
+      if (workout.authError) {
+        workoutLoadError = 'Keine gültige Berechtigung für das Workout-Sheet.';
+      } else if (workout.values && workout.values.length > 1) {
         const wHeaders = workout.values[0].map(h => h.trim());
         const wRows = workout.values.slice(1).map(row => {
           const obj = {};
@@ -276,9 +257,15 @@ async function loadFromAPI() {
         });
         _parseWorkoutRows(wRows);
       }
-    } catch(_) {} // Workout-Fehler sind nicht kritisch
+      // values.length <= 1 → Sheet enthält nur die Kopfzeile: kein Fehler, nur keine Einträge.
+    } catch(e) {
+      workoutLoadError = e.message || 'Unbekannter Fehler beim Abruf.';
+    } finally {
+      workoutSheetReady = true;
+    }
 
   } catch(e) { showErr('Fehler beim Laden: ' + e.message); return false; }
+  _lastLoadTs = Date.now();
   return true;
 }
 
@@ -299,8 +286,7 @@ function findField(rows, ...candidates) {
 }
 
 // ── Window / filter ────────────────────────────────────
-const TIME_RANGES = ['heute','7d','1m','3m','6m','12m','24m'];
-
+// Die auswählbaren Bereiche stehen in _RANGE_OPTS (Quelle für das Dropdown).
 function windowDays() { return {'heute':1,'7d':7}[timeRange] || null; }
 function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24}[timeRange] || null; }
 
@@ -514,10 +500,29 @@ function mSum(rows, field) {
 function allMonths(rows) { return [...new Set(rows.map(r=>r.date.slice(0,7)))].sort(); }
 function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])); return mos.map(m2=>m[m2]??null); }
 function toHM(h) { if(h==null) return '—'; return Math.floor(h)+'h '+Math.round((h%1)*60).toString().padStart(2,'0')+'m'; }
+// Pace: km/h → min/km, plus einheitliche Darstellung 5'30".
+// Vorher an drei Stellen ausgeschrieben, dabei zweimal mit '' statt " als Sekundenzeichen.
+function paceFromSpeed(kph) { return kph > 0 ? 60/kph : null; }
+function fmtPace(minPerKm) {
+  if (minPerKm == null) return '—';
+  let m = Math.floor(minPerKm), s = Math.round((minPerKm % 1) * 60);
+  if (s === 60) { m++; s = 0; }   // 5.999 min/km sonst als 5'60"
+  return `${m}'${String(s).padStart(2,'0')}"`;
+}
 function fmtHHMM(h) { if(h==null) return '—'; const hh=Math.floor(h)%24; const mm=Math.round((h%1)*60)%60; return hh.toString().padStart(2,'0')+':'+mm.toString().padStart(2,'0'); }
 function parseTV(val) { if(val==null)return null; if(typeof val==='number'&&!isNaN(val))return val; if(typeof val==='string'){const dt=val.match(/\d{4}-\d{2}-\d{2}\s+(\d{2}):(\d{2})/);if(dt)return parseInt(dt[1])+parseInt(dt[2])/60; const t=val.match(/^(\d{1,2}):(\d{2})/);if(t)return parseInt(t[1])+parseInt(t[2])/60;} return null; }
 function avgCircTime(rows,field,isSleepOnset){ if(!field)return null; const vals=rows.map(r=>parseTV(r[field])).filter(v=>v!=null); if(!vals.length)return null; const norm=isSleepOnset?vals.map(h=>h<12?h+24:h):vals; const avg=norm.reduce((a,b)=>a+b,0)/norm.length; return avg>=24?avg-24:avg; }
 function findAnyField(rows,...cands){ for(const c of cands){if(rows.some(r=>r[c]!=null))return c;} return null; }
+
+// ── Wochentag / Wochenende ─────────────────────────────
+// Dieselbe Zerlegung stand vorher an 14 Stellen wortwörtlich im Code – jede
+// Änderung (etwa Samstag als Wochentag zu werten) hätte 14 Korrekturen erfordert.
+function isWeekend(dateStr) { const d = new Date(dateStr+'T00:00:00').getDay(); return d === 0 || d === 6; }
+function splitWeekWknd(rows) {
+  const wkd = [], wknd = [];
+  rows.forEach(r => (isWeekend(r.date) ? wknd : wkd).push(r));
+  return { wkd, wknd };
+}
 
 function is7D() { return timeRange === '7d'; }
 function getWeekMonday(dateStr) {
@@ -606,35 +611,110 @@ function mkC(id, cfg) {
   }
   return charts[id];
 }
-// ── Fixed-position tooltip for .debt-tt-wrap ──────────
-document.addEventListener('mouseover', e => {
-  const wrap = e.target.closest('.debt-tt-wrap');
-  if (!wrap) return;
-  const tt = wrap.querySelector('.debt-tt');
-  if (!tt) return;
-  const rect = wrap.getBoundingClientRect();
-  // offsetWidth works even at opacity:0 (element is still laid out)
-  const ttW = tt.offsetWidth || 270;
-  const ttH = tt.offsetHeight || 220;
+// ═══════════════════════════════════════════════════════════
+// Tooltips – bedienbar per Maus UND per Fingertipp
+// ═══════════════════════════════════════════════════════════
+// Vorher hingen alle Detail-Einblendungen an Maus-Ereignissen (mouseover bzw.
+// CSS :hover). Auf dem iPhone – der Hauptplattform dieser App – gibt es keinen
+// schwebenden Zeiger, damit war rund die Hälfte der Detailinformationen praktisch
+// unerreichbar. Jetzt: Antippen öffnet, erneutes Antippen oder ein Tipp daneben
+// schliesst; auf dem Desktop funktioniert Hover unverändert weiter.
+//
+// Betroffen sind drei Bauarten, die absichtlich verschieden bleiben:
+//   .debt-tt-wrap      → Tooltip-Element im DOM, wird frei positioniert
+//   .cal-train         → gemeinsames #cal-tip-Element, Inhalt aus workoutData
+//   .ov-ring-wrap /
+//   .hs-komp-bar-wrap  → reine CSS-Tooltips, geöffnet über die Klasse .tt-open
+const TT_TAP_SELECTOR = '.debt-tt-wrap, .cal-train, .ov-ring-wrap, .hs-komp-bar-wrap';
+
+// Positioniert ein frei schwebendes Tooltip-Element über (oder unter) seinem Anker.
+function _placeTooltip(tt, rect, fallbackW, fallbackH) {
   const PAD = 12;
-  let top = rect.top - ttH - 10;
+  const ttW = tt.offsetWidth  || fallbackW;
+  const ttH = tt.offsetHeight || fallbackH;
+  let top  = rect.top - ttH - 10;
   let left = rect.left + rect.width / 2 - ttW / 2;
   left = Math.max(PAD, Math.min(left, window.innerWidth - ttW - PAD));
-  if (top < PAD) top = rect.bottom + 10;
-  tt.style.top = top + 'px';
+  if (top < PAD) top = rect.bottom + 10;          // kein Platz oben → darunter
+  tt.style.top  = top + 'px';
   tt.style.left = left + 'px';
-  // Arrow points at bar center regardless of tooltip shift
+  // Pfeil zeigt weiterhin auf die Mitte des Ankers, auch wenn das Tooltip verschoben wurde
   const arrowLeft = (rect.left + rect.width / 2) - left;
   tt.style.setProperty('--arrow-left', Math.max(10, Math.min(arrowLeft, ttW - 10)) + 'px');
-  tt.classList.add('visible');
+}
+
+// ── Trainingskalender: gemeinsames Tooltip-Element ──
+function _calTipEl() {
+  let tip = document.getElementById('cal-tip');
+  if (!tip) { tip = document.createElement('div'); tip.id = 'cal-tip'; document.body.appendChild(tip); }
+  return tip;
+}
+function _calTipHTML(ds) {
+  const wo = workoutData[ds];
+  if (!wo) return '';
+  const dateStr = new Date(ds+'T00:00:00').toLocaleDateString('de-CH',{weekday:'short',day:'2-digit',month:'long'});
+  let html = `<div class="cal-tip-title">${wo.icon} ${dateStr}</div>`;
+  if (wo.avgHR)       html += `<div class="cal-tip-row">💓 Ø ${Math.round(wo.avgHR)} bpm${wo.maxHR?` · Max ${wo.maxHR} bpm`:''}</div>`;
+  if (wo.distanceKm)  html += `<div class="cal-tip-row">📍 ${wo.distanceKm.toFixed(2)} km${wo.avgSpeedKph?` · ${fmtPace(paceFromSpeed(wo.avgSpeedKph))}/km`:''}</div>`;
+  if (wo.elevationM)  html += `<div class="cal-tip-row">⛰️ ${Math.round(wo.elevationM)} m ↑</div>`;
+  if (wo.durationMin) html += `<div class="cal-tip-row">⏱️ ${Math.floor(wo.durationMin)} min</div>`;
+  return html;
+}
+
+// ── Öffnen / Schliessen ──
+let _ttOpenEl = null;
+function closeTooltips() {
+  document.querySelectorAll('.debt-tt.visible').forEach(t => t.classList.remove('visible'));
+  document.querySelectorAll('.tt-open').forEach(el => el.classList.remove('tt-open'));
+  const tip = document.getElementById('cal-tip');
+  if (tip) tip.classList.remove('visible');
+  _ttOpenEl = null;
+}
+function openTooltip(el) {
+  if (_ttOpenEl === el) { closeTooltips(); return; }   // erneuter Tipp = schliessen
+  closeTooltips();
+  _ttOpenEl = el;
+  const rect = el.getBoundingClientRect();
+  if (el.classList.contains('debt-tt-wrap')) {
+    const tt = el.querySelector('.debt-tt');
+    if (!tt) { _ttOpenEl = null; return; }
+    _placeTooltip(tt, rect, 270, 220);
+    tt.classList.add('visible');
+  } else if (el.classList.contains('cal-train')) {
+    const tip = _calTipEl();
+    tip.innerHTML = _calTipHTML(el.dataset.day);
+    tip.classList.add('visible');                       // erst sichtbar, dann messen
+    _placeTooltip(tip, rect, 190, 110);
+  } else {
+    el.classList.add('tt-open');                        // reine CSS-Tooltips
+  }
+}
+
+// Maus: unverändertes Hover-Verhalten (Desktop)
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest(TT_TAP_SELECTOR);
+  if (el) openTooltip(el);
 });
 document.addEventListener('mouseout', e => {
-  const wrap = e.target.closest('.debt-tt-wrap');
-  if (!wrap) return;
-  if (wrap.contains(e.relatedTarget)) return;
-  const tt = wrap.querySelector('.debt-tt');
-  if (tt) tt.classList.remove('visible');
+  const el = e.target.closest(TT_TAP_SELECTOR);
+  if (!el || el.contains(e.relatedTarget)) return;
+  closeTooltips();
 });
+// Finger/Klick: öffnen, erneut tippen schliesst, danebentippen schliesst ebenfalls
+document.addEventListener('click', e => {
+  const el = e.target.closest(TT_TAP_SELECTOR);
+  if (el) { e.stopPropagation(); openTooltip(el); }
+  else closeTooltips();
+});
+// Tastaturbedienung für dieselben Elemente
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeTooltips(); return; }
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest && e.target.closest(TT_TAP_SELECTOR);
+  if (el) { e.preventDefault(); openTooltip(el); }
+});
+// Beim Scrollen schliessen – ein fix positioniertes Tooltip würde sonst danebenstehen
+window.addEventListener('scroll', () => { if (_ttOpenEl) closeTooltips(); }, true);
 
 const GRID_COLOR = 'rgba(148,163,184,0.18)';
 const gx = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:9}}};
@@ -651,9 +731,13 @@ function computeHealthScore(days) {
   if(hr!=null){const v=hr<=50?100:hr>=80?0:((80-hr)/30)*100;s+=v*20;w+=20;}
   const st=av(days,'steps');
   if(st!=null){s+=Math.min(100,(st/10000)*100)*15;w+=15;}
-  return w ? Math.round(s/w) : 70;
+  // null statt eines erfundenen Platzhalters: ohne Messwerte gibt es keinen Score.
+  // Ein fester Wert (früher 70 = "Gut") wäre von einem echten Ergebnis nicht
+  // unterscheidbar gewesen – in einer Gesundheits-App der schlechteste Fehlerfall.
+  return w ? Math.round(s/w) : null;
 }
 function scoreCat(s) {
+  if(s==null)return['Keine Daten','#94A3B8'];
   if(s>=85)return['Ausgezeichnet','#10B981'];
   if(s>=70)return['Gut','#84CC16'];
   if(s>=55)return['Ordentlich','#EAB308'];
@@ -682,24 +766,30 @@ function calculateDeviation(current, baseline) {
 // Sleep debt: target minus actual, in hours
 // SLEEP_TARGET_H is the personal nightly goal
 const SLEEP_TARGET_H = 7.5;
+// Bezugsgröße ist durchgehend das übergebene Fenster (aktuell: 14 Nächte).
+// `perNight` ist der eigentliche Kennwert – die Summe allein sagt nichts aus,
+// solange die Anzahl der Nächte nicht dabei steht.
 function calculateSleepDebt(rows) {
   const debts = rows.map(r => r.sleepTotal != null ? SLEEP_TARGET_H - r.sleepTotal : null).filter(v => v != null);
-  const today = debts.length ? debts[debts.length-1] : null;
-  const week  = debts.length ? debts.reduce((s,v) => s+v, 0) : null;
-  return { today, week, nDays: debts.length };
+  if (!debts.length) return { last: null, total: null, perNight: null, nDays: 0 };
+  const total = debts.reduce((s,v) => s+v, 0);
+  return { last: debts[debts.length-1], total, perNight: total/debts.length, nDays: debts.length };
+}
+// Balken/Ampel richten sich nach dem Ø-Defizit pro Nacht, nicht nach der Summe:
+// eine Summe wächst allein durch mehr Nächte und war deshalb praktisch immer rot.
+const SLEEP_DEBT_FULL_BAR_H = 1.0; // Ø 1h zu wenig pro Nacht = Balken voll
+function sleepDebtLevel(perNight) {
+  if (perNight == null)   return { color:'#94A3B8', label:'Keine Daten' };
+  if (perNight >= 0.75)   return { color:'#EF4444', label:'Deutliches Defizit' };
+  if (perNight >= 0.33)   return { color:'#F97316', label:'Leichtes Defizit' };
+  if (perNight > 0)       return { color:'#84CC16', label:'Nahe am Ziel' };
+  return                         { color:'#10B981', label:'Ziel erreicht' };
 }
 
-// Classify sleep consistency (std deviation based)
-function classifySleepConsistency(rows) {
-  const vals = rows.map(r => r.sleepTotal).filter(v => v != null);
-  if (vals.length < 4) return {label:'Zu wenig Daten',cls:'neu'};
-  const s = sdv(vals.map(v=>({sleepTotal:v})),'sleepTotal') ?? sdv(vals.map(v=>({_v:v})),'_v');
-  // sdv takes rows+field, so:
-  const sd = (() => { if(vals.length<2)return 0; const m=vals.reduce((a,b)=>a+b,0)/vals.length; return Math.sqrt(vals.map(v=>(v-m)**2).reduce((a,b)=>a+b,0)/vals.length); })();
-  if (sd <= 0.5)  return {label:'Sehr konstant ✓',cls:'pos',sd};
-  if (sd <= 1.0)  return {label:'Leicht unregelmässig',cls:'neu',sd};
-  return {label:'Stark unregelmässig',cls:'neg',sd};
-}
+// Hinweis: Die frühere classifySleepConsistency wurde entfernt – ihr Ergebnis
+// wurde nirgends angezeigt, und sie enthielt eine doppelte Streuungsberechnung
+// (eine davon ungenutzt). Die Konsistenz-Einstufung auf dem Schlaf-Tab kommt
+// aus consGrade(), das auf dem gewählten Zeitfenster arbeitet.
 
 // ── Main Daily Recommendation Logic ───────────────────
 // Returns {status, statusColor, badge, text, action}
@@ -800,14 +890,6 @@ function _computeWarningSignals() {
   };
 }
 
-// ── Training Load (simple volume-based) ────────────────
-function calculateTrainingLoad(rows) {
-  // Uses durationMin from Workout Data sheet (single source of truth)
-  const withData = rows.filter(r => workoutData[r.date]?.durationMin != null);
-  if (!withData.length) return null;
-  return withData.reduce((s,r) => s + workoutData[r.date].durationMin, 0);
-}
-
 // ── Pattern Insights (correlation-based text insights) ─
 function generatePatternInsights() { return _memo('patternInsights', _computePatternInsights); }
 function _computePatternInsights() {
@@ -817,10 +899,9 @@ function _computePatternInsights() {
   // Helper: build date → row lookup
   const byDate = {};
   allData.forEach(r => { byDate[r.date] = r; });
-  function nextDay(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate()+1);
-    return d.toISOString().slice(0,10);
-  }
+  // Nutzt addDays (lokale Zeitrechnung). Die frühere eigene Variante rechnete über
+  // toISOString nach UTC um und lieferte in CH denselben statt des nächsten Tages.
+  const nextDay = dateStr => addDays(dateStr, 1);
   // Helper: linear trend slope (positive = rising)
   function linTrend(rows, field) {
     const pts = rows.map((r,i)=>({x:i,y:r[field]})).filter(p=>p.y!=null);
@@ -879,8 +960,7 @@ function _computePatternInsights() {
     const afterTrain=[], afterRest=[];
     allData.forEach(r => {
       if (r.hrv==null) return;
-      const prev = new Date(r.date+'T00:00:00'); prev.setDate(prev.getDate()-1);
-      const prevStr = prev.toISOString().slice(0,10);
+      const prevStr = addDays(r.date, -1); // lokal, nicht über UTC (sonst zwei Tage zurück)
       if (trainDates.has(prevStr)) afterTrain.push(r);
       else if (byDate[prevStr]) afterRest.push(r);
     });
@@ -902,8 +982,7 @@ function _computePatternInsights() {
     const afterTrainHR=[], afterRestHR=[];
     allData.forEach(r => {
       if (r.restHR==null) return;
-      const prev = new Date(r.date+'T00:00:00'); prev.setDate(prev.getDate()-1);
-      const prevStr = prev.toISOString().slice(0,10);
+      const prevStr = addDays(r.date, -1); // lokal, nicht über UTC (sonst zwei Tage zurück)
       if (trainDates.has(prevStr)) afterTrainHR.push(r);
       else if (byDate[prevStr]) afterRestHR.push(r);
     });
@@ -995,8 +1074,7 @@ function _computePatternInsights() {
   // Insight 11: Wochentag vs. Wochenende Schlaf
   const withSleep = allData.filter(r=>r.sleepTotal!=null);
   if (withSleep.length >= 14) {
-    const weekday = withSleep.filter(r=>{ const d=new Date(r.date+'T00:00:00').getDay(); return d>=1&&d<=5; });
-    const weekend = withSleep.filter(r=>{ const d=new Date(r.date+'T00:00:00').getDay(); return d===0||d===6; });
+    const { wkd: weekday, wknd: weekend } = splitWeekWknd(withSleep);
     const slWD = weekday.length>=5?av(weekday,'sleepTotal'):null;
     const slWE = weekend.length>=2?av(weekend,'sleepTotal'):null;
     if (slWD&&slWE&&slWE>slWD+0.4) {
@@ -1048,6 +1126,33 @@ function _computePatternInsights() {
   return insights;
 }
 
+
+// ── Bezugszeitraum-Etikett ─────────────────────────────
+// Kennzeichnet Kacheln, deren Zahlen NICHT dem globalen Zeitfilter folgen.
+// Ohne diese Kennzeichnung ist nicht erkennbar, warum sich beim Umstellen des
+// Filters nur ein Teil des Bildschirms ändert.
+function scopeBadge(text) {
+  return `<span class="scope-badge" title="Bezugszeitraum dieser Kachel – unabhängig vom Zeitfilter">${text}</span>`;
+}
+
+// ── Daten-Stand ────────────────────────────────────────
+// Zeigt, bis wann Daten vorliegen und wann zuletzt geladen wurde. Ohne diese
+// Angabe war nach einem 🔄 nicht erkennbar, ob der Abruf etwas bewirkt hat.
+function dataStandHTML() {
+  if (!allData.length) return '';
+  const newest = allData[allData.length-1].date;
+  const ageDays = Math.round(
+    (new Date(toLocalDateStr(new Date())+'T00:00:00') - new Date(newest+'T00:00:00')) / 86400000
+  );
+  // Kurz halten – die Zeile muss auf einem iPhone in eine Zeile passen. Das Alter
+  // wird nur genannt, wenn es auffällig ist; sonst genügt Datum + Ladezeit.
+  const stale  = ageDays >= 2;
+  const ageTxt = stale ? ` · ${ageDays} Tage alt` : '';
+  const loaded = _lastLoadTs
+    ? new Date(_lastLoadTs).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})
+    : null;
+  return `<div class="pg-banner-stand${stale?' stale':''}">${stale?'⚠️ ':''}Daten bis ${fmtDayShort(newest)}${ageTxt}${loaded?` · geladen ${loaded}`:''}</div>`;
+}
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
   const dir = delta==null?'neu':delta>0?'pos':'neg';
@@ -1112,7 +1217,8 @@ function pgOverview() {
   const hs = computeHealthScore([lastDay]);
   const prev7hs = computeHealthScore(priorDays.length ? priorDays : [lastDay]);
   const [hsCat, hsColor] = scoreCat(hs);
-  const hsDelta = hs - prev7hs;
+  // Delta nur bilden, wenn beide Seiten wirklich vorliegen.
+  const hsDelta = (hs != null && prev7hs != null) ? hs - prev7hs : null;
 
   // Daily recommendation
   const dailyRec = getDailyRecommendation();
@@ -1127,7 +1233,6 @@ function pgOverview() {
   const _hsHv=av(_hsDays,'hrv'), _hsHvA=av(allData,'hrv');
   const _hsHr=av(_hsDays,'restHR');
   const _hsSt=av(_hsDays,'steps');
-  function _scoreBar(v){const n=Math.round(v||0);const c=n>=70?'#10B981':n>=50?'#EAB308':'#EF4444';return `<span style="color:${c};font-weight:800">${n}</span>`;}
   const _slScore=_hsSl!=null?Math.min(100,Math.max(0,_hsSl>=7&&_hsSl<=9?100:_hsSl<4?0:_hsSl<7?((_hsSl-4)/3)*100:Math.max(0,100-(_hsSl-9)*20))):null;
   const _hvScore=_hsHv!=null&&_hsHvA?Math.min(100,(_hsHv/_hsHvA)*100):null;
   const _hrScore=_hsHr!=null?(_hsHr<=50?100:_hsHr>=80?0:(80-_hsHr)/30*100):null;
@@ -1191,7 +1296,7 @@ function pgOverview() {
     ${warnSig ? `<div class="warn-card">
       <div class="warn-icon">⚠️</div>
       <div>
-        <div class="warn-title">Belastungssignal erkannt</div>
+        <div class="warn-title">Belastungssignal erkannt ${scopeBadge('letzter Tag')}</div>
         <div class="warn-text">${warnSig.text}</div>
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
@@ -1200,7 +1305,7 @@ function pgOverview() {
     <!-- Zeile 1: Score | Empfehlung+Tagesinsights -->
     <div class="ov-row">
       <div class="ov-score-card ov-col-narrow">
-        <h3 style="font-size:.78rem;font-weight:700;margin-bottom:.6rem">Gesundheits-Score</h3>
+        <div class="chart-head"><h3 style="font-size:.78rem;font-weight:700">Gesundheits-Score</h3>${scopeBadge('heute')}</div>
         <div class="ov-score-body">
         <div class="ov-score-left">
           <div class="ov-ring-wrap">
@@ -1258,24 +1363,27 @@ function pgOverview() {
         </div>
         </div><!-- /ov-score-body -->
         <div class="ov-score-footer">
-          <div class="ov-score-delta">${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt</div>
+          ${hs==null?`<div class="ov-score-interp">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>`:`
+          <div class="ov-score-delta">${hsDelta!=null?`${hsDelta>=0?'+':''}${hsDelta} vs. 7-Tage-Schnitt`:'Kein Vergleichswert'}</div>
           <div class="ov-score-interp">${(()=>{
+            if(hsDelta==null)return'Für die Vorwoche liegen zu wenige Daten für einen Vergleich vor.';
             if(hsDelta>=8)return'<span style="color:#10B981">Deutliche Verbesserung</span> gegenüber der letzten Woche';
             if(hsDelta>=3)return'<span style="color:#10B981">Leichte Verbesserung</span> gegenüber letzter Woche';
             if(hsDelta>=-2)return'Score ist <span style="color:#94A3B8">stabil</span>, kaum Veränderung';
             if(hsDelta>=-7)return'Leicht <span style="color:#F97316">unter dem Wochenschnitt</span> – beobachten';
             return'Deutlich <span style="color:#EF4444">unter dem Wochenschnitt</span> – Erholung empfohlen';
-          })()}</div>
+          })()}</div>`}
         </div>
       </div>
       <!-- Kombinierte Kachel: Empfehlung + Tagesinsights -->
       <div class="ov-combo-card ov-col-wide">
         ${dailyRec ? `<div class="ov-combo-rec" style="border-left-color:${dailyRec.statusColor}">
           <div class="rec-status" style="background:${dailyRec.statusColor}22;color:${dailyRec.statusColor};margin-bottom:.5rem">${dailyRec.badge} ${dailyRec.status}</div>
-          <div class="rec-title" style="margin-bottom:.4rem">Heutige Empfehlung</div>
+          <div class="rec-title" style="margin-bottom:.4rem">Heutige Empfehlung ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
           <div class="rec-text" style="margin-bottom:.5rem">${dailyRec.text}</div>
           <div class="rec-action">💡 ${dailyRec.action}</div>
         </div>` : ''}
+        <div class="scope-row">${scopeBadge('letzter Tag · Vergleich: Ø 7 Tage')}</div>
         <div class="ti-metrics">
           ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
             <div class="ti-metric-lbl">🌙 Schlaf</div>
@@ -1357,7 +1465,7 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem">📊 Muster & Zusammenhänge</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">📊 Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
     <div class="pi-grid">
       ${patternIns.map(p=>{
         let txt=p.text;
@@ -1369,11 +1477,12 @@ function pgOverview() {
     </div>`:''}
     `;
 
-  // Animate score ring
+  // Animate score ring – ohne Score bleibt der Ring leer und die Zahl ein "—".
   setTimeout(()=>{
     const arc=document.getElementById('hs-arc'), num=document.getElementById('hs-num');
-    if(arc){const c=2*Math.PI*48;arc.setAttribute('stroke-dasharray',`${c*hs/100} ${c}`);}
-    if(num)num.textContent=hs;
+    const c=2*Math.PI*48;
+    if(arc) arc.setAttribute('stroke-dasharray', hs!=null ? `${c*hs/100} ${c}` : `0 ${c}`);
+    if(num) num.textContent = hs!=null ? hs : '—';
   },80);
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
@@ -1425,14 +1534,12 @@ function pgHerz() {
   const hvStd=sdv(hvf,'hrv');
 
   // Weekday vs weekend HR & HRV
-  const hrWkdRows=hrf.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;});
-  const hrWkndRows=hrf.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;});
-  const hrWeek=av(hrWkdRows,'restHR');
-  const hrWknd=av(hrWkndRows,'restHR');
-  const hvWkdRows=hvf.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;});
-  const hvWkndRows=hvf.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;});
-  const hvWeek=av(hvWkdRows,'hrv');
-  const hvWknd=av(hvWkndRows,'hrv');
+  const hrSplit=splitWeekWknd(hrf);
+  const hrWeek=av(hrSplit.wkd,'restHR');
+  const hrWknd=av(hrSplit.wknd,'restHR');
+  const hvSplit=splitWeekWknd(hvf);
+  const hvWeek=av(hvSplit.wkd,'hrv');
+  const hvWknd=av(hvSplit.wknd,'hrv');
 
   // HR zone classification
   function hrZone(v){
@@ -1502,7 +1609,7 @@ function pgHerz() {
     ${pgBanner('❤️','Herz','Ist mein Herz-Kreislauf-System stabil oder zeigt es Belastung?','#7F1D1D','#EF4444')}
     ${herzInterpret?`<div class="rec-card" style="--rec-color:${herzInterpret.color};margin-bottom:.7rem">
       <div class="rec-status" style="background:${herzInterpret.color}22;color:${herzInterpret.color}">❤️ ${herzInterpret.status}</div>
-      <div class="rec-title">Herz-Kreislauf Einordnung</div>
+      <div class="rec-title">Herz-Kreislauf Einordnung ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
       <div class="rec-text">${herzInterpret.text}</div>
     </div>`:''}
     <div class="two-col-eq">
@@ -1593,7 +1700,7 @@ function pgSchlaf() {
   const D=filtered(), P=prevPeriod();
   const last14sl = allData.slice(-14);
   const sleepDebt = calculateSleepDebt(last14sl);
-  const sleepCons = classifySleepConsistency(last14sl);
+  const debtLvl = sleepDebtLevel(sleepDebt.perNight);
   const slD_last = (allData[allData.length-1]||{}).sleepTotal;
   const slCoachHint = slD_last!=null
     ? slD_last >= 7.5
@@ -1650,10 +1757,9 @@ function pgSchlaf() {
   const nTot=nBelow6+n6to7+n7to85+nOver85||1;
 
   // Weekday vs weekend sleep
-  const slWkdRows=slRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;});
-  const slWkndRows=slRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;});
-  const slWeek=av(slWkdRows,'sleepTotal');
-  const slWknd=av(slWkndRows,'sleepTotal');
+  const slSplit=splitWeekWknd(slRows);
+  const slWeek=av(slSplit.wkd,'sleepTotal');
+  const slWknd=av(slSplit.wknd,'sleepTotal');
 
   // Consistency grade
   function consGrade(s){
@@ -1700,7 +1806,7 @@ function pgSchlaf() {
   document.getElementById("screen-schlaf").innerHTML=`
     ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
     <div class="ch-card">
-      <h4>💬 Was bedeutet das für heute?</h4>
+      <h4>💬 Was bedeutet das für heute? ${scopeBadge('letzte Nacht')}</h4>
       <p>${slCoachHint}</p>
     </div>
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:fn(scD,0),unit:'/d',delta:pct(scD,scP),color:'var(--sleep)'})}</div>`:''}
@@ -1723,16 +1829,17 @@ function pgSchlaf() {
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0">
-        <h3>🌙 Schlafschuld (letzte 14 Nächte)</h3>
+        <div class="chart-head"><h3>🌙 Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
           <div class="stat-row"><span class="stat-lbl">Zielschlaf pro Nacht</span><span class="stat-val">${toHM(SLEEP_TARGET_H)}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Heute</span><span class="stat-val" style="color:${sleepDebt.today!=null?(sleepDebt.today>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.today!=null?(sleepDebt.today>0?'-'+toHM(sleepDebt.today):'+'+toHM(-sleepDebt.today)):'—'}</span></div>
-          <div class="stat-row"><span class="stat-lbl">Akkumuliert (14 Nächte)</span><span class="stat-val" style="color:${sleepDebt.week!=null?(sleepDebt.week>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.week!=null?(sleepDebt.week>0?'-'+toHM(sleepDebt.week):'+'+toHM(-sleepDebt.week)):'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Letzte Nacht</span><span class="stat-val" style="color:${sleepDebt.last!=null?(sleepDebt.last>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.last!=null?(sleepDebt.last>0?'−'+toHM(sleepDebt.last):'+'+toHM(-sleepDebt.last)):'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Ø pro Nacht</span><span class="stat-val" style="color:${debtLvl.color}">${sleepDebt.perNight!=null?(sleepDebt.perNight>0?'−'+toHM(sleepDebt.perNight):'+'+toHM(-sleepDebt.perNight)):'—'}</span></div>
+          <div class="stat-row"><span class="stat-lbl">Summe über ${sleepDebt.nDays} Nächte</span><span class="stat-val" style="color:${sleepDebt.total!=null?(sleepDebt.total>0?'#EF4444':'#10B981'):'var(--txt3)'}">${sleepDebt.total!=null?(sleepDebt.total>0?'−'+toHM(sleepDebt.total):'+'+toHM(-sleepDebt.total)):'—'}</span></div>
         </div>
         <div class="debt-bar-wrap">
-          ${sleepDebt.week!=null?`<div style="font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">Schuld: ${sleepDebt.week>0?toHM(Math.min(sleepDebt.week,SLEEP_TARGET_H*14)):'0h'} von max. ${toHM(SLEEP_TARGET_H*14/2)} (7 Nächte)</div>
-          <div class="debt-tt-wrap">
-            <div class="debt-bar-bg"><div class="debt-bar-fill" style="width:${Math.min(100,Math.max(0,(sleepDebt.week/7)*100))}%;background:${sleepDebt.week>4?'#EF4444':sleepDebt.week>1.5?'#F97316':'#10B981'}"></div></div>
+          ${sleepDebt.perNight!=null?`<div style="font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">${debtLvl.label} · Balken voll bei Ø ${toHM(SLEEP_DEBT_FULL_BAR_H)} Defizit pro Nacht</div>
+          <div class="debt-tt-wrap" tabindex="0" role="button" aria-label="Zusammensetzung der Schlafschuld anzeigen">
+            <div class="debt-bar-bg"><div class="debt-bar-fill" style="width:${Math.min(100,Math.max(0,(sleepDebt.perNight/SLEEP_DEBT_FULL_BAR_H)*100))}%;background:${debtLvl.color}"></div></div>
             <div class="debt-tt">
               <div class="debt-tt-title">Zusammensetzung – ${debtTtNDays} Nächte · Ziel ${toHM(SLEEP_TARGET_H)}/Nacht</div>
               <div class="debt-tt-hd"><span>Datum</span><span>Geschlafen</span><span style="text-align:right">Schuld / Plus</span></div>
@@ -1832,17 +1939,32 @@ function pgSchlaf() {
 async function pgTraining() {
   const D=filtered(), P=prevPeriod();
 
+  // 1) Auf den Abschluss des Workout-Ladevorgangs warten – begrenzt, damit ein
+  //    fehlgeschlagener Abruf nicht in einem dauerhaften Ladezustand endet.
+  //    Muss VOR der Auswertung stehen: sonst würde mit noch leerem workoutData gerechnet.
+  if(!workoutSheetReady){
+    document.getElementById("screen-training").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;height:180px;color:var(--txt3);font-size:.8rem">⏳ Workout-Daten werden geladen…</div>`;
+    await _awaitWorkoutSheet(10000);
+  }
+  const woProblem = !workoutSheetReady
+    ? 'Die Workout-Daten konnten nicht rechtzeitig geladen werden.'
+    : workoutLoadError;
+  if(woProblem){
+    document.getElementById("screen-training").innerHTML=`
+      ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?')}
+      <div class="no-data">
+        <strong>⚠️ Workout-Daten nicht verfügbar</strong>
+        ${woProblem}
+        <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Mit 🔄 oben rechts erneut versuchen.</div>
+      </div>`;
+    return;
+  }
+
   // ── Trainingstage im aktuellen Filterzeitraum ──
   // Quelle ist ausschließlich das Workout-Sheet (workoutData). Tage mit runSpeed
   // in Health-CSV, die NICHT im Workout-Sheet stehen, zählen nicht mehr als Training.
   const _healthDates=new Set(D.map(r=>r.date));
   const trainDates=Object.keys(workoutData).filter(d=>_healthDates.has(d)).sort();
-  // 1) Wait for consolidated sheet (primary source)
-  if(!workoutSheetReady){
-    document.getElementById("screen-training").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;height:180px;color:var(--txt3);font-size:.8rem">⏳ Workout-Daten werden geladen…</div>`;
-    await new Promise(r=>{ const t=setInterval(()=>{if(workoutSheetReady){clearInterval(t);r();}},200); });
-  }
-  // (Workout-Daten sind bereits vollständig über API geladen)
   // Workout rows for current period (with HR data)
   const wRows=trainDates.map(d=>workoutData[d]).filter(w=>w!=null);
   const wRowsHR=wRows.filter(w=>w.avgHR!=null);
@@ -1856,7 +1978,7 @@ async function pgTraining() {
   const woAvgDist=woDist.length ? woTotalDist/woDist.length : null;
   const woSpeedRows=wRows.filter(w=>w.avgSpeedKph&&w.avgSpeedKph>0);
   const woAvgSpeed=woSpeedRows.length ? woSpeedRows.reduce((s,w)=>s+w.avgSpeedKph,0)/woSpeedRows.length : null;
-  const woAvgPaceStr=woAvgSpeed ? `${Math.floor(60/woAvgSpeed)}'${String(Math.round(((60/woAvgSpeed)%1)*60)).padStart(2,'0')}''` : null;
+  const woAvgPaceStr=woAvgSpeed ? fmtPace(paceFromSpeed(woAvgSpeed)) : null;
   const woElev=wRows.filter(w=>w.elevationM!=null);
   const woTotalElev=woElev.length ? Math.round(woElev.reduce((s,w)=>s+w.elevationM,0)) : null;
 
@@ -1900,7 +2022,6 @@ async function pgTraining() {
   const minWkndAvg=_avgNn(_wkndIdx.map(i=>trendMin[i]));
   const paceWkdAvg=_avgNn(_wkdIdx.map(i=>trendPace[i]));
   const paceWkndAvg=_avgNn(_wkndIdx.map(i=>trendPace[i]));
-  const fmtPace=v=>v!=null?`${Math.floor(v)}'${String(Math.round((v%1)*60)).padStart(2,'0')}"`:null;
 
   // Totals for period
   const calTotal=calField?D.filter(r=>r[calField]!=null).reduce((a,r)=>a+(r[calField]||0),0):null;
@@ -1914,14 +2035,13 @@ async function pgTraining() {
   const avgPerWeek=D.length>0?(activeDays/(D.length/7)).toFixed(1):null;
 
   // Weekday vs weekend training (use all days with the field, not just active ones)
-  const calWkdRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;}):[];
-  const calWkndRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;}):[];
-  const _woMinWkd=D.filter(r=>workoutData[r.date]?.durationMin!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;}).map(r=>workoutData[r.date].durationMin);
-  const _woMinWknd=D.filter(r=>workoutData[r.date]?.durationMin!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;}).map(r=>workoutData[r.date].durationMin);
-  const calWeek=calWkdRows.length?av(calWkdRows,calField):null;
-  const calWknd=calWkndRows.length?av(calWkndRows,calField):null;
-  const minWeek=_woMinWkd.length?_woMinWkd.reduce((a,b)=>a+b,0)/_woMinWkd.length:null;
-  const minWknd=_woMinWknd.length?_woMinWknd.reduce((a,b)=>a+b,0)/_woMinWknd.length:null;
+  const calSplit=splitWeekWknd(calField?D.filter(r=>r[calField]!=null):[]);
+  const calWeek=calSplit.wkd.length?av(calSplit.wkd,calField):null;
+  const calWknd=calSplit.wknd.length?av(calSplit.wknd,calField):null;
+  const woMinSplit=splitWeekWknd(D.filter(r=>workoutData[r.date]?.durationMin!=null));
+  const _woDur=rows=>rows.map(r=>workoutData[r.date].durationMin);
+  const minWeek=av(_woDur(woMinSplit.wkd));
+  const minWknd=av(_woDur(woMinSplit.wknd));
 
   // Init calendar to latest data month if not yet set
   if(!_calDate && allData.length){
@@ -2207,16 +2327,14 @@ function pgAktivitaet() {
   const stMin=stRows.length?Math.min(...stRows.map(r=>r.steps)):null;
 
   // Week vs weekend
-  const weekRows=stRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;});
-  const wkndRows=stRows.filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;});
-  const stWeek=av(weekRows,'steps');
-  const stWknd=av(wkndRows,'steps');
+  const stSplit=splitWeekWknd(stRows);
+  const stWeek=av(stSplit.wkd,'steps');
+  const stWknd=av(stSplit.wknd,'steps');
 
   // Calorie weekday/weekend averages
-  const calWeekRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd>=1&&wd<=5;}):[];
-  const calWkndRows=calField?D.filter(r=>r[calField]!=null).filter(r=>{const wd=new Date(r.date+'T00:00:00').getDay();return wd===0||wd===6;}):[];
-  const calWeek=calField&&calWeekRows.length?av(calWeekRows,calField):null;
-  const calWknd=calField&&calWkndRows.length?av(calWkndRows,calField):null;
+  const calSplit=splitWeekWknd(calField?D.filter(r=>r[calField]!=null):[]);
+  const calWeek=calSplit.wkd.length?av(calSplit.wkd,calField):null;
+  const calWknd=calSplit.wknd.length?av(calSplit.wknd,calField):null;
 
   // Streak: consecutive days >= 8k
   let maxStreak=0,cur=0;
@@ -2322,7 +2440,7 @@ function pgBanner(icon,title,sub){
   // Refresh + Dark-Toggle sitzen jetzt rechtsbündig direkt auf der Titelzeile
   // (keine eigene Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div></div><div class="pg-banner-actions"><button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions"><button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -2634,7 +2752,9 @@ function initScrollHideNav() {
     // Nur auf "totem" Hintergrund togglen. Alles, was selbst etwas auslöst, ausnehmen:
     // Buttons/Links/Eingaben, die Chart-Canvas (Tooltip beim Antippen), die Filterleiste
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], .debt-tt-wrap, .topbar-inline')) return;
+    // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
+    // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], .topbar-inline, ' + TT_TAP_SELECTOR)) return;
     nav.classList.toggle('nav-hidden');
   });
 }
@@ -2710,7 +2830,7 @@ async function refreshData() {
   // 2. Kurz warten bis Sheet bereit ist
   await new Promise(r => setTimeout(r, 4000));
   // 3. Daten neu aus Sheet laden
-  workoutData = {}; workoutSheetReady = false;
+  workoutData = {}; workoutSheetReady = false; workoutLoadError = null;
   await loadFromAPI();
   document.querySelectorAll('.refresh-btn').forEach(b => { b.disabled = false; b.classList.remove('spinning'); });
   updateNavUI();

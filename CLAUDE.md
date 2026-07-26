@@ -31,6 +31,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - `Code.gs`, `Maintenance.gs` — Apps-Script-Backend (**Referenz**, NICHT Teil des Web-Deploys).
 - `.claude/devserver.py` — lokaler Test-Server ohne Caching (`python3 .claude/devserver.py`,
   Port 8124). Nötig, weil der Browser sonst beim Prüfen weiter die alte `app.js` ausliefert.
+- `.claude/_render-test.html` — Render-Prüfstand: ersetzt OAuth und Sheets-API durch erfundene
+  Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
+  `?scenario=normal|nodata|woerror|stale`. Nur Entwicklung, nicht Teil der App.
 - **Cruft (bereits in `.gitignore`):** `archive/` (alte Versionen), `.DS_Store`,
   `.claude/settings.local.json`.
 
@@ -82,11 +85,26 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
 - **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
+- **Tooltips:** ein zentrales System für Maus **und** Fingertipp. Neue Tooltip-Anker gehören in
+  `TT_TAP_SELECTOR`; `openTooltip()`/`closeTooltips()` regeln den Rest. Reine CSS-`:hover`-
+  Tooltips brauchen zusätzlich eine `.tt-open`-Regel, sonst sind sie am iPhone unerreichbar.
+- **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
+  `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
+- **Gemeinsame Helfer statt Copy-Paste:** `splitWeekWknd(rows)` (Wochentag/Wochenende),
+  `fmtPace`/`paceFromSpeed` (Pace), `dataStandHTML()` (Daten-Stand im Banner).
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart aus `runSpeed`,
   VO₂max-Sektion (zuunterst) aus `r.vo2max`.
 
 ## Gotchas
 - **Cache-Bump nicht vergessen** — häufigste Fehlerquelle.
+- **NIE `toISOString()` für Datums-Strings.** Es rechnet nach UTC um; in der Schweiz
+  (UTC+1/+2) kommt dabei der Vortag heraus. Immer `toLocalDateStr(dt)` bzw. `addDays(ds,n)`
+  nutzen. Dieser Fehler steckte einmal an sechs Stellen und verfälschte Muster-Insights
+  und Trainingskalender.
+- **Kein erfundener Platzhalter für fehlende Messwerte.** `computeHealthScore` gibt `null`
+  zurück (früher fest `70` = „Gut"), die Anzeige zeigt dann „—". Gilt sinngemäß überall.
+- **Testen nur nach SW-Abmeldung.** Ein früher registrierter Service Worker liefert sonst
+  die alte `app.js` aus — auch auf `localhost`.
 - **iOS-PWA:** `viewport-fit=cover`, Status-Bar `black-translucent`, `env(safe-area-inset-*)`.
   **Kein** Body-Gradient mit `background-attachment:fixed` (friert auf iOS ein) — soliden Body
   + `.screen`-Safe-Areas nutzen.
