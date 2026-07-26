@@ -104,7 +104,9 @@ for (let i = N_DAYS - 1; i >= endOffset; i--) {
   ]);
   if (train) {
     const speed = 9.5 + rnd()*3, dur = 28 + rnd()*55;
-    workout.push([ds, ['Laufen','Krafttraining','Radfahren','Wandern'][Math.floor(rnd()*4)],
+    // Bezeichnungen wie sie Apple/Health Auto Export tatsächlich liefert – inklusive
+    // der eigenwilligen Übersetzungen, an denen die frühere exakte Namensliste scheiterte.
+    workout.push([ds, ['Outdoor Ausführen','Hochintensives Intervalltraining','Innenräume Ausführen','Trail-Laufen'][Math.floor(rnd()*4)],
       dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30),
       Math.round(165+rnd()*20), speed.toFixed(2), Math.round(rnd()*260), Math.round(1200+rnd()*1600)]);
   }

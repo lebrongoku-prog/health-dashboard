@@ -126,7 +126,31 @@ function _buildCalHTML(year, month) {
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
-const _typeIcons = {'Outdoor Ausführen':'🏃','Laufen':'🏃','Radfahren':'🚴','Schwimmen':'🏊','Wandern':'🥾','Krafttraining':'💪','HIIT':'⚡','Yoga':'🧘','Radfahren, drinnen':'🚴','Funktionstraining':'🏋️','Trail-Laufen':'🏔️'};
+// Symbol zur Trainingsart – Stichwortsuche statt exakter Namensliste.
+// Apple liefert die Bezeichnungen lokalisiert und teils eigenwillig übersetzt
+// ("Innenräume Ausführen" für einen Indoor-Lauf). Die frühere Liste verlangte eine
+// wortgenaue Übereinstimmung und verfehlte damit zwei der drei real vorkommenden
+// Arten – die bekamen dann die Standard-Hantel statt des passenden Symbols.
+// REIHENFOLGE IST PRIORITÄT: der erste Treffer gewinnt. Deshalb steht "trail" vor
+// "lauf" und "intervall" ganz oben – sonst würde "Trail-Laufen" als Lauf und
+// "Hochintensives Intervalltraining" als Krafttraining eingestuft.
+const _TYPE_ICONS = [
+  [/intervall|hiit|hochintensiv/i,  '⚡'],
+  [/trail/i,                        '🏔️'],
+  [/funktionstraining|functional/i, '🏋️'],
+  [/kraft|strength/i,               '💪'],
+  [/rad|bike|cycl/i,                '🚴'],
+  [/schwimm|swim/i,                 '🏊'],
+  [/wander|hik/i,                   '🥾'],
+  [/yoga/i,                         '🧘'],
+  [/gehen|walk/i,                   '🚶'],
+  [/lauf|ausführen|run/i,           '🏃']
+];
+function workoutIcon(typeRaw) {
+  const t = String(typeRaw || '');
+  for (const [muster, icon] of _TYPE_ICONS) if (muster.test(t)) return icon;
+  return '🏋️';
+}
 function _parseWorkoutRows(rows) {
   // Sheet values arrive as strings via .toString() – parse to numbers explicitly
   const pN = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
@@ -134,9 +158,9 @@ function _parseWorkoutRows(rows) {
     const date = r['Date'] || r['date'];
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
     const typeRaw = String(r['Type'] || r['type'] || '').trim();
-    const icon = _typeIcons[typeRaw] || '🏋️';
+    const icon = workoutIcon(typeRaw);
     workoutData[date] = {
-      // typeRaw bleibt roh (dient als Schlüssel für _typeIcons); typeLabel ist die
+      // typeRaw bleibt roh (Grundlage für workoutIcon); typeLabel ist die
       // Anzeigefassung und deshalb bereits entschärft.
       date, typeRaw, typeLabel: icon + ' ' + esc(typeRaw || 'Workout'), icon,
       durationMin:    pN(r['Duration (min)']),
