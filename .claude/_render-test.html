@@ -47,6 +47,22 @@
 // ═══════════════════════════════════════════════════════════
 const SC = new URLSearchParams(location.search).get('scenario') || 'normal';
 
+// Service Worker abmelden und Caches leeren. Sonst liefert eine frühere Registrierung
+// auf localhost weiter die ALTE app.js aus – man prüft dann ahnungslos den Vorstand.
+// Beim ersten Aufruf einmal automatisch neu laden, damit die frische Datei greift.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(async regs => {
+    const namen = await caches.keys();
+    if (regs.length || namen.length) {
+      await Promise.all([...regs.map(r => r.unregister()), ...namen.map(n => caches.delete(n))]);
+      if (!sessionStorage.getItem('sw-geleert')) {
+        sessionStorage.setItem('sw-geleert', '1');
+        location.reload();
+      }
+    }
+  });
+}
+
 localStorage.setItem('g_token', 'testtoken');
 localStorage.setItem('g_expiry', String(Date.now() + 3600e3));
 

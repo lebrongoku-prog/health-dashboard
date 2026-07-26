@@ -82,8 +82,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
 - **Bedienelemente:** 🔄 Refresh + 🌙 Dark-Toggle liegen rechtsbündig auf der
-  `pg-banner`-Titelzeile (`pgBanner()`). Zeitfilter (Dropdown + Datumsnav `‹ Heute ›`) steckt
-  in jeder Diagramm-Karte (`chartFilterHTML()` / `_injectChartFilters`).
+  `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Dropdown + Datumsnav `‹ Heute ›`)
+  sitzt **einmal pro Tab** direkt unter dem Banner (`.tab-filter-bar`, gesetzt von
+  `_injectChartFilters`). **Nicht** wieder in die Diagramm-Karten legen: dort belegte er
+  zwei Drittel der Kopfzeile und schnitt die Titel auf „V…" / „❤️.." zusammen.
+- **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
+  Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielBadge` / `zielLinie` und die
+  Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
+  nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
+- **Farbe bedeutet Bewertung, nie Richtung.** Pfeil = Verlauf, Farbe = gut/schlecht, abgeleitet
+  aus `ZIELE[key].richtung` über `trendKlasse()`. Ein sinkender Ruhepuls ist grün, obwohl der
+  Pfeil nach unten zeigt. Reine Beschreibungen (z. B. „Differenz Wochentag/Wochenende")
+  bleiben neutral grau.
+- **Keine Kunst-Einheiten:** Tagesdurchschnitte heissen `Ø 57 bpm`, nicht `57 bpm/d`
+  („Schläge pro Minute pro Tag" ergibt keinen Sinn).
+- **Kennzahlen erklären:** `infoI('key')` setzt ein antippbares ⓘ mit Text aus `ERKLAERUNG`.
+  Jede Erklärung nennt *was es ist* **und** *welche Richtung gut ist* — ohne die zweite
+  Angabe lässt sich weder Farbe noch Pfeil deuten.
 - **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
   Durchschnittswerte tragen ein Perioden-Kürzel (Tagesmittel = `/d`).
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die

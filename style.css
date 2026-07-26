@@ -378,6 +378,76 @@ body.dark #bottom-nav {
 .chart-head .scope-badge{margin-left:auto}
 body.dark .scope-badge{background:#0F172A}
 
+/* ── Zeitfilter: eine Leiste pro Tab ──────────────────────
+   Löst die zwölf Kopien in den Diagramm-Karten ab, die dort zwei Drittel der
+   Kopfzeile belegten und die Titel auf "V…" bzw. "❤️.." zusammenschrumpfen liessen. */
+.tab-filter-bar{
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
+  padding:.45rem .6rem;margin-bottom:.7rem;
+}
+.tfb-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);flex:0 0 auto}
+.tab-filter-bar .chart-filter{margin:0;flex:1 1 auto;justify-content:flex-end}
+
+/* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
+.chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
+.chart-note{font-size:.6rem;color:var(--txt3);margin:-.15rem 0 .4rem;line-height:1.4}
+.stat-hint{font-size:.63rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
+
+/* ── Zielwerte ────────────────────────────────────────────
+   Eine Form, eine Position, eine Bedeutung – überall gleich. Vorher hiess Farbe
+   je nach Kachel etwas anderes. */
+.ziel-badge{
+  display:inline-block;font-size:.58rem;font-weight:600;line-height:1.4;
+  padding:.12rem .42rem;border-radius:999px;white-space:nowrap;
+  border:1px solid transparent;
+}
+.ziel-badge.ok{color:#047857;background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
+.ziel-badge.ab{color:#B45309;background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.32)}
+.ziel-badge.neutral{color:var(--txt3);background:var(--bg);border-color:var(--border)}
+body.dark .ziel-badge.ok{color:#6EE7B7}
+body.dark .ziel-badge.ab{color:#FDBA74}
+.mt-ziel{padding:0 0 .45rem 1.15rem;border-bottom:1px solid #F8FAFC}
+body.dark .mt-ziel{border-bottom-color:#1E293B}
+
+/* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
+.ziel-status{
+  background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
+  padding:.6rem .7rem;margin-bottom:.7rem;border-left:4px solid #10B981;
+}
+.ziel-status.ab{border-left-color:#F97316}
+.zs-kopf{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.78rem;color:var(--txt)}
+.zs-kopf .scope-badge{margin-left:auto}
+.zs-liste{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
+.zs-item{
+  font-size:.64rem;color:var(--txt2);background:var(--bg);
+  border:1px solid var(--border);border-radius:8px;padding:.2rem .45rem;
+}
+.zs-item strong{color:#B45309}
+body.dark .zs-item{background:#0F172A}
+body.dark .zs-item strong{color:#FDBA74}
+
+/* ── ⓘ-Erklärungen ───────────────────────────────────────
+   Beantworten pro Kennzahl: Was ist das, und welche Richtung ist gut? Ohne die
+   zweite Angabe lässt sich weder Farbe noch Pfeil deuten. */
+.info-i{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;flex:0 0 auto;vertical-align:middle;
+  border-radius:50%;border:1px solid var(--txt3);color:var(--txt3);
+  font-size:.55rem;font-weight:700;font-style:italic;line-height:1;
+  cursor:help;position:relative;-webkit-tap-highlight-color:transparent;
+}
+.info-i::after{
+  content:attr(data-tt);position:absolute;bottom:calc(100% + 7px);left:50%;
+  transform:translateX(-50%);width:210px;
+  background:#1E293B;color:#fff;font-size:.63rem;font-weight:500;font-style:normal;
+  line-height:1.45;padding:.45rem .6rem;border-radius:8px;
+  opacity:0;pointer-events:none;transition:opacity .15s;z-index:400;
+  white-space:normal;text-align:left;
+}
+.info-i:hover::after,.info-i.tt-open::after{opacity:1}
+.info-i:focus-visible{outline:2px solid var(--tab-color,#0891B2);outline-offset:2px}
+
 /* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
 .chart-filter{display:flex;align-items:center;gap:.3rem;margin:.1rem 0 .5rem}
 .chart-filter .range-select{height:30px;padding:0 .55rem;font-size:.64rem;font-weight:600;color:var(--txt2);background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit}
@@ -491,14 +561,21 @@ body.dark .ov-combo-rec .rec-action{background:#0F172A}
 .ov-grid-mid>*{min-width:0;overflow:hidden}
 
 /* Monatstrend rows */
-.mt-row{display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid #F8FAFC}
-.mt-row:last-child{border:none}
+/* Die Trennlinie sitzt jetzt unter der Ziel-Zeile, nicht mehr unter der Wertzeile –
+   Wert und zugehöriges Ziel gehören optisch zusammen. */
+.mt-row{display:flex;align-items:center;gap:.6rem;padding:.4rem 0 .15rem}
+.mt-ziel:last-child{border:none}
 .mt-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.mt-lbl{font-size:.7rem;color:var(--txt2);flex:0 0 96px;white-space:nowrap;overflow:hidden}
+.mt-lbl{font-size:.7rem;color:var(--txt2);flex:0 0 104px;white-space:nowrap;display:flex;align-items:center;gap:.25rem}
 .mt-spark{flex:1;height:24px;min-width:0}
 .mt-val{font-size:.77rem;font-weight:700;flex:0 0 64px;text-align:right;white-space:nowrap}
 .mt-arrow{font-size:.74rem;font-weight:700;margin-left:.25rem;min-width:12px}
-.mt-arrow.up{color:#10B981}.mt-arrow.dn{color:#EF4444}.mt-arrow.eq{color:var(--txt3)}
+/* Farbe = Bewertung, Pfeilrichtung = Verlauf. Beides ist NICHT dasselbe: ein
+   sinkender Ruhepuls zeigt nach unten, ist aber ein gutes Zeichen. Die früheren
+   Klassen .up/.dn färbten nach Richtung und stellten genau das auf den Kopf. */
+.mt-arrow.gut{color:#10B981}
+.mt-arrow.schlecht{color:#EF4444}
+.mt-arrow.neutral{color:var(--txt3)}
 
 /* Tagesinsights / Ti-Metrics */
 .ti-row{display:flex;align-items:flex-start;gap:.5rem;padding:.2rem 0;font-size:.73rem}
