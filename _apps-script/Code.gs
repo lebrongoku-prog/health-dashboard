@@ -145,18 +145,53 @@ function getHealthFolder() {
   throw new Error('Ordner nicht gefunden: Health Data');
 }
 
+// Pro Datum genau eine Datei zurückgeben.
+// Google Drive ERSETZT eine gleichnamige Datei nicht, sondern legt eine zweite daneben.
+// Exportiert Health Auto Export für denselben Tag mehrmals, lagen bisher mehrere
+// Dateien mit identischem Namen im Ordner – und jede erzeugte eine eigene Sheet-Zeile.
+// Bei Mehrfachtreffern gewinnt die zuletzt geänderte Datei.
 function getAllHealthFiles() {
   var folder = getHealthFolder();
   var files = folder.getFiles();
-  var list = [];
+  var proDatum = {};
   while (files.hasNext()) {
     var f = files.next();
     var n = f.getName();
-    if (/^HealthAutoExport-\d{4}-\d{2}-\d{2}\.json$/.test(n)) {
-      list.push({ date: n.slice(17, 27), file: f });
+    if (!/^HealthAutoExport-\d{4}-\d{2}-\d{2}\.json$/.test(n)) continue;
+    var d = n.slice(17, 27);
+    var vorh = proDatum[d];
+    // getLastUpdated() nur im Kollisionsfall aufrufen – sonst ein API-Call je Datei.
+    if (!vorh || f.getLastUpdated() > vorh.file.getLastUpdated()) {
+      proDatum[d] = { date: d, file: f };
     }
   }
-  return list;
+  return Object.keys(proDatum).map(function(d) { return proDatum[d]; });
+}
+
+// Datum → Zeilennummer für das gesamte Sheet.
+// Grundlage dafür, dass ein Tag ERSETZT statt ein zweites Mal angehängt wird.
+function buildDateIndex(sheet) {
+  var index = {};
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return index;
+  var werte = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < werte.length; i++) {
+    var v = werte[i][0];
+    var d = (v instanceof Date)
+      ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+      : String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) index[d] = i + 2;  // +2: Kopfzeile + 0-basiert
+  }
+  return index;
+}
+
+// Datum minus n Tage, ohne Zeitzonen-Fallstrick.
+// 12:00 UTC als Anker: dadurch kann keine Zeitverschiebung und keine Sommerzeit-
+// Umstellung über eine Tagesgrenze kippen.
+function minusTage(datumStr, n) {
+  var t = new Date(datumStr + 'T12:00:00Z');
+  t.setUTCDate(t.getUTCDate() - n);
+  return t.toISOString().slice(0, 10);
 }
 
 function getOrCreateSheet() {
@@ -186,11 +221,23 @@ function getOrCreateSheet() {
   return { ss: ss, sheet: sheet };
 }
 
-function appendDay(sheet, day) {
-  sheet.appendRow(COLUMNS.map(function(col) {
+// Schreibt einen Tag. Existiert bereits eine Zeile mit diesem Datum, wird sie
+// ÜBERSCHRIEBEN statt eine zweite anzuhängen – das ist der eigentliche Dubletten-Schutz.
+// Gibt true zurück, wenn ersetzt wurde, false bei einem neu angehängten Tag.
+// Ersetzt das frühere appendDay(), das ungeprüft angehängt hat.
+function upsertDay(sheet, day, index) {
+  var zeile = COLUMNS.map(function(col) {
     var v = day[col];
     return (v !== undefined && v !== null) ? v : '';
-  }));
+  });
+  var row = index[day.date];
+  if (row) {
+    sheet.getRange(row, 1, 1, COLUMNS.length).setValues([zeile]);
+    return true;
+  }
+  sheet.appendRow(zeile);
+  index[day.date] = sheet.getLastRow();
+  return false;
 }
 
 function writeToSheet() {
@@ -198,35 +245,55 @@ function writeToSheet() {
   var BATCH_LIMIT = 60;
   var r = getOrCreateSheet();
   var sheet = r.sheet;
-  var lastRow = sheet.getLastRow();
-  var refreshDate = null;
-  if (lastRow > 1) {
-    var refreshRow = Math.max(2, lastRow - DAYS_TO_REFRESH + 1);
-    var val = sheet.getRange(refreshRow, 1).getValue();
-    refreshDate = (val instanceof Date)
-      ? Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd')
-      : String(val);
-    sheet.deleteRows(refreshRow, lastRow - refreshRow + 1);
-  }
+
+  // Frühere Logik: "die letzten DAYS_TO_REFRESH ZEILEN löschen und ab dem Datum der
+  // vorletzten Zeile neu einlesen". Das setzte zweierlei voraus – dass das Sheet nach
+  // Datum sortiert ist, und dass die letzten Zeilen die neuesten Tage sind. Beides
+  // stimmte irgendwann nicht mehr, mit zwei Folgen:
+  //   • Eine Datei, die verspätet ankam (z. B. der 23.07., während 25./26. schon
+  //     im Sheet standen), lag VOR dem Stichtag und wurde nie wieder eingelesen.
+  //   • Nachträglich angehängte Tage standen doppelt im Sheet.
+  // Jetzt: kein Löschen mehr. Über einen Datums-Index wird jede Zeile am richtigen
+  // Platz ersetzt, und fehlende Tage werden unabhängig von ihrem Alter nachgetragen.
+  var index = buildDateIndex(sheet);
+  var vorhandene = Object.keys(index).sort();
+
+  // Auffrisch-Fenster: die letzten DAYS_TO_REFRESH Tage ab dem NEUESTEN Datum im
+  // Sheet (nicht ab der letzten Zeilennummer). Diese Tage werden neu geschrieben,
+  // weil ihre Werte sich im Tagesverlauf noch ändern.
+  var refreshDate = vorhandene.length
+    ? minusTage(vorhandene[vorhandene.length - 1], DAYS_TO_REFRESH - 1)
+    : null;
+
   var list = getAllHealthFiles().filter(function(item) {
-    return !refreshDate || item.date >= refreshDate;
+    // (a) Tag fehlt noch → nachtragen, auch wenn er älter ist als das Fenster
+    // (b) Tag liegt im Auffrisch-Fenster → neu schreiben
+    return !index[item.date] || (refreshDate && item.date >= refreshDate);
   });
   list.sort(function(a, b) { return a.date.localeCompare(b.date); });
   var batch = list.slice(0, BATCH_LIMIT);
   var remaining = list.length - batch.length;
-  var added = 0;
+  var neu = 0, ersetzt = 0;
   batch.forEach(function(item) {
     try {
       var raw = JSON.parse(item.file.getBlob().getDataAsString());
-      appendDay(sheet, parseDay(item.date, raw.data.metrics));
-      added++;
+      if (upsertDay(sheet, parseDay(item.date, raw.data.metrics), index)) ersetzt++;
+      else neu++;
     } catch(e) { Logger.log('Fehler ' + item.date + ': ' + e); }
   });
+
+  // Nachgetragene ältere Tage landen beim Anhängen unten. Einmal sortieren hält das
+  // Sheet lesbar – genau die Unordnung hatte die Dubletten zuvor verschleiert.
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 2) {
+    sheet.getRange(2, 1, lastRow - 1, COLUMNS.length).sort({ column: 1, ascending: true });
+  }
+
   sheet.getRange(1,1).setNote('Zuletzt aktualisiert: ' + new Date().toLocaleString('de-DE'));
   if (remaining > 0) {
-    Logger.log('✅ ' + added + ' Tage aktualisiert. Noch ' + remaining + ' übrig → erneut ausführen!');
+    Logger.log('✅ ' + neu + ' neu, ' + ersetzt + ' aktualisiert. Noch ' + remaining + ' übrig → erneut ausführen!');
   } else {
-    Logger.log('✅ ' + added + ' Tage aktualisiert. Gesamt: ' + (sheet.getLastRow()-1));
+    Logger.log('✅ ' + neu + ' neu, ' + ersetzt + ' aktualisiert. Gesamt: ' + (sheet.getLastRow()-1));
   }
   // Workout Data Sheet ebenfalls aktualisieren (CSV-Dateien aus Workout-Ordner)
   try {

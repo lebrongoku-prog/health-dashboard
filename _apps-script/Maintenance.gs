@@ -57,6 +57,11 @@ function writeToSheetBatch() {
   var lastDone = props.getProperty('batch_last_date') || '0000-00-00';
   var r = getOrCreateSheet();
   var sheet = r.sheet;
+  // Schreibt über upsertDay statt über das frühere appendDay. Vorher hängte dieses
+  // Skript ungeprüft an – es schaute weder ins Sheet noch löschte es etwas. Wurde es
+  // ausgeführt, um eine Lücke zu schliessen, entstanden dabei Zweitzeilen für alle
+  // Tage, die bereits vorhanden waren (im Sheet als Block ganz unten sichtbar).
+  var index = buildDateIndex(sheet);
   var list = getAllHealthFiles().filter(function(item) {
     return item.date > lastDone;
   });
@@ -65,7 +70,7 @@ function writeToSheetBatch() {
   batch.forEach(function(item) {
     try {
       var raw = JSON.parse(item.file.getBlob().getDataAsString());
-      appendDay(sheet, parseDay(item.date, raw.data.metrics));
+      upsertDay(sheet, parseDay(item.date, raw.data.metrics), index);
       props.setProperty('batch_last_date', item.date);
     } catch(e) { Logger.log('Fehler ' + item.date + ': ' + e); }
   });
