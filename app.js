@@ -1794,7 +1794,11 @@ function pgSchlaf() {
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
         <h3>🌙 ${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
-        ${slD!=null?`<div class="chart-legend" style="margin-bottom:.3rem"><div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø Schlafdauer · <strong>${toHM(slD)}</strong></div></div>`:''}
+        <div class="chart-legend" style="margin-bottom:.3rem">
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel (${toHM(ZIELE.sleepTotal.ziel)})</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
+          ${slD!=null?`<div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø <strong>${toHM(slD)}</strong></div>`:''}
+        </div>
         <div class="chart-wrap" style="height:155px"><canvas id="c-sl-dur"></canvas></div>
         ${slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
           <div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${slWeek!=null?toHM(slWeek)+'':'—'}</span></div>
@@ -1847,22 +1851,40 @@ function pgSchlaf() {
       _slY.min=Math.max(0, Math.floor(Math.min(..._slV) - 0.5));
       _slY.max=Math.ceil(Math.max(..._slV) + 0.2);
     } else { _slY.min=0; }
+    // Das Ziel MUSS im Sichtbereich liegen. Schläft man eine Woche lang durchgehend
+    // mehr als 7h30, läge die Farbnaht sonst unterhalb der Achse – alle Balken sähen
+    // einfarbig aus und die Zielerreichung wäre nicht mehr ablesbar.
+    _slY.min = Math.min(_slY.min, ZIELE.sleepTotal.ziel - 0.5);
+    // Zweifarbiger Balken statt zusätzlicher Ziellinie: der Teil bis zum Ziel ist
+    // kräftig, der Überschuss darüber hell. Die Farbnaht liegt exakt auf 7h30 und
+    // IST damit die Ziellinie – gezeichnet werden muss keine. Vorher lagen hier
+    // zwei gestrichelte Linien (Ø und Ziel) nur ~20 Minuten auseinander und
+    // verschmolzen optisch zu einem unklaren Doppelstrich.
+    const _slZiel = ZIELE.sleepTotal.ziel;
+    const _slBis  = slMa.map(v=>v==null?null:Math.min(v,_slZiel));
+    const _slUeber= slMa.map(v=>v==null?null:Math.max(0,v-_slZiel));
     mkC('c-sl-dur',{type:'bar',data:{labels:tL,datasets:[
-      // Balken unterhalb des Ziels bleiben blass – Zielerreichung ist damit ohne
-      // Zahlenlesen erkennbar. Schwelle kommt aus ZIELE, nicht mehr hartkodiert.
-      {data:slMa,backgroundColor:slMa.map(v=>v!=null&&v>=ZIELE.sleepTotal.ziel?'rgba(124,58,237,.8)':'rgba(124,58,237,.35)'),borderRadius:5},
-      {label:'Ø Schlafdauer',data:slAvgLine,type:'line',borderColor:'rgba(124,58,237,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0},
-      zielLinie('sleepTotal', slMa.length)
+      // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
+      {label:'bis Ziel',data:_slBis,backgroundColor:'rgba(124,58,237,.85)',stack:'s',
+       borderRadius:ctx=>_slUeber[ctx.dataIndex]>0?0:5},
+      {label:'über Ziel',data:_slUeber,backgroundColor:'rgba(124,58,237,.32)',stack:'s',borderRadius:5},
+      {label:'Ø Schlafdauer',data:slAvgLine,type:'line',borderColor:'rgba(124,58,237,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0}
     ]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
-        if(!nurMesswerte(ctx)) return null;
-        const _isAvg=timeRange!=='7d'&&timeRange!=='1m';
-        const lines=[`${_isAvg?'Ø ':''}${toHM(ctx.raw)}${_isAvg?'':''}`];
+        // Der Balken ist aus zwei Segmenten aufgebaut, gemeint ist aber EINE Nacht:
+        // nur das untere Segment beschriften, und zwar mit der Gesamtdauer.
+        if(ctx.datasetIndex!==0) return null;
         const i=ctx.dataIndex;
+        const gesamt=slMa[i];
+        if(gesamt==null) return null;
+        const _isAvg=timeRange!=='7d'&&timeRange!=='1m';
+        const fehlt=_slZiel-gesamt;
+        const lines=[`${_isAvg?'Ø ':''}${toHM(gesamt)}`];
+        lines.push(fehlt>0 ? `${toHM(fehlt)} unter Ziel` : `${toHM(-fehlt)} über Ziel`);
         if(slStartArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Eingeschlafen: '+fmtHHMM(slStartArr[i])));
         if(slEndArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Aufgewacht: '+fmtHHMM(slEndArr[i])));
         return lines;
-      }}}},scales:{x:gx,y:_slY}}});
+      }}}},scales:{x:{...gx,stacked:true},y:{..._slY,stacked:true}}}});
     if(hasPhases){
       const _phDs=[
         {label:'Tiefschlaf',data:dpMa,backgroundColor:'#1E1B6E',borderRadius:3,stack:'s'},
