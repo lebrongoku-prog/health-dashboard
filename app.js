@@ -694,9 +694,8 @@ function mkC(id, cfg) {
 // Betroffen sind drei Bauarten, die absichtlich verschieden bleiben:
 //   .debt-tt-wrap      → Tooltip-Element im DOM, wird frei positioniert
 //   .cal-train         → gemeinsames #cal-tip-Element, Inhalt aus workoutData
-//   .ov-ring-wrap /
-//   .hs-komp-bar-wrap  → reine CSS-Tooltips, geöffnet über die Klasse .tt-open
-const TT_TAP_SELECTOR = '.debt-tt-wrap, .cal-train, .ov-ring-wrap, .hs-komp-bar-wrap, .info-i';
+//   .info-i            → Erklärungskasten als .info-tt-Element im Anker
+const TT_TAP_SELECTOR = '.debt-tt-wrap, .cal-train, .info-i';
 
 // Positioniert ein frei schwebendes Tooltip-Element über (oder unter) seinem Anker.
 function _placeTooltip(tt, rect, fallbackW, fallbackH) {
@@ -827,13 +826,9 @@ function zielText(key) {
   if (!z) return '';
   return `Ziel: ${z.richtung === 'hoch' ? '≥' : '≤'} ${z.fmt(z.ziel)}`;
 }
-// Einheitliche Markierung an jeder Kachel: immer gleiche Form, immer gleiche Stelle.
-// Vorher bedeutete Farbe je nach Kachel etwas anderes.
-function zielBadge(key, wert) {
-  const ok = zielErfuellt(key, wert);
-  if (ok === null) return `<span class="ziel-badge neutral">${zielText(key)}</span>`;
-  return `<span class="ziel-badge ${ok?'ok':'ab'}">${ok?'✓':'!'} ${zielText(key)}</span>`;
-}
+// Hinweis: zielBadge wurde entfernt – die Marke sass ausschliesslich in der
+// Trend-Karte der Uebersicht. zielText/zielErfuellt bleiben: die Statuszeile
+// oben auf der Uebersicht und die Ziellinien in den Diagrammen nutzen sie.
 // Tooltip-Filter: Hilfslinien (Ø-Linie, Ziellinie) sind Orientierung, keine Messwerte –
 // sie gehören nicht in die Werteliste beim Antippen eines Datenpunkts.
 const nurMesswerte = item => !/^(Ø|Ziel)/.test(item.dataset.label || '');
@@ -922,30 +917,8 @@ function _infoAnker(text) {
 function infoI(key)     { return _infoAnker(ERKLAERUNG[key]); }
 function infoMini(key)  { return _infoAnker(ERKLAERUNG_MINI[key]); }
 
-// ── Score ──────────────────────────────────────────────
-function computeHealthScore(days) {
-  let s=0,w=0;
-  const sl=av(days,'sleepTotal');
-  if(sl!=null){const v=sl>=7&&sl<=9?100:sl<4?0:sl<7?((sl-4)/3)*100:Math.max(0,100-(sl-9)*20);s+=Math.min(100,Math.max(0,v))*35;w+=35;}
-  const hv=av(days,'hrv'),hvA=av(allData,'hrv');
-  if(hv!=null&&hvA){s+=Math.min(100,(hv/hvA)*100)*30;w+=30;}
-  const hr=av(days,'restHR');
-  if(hr!=null){const v=hr<=50?100:hr>=80?0:((80-hr)/30)*100;s+=v*20;w+=20;}
-  const st=av(days,'steps');
-  if(st!=null){s+=Math.min(100,(st/10000)*100)*15;w+=15;}
-  // null statt eines erfundenen Platzhalters: ohne Messwerte gibt es keinen Score.
-  // Ein fester Wert (früher 70 = "Gut") wäre von einem echten Ergebnis nicht
-  // unterscheidbar gewesen – in einer Gesundheits-App der schlechteste Fehlerfall.
-  return w ? Math.round(s/w) : null;
-}
-function scoreCat(s) {
-  if(s==null)return['Keine Daten','#94A3B8'];
-  if(s>=85)return['Ausgezeichnet','#10B981'];
-  if(s>=70)return['Gut','#84CC16'];
-  if(s>=55)return['Ordentlich','#EAB308'];
-  if(s>=40)return['Ausbaufähig','#F97316'];
-  return['Niedrig','#EF4444'];
-}
+// Hinweis: computeHealthScore/scoreCat wurden entfernt – die Score-Karte auf der
+// Uebersicht ist auf Wunsch weggefallen und war ihr einziger Aufrufer.
 
 // ─────────────────────────────────────────────────────────
 // ── Coaching Helpers ───────────────────────────────────
@@ -1313,23 +1286,8 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
   </div>`;
 }
 
-// ── sparkline SVG ─────────────────────────────────────
-function sparkSVG(data, color='#4F46E5', w=80, h=26) {
-  const vals = data.filter(v => v != null && !isNaN(v));
-  if (vals.length < 2) return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}"></svg>`;
-  const mn = Math.min(...vals), mx = Math.max(...vals), rng = (mx-mn)||1;
-  const pts = vals.map((v,i)=>{
-    const x = (i/(vals.length-1))*w;
-    const y = h - ((v-mn)/rng)*(h-6) - 3;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const apts = vals.map((v,i)=>({x:(i/(vals.length-1))*w,y:h-((v-mn)/rng)*(h-6)-3}));
-  const area = `M0,${h} ` + apts.map(p=>`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ` L${w},${h} Z`;
-  return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;min-width:0">
-    <path d="${area}" fill="${color}" fill-opacity=".1"/>
-    <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-  </svg>`;
-}
+// Hinweis: sparkSVG wurde entfernt – die Sparklines lebten ausschliesslich in der
+// Trend-Karte der Uebersicht.
 
 
 
@@ -1345,30 +1303,10 @@ function pgOverview() {
     steps: av(priorDays,'steps'),
     vo2:   av(priorDays.filter(r=>r.vo2max),'vo2max')
   };
-  // Health score (immer der Score des aktuellen Tages – unabhängig vom Zeitfilter)
-  const hs = computeHealthScore([lastDay]);
-  const [hsCat, hsColor] = scoreCat(hs);
-  // Der Vergleich zum 7-Tage-Schnitt wurde auf Wunsch aus der Anzeige entfernt;
-  // damit entfallen auch die Berechnung des Vorwochen-Scores und des Deltas.
 
-  // Daily recommendation
-  // Warning signals
+  // Belastungswarnung und Muster-Insights – vom Wegfall der Score-Karte unberührt.
   const warnSig = detectWarningSignals();
-  // Pattern insights
   const patternIns = generatePatternInsights();
-
-  // Score component breakdown for tooltip (immer aktueller Tag, passend zum Score)
-  const _hsDays = [lastDay];
-  const _hsSl=av(_hsDays,'sleepTotal');
-  const _hsHv=av(_hsDays,'hrv'), _hsHvA=av(allData,'hrv');
-  const _hsHr=av(_hsDays,'restHR');
-  const _hsSt=av(_hsDays,'steps');
-  const _slScore=_hsSl!=null?Math.min(100,Math.max(0,_hsSl>=7&&_hsSl<=9?100:_hsSl<4?0:_hsSl<7?((_hsSl-4)/3)*100:Math.max(0,100-(_hsSl-9)*20))):null;
-  const _hvScore=_hsHv!=null&&_hsHvA?Math.min(100,(_hsHv/_hsHvA)*100):null;
-  const _hrScore=_hsHr!=null?(_hsHr<=50?100:_hsHr>=80?0:(80-_hsHr)/30*100):null;
-  const _stScore=_hsSt!=null?Math.min(100,(_hsSt/10000)*100):null;
-
-
 
   // Mini-card deltas (absolute vs 7-day avg)
   function absDelta(curr, ref) { return (curr!=null&&ref!=null) ? curr-ref : null; }
@@ -1401,34 +1339,6 @@ function pgOverview() {
   const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
   const _wocheAgg = !(timeRange === '7d' || timeRange === '1m'); // aggregierte Buckets → "Ø" im Tooltip
 
-  // Trend-Karte: folgt dem globalen Filter (Sparkline/Schnitt/Pfeil über das Fenster D).
-  function trendArrowRaw(vals) {
-    if (vals.length < 4) return 'eq';
-    const h1 = vals.slice(0,Math.floor(vals.length/2));
-    const h2 = vals.slice(Math.floor(vals.length/2));
-    const a1 = h1.reduce((a,b)=>a+b,0)/h1.length;
-    const a2 = h2.reduce((a,b)=>a+b,0)/h2.length;
-    const diff = a2-a1, threshold = Math.abs(a1)*0.02;
-    return Math.abs(diff)<threshold?'eq':diff>0?'up':'dn';
-  }
-  // Der Pfeil zeigt die RICHTUNG, die Farbe die BEWERTUNG – das ist nicht dasselbe.
-  // Vorher war ↑ immer grün und ↓ immer rot; ein sinkender Ruhepuls, also genau das
-  // Ziel jedes Ausdauertrainings, erschien dadurch in Alarmrot.
-  function trendKlasse(key, dir) {
-    if (dir === 'eq') return 'neutral';
-    const z = ZIELE[key];
-    if (!z) return 'neutral';
-    const besser = z.richtung === 'hoch' ? 'up' : 'dn';
-    return dir === besser ? 'gut' : 'schlecht';
-  }
-  function trendGlyph(dir) { return dir==='up'?'↑':dir==='dn'?'↓':'→'; }
-  const _trendTitle = {heute:'Heute','7d':'7-Tage-Trend','1m':'1-Monats-Trend','3m':'3-Monats-Trend','6m':'6-Monats-Trend','12m':'12-Monats-Trend','24m':'24-Monats-Trend'}[timeRange] || 'Trend';
-  const slValsT = D.filter(r=>r.sleepTotal!=null).map(r=>r.sleepTotal);
-  const hrValsT = D.filter(r=>r.restHR!=null).map(r=>r.restHR);
-  const hvValsT = D.filter(r=>r.hrv!=null).map(r=>r.hrv);
-  const stValsT = D.filter(r=>r.steps!=null).map(r=>r.steps);
-  const slTr = trendArrowRaw(slValsT); const hrTr = trendArrowRaw(hrValsT);
-  const hvTr = trendArrowRaw(hvValsT); const stTr = trendArrowRaw(stValsT);
 
 
   document.getElementById("screen-overview").innerHTML = `
@@ -1444,78 +1354,11 @@ function pgOverview() {
       </div>
     </div>` : ''}
 
-    <!-- Zeile 1: Score | Empfehlung+Tagesinsights -->
-    <div class="ov-row">
-      <div class="ov-score-card ov-col-narrow">
-        <div class="chart-head"><h3 style="font-size:.78rem;font-weight:700">Gesundheits-Score</h3>${scopeBadge('heute')}</div>
-        <div class="ov-score-body">
-        <div class="ov-score-left">
-          <div class="ov-ring-wrap">
-            <div class="ov-score-ring">
-              <svg width="120" height="120" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="48" fill="none" stroke="#E2E8F0" stroke-width="9"/>
-                <circle id="hs-arc" cx="60" cy="60" r="48" fill="none" stroke="${hsColor}" stroke-width="9"
-                  stroke-dasharray="0 302" stroke-linecap="round" transform="rotate(-90 60 60)"
-                  style="transition:stroke-dasharray .9s ease"/>
-                <text id="hs-num" x="60" y="60" text-anchor="middle" dominant-baseline="central"
-                  font-size="34" font-weight="800" fill="currentColor" style="letter-spacing:-0.04em">—</text>
-              </svg>
-            </div>
-            <div class="hs-ring-tt">
-              <div class="hs-tt-title">Score-Zusammensetzung</div>
-              <div class="hs-ring-tt-row"><span>🌙 Schlaf</span><span style="color:var(--txt3)">35%</span></div>
-              <div class="hs-ring-tt-row"><span>💙 HRV</span><span style="color:var(--txt3)">30%</span></div>
-              <div class="hs-ring-tt-row"><span>❤️ Ruhepuls</span><span style="color:var(--txt3)">20%</span></div>
-              <div class="hs-ring-tt-row"><span>🚶 Schritte</span><span style="color:var(--txt3)">15%</span></div>
-            </div>
-          </div>
-          <div class="ov-score-cat" style="color:${hsColor}">${hsCat}</div>
-        </div>
-        <div class="hs-komp-rows">
-        <div class="hs-komp-title">Score-Komponenten</div>
-        ${(()=>{
-          const bl30hrv=calculateBaseline('hrv',30);
-          const bl30hr=calculateBaseline('restHR',30);
-          const bl30sl=calculateBaseline('sleepTotal',30);
-          const last=allData[allData.length-1]||{};
-          let slPts=null,hvPts=null,hrPts=null,stPts=null;
-          if(last.sleepTotal!=null&&bl30sl!=null){const d=last.sleepTotal-bl30sl;slPts=Math.round(d*4);}
-          if(last.hrv!=null&&bl30hrv!=null){const d=calculateDeviation(last.hrv,bl30hrv);hvPts=Math.round((d||0)*0.4);}
-          if(last.restHR!=null&&bl30hr!=null){const d=calculateDeviation(last.restHR,bl30hr);hrPts=Math.round(-(d||0)*0.3);}
-          if(last.steps!=null){stPts=last.steps>=10000?3:last.steps>=7000?1:last.steps>=4000?0:-2;}
-          function kompRow(icon,lbl,score,pts){
-            if(score==null)return'';
-            const c=score>=70?'#10B981':score>=40?'#F97316':'#EF4444';
-            const ttTxt=pts!=null?(pts>0?`+${pts} Pkt vs. 30-Tage-Schnitt`:`${pts} Pkt vs. 30-Tage-Schnitt`):'Keine Änderungsdaten';
-            return `<div class="hs-komp-row">
-              <span class="hs-komp-lbl">${icon} ${lbl}</span>
-              <span class="hs-komp-val" style="color:${c}">${Math.round(score)}</span>
-              <div class="hs-komp-bar-wrap" data-tt="${ttTxt}">
-                <div class="hs-komp-bar-fill" style="width:${score}%;background:${c}"></div>
-              </div>
-            </div>`;
-          }
-          return [
-            kompRow('🌙','Schlaf',_slScore,slPts),
-            kompRow('💙','HRV',_hvScore,hvPts),
-            kompRow('❤️','Ruhepuls',_hrScore,hrPts),
-            kompRow('🚶','Schritte',_stScore,stPts)
-          ].join('');
-        })()}
-        </div>
-        </div><!-- /ov-score-body -->
-        <!-- Fusszeile nur noch im Ausnahmefall: der deutende Satz UND die Zahl
-             "vs. 7-Tage-Schnitt" wurden auf Wunsch entfernt. Liegt ein Score vor,
-             entfällt die Fusszeile ganz – sonst bliebe eine leere Trennlinie stehen.
-             Der Hinweis bei fehlenden Messwerten bleibt, weil er erklärt statt zu
-             bewerten (Gegenstück zum früheren Platzhalter-Score 70). -->
-        ${hs==null ? `<div class="ov-score-footer">
-          <div class="ov-score-hinweis">Für ${lastDay.date?fmtDayFull(lastDay.date):'den letzten Tag'} liegen noch keine Messwerte vor. Sobald Schlaf, Ruhepuls, HRV oder Schritte im Sheet stehen, wird der Score berechnet.</div>
-        </div>` : ''}
-      </div>
+    <!-- Aktuelle Tageswerte. Der Gesundheits-Score stand hier daneben und wurde
+         auf Wunsch komplett entfernt; die Belastungswarnung oben bleibt. -->
       <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
            wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
-      <div class="ov-combo-card ov-col-wide">
+    <div class="ov-combo-card">
         <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
@@ -1562,26 +1405,6 @@ function pgOverview() {
       </div>
       <div class="chart-wrap" style="height:240px"><canvas id="c-woche"></canvas></div>
     </div>
-    <!-- Zeile 3: Monats-Trend (unterhalb des Verlaufs) -->
-    <div class="chart-card" style="margin-bottom:.7rem">
-      <div class="chart-head"><h3>${_trendTitle}</h3></div>
-      <div>
-        ${[
-          {key:'sleepTotal', farbe:'#7C3AED', vals:slValsT, dir:slTr, wert:av(D,'sleepTotal')},
-          {key:'restHR',     farbe:'#EF4444', vals:hrValsT, dir:hrTr, wert:av(D,'restHR')},
-          {key:'hrv',        farbe:'#2563EB', vals:hvValsT, dir:hvTr, wert:av(D,'hrv')},
-          {key:'steps',      farbe:'#059669', vals:stValsT, dir:stTr, wert:av(D,'steps')}
-        ].map(m => `
-        <div class="mt-row">
-          <div class="mt-dot" style="background:${m.farbe}"></div>
-          <div class="mt-lbl">${ZIELE[m.key].label} ${infoI(m.key)}</div>
-          <div class="mt-spark">${sparkSVG(m.vals,m.farbe,160,24)}</div>
-          <div class="mt-val">${m.wert!=null?'Ø '+ZIELE[m.key].fmt(m.wert):'—'}</div>
-          <div class="mt-arrow ${trendKlasse(m.key,m.dir)}">${trendGlyph(m.dir)}</div>
-        </div>
-        <div class="mt-ziel">${zielBadge(m.key, m.wert)}</div>`).join('')}
-      </div>
-    </div>
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
@@ -1597,13 +1420,6 @@ function pgOverview() {
     </div>`:''}
     `;
 
-  // Animate score ring – ohne Score bleibt der Ring leer und die Zahl ein "—".
-  setTimeout(()=>{
-    const arc=document.getElementById('hs-arc'), num=document.getElementById('hs-num');
-    const c=2*Math.PI*48;
-    if(arc) arc.setAttribute('stroke-dasharray', hs!=null ? `${c*hs/100} ${c}` : `0 ${c}`);
-    if(num) num.textContent = hs!=null ? hs : '—';
-  },80);
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){

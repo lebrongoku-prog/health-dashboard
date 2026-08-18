@@ -76,10 +76,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','aktivitaet','training']` (5 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
+- **Übersicht (`pgOverview`):** Zielstatus-Zeile → Tageswert-Kacheln → Verlaufs-Chart →
+  Muster-Insights. Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
+  entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/`.nav-today`/
   `.refresh-btn`/`.dark-toggle` (click) und `.range-select` (change). Jede State-Änderung
   → `_refreshAfterStateChange()`.
-- **Health-Score-Gewichtung:** Schlaf 35 / HRV 30 / Ruhepuls 20 / Schritte 15.
 
 ## UI-/Namens-Konventionen
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
@@ -90,13 +92,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `_injectChartFilters`). **Nicht** wieder in die Diagramm-Karten legen: dort belegte er
   zwei Drittel der Kopfzeile und schnitt die Titel auf „V…" / „❤️.." zusammen.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
-  Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielBadge` / `zielLinie` und die
+  Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
-- **Farbe bedeutet Bewertung, nie Richtung.** Pfeil = Verlauf, Farbe = gut/schlecht, abgeleitet
-  aus `ZIELE[key].richtung` über `trendKlasse()`. Ein sinkender Ruhepuls ist grün, obwohl der
-  Pfeil nach unten zeigt. Reine Beschreibungen (z. B. „Differenz Wochentag/Wochenende")
-  bleiben neutral grau.
+- **Farbe bedeutet Bewertung, nie Richtung.** Ob eine Abweichung gut oder schlecht ist, kommt
+  aus `ZIELE[key].richtung` — ein sinkender Ruhepuls ist grün, obwohl der Wert fällt. Reine
+  Beschreibungen (z. B. „Differenz Wochentag/Wochenende") bleiben neutral grau.
 - **Keine Kunst-Einheiten:** Tagesdurchschnitte heissen `Ø 57 bpm`, nicht `57 bpm/d`
   („Schläge pro Minute pro Tag" ergibt keinen Sinn).
 - **Kennzahlen erklären:** `infoI('key')` setzt ein antippbares ⓘ mit Text aus `ERKLAERUNG`,
@@ -106,7 +107,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Pfeil deuten. Der Kasten ist ein eigenes `.info-tt`-Element (kein `::after`), damit
   `openTooltip` ihn am Bildschirmrand einklemmen kann.
 - **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
-  Durchschnittswerte tragen ein Perioden-Kürzel (Tagesmittel = `/d`).
+  Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
 - **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
@@ -133,8 +134,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (UTC+1/+2) kommt dabei der Vortag heraus. Immer `toLocalDateStr(dt)` bzw. `addDays(ds,n)`
   nutzen. Dieser Fehler steckte einmal an sechs Stellen und verfälschte Muster-Insights
   und Trainingskalender.
-- **Kein erfundener Platzhalter für fehlende Messwerte.** `computeHealthScore` gibt `null`
-  zurück (früher fest `70` = „Gut"), die Anzeige zeigt dann „—". Gilt sinngemäß überall.
+- **Kein erfundener Platzhalter für fehlende Messwerte.** Fehlt ein Wert, zeigt die App
+  „—" statt eines geschätzten Ersatzwerts. Gilt überall.
 - **Testen nur nach SW-Abmeldung.** Ein früher registrierter Service Worker liefert sonst
   die alte `app.js` aus — auch auf `localhost`.
 - **iOS-PWA:** `viewport-fit=cover`, Status-Bar `black-translucent`, `env(safe-area-inset-*)`.
