@@ -510,7 +510,9 @@ body.dark .chart-filter .range-select{background:#0F172A}
 .ov-ti-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .ov-ti-card h3{font-size:.84rem;font-weight:700;margin-bottom:.45rem;flex-shrink:0}
 .ti-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
-.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.45rem}
+/* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
+   die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
+.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.45rem;margin-bottom:.7rem}
 .ov-grid-mid{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .ov-grid-mid>*{min-width:0;overflow:hidden}
 
