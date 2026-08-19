@@ -574,6 +574,14 @@ function toHM(h) { if(h==null) return '—'; return Math.floor(h)+'h '+Math.roun
 // Pace: km/h → min/km, plus einheitliche Darstellung 5'30".
 // Vorher an drei Stellen ausgeschrieben, dabei zweimal mit '' statt " als Sekundenzeichen.
 function paceFromSpeed(kph) { return kph > 0 ? 60/kph : null; }
+// Minuten menschenlesbar: ab einer Stunde als "1h 25min", darunter "45 min".
+function fmtMin(min) {
+  if (min == null) return '—';
+  const vz = min < 0 ? '−' : '', a = Math.abs(Math.round(min));
+  if (a < 60) return vz + a + ' min';
+  const h = Math.floor(a/60), m = a % 60;
+  return vz + h + 'h' + (m ? ' ' + m + 'min' : '');
+}
 function fmtPace(minPerKm) {
   if (minPerKm == null) return '—';
   let m = Math.floor(minPerKm), s = Math.round((minPerKm % 1) * 60);
@@ -618,6 +626,15 @@ function wSum(rows, field) {
 }
 function allWeeks(rows) { return [...new Set(rows.map(r=>getWeekMonday(r.date)))].sort(); }
 function alignByWeek(weeks,arr) { const m=Object.fromEntries(arr.map(x=>[x.w,x.v])); return weeks.map(w=>m[w]??null); }
+// Zweizeilige Achsenbeschriftung für Tagesauflösung: Wochentag über dem Datum.
+// Chart.js rendert ein Array als mehrzeiligen Tick – erster Eintrag oben.
+const WOCHENTAG_KURZ = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+function wochentagKurz(dateStr) { return WOCHENTAG_KURZ[new Date(dateStr+'T00:00:00').getDay()]; }
+function tagLabel(dateStr) {
+  const dt = new Date(dateStr+'T00:00:00');
+  return [wochentagKurz(dateStr),
+          String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'];
+}
 function fmtWeek(w) { const dt=new Date(w+'T00:00:00'); return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'; }
 
 // granular=true → weekly buckets for 1M/3M (line charts); false → monthly (bar charts)
@@ -626,7 +643,7 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     const days = weekDays7();
     const byDate = {};
     rows.forEach(r => { byDate[r.date] = r; });
-    const labels = days.map(d => { const dt=new Date(d+'T00:00:00'); return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'; });
+    const labels = days.map(tagLabel);
     const align = field => days.map(d => byDate[d]?.[field] ?? null);
     return { labels, align, alignSum:align, hasData:days.some(d => d in byDate) };
   }
@@ -637,7 +654,7 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     rows.forEach(r=>{byDate[r.date]=r;});
     const days=[];
     if(mw){let d=new Date(mw.s+'T00:00:00');const end=new Date(mw.e+'T00:00:00');while(d<=end){days.push(toLocalDateStr(d));d.setDate(d.getDate()+1);}}
-    const labels=days.map(d=>{const dt=new Date(d+'T00:00:00');return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.';});
+    const labels=days.map(tagLabel);
     const align=field=>days.map(d=>byDate[d]?.[field]??null);
     return{labels,align,alignSum:align,hasData:days.some(d=>d in byDate)};
   }
@@ -1815,19 +1832,10 @@ function pgSchlaf() {
           })()}`:``}
         </div>`:''}
       </div>
-      ${hasPhases?`<div class="chart-card" style="margin-bottom:0">
-        <h3>💤 Schlafphasen-Aufteilung (Ø pro Nacht)</h3>
-        ${phaseBar}
-        <div class="stats-list" style="margin-top:.6rem">
-          ${awD!=null?`<div class="stat-row"><span class="stat-lbl">Wach</span><span class="stat-val">${toHM(awD)} – ${awPct}%</span></div>`:''}
-          ${remD!=null?`<div class="stat-row"><span class="stat-lbl">REM-Schlaf</span><span class="stat-val">${toHM(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> (Ziel: 20–25%)</span></div>`:''}
-          ${lD!=null?`<div class="stat-row"><span class="stat-lbl">Leichtschlaf</span><span class="stat-val">${toHM(lD)} – ${lPct}%</span></div>`:''}
-          ${dpD!=null?`<div class="stat-row"><span class="stat-lbl">Tiefschlaf</span><span class="stat-val">${toHM(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> (Ziel: 15–20%)</span></div>`:''}
-        </div>
-      </div>`:''}
     </div>
 
-    <!-- Zeile 4: Schlafphasen-Verlauf -->
+    <!-- Verlauf steht auf Wunsch VOR der Aufteilung: erst der zeitliche Verlauf,
+         dann die Zusammenfassung als Durchschnitt. -->
     ${hasPhases?`<div class="chart-card">
       <h3>💤 Schlafphasen-Verlauf</h3>
       <div class="chart-legend">
@@ -1838,6 +1846,17 @@ function pgSchlaf() {
       </div>
       <div class="chart-wrap" style="height:180px"><canvas id="c-sl-phases"></canvas></div>
     </div>`:''}
+    ${hasPhases?`<div class="chart-card">
+        <h3>💤 Schlafphasen-Aufteilung (Ø pro Nacht)</h3>
+        ${phaseBar}
+        <div class="stats-list" style="margin-top:.6rem">
+          ${awD!=null?`<div class="stat-row"><span class="stat-lbl">Wach</span><span class="stat-val">${toHM(awD)} – ${awPct}%</span></div>`:''}
+          ${remD!=null?`<div class="stat-row"><span class="stat-lbl">REM-Schlaf</span><span class="stat-val">${toHM(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> (Ziel: 20–25%)</span></div>`:''}
+          ${lD!=null?`<div class="stat-row"><span class="stat-lbl">Leichtschlaf</span><span class="stat-val">${toHM(lD)} – ${lPct}%</span></div>`:''}
+          ${dpD!=null?`<div class="stat-row"><span class="stat-lbl">Tiefschlaf</span><span class="stat-val">${toHM(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> (Ziel: 15–20%)</span></div>`:''}
+        </div>
+    </div>`:''}
+
     ${hasScore?`<div class="chart-card"><h3>⭐ Schlaf-Score Verlauf</h3><div class="chart-wrap" style="height:150px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
 
 
@@ -1958,7 +1977,7 @@ async function pgTraining() {
 
   // Chart data for Leistungs-Trend (per training day, chronological)
   const trendDates=trainDates.slice().sort();
-  const trendLabels=trendDates.map(d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'});});
+  const trendLabels=trendDates.map(tagLabel);   // je Trainingstag: Wochentag + Datum
   const trendDist=trendDates.map(d=>(workoutData[d]?.distanceKm??null));
   const trendHR=trendDates.map(d=>(workoutData[d]?.avgHR??null));
   // Very broad field detection
@@ -2050,7 +2069,7 @@ async function pgTraining() {
     const _dim=new Date(_yr,_mo+1,0).getDate();
     const _bd={};D.forEach(r=>{_bd[r.date]=r;});
     const _moDays=Array.from({length:_dim},(_,i)=>toLocalDateStr(new Date(_yr,_mo,i+1)));
-    _1mLabels=_moDays.map(d=>{const dt=new Date(d+'T00:00:00');return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'});
+    _1mLabels=_moDays.map(tagLabel);
     _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
     _moDays.forEach((d,i)=>{if(new Date(d+'T00:00:00').getDay()===1)_1mMoIdx.add(i);});
@@ -2093,9 +2112,9 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          ${minWeek!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${Math.round(minWeek)} min</span></div>`:''}
-          ${minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${Math.round(minWknd)} min</span></div>`:''}
-          ${minWeek!=null&&minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:var(--txt2)">${minWknd>minWeek?'+':''}${Math.round(minWknd-minWeek)} min</span></div>`:''}
+          ${minWeek!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochentag (Mo–Fr)</span><span class="stat-val">${fmtMin(minWeek)}</span></div>`:''}
+          ${minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Ø Wochenende (Sa–So)</span><span class="stat-val">${fmtMin(minWknd)}</span></div>`:''}
+          ${minWeek!=null&&minWknd!=null?`<div class="stat-row"><span class="stat-lbl">Differenz</span><span class="stat-val" style="color:var(--txt2)">${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}</span></div>`:''}
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">

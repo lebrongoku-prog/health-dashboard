@@ -512,7 +512,7 @@ body.dark .chart-filter .range-select{background:#0F172A}
 .ti-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
 /* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
    die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
-.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.45rem;margin-bottom:.7rem}
+.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.7rem;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;margin-bottom:.7rem}
 .ov-grid-mid{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 .ov-grid-mid>*{min-width:0;overflow:hidden}
 
@@ -527,7 +527,10 @@ body.dark .chart-filter .range-select{background:#0F172A}
 .ti-row{display:flex;align-items:flex-start;gap:.5rem;padding:.2rem 0;font-size:.73rem}
 .ti-arrow{font-size:.91rem;font-weight:800;width:18px;text-align:center;flex-shrink:0;margin-top:.05rem}
 .ti-txt{color:var(--txt2);line-height:1.4;font-weight:500}
-.ti-metrics{display:grid;grid-template-columns:repeat(4,1fr);margin-top:.65rem;gap:.4rem}
+/* Kein margin-top mehr: das war der Abstand zur frueheren Empfehlungs-Kachel, die
+   ueber den Minikacheln sass. Seit sie weg ist, sind die Kacheln der einzige Inhalt
+   der Karte – der Rest war ungenutzter Raum. */
+.ti-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
 .ti-metric{padding:.55rem .5rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;position:relative;overflow:visible}
 /* ⓘ in die Ecke statt in den Textfluss: auf den schmalen Kacheln (~78 px) rutschte
    es sonst in eine eigene Zeile und machte die Kacheln unterschiedlich hoch.
