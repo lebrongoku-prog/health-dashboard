@@ -982,15 +982,9 @@ function zielErfuellt(key, wert) {
   if (!z || wert == null) return null;
   return z.richtung === 'hoch' ? wert >= z.ziel : wert <= z.ziel;
 }
-// Klartext des Ziels, z. B. "Ziel: ≥ 7h 30m"
-function zielText(key) {
-  const z = ZIELE[key];
-  if (!z) return '';
-  return `Ziel: ${z.richtung === 'hoch' ? '≥' : '≤'} ${z.fmt(z.ziel)}`;
-}
 // Hinweis: zielBadge wurde entfernt – die Marke sass ausschliesslich in der
-// Trend-Karte der Uebersicht. zielText/zielErfuellt bleiben: die Statuszeile
-// oben auf der Uebersicht und die Ziellinien in den Diagrammen nutzen sie.
+// Trend-Karte der Uebersicht. Mit ihr entfiel auch zielText, das nur von zielBadge
+// gebraucht wurde. zielErfuellt bleibt: die Statuszeile oben nutzt es weiter.
 // Tooltip-Filter: Hilfslinien (Ø-Linie, Ziellinie) sind Orientierung, keine Messwerte –
 // sie gehören nicht in die Werteliste beim Antippen eines Datenpunkts.
 const nurMesswerte = item => !/^(Ø|Ziel)/.test(item.dataset.label || '');
@@ -1480,20 +1474,11 @@ function pgOverview() {
   const patternIns = generatePatternInsights();
 
   // Mini-card deltas (absolute vs 7-day avg)
-  function absDelta(curr, ref) { return (curr!=null&&ref!=null) ? curr-ref : null; }
   const slLast = lastDay.sleepTotal;
   const hrLast = lastDay.restHR;
   const hvLast = lastDay.hrv;
   const stLast = lastDay.steps;
 
-  function miniDeltaStr(d, fmt='num', decimals=1) {
-    if (d == null) return '';
-    const sign = d > 0 ? '+' : d < 0 ? '' : '±';
-    if (fmt==='hm') { const h=Math.floor(Math.abs(d)),m=Math.round((Math.abs(d)%1)*60); return (d>=0?'+':'-')+h+':'+String(m).padStart(2,'0')+' vs. 7-Tage-Schnitt'; }
-    if (fmt==='steps') return sign+Math.round(Math.abs(d)).toLocaleString('de-CH')+' vs. 7-Tage-Schnitt';
-    return sign+Math.abs(d).toFixed(decimals)+' vs. 7-Tage-Schnitt';
-  }
-  function miniDeltaClass(d) { return d==null?'neu':d>0?'pos':d<0?'neg':'neu'; }
 
   // Verlaufs-Chart + Trend folgen jetzt dem globalen Zeitfilter (D = gewähltes Fenster).
   const D = filtered();
@@ -1627,9 +1612,9 @@ function pgOverview() {
 
 // ── Herz ───────────────────────────────────────────────
 function pgHerz() {
-  const D=filtered(), P=prevPeriod();
-  const hrD=mittel(D,'restHR'), hrP=mittel(P,'restHR');
-  const hvD=mittel(D,'hrv'), hvP=mittel(P,'hrv');
+  const D=filtered();
+  const hrD=mittel(D,'restHR');
+  const hvD=mittel(D,'hrv');
   const hrf=D.filter(r=>r.restHR!=null);
   const hvf=D.filter(r=>r.hrv!=null);
 
@@ -1812,11 +1797,11 @@ function pgSchlaf() {
         ? 'Dein Schlaf lag leicht unter Zielwert. Vermeide heute sehr intensive Belastung und priorisiere frühere Schlafenszeit.'
         : 'Schlafdauer unter 6.5h. Heute möglichst auf intensives Training verzichten. Fokus auf Erholung.'
     : 'Schlafeinschätzung noch nicht verfügbar.';
-  const slD=mittel(D,'sleepTotal'), slP=mittel(P,'sleepTotal');
+  const slD=mittel(D,'sleepTotal');
   const scD=mittel(D,'sleepScore'), scP=mittel(P,'sleepScore');
-  const dpD=mittel(D,'sleepDeep')||mittel(D,'deepSleep'), dpP=mittel(P,'sleepDeep')||mittel(P,'deepSleep');
-  const remD=mittel(D,'sleepRem')||mittel(D,'remSleep'), remP=mittel(P,'sleepRem')||mittel(P,'remSleep');
-  const lD=mittel(D,'sleepCore')||mittel(D,'lightSleep'), lP=mittel(P,'sleepCore')||mittel(P,'lightSleep');
+  const dpD=mittel(D,'sleepDeep')||mittel(D,'deepSleep');
+  const remD=mittel(D,'sleepRem')||mittel(D,'remSleep');
+  const lD=mittel(D,'sleepCore')||mittel(D,'lightSleep');
   const slStd=standardabw(D.filter(r=>r.sleepTotal!=null),'sleepTotal');
   const slRows=D.filter(r=>r.sleepTotal!=null);
   const slMax=slRows.length?Math.max(...slRows.map(r=>r.sleepTotal)):null;
@@ -1825,7 +1810,7 @@ function pgSchlaf() {
   const WDAYS=['So','Mo','Di','Mi','Do','Fr','Sa'];
   const debtTooltipRows=last14sl.filter(r=>r.sleepTotal!=null).map(r=>{
     const d=SLEEP_TARGET_H-r.sleepTotal;
-    const [yr,mo,dy]=r.date.split('-');
+    const [,mo,dy]=r.date.split('-');   // Jahr wird hier nicht gebraucht
     const wd=WDAYS[new Date(r.date+'T00:00:00').getDay()];
     return `<div class="debt-tt-row"><span class="debt-tt-date">${wd} ${dy}.${mo}.</span><span class="debt-tt-slept">${alsStdMin(r.sleepTotal)}</span><span class="debt-tt-d ${d>0?'neg':'pos'}">${d>0?'-'+alsStdMin(d):'+'+alsStdMin(-d)}</span></div>`;
   }).join('');
@@ -2132,22 +2117,7 @@ async function pgTraining() {
   const trendDist=trendDates.map(d=>(workoutData[d]?.distanceKm??null));
   const trendHR=trendDates.map(d=>(workoutData[d]?.avgHR??null));
   // Very broad field detection
-  const calField=findField(D,
-    'activeCal',
-    'activeEnergyBurned','activeCalories','calories','activeEnergy',
-    'moveCalories','burnedCalories','totalCaloriesBurned','energyBurned',
-    'activeKcal','kcal','caloriesBurned','workoutCalories',
-    'HKQuantityTypeIdentifierActiveEnergyBurned'
-  );
   // minField removed – durationMin comes exclusively from Workout Data sheet (workoutData)
-  const distField=findField(D,
-    'distKm',
-    'distanceWalkingRunning','distance','totalDistance','distanceRun',
-    'runningDistance','walkingDistance','distanceKm',
-    'HKQuantityTypeIdentifierDistanceWalkingRunning'
-  );
-  const calD=calField?mittel(D,calField):null, calP=calField?mittel(P,calField):null;
-  const distD=distField?mittel(D,distField):null, distP=distField?mittel(P,distField):null;
 
   // New chart data — durationMin + distanceKm from CSV workout files
   const trendPace=trendDates.map(d=>{const row=D.find(r=>r.date===d);return row?.runSpeed>0?Math.round((60/row.runSpeed)*100)/100:null;});
@@ -2165,9 +2135,6 @@ async function pgTraining() {
   // Aktive Tage = Tage mit Workout-Sheet-Eintrag und durationMin > 0.
 
   // Weekday vs weekend training (use all days with the field, not just active ones)
-  const calSplit=splitWeekWknd(calField?D.filter(r=>r[calField]!=null):[]);
-  const calWeek=calSplit.wkd.length?mittel(calSplit.wkd,calField):null;
-  const calWknd=calSplit.wknd.length?mittel(calSplit.wknd,calField):null;
   const woMinSplit=splitWeekWknd(D.filter(r=>workoutData[r.date]?.durationMin!=null));
   const _woDur=rows=>rows.map(r=>workoutData[r.date].durationMin);
   const minWeek=mittel(_woDur(woMinSplit.wkd));
@@ -2466,12 +2433,10 @@ function vo2Abschnitt(D, P) {
 
 // ── Aktivität ──────────────────────────────────────────
 function pgAktivitaet() {
-  const D=filtered(), P=prevPeriod();
-  const stD=mittel(D,'steps'), stP=mittel(P,'steps');
+  const D=filtered();
+  const stD=mittel(D,'steps');
   const calField=findField(D,'activeCal','activeEnergyBurned','activeCalories','calories','activeEnergy','moveCalories');
-  const calD=calField?mittel(D,calField):null, calP=calField?mittel(P,calField):null;
-  const distField=findField(D,'distKm','distanceWalkingRunning','distance','totalDistance','distanceKm');
-  const distD=distField?mittel(D,distField):null;
+  const calD=calField?mittel(D,calField):null;
 
   const stRows=D.filter(r=>r.steps!=null);
   const n10k=stRows.filter(r=>r.steps>=10000).length;
