@@ -87,10 +87,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
 - **Bedienelemente:** 🔄 Refresh + 🌙 Dark-Toggle liegen rechtsbündig auf der
-  `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Dropdown + Datumsnav `‹ Heute ›`)
-  sitzt **einmal pro Tab** direkt unter dem Banner (`.tab-filter-bar`, gesetzt von
-  `_injectChartFilters`). **Nicht** wieder in die Diagramm-Karten legen: dort belegte er
-  zwei Drittel der Kopfzeile und schnitt die Titel auf „V…" / „❤️.." zusammen.
+  `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
+  **in jeder Diagramm-Karte**, als **eigene Zeile unter dem Titel** (`_injectChartFilters`).
+  Die Zeile unter dem Titel ist Bedingung: **neben** dem Titel belegte die Leiste zwei
+  Drittel der Kopfzeile und schnitt ihn auf „V…" / „❤️.." zusammen. Die Zeitspanne wird
+  **nicht** als Text gezeigt — sie steht auf der Zeitachse.
+- **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
+  Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
+- **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
+  (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
+  funktionieren Wochenend-Tönung und Markierung nicht. `timeDim` liefert beides mit;
+  Diagramme mit eigener Achse (Training) setzen es selbst.
+- **Markierung:** Tipp auf eine Säule hebt sie in **allen** Diagrammen der App hervor —
+  synchronisiert über das **Datum**, nicht über die Position (die 3. Säule im Trainings-
+  diagramm ist ein anderer Tag als im Schlafdiagramm). Monatsdiagramme markieren den
+  Monat, der den Tag enthält. Abschalten nur durch erneuten Tipp auf denselben Punkt —
+  ein Tipp **neben** ein Diagramm löscht bewusst NICHT, damit Vergleiche über Tabs
+  hinweg bestehen bleiben. Das Zurücktreten der übrigen Säulen ist ein Schleier ÜBER
+  den Daten (`markierungPlugin.afterDatasetsDraw`), kein Eingriff in die Farben der
+  zwölf unterschiedlich gebauten Diagramme.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
@@ -100,6 +115,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Grund: Ø-Linie und Ziellinie lagen nur ~20 Min. auseinander und verschmolzen optisch.
   Die Y-Achse wird dort auf `Ziel − 0.5` geklemmt, sonst liegt die Naht ausserhalb des
   Sichtbereichs und alle Balken sehen einfarbig aus.
+  Zusätzlich tönt `zielBand` die Fläche **oberhalb** des Ziels.
 - **Farbe bedeutet Bewertung, nie Richtung.** Ob eine Abweichung gut oder schlecht ist, kommt
   aus `ZIELE[key].richtung` — ein sinkender Ruhepuls ist grün, obwohl der Wert fällt. Reine
   Beschreibungen (z. B. „Differenz Wochentag/Wochenende") bleiben neutral grau.

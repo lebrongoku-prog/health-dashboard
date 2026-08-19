@@ -414,37 +414,19 @@ function fmtDayFull(d) {
   return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+dt.getFullYear();
 }
 
-const MONATE_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const MO_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 function fmtDayShort(d) {
   if (!d) return '–';
   const dt = new Date(d+'T00:00:00');
   return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+String(dt.getFullYear()).slice(-2);
 }
-function fmtMonthYear(dt) { return MO_SHORT[dt.getMonth()]+' '+String(dt.getFullYear()).slice(-2); }
 
-function navDateLabel() {
-  if (!referenceDate) return '–';
-  if (timeRange === '7d') {
-    const days = weekDays7();
-    if (!days.length) return '–';
-    return fmtDayShort(days[0]) + ' – ' + fmtDayShort(days[6]);
-  }
-  const wm = windowMonths();
-  if (wm != null) {
-    const endDt = new Date(referenceDate+'T00:00:00');
-    if (wm === 1) return fmtMonthYear(endDt); // single month: "Mär '26"
-    const startFirst = addMonths(moFirst(referenceDate), -(wm-1));
-    const startDt = new Date(startFirst+'T00:00:00');
-    return fmtMonthYear(startDt) + ' – ' + fmtMonthYear(endDt);
-  }
-  const dt2 = new Date(referenceDate+'T00:00:00');
-  return MONATE_LANG[dt2.getMonth()] + ' ' + dt2.getFullYear();
-}
+// Hinweis: navDateLabel wurde entfernt – die Filterleiste zeigt die Zeitspanne
+// nicht mehr als Text, sie steht auf der Zeitachse der Diagramme.
 
 function updateNavUI() {
-  const label = navDateLabel();
-  document.querySelectorAll('.nav-label').forEach(el => { el.textContent = label; });
+  // Die Zeitspanne als Text entfiel mit der neuen Filterleiste (sie steht auf der
+  // Zeitachse). Geblieben ist der Aktiv-/Inaktiv-Zustand der beiden Pfeile.
   if (!allData.length) return;
   const minDate = allData[0].date;
   const maxDate = allData[allData.length-1].date;
@@ -645,7 +627,7 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     rows.forEach(r => { byDate[r.date] = r; });
     const labels = days.map(tagLabel);
     const align = field => days.map(d => byDate[d]?.[field] ?? null);
-    return { labels, align, alignSum:align, hasData:days.some(d => d in byDate) };
+    return { labels, align, alignSum:align, hasData:days.some(d => d in byDate), keys:days, keyTyp:'tag' };
   }
   // Daily data for 1M
   if (timeRange==='1m' && !keepAggregated) {
@@ -656,7 +638,7 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     if(mw){let d=new Date(mw.s+'T00:00:00');const end=new Date(mw.e+'T00:00:00');while(d<=end){days.push(toLocalDateStr(d));d.setDate(d.getDate()+1);}}
     const labels=days.map(tagLabel);
     const align=field=>days.map(d=>byDate[d]?.[field]??null);
-    return{labels,align,alignSum:align,hasData:days.some(d=>d in byDate)};
+    return{labels,align,alignSum:align,hasData:days.some(d=>d in byDate),keys:days,keyTyp:'tag'};
   }
   if (granular && (timeRange==='1m' || timeRange==='3m')) {
     const weeks = allWeeks(rows);
@@ -669,7 +651,8 @@ function timeDim(rows, granular=false, keepAggregated=false) {
       labels,
       align: field => alignByWeek(weeks, wAvg(rows, field)),
       alignSum: field => alignByWeek(weeks, wSum(rows, field)),
-      hasData: weeks.length > 0
+      hasData: weeks.length > 0,
+      keys: weeks, keyTyp: 'woche'
     };
   }
   const mos = allMonths(rows);
@@ -677,9 +660,129 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     labels: mos.map(fmtM),
     align: field => alignByMo(mos, mAvg(rows, field)),
     alignSum: field => alignByMo(mos, mSum(rows, field)),
-    hasData: mos.length > 0
+    hasData: mos.length > 0,
+    keys: mos, keyTyp: 'monat'
   };
 }
+
+// ═══════════════════════════════════════════════════════════
+// Zeitraum-Schlüssel, Wochenend-Tönung und app-weite Markierung
+// ═══════════════════════════════════════════════════════════
+// Jedes Diagramm meldet über cfg.__keys, welcher Zeitraum hinter welcher Säule
+// steckt, und über cfg.__keyTyp dessen Auflösung ('tag' | 'woche' | 'monat').
+// Erst dadurch lässt sich eine Markierung sinnvoll über Diagramme hinweg
+// übertragen: Positionen sind NICHT vergleichbar (die 3. Säule im Trainings-
+// diagramm ist ein anderer Tag als die 3. Säule im Schlafdiagramm).
+
+// Ausgewählter Tag, app-weit. Bleibt bestehen, bis derselbe Punkt erneut
+// angetippt wird – Tippen neben ein Diagramm hebt sie bewusst NICHT auf,
+// damit sich Diagramme über Tabs hinweg vergleichen lassen.
+let _markierung = null;   // 'YYYY-MM-DD' oder null
+
+// Index der Säule, die in diesem Diagramm den markierten Tag enthält.
+function _markIndex(chart) {
+  if (!_markierung || !chart.$keys) return -1;
+  const d = _markierung;
+  if (chart.$keyTyp === 'monat') return chart.$keys.indexOf(d.slice(0,7));
+  if (chart.$keyTyp === 'woche') return chart.$keys.indexOf(getWeekMonday(d));
+  return chart.$keys.indexOf(d);
+}
+
+// Grenzen einer Säule in Pixeln. Bei Kategorie-Achsen ist die Spaltenbreite
+// gleichmässig, deshalb reicht die halbe Kategorie-Breite links und rechts.
+function _spalte(chart, i) {
+  const x = chart.scales.x, a = chart.chartArea;
+  const mitte = x.getPixelForValue(i);
+  const n = chart.$keys ? chart.$keys.length : (chart.data.labels||[]).length;
+  const halb = n > 0 ? (a.right - a.left) / n / 2 : 12;
+  return { mitte, links: mitte - halb, rechts: mitte + halb };
+}
+
+function _cssFarbe(name, fallback) {
+  const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+// ── Ebene 1: Wochenenden tönen (nur bei Tagesauflösung) ──
+const wochenendePlugin = {
+  id: 'wochenende',
+  beforeDatasetsDraw(chart) {
+    if (chart.$keyTyp !== 'tag' || !chart.$keys) return;
+    const a = chart.chartArea; if (!a) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.fillStyle = document.body.classList.contains('dark')
+      ? 'rgba(148,163,184,.10)' : 'rgba(100,116,139,.075)';
+    chart.$keys.forEach((d, i) => {
+      if (!isWeekend(d)) return;
+      const sp = _spalte(chart, i);
+      ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
+    });
+    ctx.restore();
+  }
+};
+
+// ── Ebene 2: markierte Säule tönen + einrahmen (vor den Daten) ──
+const markierungPlugin = {
+  id: 'markierung',
+  beforeDatasetsDraw(chart) {
+    const i = _markIndex(chart);
+    if (i < 0) return;
+    const a = chart.chartArea; if (!a) return;
+    const sp = _spalte(chart, i), ctx = chart.ctx;
+    const akzent = _cssFarbe('--tab-color', '#0891B2');
+    ctx.save();
+    ctx.fillStyle = akzent; ctx.globalAlpha = 0.13;
+    ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
+    ctx.globalAlpha = 0.55; ctx.strokeStyle = akzent; ctx.lineWidth = 1;
+    [sp.links, sp.rechts].forEach(x => {
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x) + 0.5, a.top);
+      ctx.lineTo(Math.round(x) + 0.5, a.bottom);
+      ctx.stroke();
+    });
+    ctx.restore();
+  },
+  // ── Ebene 3: alles ausserhalb der Säule zurücktreten lassen ──
+  // Als Schleier ÜBER den Daten statt über die Farben jedes einzelnen Datensatzes:
+  // wirkt dadurch auch auf Linien und Flächen und kommt ohne Eingriff in die
+  // zwölf unterschiedlich aufgebauten Diagramme aus.
+  afterDatasetsDraw(chart) {
+    const i = _markIndex(chart);
+    if (i < 0) return;
+    const a = chart.chartArea; if (!a) return;
+    const sp = _spalte(chart, i), ctx = chart.ctx;
+    ctx.save();
+    ctx.fillStyle = document.body.classList.contains('dark')
+      ? 'rgba(30,41,59,.72)' : 'rgba(255,255,255,.72)';
+    ctx.fillRect(a.left, a.top, Math.max(0, sp.links - a.left), a.bottom - a.top);
+    ctx.fillRect(sp.rechts, a.top, Math.max(0, a.right - sp.rechts), a.bottom - a.top);
+    ctx.restore();
+  }
+};
+
+// Markierung setzen und ALLE Diagramme der App neu zeichnen – auch die der
+// anderen Tabs, die im DOM bereits vorgerendert sind.
+function setMarkierung(datum) {
+  _markierung = datum;
+  Object.values(charts).forEach(c => { try { c.update('none'); } catch(_) {} });
+}
+
+// Tipp auf ein Diagramm: Säule bestimmen, Tag ableiten, umschalten.
+function _chartTipp(chart, evt) {
+  if (!chart.$keys || !chart.$keys.length) return;
+  const treffer = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+  if (!treffer.length) return;
+  const i = treffer[0].index;
+  if (i == null || i < 0 || i >= chart.$keys.length) return;
+  // Erneuter Tipp auf dieselbe Säule schaltet ab – auch aus einem anderen Diagramm.
+  if (_markIndex(chart) === i) { setMarkierung(null); return; }
+  const k = chart.$keys[i];
+  // Monats-/Wochensäulen liefern kein Datum: den ersten Tag des Zeitraums nehmen.
+  setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : k);
+}
+
+Chart.register(wochenendePlugin, markierungPlugin);
 
 function killCharts() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -693,6 +796,15 @@ function mkC(id, cfg) {
   // Wisch-Bewegung übernimmt _animNavSlide (sonst zwei konkurrierende Animationen).
   if (_navSliding) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
   charts[id] = new Chart(el, cfg);
+  // Zeitraum-Schlüssel am Chart hinterlegen (siehe Kern-Block oben) und den Tipp
+  // verkabeln. Ohne __keys bleibt ein Diagramm von Wochenend-Tönung und Markierung
+  // unberührt – so lassen sich einzelne Diagramme bewusst ausnehmen.
+  charts[id].$keys   = cfg.__keys   || null;
+  charts[id].$keyTyp = cfg.__keyTyp || null;
+  if (charts[id].$keys) {
+    el.addEventListener('click', e => _chartTipp(charts[id], e));
+    el.style.cursor = 'pointer';
+  }
   // Track chart per tab (for per-tab destroy on re-render)
   if (_currentRenderingTab && tabCharts[_currentRenderingTab]) {
     tabCharts[_currentRenderingTab].push(id);
@@ -1345,7 +1457,7 @@ function pgOverview() {
   // Verlaufs-Chart + Trend folgen jetzt dem globalen Zeitfilter (D = gewähltes Fenster).
   const D = filtered();
   const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin > 0);
-  const { labels: wLabels, align: wAlign, hasData: wHas } = timeDim(D);
+  const { labels: wLabels, align: wAlign, hasData: wHas, keys: wKeys, keyTyp: wKeyTyp } = timeDim(D);
   const wSl = wAlign('sleepTotal');
   const wHR = wAlign('restHR');
   const wHV = wAlign('hrv');
@@ -1453,7 +1565,7 @@ function pgOverview() {
     return lbl+': '+(v!=null?v.toFixed(1):'—');
   }
   if(wHas){
-    mkC('c-woche',{
+    mkC('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
       data:{labels:wLabels,datasets:[
         {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:4,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
@@ -1553,7 +1665,7 @@ function pgHerz() {
       text:`HRV (${hvPct||'—'}) und Ruhepuls (${hrPct||'—'}) liegen nahe der persönlichen 30-Tage-Baseline – keine Auffälligkeiten festgestellt.`};
   })();
 
-  const {labels:tL,align:tA,hasData:tHD}=timeDim(D);
+  const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
   const tdL=timeDim(D,true);
   const hrMa=tA('restHR'); const hvMa=tA('hrv');
   const hrMaL=tdL.align('restHR'); const hvMaL=tdL.align('hrv');
@@ -1634,7 +1746,7 @@ function pgHerz() {
       if(_yMin===_yMax)_yMax=_yMin+_yStep;
     }
     const _yAxis=extra=>({min:_yMin,max:_yMax,ticks:{color:'#94A3B8',font:{size:9},stepSize:_yStep,callback:v=>Math.round(v)},...extra});
-    mkC('c-herz',{type:'line',data:{labels:tdL.labels,datasets:[
+    mkC('c-herz',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
       {label:'Ø Ruhepuls',data:hrAvgLine,borderColor:'rgba(239,68,68,.45)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,yAxisID:'yL'},
@@ -1684,7 +1796,7 @@ function pgSchlaf() {
     return `<div class="debt-tt-row"><span class="debt-tt-date">${wd} ${dy}.${mo}.</span><span class="debt-tt-slept">${toHM(r.sleepTotal)}</span><span class="debt-tt-d ${d>0?'neg':'pos'}">${d>0?'-'+toHM(d):'+'+toHM(-d)}</span></div>`;
   }).join('');
   const debtTtNDays=last14sl.filter(r=>r.sleepTotal!=null).length;
-  const {labels:tL,align:tA,hasData:tHD}=timeDim(D);
+  const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
   const tdL=timeDim(D,true);
   const slMa=tA('sleepTotal');
   const dpField=D.some(r=>r.sleepDeep!=null)?'sleepDeep':'deepSleep';
@@ -1882,7 +1994,26 @@ function pgSchlaf() {
     const _slZiel = ZIELE.sleepTotal.ziel;
     const _slBis  = slMa.map(v=>v==null?null:Math.min(v,_slZiel));
     const _slUeber= slMa.map(v=>v==null?null:Math.max(0,v-_slZiel));
-    mkC('c-sl-dur',{type:'bar',data:{labels:tL,datasets:[
+    // Getönte Fläche ab dem Schlafziel aufwärts – zusätzlich zur Zweifarbigkeit der
+    // Balken. Liegt hinter den Daten, damit die Balken darauf stehen.
+    const zielBand = {
+      id:'zielBand',
+      beforeDatasetsDraw(chart){
+        const a=chart.chartArea, y=chart.scales.y; if(!a||!y) return;
+        // Gefuellt wird der Bereich OBERHALB des Ziels: von der Diagrammoberkante
+        // bis zur Ziel-Hoehe. Y-Pixel wachsen nach unten, deshalb ist das a.top..yp.
+        const yp=Math.min(a.bottom, y.getPixelForValue(_slZiel));
+        const hoehe=yp-a.top;
+        if(hoehe<=0) return;                           // Ziel liegt ueber dem Sichtbereich
+        const ctx=chart.ctx;
+        ctx.save();
+        ctx.fillStyle=document.body.classList.contains('dark')
+          ? 'rgba(124,58,237,.16)' : 'rgba(124,58,237,.10)';
+        ctx.fillRect(a.left, a.top, a.right-a.left, hoehe);
+        ctx.restore();
+      }
+    };
+    mkC('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,plugins:[zielBand],type:'bar',data:{labels:tL,datasets:[
       // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
       {label:'bis Ziel',data:_slBis,backgroundColor:'rgba(124,58,237,.85)',stack:'s',
        borderRadius:ctx=>_slUeber[ctx.dataIndex]>0?0:5},
@@ -1912,7 +2043,7 @@ function pgSchlaf() {
       ];
       if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:3,stack:'s'});
       const _phAvg={Tiefschlaf:dpD,Leichtschlaf:lD,REM:remD,Wach:awD};
-      mkC('c-sl-phases',{type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
+      mkC('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
             if(ctx.raw==null)return null;
@@ -1923,7 +2054,7 @@ function pgSchlaf() {
         }}},
         scales:{x:{...gx,stacked:true},y:{...gy,stacked:true,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}}}}});
     }
-    if(hasScore) mkC('c-sl-score',{type:'line',data:{labels:tdL.labels,datasets:[{data:scMa,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3}]},
+    if(hasScore) mkC('c-sl-score',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[{data:scMa,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:gx,y:{...gy,min:0,max:100}}}});
   }
 }
@@ -2047,7 +2178,7 @@ async function pgTraining() {
     _calDate={y:refD.getFullYear(),m:refD.getMonth()};
   }
 
-  const {labels:tL}=timeDim(D);
+  const {labels:tL,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
   // NOTE: _woByDate was removed — it filtered to runSpeed-dates only, excluding indoor workouts
@@ -2062,7 +2193,7 @@ async function pgTraining() {
   const distSmD=_train1m?distSm_wo.map((v,i)=>minSmD[i]!=null?v:null):distSm_wo;
 
   // 1M: build full calendar-month arrays + Monday indices for week gridlines
-  let _1mLabels=tL, _1mMinData=minSmD, _1mDistData=distSmD, _1mMoIdx=new Set();
+  let _1mLabels=tL, _1mKeys=tKeys, _1mMinData=minSmD, _1mDistData=distSmD, _1mMoIdx=new Set();
   if(timeRange==='1m'){
     const _rd=new Date(referenceDate+'T00:00:00');
     const _yr=_rd.getFullYear(), _mo=_rd.getMonth();
@@ -2070,6 +2201,7 @@ async function pgTraining() {
     const _bd={};D.forEach(r=>{_bd[r.date]=r;});
     const _moDays=Array.from({length:_dim},(_,i)=>toLocalDateStr(new Date(_yr,_mo,i+1)));
     _1mLabels=_moDays.map(tagLabel);
+    _1mKeys=_moDays;
     _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
     _moDays.forEach((d,i)=>{if(new Date(d+'T00:00:00').getDay()===1)_1mMoIdx.add(i);});
@@ -2097,7 +2229,7 @@ async function pgTraining() {
     return['Niedrig','#EF4444',15];
   };
   const [v2cat,v2catColor,v2pctPos]=_vo2Cat(v2D);
-  const {labels:_v2tL,align:_v2tA,hasData:_v2tHD}=timeDim(D,true,true);
+  const {labels:_v2tL,align:_v2tA,hasData:_v2tHD,keys:_v2Keys,keyTyp:_v2KeyTyp}=timeDim(D,true,true);
   const v2MaFull=_v2tA('vo2max');
 
   document.getElementById("screen-training").innerHTML=`
@@ -2192,8 +2324,10 @@ async function pgTraining() {
     const _lStrData=_is1m?_1mDistData:distSmD;
     const _lZeitLbls=_is1m?_1mLabels:tL;
     const _lStrLbls=_is1m?_1mLabels:tL;
+    const _lZeitKeys=_is1m?_1mKeys:tKeys;
+    const _lKeyTyp=_is1m?'tag':tKeyTyp;
 
-    mkC('c-tot-zeit',{type:'bar',data:{labels:_lZeitLbls,datasets:[
+    mkC('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:_is1m?2:4}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
@@ -2204,7 +2338,7 @@ async function pgTraining() {
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
-    mkC('c-tot-strecke',{type:'bar',data:{labels:_lStrLbls,datasets:[
+    mkC('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:_is1m?2:4}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${ctx.raw.toFixed(2)} km`:null}}},
@@ -2215,7 +2349,7 @@ async function pgTraining() {
   // ── Leistungs-Trend chart (monthly aggregation for 3M+) ──
   {
     const _useMonthly=timeRange!=='7d'&&timeRange!=='1m';
-    let woLabels,woDist,woHR;
+    let woLabels,woDist,woHR,woKeys,woKeyTyp;
     if(_useMonthly){
       // Build from ALL months in the health-data range so months without workouts show 0
       const mMap={};
@@ -2227,10 +2361,13 @@ async function pgTraining() {
       });
       const months=allMonths(D); // all months in current filter, not just those with workouts
       woLabels=months.map(mk=>{const dt=new Date(mk+'-01T00:00:00');return dt.toLocaleDateString('de-CH',{month:'short',year:'2-digit'});});
+      woKeys=months; woKeyTyp='monat';
       woDist=months.map(mk=>{const a=(mMap[mk]||{dists:[]}).dists;return a.length?a.reduce((s,v)=>s+v,0)/a.length:0;});
       woHR=months.map(mk=>{const a=(mMap[mk]||{hrs:[]}).hrs;return a.length?a.reduce((s,v)=>s+v,0)/a.length:null;});
     } else {
       woLabels=trendDates.length>0?trendLabels:tL;
+      woKeys=trendDates.length>0?trendDates:tKeys;
+      woKeyTyp=trendDates.length>0?'tag':tKeyTyp;
       woDist=trendDates.length>0?trendDist:tL.map(()=>null);
       woHR=trendDates.length>0?trendHR:tL.map(()=>null);
     }
@@ -2244,7 +2381,7 @@ async function pgTraining() {
       borderColor:'#EF4444',backgroundColor:'transparent',tension:.3,
       pointRadius:3,pointBackgroundColor:'#EF4444',type:'line',yAxisID:'yR'
     });
-    mkC('c-wo-trend',{
+    mkC('c-wo-trend',{__keys:woKeys,__keyTyp:woKeyTyp,
       type:'bar',
       data:{labels:woLabels,datasets:woDsets},
       options:{responsive:true,maintainAspectRatio:false,
@@ -2267,10 +2404,12 @@ async function pgTraining() {
   {
     const _hasP=trendDates.length>0&&trendPace.some(v=>v!=null);
     const _paceLabels=_hasP?trendLabels:tL;
+    const _paceKeys=_hasP?trendDates:tKeys;
+    const _paceKeyTyp=_hasP?'tag':tKeyTyp;
     const _paceData=_hasP?trendPace:tL.map(()=>null);
     const _pMin=_hasP?Math.floor(Math.min(...trendPace.filter(v=>v!=null))*0.97*10)/10:4;
     const _pMax=_hasP?Math.ceil(Math.max(...trendPace.filter(v=>v!=null))*1.03*10)/10:8;
-    mkC('c-tr-pace',{type:'line',data:{labels:_paceLabels,datasets:[
+    mkC('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,type:'line',data:{labels:_paceLabels,datasets:[
       {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
@@ -2296,7 +2435,7 @@ async function pgTraining() {
     if(v2D!=null) _v2Dsets.push({label:'Ø VO₂max',data:_v2tL.map(()=>v2D),borderColor:'rgba(217,119,6,.55)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,fill:false,spanGaps:true});
     _v2Dsets.push(zielLinie('vo2max', _v2tL.length));
     _v2Min=Math.min(_v2Min, ZIELE.vo2max.ziel); _v2Max=Math.max(_v2Max, ZIELE.vo2max.ziel); // Ziellinie im Sichtbereich halten
-    mkC('c-vo2',{type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
+    mkC('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
         scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,ticks:{...gy.ticks,stepSize:_v2Step}}}}});
@@ -2343,7 +2482,7 @@ function pgAktivitaet() {
   const calDisplayAvg=calD!=null?Math.round(calD):null;
   const calDisplayLbl='';
 
-  const {labels:tL,align:tA,hasData:tHD}=timeDim(D);
+  const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
   const stMa=tA('steps');   // Ø pro Tag (Durchschnitt der Tageswerte pro Zeitbucket)
   const calMaAct=calField?tA(calField):tL.map(()=>null);  // Ø pro Tag
 
@@ -2411,7 +2550,7 @@ function pgAktivitaet() {
     ];
     if(stDisplayAvg!=null) dsSteps.push({label:'Ø Schritte',data:stMa.map(()=>stDisplayAvg),borderColor:'rgba(5,150,105,.45)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,type:'line'});
     dsSteps.push(zielLinie('steps', stMa.length));
-    mkC('c-steps',{type:'bar',data:{labels:tL,datasets:dsSteps},
+    mkC('c-steps',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:dsSteps},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' Schritte':null}}},
         scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
     // Chart 2: Aktive Kalorien (bar)
@@ -2420,7 +2559,7 @@ function pgAktivitaet() {
         {label:'Kalorien',data:calMaAct,backgroundColor:calMaAct.map(v=>v!=null&&calDisplayAvg!=null&&v>=calDisplayAvg?'rgba(52,211,153,.80)':'rgba(148,163,184,.45)'),borderRadius:5,type:'bar'}
       ];
       if(calDisplayAvg!=null) dsCals.push({label:'Ø Kalorien',data:calMaAct.map(()=>calDisplayAvg),borderColor:'rgba(52,211,153,.5)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,type:'line'});
-      mkC('c-cals',{type:'bar',data:{labels:tL,datasets:dsCals},
+      mkC('c-cals',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:dsCals},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' kcal':null}}},
           scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
     }
@@ -2465,14 +2604,14 @@ function chartFilterHTML() {
   const r = timeRange;
   const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===r?' selected':''}>${lbl}</option>`).join('');
   const hideNav = r === 'heute';
-  // ↺ (aktuellster Zeitraum) bewusst GANZ LINKS, getrennt vom ›-Pfeil – sonst
-  // wird es leicht aus Versehen statt des Vorwärts-Pfeils getroffen.
+  // Eigene Zeile UNTER dem Diagramm-Titel statt daneben: neben dem Titel belegte die
+  // Leiste zwei Drittel der Kopfzeile und schnitt ihn auf „V…" / „❤️.." zusammen.
+  // Die Zeitspanne als Text ist bewusst weg – sie steht bereits auf der Zeitachse.
   return `<div class="chart-filter">
     <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${hideNav?'none':'inline-flex'}">Heute</button>
     <select class="range-select" aria-label="Zeitraum">${opts}</select>
     <div class="date-nav" style="display:${hideNav?'none':'inline-flex'}">
       <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
-      <span class="nav-label">${navDateLabel()}</span>
       <button class="nav-arrow nav-next" aria-label="Vor">›</button>
     </div>
   </div>`;
@@ -2487,11 +2626,15 @@ function chartFilterHTML() {
 function _injectChartFilters(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
-  if (screenEl.querySelector('.tab-filter-bar')) return;   // nicht doppelt injizieren
-  const banner = screenEl.querySelector('.pg-banner');
-  if (!banner) return;
-  banner.insertAdjacentHTML('afterend',
-    `<div class="tab-filter-bar"><span class="tfb-lbl">Zeitraum</span>${chartFilterHTML()}</div>`);
+  // Eine Leiste pro Diagramm – die frühere gemeinsame Leiste oben im Tab entfällt.
+  // Eingesetzt wird sie NACH dem Titel, damit dieser vollständig lesbar bleibt.
+  screenEl.querySelectorAll('.chart-card').forEach(card => {
+    if (!card.querySelector('canvas')) return;         // nur echte Diagramm-Karten
+    if (card.querySelector('.chart-filter')) return;   // nicht doppelt injizieren
+    const kopf = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
+    if (kopf) kopf.insertAdjacentHTML('afterend', chartFilterHTML());
+    else card.insertAdjacentHTML('afterbegin', chartFilterHTML());
+  });
 }
 
 // Nach dem Render eines Tabs: Filter-Controls in die Diagramme setzen und
