@@ -191,6 +191,13 @@ Chart.defaults.datasets.bar.barPercentage      = 0.62;
 Chart.defaults.datasets.bar.categoryPercentage = 0.74;
 Chart.defaults.datasets.bar.maxBarThickness    = 26;
 
+// Tooltip-Animation aus. Zwei Gründe: die Markierung blendet den Tooltip in ALLEN
+// Diagrammen gleichzeitig ein – ein Einfaden je Diagramm bringt dort nichts und
+// verzögert nur. Und ohne Animator berechnet Chart.js Position und Grösse sofort;
+// mit Animator entstehen sie erst über mehrere Frames, was ein programmgesteuertes
+// Einblenden unzuverlässig macht.
+Chart.defaults.plugins.tooltip.animation = false;
+
 // Wisch-Plugin für den Datums-Navigator: verschiebt beim Navigieren NUR die
 // Datenfläche (auf chartArea geclippt), sodass X- und Y-Achse/Gitter fix bleiben.
 // Aktiv ausschließlich, solange chart.$navslide gesetzt ist – sonst null Overhead.
@@ -761,11 +768,40 @@ const markierungPlugin = {
   }
 };
 
+// Tooltip des markierten Punkts dauerhaft einblenden – in JEDEM Diagramm, das
+// diesen Tag enthält. Ohne das müsste man jedes Diagramm einzeln antippen, um die
+// Werte zum selben Tag abzulesen; genau das soll der Vergleich ja ersparen.
+function _tooltipAnMarkierung(chart) {
+  const tt = chart.tooltip;
+  if (!tt) return;
+  const leeren = () => { try { tt.setActiveElements([], {x:0,y:0}); } catch(_) {} };
+  const i = _markIndex(chart);
+  if (i < 0) { leeren(); return; }
+  // ALLE sichtbaren Datensätze mit echtem Wert an dieser Stelle aktivieren – die
+  // meisten Diagramme nutzen den Tooltip-Modus 'index' und zeigen dort sonst nur
+  // eine einzelne Zeile statt aller Reihen (z. B. nur „Tiefschlaf" statt aller
+  // vier Schlafphasen). Ein null-Punkt (fehlende Messung) bleibt aussen vor.
+  const elemente = [];
+  chart.data.datasets.forEach((ds, di) => {
+    if (chart.isDatasetVisible(di) && ds.data[i] != null) elemente.push({ datasetIndex: di, index: i });
+  });
+  if (!elemente.length) { leeren(); return; }
+  const punkt = chart.getDatasetMeta(elemente[0].datasetIndex).data[i];
+  try {
+    tt.setActiveElements(elemente, { x: punkt ? punkt.x : 0, y: punkt ? punkt.y : 0 });
+    // Modell (Position, Grösse, Inhalt) sofort aufbauen – setActiveElements allein
+    // setzt nur den Zustand, gezeichnet würde sonst ein Kasten ohne Geometrie.
+    tt.update(true);
+  } catch(_) {}
+}
+
 // Markierung setzen und ALLE Diagramme der App neu zeichnen – auch die der
 // anderen Tabs, die im DOM bereits vorgerendert sind.
 function setMarkierung(datum) {
   _markierung = datum;
-  Object.values(charts).forEach(c => { try { c.update('none'); } catch(_) {} });
+  Object.values(charts).forEach(c => {
+    try { c.update('none'); _tooltipAnMarkierung(c); c.draw(); } catch(_) {}
+  });
 }
 
 // Tipp auf ein Diagramm: Säule bestimmen, Tag ableiten, umschalten.
@@ -804,6 +840,9 @@ function mkC(id, cfg) {
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
+    // Beim Neuaufbau (Filter- oder Tabwechsel) die bestehende Markierung samt
+    // Tooltip wieder herstellen – sonst verschwände sie beim ersten Re-Render.
+    if (_markierung) { try { _tooltipAnMarkierung(charts[id]); charts[id].draw(); } catch(_) {} }
   }
   // Track chart per tab (for per-tab destroy on re-render)
   if (_currentRenderingTab && tabCharts[_currentRenderingTab]) {

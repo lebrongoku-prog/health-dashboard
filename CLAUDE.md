@@ -105,7 +105,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   ein Tipp **neben** ein Diagramm löscht bewusst NICHT, damit Vergleiche über Tabs
   hinweg bestehen bleiben. Das Zurücktreten der übrigen Säulen ist ein Schleier ÜBER
   den Daten (`markierungPlugin.afterDatasetsDraw`), kein Eingriff in die Farben der
-  zwölf unterschiedlich gebauten Diagramme.
+  zwölf unterschiedlich gebauten Diagramme. Zusätzlich wird der **Tooltip** des
+  markierten Punkts in allen Diagrammen dauerhaft eingeblendet
+  (`_tooltipAnMarkierung`) — mit **allen** Datensätzen der Säule, sonst zeigt der
+  Modus `index` nur eine Zeile. Dafür ist `Chart.defaults.plugins.tooltip.animation`
+  **aus**: mit Animator berechnet Chart.js Position und Grösse erst über mehrere
+  Frames, wodurch ein programmgesteuertes Einblenden unzuverlässig wird.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
