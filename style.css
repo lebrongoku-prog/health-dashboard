@@ -72,51 +72,10 @@ body.theme-overview   { --tab-color: #0891B2; }
 body.theme-herz       { --tab-color: #EF4444; }
 body.theme-schlaf     { --tab-color: #7C3AED; }
 body.theme-aktivitaet { --tab-color: #10B981; }
-body.theme-training   { --tab-color: #F97316; }
-body.theme-vo2        { --tab-color: #F59E0B; }
-
-/* ── Topbar pro Tab (inline) ─────────────────────────────
+body.theme-training   { --tab-color: #F97316; }/* ── Topbar pro Tab (inline) ─────────────────────────────
    Die Topbar wird per JS in jede .screen-Fläche injiziert und scrollt
    mit dem Inhalt. Kein position:fixed, kein Auto-Hide. */
-.topbar-inline {
-  background: color-mix(in srgb, var(--tab-color) 12%, var(--card) 88%);
-  color: var(--txt);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 8px 12px;
-  margin-bottom: .7rem;
-  box-shadow: var(--shadow);
-}
-body.dark .topbar-inline {
-  background: color-mix(in srgb, var(--tab-color) 22%, #1E293B 78%);
-  border-color: #334155;
-}
-.tb-row { display: flex; align-items: center; gap: 6px; min-height: 36px; }
-.tb-row-main { justify-content: flex-start; margin-bottom: 6px; }
-.tb-spacer { flex: 1; min-width: 8px; }
-.date-nav { display: flex; align-items: center; gap: 4px; min-width: 0; }
-/* Refresh + Dark-Toggle: deutlich unterscheidbare Tönung gegen versehentliche Verwechslung */
-.tb-refresh {
-  background: rgba(37, 99, 235, 0.18) !important;
-  border-color: rgba(37, 99, 235, 0.42) !important;
-}
-.tb-dark {
-  background: rgba(251, 191, 36, 0.22) !important;
-  border-color: rgba(251, 191, 36, 0.50) !important;
-}
-body.dark .tb-refresh {
-  background: rgba(37, 99, 235, 0.30) !important;
-  border-color: rgba(37, 99, 235, 0.60) !important;
-}
-body.dark .tb-dark {
-  background: rgba(251, 191, 36, 0.30) !important;
-  border-color: rgba(251, 191, 36, 0.60) !important;
-}
-.nav-label {
-  font-size: 14px; font-weight: 600;
-  min-width: 130px; text-align: center;
-  color: var(--txt); white-space: nowrap;
-}
+.date-nav { display: flex; align-items: center; gap: 4px; min-width: 0; }/* Refresh + Dark-Toggle: deutlich unterscheidbare Tönung gegen versehentliche Verwechslung */
 .nav-arrow {
   width: 36px; height: 36px;
   background: var(--card); border: 1px solid var(--border);
@@ -127,17 +86,7 @@ body.dark .tb-dark {
 }
 .nav-arrow:hover:not(:disabled) { background: #F8FAFC; color: var(--txt); }
 .nav-arrow:disabled { opacity: 0.3; cursor: default; }
-body.dark .dark-toggle { color: #FBBF24; }
-
-/* Filter pills (horizontal scrollable) */
-.tbg {
-  display: flex; gap: 6px;
-  overflow-x: auto; overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  justify-content: flex-start;
-}
-.tbg::-webkit-scrollbar { display: none; }
+body.dark .dark-toggle { color: #FBBF24; }/* Filter pills (horizontal scrollable) */
 .tbtn {
   flex-shrink: 0;
   padding: 10px 16px;
@@ -339,8 +288,6 @@ body.dark #bottom-nav {
 .kpi-grid{display:grid;gap:.6rem;margin-bottom:.7rem}
 .kpi-grid>*{min-width:0;overflow:hidden}
 .kpi-grid-1{grid-template-columns:1fr}
-.kpi-grid-2{grid-template-columns:repeat(2,1fr);gap:.45rem}
-.kpi-grid-3,.kpi-grid-4,.kpi-grid-5,.kpi-grid-6{grid-template-columns:repeat(2,1fr);gap:.45rem}
 .kpi{background:var(--card);border-radius:var(--r);padding:.65rem .7rem;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;cursor:default;border-top:3px solid transparent}
 .kpi-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}
 .kpi-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)}
@@ -377,12 +324,10 @@ body.dark #bottom-nav {
 .chart-head .scope-badge{margin-left:auto}
 body.dark .scope-badge{background:#0F172A}
 
-
 /* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
 .chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
 .chart-note{font-size:.6rem;color:var(--txt3);margin:-.15rem 0 .4rem;line-height:1.4}
 .stat-hint{font-size:.63rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
-
 
 /* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
 .ziel-status{
@@ -436,7 +381,6 @@ body.dark .zs-item strong{color:#FDBA74}
 .chart-filter .nav-arrow{width:36px;height:36px;font-size:1.15rem;border-radius:9px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
 .chart-filter .nav-today{width:auto;min-width:0;height:36px;padding:0 .7rem;font-size:.7rem;font-weight:600;border-radius:9px}
-.chart-filter .nav-label{font-size:.64rem;font-weight:600;min-width:58px;text-align:center;color:var(--txt2);white-space:nowrap}
 body.dark .chart-filter .range-select{background:#0F172A}
 
 /* Multi-column layouts */
@@ -496,30 +440,14 @@ body.dark .chart-filter .range-select{background:#0F172A}
 .field-hint code{font-family:monospace;font-size:.73rem;color:var(--accent);background:#EEF2FF;padding:.05rem .25rem;border-radius:3px}
 
 /* Misc */
-.badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}
-
-/* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
+.badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}/* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
    Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
-.ov-ti-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
-.ov-ti-card h3{font-size:.84rem;font-weight:700;margin-bottom:.45rem;flex-shrink:0}
-.ti-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
 /* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
    die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
-.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.7rem;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;margin-bottom:.7rem}
-.ov-grid-mid{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
-.ov-grid-mid>*{min-width:0;overflow:hidden}
-
-/* Monatstrend rows */
-/* Die Trennlinie sitzt jetzt unter der Ziel-Zeile, nicht mehr unter der Wertzeile –
-   Wert und zugehöriges Ziel gehören optisch zusammen. */
-/* Farbe = Bewertung, Pfeilrichtung = Verlauf. Beides ist NICHT dasselbe: ein
+.ov-combo-card{background:var(--card);border-radius:var(--r);padding:.7rem;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;margin-bottom:.7rem}/* Monatstrend rows *//* Die Trennlinie sitzt jetzt unter der Ziel-Zeile, nicht mehr unter der Wertzeile –
+   Wert und zugehöriges Ziel gehören optisch zusammen. *//* Farbe = Bewertung, Pfeilrichtung = Verlauf. Beides ist NICHT dasselbe: ein
    sinkender Ruhepuls zeigt nach unten, ist aber ein gutes Zeichen. Die früheren
-   Klassen .up/.dn färbten nach Richtung und stellten genau das auf den Kopf. */
-
-/* Tagesinsights / Ti-Metrics */
-.ti-row{display:flex;align-items:flex-start;gap:.5rem;padding:.2rem 0;font-size:.73rem}
-.ti-arrow{font-size:.91rem;font-weight:800;width:18px;text-align:center;flex-shrink:0;margin-top:.05rem}
-.ti-txt{color:var(--txt2);line-height:1.4;font-weight:500}
+   Klassen .up/.dn färbten nach Richtung und stellten genau das auf den Kopf. *//* Tagesinsights / Ti-Metrics */
 /* Kein margin-top mehr: das war der Abstand zur frueheren Empfehlungs-Kachel, die
    ueber den Minikacheln sass. Seit sie weg ist, sind die Kacheln der einzige Inhalt
    der Karte – der Rest war ungenutzter Raum. */
@@ -539,29 +467,13 @@ body.dark .chart-filter .range-select{background:#0F172A}
 .ti-metric-delta{font-size:.67rem;font-weight:500;margin-top:.25rem}
 .ti-metric-delta.pos{color:#10B981}
 .ti-metric-delta.neg{color:#EF4444}
-.ti-metric-delta.neu{color:var(--txt3)}
-
-/* Letzte Workout Tabelle */
-.lw-table{width:100%;border-collapse:collapse;margin-top:.5rem}
-.lw-table th{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);text-align:left;padding:.3rem .4rem;border-bottom:1px solid var(--border)}
-.lw-table td{font-size:.77rem;padding:.45rem .4rem;color:var(--txt);font-weight:600}
-.lw-table tr:first-child td{padding-top:.55rem}
+.ti-metric-delta.neu{color:var(--txt3)}/* Letzte Workout Tabelle */
 
 /* Recommendation Card */
 .rec-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);border-left:4px solid var(--rec-color,#0891B2);display:flex;flex-direction:column}
 .rec-status{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;font-size:.73rem;font-weight:700;margin-bottom:.5rem}
 .rec-title{font-size:.82rem;font-weight:800;margin-bottom:.3rem}
-.rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
-.rec-action{font-size:.74rem;font-weight:600;padding:.45rem .75rem;border-radius:9px;background:#F8FAFC;border:1px solid var(--border);line-height:1.5}
-body.dark .rec-action{background:#0F172A}
-
-/* Score Drivers */
-.sd-row{display:flex;justify-content:space-between;align-items:center;padding:.18rem 0;font-size:.67rem;border-bottom:1px solid #F8FAFC}
-.sd-row:last-child{border:none}
-.sd-lbl{color:var(--txt2)}
-.sd-val.pos{color:#10B981;font-weight:700}
-.sd-val.neg{color:#EF4444;font-weight:700}
-.sd-val.neu{color:var(--txt3);font-weight:600}
+.rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}/* Score Drivers */
 
 /* Warning Card */
 .warn-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #F97316;display:flex;gap:.7rem;align-items:flex-start}
@@ -570,18 +482,7 @@ body.dark .rec-action{background:#0F172A}
 .warn-text{font-size:.73rem;color:var(--txt2);line-height:1.55}
 .warn-signals{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem}
 .warn-sig{font-size:.64rem;padding:.1rem .4rem;border-radius:999px;background:#FFF7ED;color:#C2410C;font-weight:600}
-body.dark .warn-sig{background:#431407;color:#FB923C}
-
-/* Baseline Comparison */
-.bl-card{background:var(--card);border-radius:var(--r);padding:.85rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem}
-.bl-card h3{font-size:.84rem;font-weight:700;margin-bottom:.55rem}
-.bl-row{display:flex;align-items:center;gap:.6rem;padding:.3rem 0;border-bottom:1px solid #F8FAFC;font-size:.73rem}
-.bl-row:last-child{border:none}
-.bl-lbl{color:var(--txt2);min-width:110px}
-.bl-val{font-weight:700;min-width:55px}
-.bl-dev{font-size:.66rem;font-weight:700;min-width:52px;text-align:right}
-.bl-dev.pos{color:#10B981}.bl-dev.neg{color:#EF4444}.bl-dev.neu{color:var(--txt3)}
-.bl-badge{font-size:.64rem;padding:.1rem .4rem;border-radius:999px;font-weight:700}
+body.dark .warn-sig{background:#431407;color:#FB923C}/* Baseline Comparison */
 
 /* Sleep Debt */
 .debt-bar-wrap{margin:.5rem 0}
@@ -619,17 +520,8 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 }
 #cal-tip.visible{opacity:1}
 .cal-tip-title{font-weight:700;font-size:.68rem;margin-bottom:.3rem;color:var(--txt)}
-.cal-tip-row{font-size:.63rem;color:var(--txt2);margin:.1rem 0}
-
-/* Tap-Zustand der reinen CSS-Tooltips – Gegenstück zu den :hover-Regeln,
-   damit sie auch ohne Mauszeiger (iPhone) erreichbar sind. */
-
-/* EW Check */
-.ew-row{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:.4rem;padding:.22rem 0;border-bottom:1px solid #F8FAFC}
-.ew-row:last-child{border:none}
-.ew-lbl{font-size:.7rem;color:var(--txt2)}
-.ew-val{font-size:.77rem;font-weight:700;text-align:center}
-.ew-note{font-size:.66rem;text-align:right}
+.cal-tip-row{font-size:.63rem;color:var(--txt2);margin:.1rem 0}/* Tap-Zustand der reinen CSS-Tooltips – Gegenstück zu den :hover-Regeln,
+   damit sie auch ohne Mauszeiger (iPhone) erreichbar sind. *//* EW Check */
 
 /* Pattern Insights */
 .pi-grid{display:grid;grid-template-columns:1fr;gap:.6rem;margin-bottom:.7rem}
@@ -643,10 +535,7 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 /* Coaching Hint */
 .ch-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #7C3AED}
 .ch-card h4{font-size:.75rem;font-weight:700;margin-bottom:.3rem}
-.ch-card p{font-size:.68rem;color:var(--txt2);line-height:1.6}
-
-/* Page intro question (kursive Frage) */
-.page-question{font-size:.72rem;color:rgba(255,255,255,.8);font-style:italic;margin-bottom:.6rem;padding:.45rem .8rem;background:rgba(255,255,255,0.1);border-radius:8px;border-left:3px solid rgba(255,255,255,.45)}
+.ch-card p{font-size:.68rem;color:var(--txt2);line-height:1.6}/* Page intro question (kursive Frage) */
 
 /* ── Dark Mode ──────────────────────────────────────────── */
 body.dark {
@@ -664,17 +553,10 @@ body.dark .stat-row { border-bottom-color: #334155; }
 body.dark .goal-bar-bg { background: #334155; }
 body.dark .field-hint { background: #0F172A; }
 body.dark .no-data { background: var(--card); }
-body.dark .ti-row { border-bottom-color: #334155; }
-body.dark .lw-table th { border-bottom-color: #334155; }
-body.dark .bl-row { border-bottom-color: #334155; }
-body.dark .sd-row { border-bottom-color: #334155; }
-body.dark .ew-row { border-bottom-color: #334155; }
 body.dark .debt-bar-bg { background: #334155; }
 
 /* Very narrow (< 360px) – tighter */
 @media (max-width: 360px) {
-  .kpi-grid-3,.kpi-grid-4,.kpi-grid-5,.kpi-grid-6 { grid-template-columns: 1fr; }
-  .ov-mini-grid { grid-template-columns: 1fr; }
   .ti-metrics { grid-template-columns: 1fr 1fr; }
 }
 
@@ -693,88 +575,65 @@ body.dark .debt-bar-bg { background: #334155; }
 .overlay-screen, .overlay-screen * {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif !important;
   letter-spacing: 0;
-}
-
-/* Display L – große, plakative Zahlen */
-.kpi-val,
-.ring-num {
+}/* Display L – große, plakative Zahlen */
+.kpi-val{
   font-size: 2rem !important;
   line-height: 1.1;
   letter-spacing: -.02em !important;
-}
-
-/* Display M – Mini-Werte, Banner-Titel, Score-Kategorie */
-.ov-mini-val,
+}/* Display M – Mini-Werte, Banner-Titel, Score-Kategorie */
 .ti-metric-val,
-.pg-banner-title {
+.pg-banner-title{
   font-size: 1.2rem !important;
   line-height: 1.2;
-}
-
-/* Title – Card-Titel und H3 in den Sections */
-h1, h2, h3, h4, h5,
+}/* Title – Card-Titel und H3 in den Sections */
+h1,
+h2,
+h3,
+h4,
+h5,
 .chart-card h3,
-.ov-ti-card h3,
 .rec-title,
 .ch-card h4,
-.bl-card h3,
-.score-wrap h3,
 .warn-title,
-.ring-cat,
 .fit-cat-badge,
-.pi-head {
+.pi-head{
   font-size: 1rem !important;
   line-height: 1.3;
-}
-
-/* Body – Beschreibungstexte, Insight-Rows */
+}/* Body – Beschreibungstexte, Insight-Rows */
 .pi-text,
 .ch-card p,
-.ti-row, .ti-txt,
 .warn-text,
-.no-data,
-.ins-title,
-.ins-desc {
+.no-data{
   font-size: .85rem !important;
   line-height: 1.5;
-}
-
-/* Label – Stat-Zeilen, Komponenten-Rows, Sub-Werte */
-.stat-lbl, .stat-val,
-.goal-lbl, .goal-val, .goal-num,
-.ew-val, .ew-lbl,
-.sd-lbl, .sd-row,
+}/* Label – Stat-Zeilen, Komponenten-Rows, Sub-Werte */
+.stat-lbl,
+.stat-val,
+.goal-lbl,
+.goal-val,
+.goal-num,
 .debt-tt-row,
-.kpi-unit, .kpi-delta, .kpi-sub,
-.ov-mini-unit,
-.bl-lbl, .bl-val,
-.lw-table td {
+.kpi-unit,
+.kpi-delta,
+.kpi-sub{
   font-size: .75rem !important;
   line-height: 1.4;
-}
-
-/* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
+}/* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
 .kpi-lbl,
-.ov-mini-lbl,
 .ti-metric-lbl,
 .ti-metric-delta,
-.ov-mini-delta,
-.ring-sub,
 .pi-conf,
 .pl-item,
 .cl-item,
 .fit-labels,
 .field-hint,
 .pg-banner-sub,
-.ew-note,
-.bl-dev, .bl-badge,
-.debt-tt-title, .debt-tt-hd,
-.page-question,
-.lw-table th,
+.debt-tt-title,
+.debt-tt-hd,
 .rec-status,
 .warn-sig,
 .warn-signals,
-.badge {
+.badge{
   font-size: .65rem !important;
   line-height: 1.4;
 }
@@ -793,20 +652,6 @@ h1, h2, h3, h4, h5,
    Platz nicht doppelt für zwei Topbar-Zeilen draufgeht.
    ═══════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
-  .topbar-inline {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
-  .topbar-inline .tb-row-main {
-    flex: 0 0 auto;
-    margin-bottom: 0;
-  }
-  .topbar-inline .tbg {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════

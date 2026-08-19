@@ -2873,7 +2873,7 @@ function initScrollHideNav() {
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
     // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
     // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], .topbar-inline, ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], ' + TT_TAP_SELECTOR)) return;
     nav.classList.toggle('nav-hidden');
   });
 }
