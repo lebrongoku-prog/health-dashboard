@@ -142,7 +142,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Tooltips brauchen zusätzlich eine `.tt-open`-Regel, sonst sind sie am iPhone unerreichbar.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
-- **Gemeinsame Helfer statt Copy-Paste:** `splitWeekWknd(rows)` (Wochentag/Wochenende),
+- **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
+  `zahl()` statt `fn()`, `zeichneDiagramm()` statt `mkC()`, `alsStdMin()` statt `toHM()`,
+  `prozentDiff()` statt `pct()`, `monatsMittel`/`wochenSumme` statt `mAvg`/`wSum`.
+- **Gemeinsame Helfer statt Copy-Paste:** `statZeile(label, wert, farbe)` (Label links,
+  Wert rechts — 44 Stellen), `splitWeekWknd(rows)` (Wochentag/Wochenende),
   `fmtPace`/`paceFromSpeed` (Pace), `dataStandHTML()` (Daten-Stand im Banner).
 - **`esc()` bei jedem Fremdtext — nicht verhandelbar.** Alles, was NICHT aus diesem Code
   stammt und als **Text** angezeigt wird (Sheet-Zellen, Google-Fehlermeldungen), muss durch
