@@ -129,12 +129,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
-  **Ausnahme Schlafdauer-Diagramm:** dort keine `zielLinie`, sondern ein zweifarbig
-  gestapelter Balken (bis Ziel kräftig, Überschuss hell) — die Farbnaht IST die Ziellinie.
-  Grund: Ø-Linie und Ziellinie lagen nur ~20 Min. auseinander und verschmolzen optisch.
-  Die Y-Achse wird dort auf `Ziel − 0.5` geklemmt, sonst liegt die Naht ausserhalb des
-  Sichtbereichs und alle Balken sehen einfarbig aus.
-  Zusätzlich tönt `zielBand` die Fläche **oberhalb** des Ziels.
+  **Ausnahme Schlafdauer- und Schritte-Diagramm:** dort keine `zielLinie`, sondern ein
+  zweifarbig gestapelter Balken (bis Ziel kräftig, Überschuss hell) — die Farbnaht IST
+  die Ziellinie. Beim Schlaf ausserdem, weil Ø-Linie und Ziellinie nur ~20 Min.
+  auseinanderlagen und optisch verschmolzen.
+  Das Ziel muss dabei im Sichtbereich bleiben, sonst liegt die Naht ausserhalb und alle
+  Balken sehen einfarbig aus: beim Schlaf über `min = Ziel − 0.5`, bei den Schritten über
+  `suggestedMax = Ziel × 1.05` (die Achse startet dort bei 0, die Gefahr liegt oben).
+  Zusätzlich tönt ein `zielBand`-Plugin die Fläche **oberhalb** des Ziels.
 - **Farbe bedeutet Bewertung, nie Richtung.** Ob eine Abweichung gut oder schlecht ist, kommt
   aus `ZIELE[key].richtung` — ein sinkender Ruhepuls ist grün, obwohl der Wert fällt. Reine
   Beschreibungen (z. B. „Differenz Wochentag/Wochenende") bleiben neutral grau.

@@ -2538,14 +2538,61 @@ function pgAktivitaet() {
 
   if(tHD){
     // Chart 1: Schritte
+    // Zielerreichung wie beim Schlafdauer-Diagramm: zweifarbig gestapelter Balken statt
+    // einer gestrichelten Ziellinie. Der Teil bis 10'000 ist kräftig, der Überschuss
+    // darüber hell – die Farbnaht liegt exakt auf dem Ziel und IST damit die Ziellinie.
+    // Vorher färbte sich der ganze Balken um; man sah, DASS ein Tag das Ziel reisst,
+    // aber nicht, um wie viel.
+    const _stZiel = ZIELE.steps.ziel;
+    const _stBis   = stMa.map(v=>v==null?null:Math.min(v,_stZiel));
+    const _stUeber = stMa.map(v=>v==null?null:Math.max(0,v-_stZiel));
+    // Getönte Fläche ab dem Schritteziel aufwärts. Liegt hinter den Daten, damit die
+    // Balken darauf stehen.
+    const zielBandSchritte = {
+      id:'zielBandSchritte',
+      beforeDatasetsDraw(chart){
+        const a=chart.chartArea, y=chart.scales.y; if(!a||!y) return;
+        // Gefuellt wird der Bereich OBERHALB des Ziels: von der Diagrammoberkante bis
+        // zur Ziel-Hoehe. Y-Pixel wachsen nach unten, deshalb ist das a.top..yp.
+        const yp=Math.min(a.bottom, y.getPixelForValue(_stZiel));
+        const hoehe=yp-a.top;
+        if(hoehe<=0) return;                           // Ziel liegt ueber dem Sichtbereich
+        const ctx=chart.ctx;
+        ctx.save();
+        ctx.fillStyle=document.body.classList.contains('dark')
+          ? 'rgba(5,150,105,.16)' : 'rgba(5,150,105,.10)';
+        ctx.fillRect(a.left, a.top, a.right-a.left, hoehe);
+        ctx.restore();
+      }
+    };
     const dsSteps=[
-      {label:'Schritte',data:stMa,backgroundColor:stMa.map(v=>v!=null&&v>=ZIELE.steps.ziel?'rgba(5,150,105,.75)':'rgba(148,163,184,.45)'),borderRadius:5,type:'bar'}
+      // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
+      {label:'bis Ziel',data:_stBis,backgroundColor:'rgba(5,150,105,.85)',stack:'s',
+       borderRadius:ctx=>_stUeber[ctx.dataIndex]>0?0:5},
+      {label:'über Ziel',data:_stUeber,backgroundColor:'rgba(5,150,105,.32)',stack:'s',borderRadius:5}
     ];
     if(stDisplayAvg!=null) dsSteps.push({label:'Ø Schritte',data:stMa.map(()=>stDisplayAvg),borderColor:'rgba(5,150,105,.45)',borderDash:[5,4],pointRadius:0,borderWidth:1.5,tension:0,type:'line'});
-    dsSteps.push(zielLinie('steps', stMa.length));
-    zeichneDiagramm('c-steps',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:dsSteps},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' Schritte':null}}},
-        scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
+    // Das Ziel MUSS im Sichtbereich liegen. Bleibt man einen ganzen Zeitraum darunter,
+    // läge die Farbnaht sonst über der Achse – alle Balken sähen einfarbig aus und die
+    // Zielerreichung wäre nicht mehr ablesbar. Die 5 % Luft darüber sind nötig, damit
+    // die Naht nicht auf der Oberkante klebt und das getönte Band sichtbar bleibt.
+    const _stY={...gy,stacked:true,suggestedMax:_stZiel*1.05,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}};
+    zeichneDiagramm('c-steps',{__keys:tKeys,__keyTyp:tKeyTyp,plugins:[zielBandSchritte],type:'bar',data:{labels:tL,datasets:dsSteps},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>{
+        // Der Balken ist aus zwei Segmenten aufgebaut, gemeint ist aber EIN Tag:
+        // nur das untere Segment beschriften, und zwar mit der Gesamtzahl.
+        if(ctx.datasetIndex!==0) return null;
+        const gesamt=stMa[ctx.dataIndex];
+        if(gesamt==null) return null;
+        const _isAvg=timeRange!=='7d'&&timeRange!=='1m';
+        const alsZahl=v=>Math.round(v).toLocaleString('de-CH');
+        const fehlt=_stZiel-gesamt;
+        return [
+          `${_isAvg?'Ø ':''}${alsZahl(gesamt)} Schritte`,
+          fehlt>0 ? `${alsZahl(fehlt)} unter Ziel` : `${alsZahl(-fehlt)} über Ziel`
+        ];
+      }}}},
+        scales:{x:{...gx,stacked:true},y:_stY}}});
     // Chart 2: Aktive Kalorien (bar)
     if(calMaAct.some(v=>v!=null)){
       const dsCals=[
