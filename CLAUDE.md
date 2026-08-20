@@ -77,7 +77,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
 - **Übersicht (`pgOverview`):** Zielstatus-Zeile → Tageswert-Kacheln → Verlaufs-Chart →
-  Muster-Insights. Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
+  Muster-Insights → App-Karte (installierte Version + Update-Knopf). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/`.nav-today`/
   `.refresh-btn`/`.dark-toggle` (click) und `.range-select` (change). Jede State-Änderung
@@ -157,6 +157,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart aus `runSpeed`,
   VO₂max-Sektion (zuunterst) aus `r.vo2max`.
+
+- **App-Version:** `versionAnzeigen()` liest die laufende Version aus den Namen der
+  Caches (`hcc-vNN`) — `sw.js` löscht beim Aktivieren alle fremden, es bleibt genau
+  einer übrig. Sortierung **numerisch**, sonst stünde `v9` über `v126`.
+  `jetztAktualisieren()` meldet den Service Worker ab, leert die Caches und lädt neu.
+  Der Google-Token liegt im `localStorage` und bleibt unberührt — kein neuer Login.
 
 ## Gotchas
 - **Cache-Bump nicht vergessen** — häufigste Fehlerquelle.
