@@ -731,17 +731,12 @@ const markierungPlugin = {
     if (i < 0) return;
     const a = chart.chartArea; if (!a) return;
     const sp = _spalte(chart, i), ctx = chart.ctx;
-    const akzent = _cssFarbe('--tab-color', '#0891B2');
+    // Die Markierung besteht ausschliesslich aus der getoenten Spaltenflaeche –
+    // keine senkrechten Randlinien mehr.
     ctx.save();
-    ctx.fillStyle = akzent; ctx.globalAlpha = 0.13;
+    ctx.fillStyle = _cssFarbe('--tab-color', '#0891B2');
+    ctx.globalAlpha = 0.13;
     ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
-    ctx.globalAlpha = 0.55; ctx.strokeStyle = akzent; ctx.lineWidth = 1;
-    [sp.links, sp.rechts].forEach(x => {
-      ctx.beginPath();
-      ctx.moveTo(Math.round(x) + 0.5, a.top);
-      ctx.lineTo(Math.round(x) + 0.5, a.bottom);
-      ctx.stroke();
-    });
     ctx.restore();
   },
   // ── Ebene 3: alles ausserhalb der Säule zurücktreten lassen ──

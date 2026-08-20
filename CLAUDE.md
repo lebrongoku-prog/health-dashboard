@@ -105,7 +105,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   ein Tipp **neben** ein Diagramm löscht bewusst NICHT, damit Vergleiche über Tabs
   hinweg bestehen bleiben. Das Zurücktreten der übrigen Säulen ist ein Schleier ÜBER
   den Daten (`markierungPlugin.afterDatasetsDraw`), kein Eingriff in die Farben der
-  zwölf unterschiedlich gebauten Diagramme. Zusätzlich wird der **Tooltip** des
+  zwölf unterschiedlich gebauten Diagramme. Die Markierung selbst ist **nur** die
+  getönte Spaltenfläche — keine senkrechten Randlinien. Zusätzlich wird der **Tooltip** des
   markierten Punkts in allen Diagrammen dauerhaft eingeblendet
   (`_tooltipAnMarkierung`) — mit **allen** Datensätzen der Säule, sonst zeigt der
   Modus `index` nur eine Zeile. Dafür ist `Chart.defaults.plugins.tooltip.animation`
