@@ -1573,8 +1573,20 @@ function pgOverview() {
         <div class="pi-text">${txt}</div>
       </div>`;}).join('')}
     </div>`:''}
+    <!-- App-Version + Update: eine installierte PWA übernimmt einen neuen Stand sonst
+         erst beim zweiten Start. Der Knopf holt ihn in einem Schritt. -->
+    <div class="chart-card app-karte">
+      <h3>⚙️ App</h3>
+      <div class="stats-list">
+        ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
+      </div>
+      <button class="update-btn">Jetzt aktualisieren</button>
+      <div class="app-hinweis">Holt den neuesten Stand in einem Schritt. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
+    </div>
     `;
 
+
+  versionAnzeigen();   // asynchron, füllt .app-version nach
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){
@@ -2894,6 +2906,7 @@ document.body.addEventListener('click', (e) => {
     return;
   }
   if (t.closest('.refresh-btn')) { refreshData(); return; }
+  if (t.closest('.update-btn')) { jetztAktualisieren(); return; }
   if (t.closest('.dark-toggle')) {
     setDarkMode(!document.body.classList.contains('dark'));
     return;
@@ -2940,6 +2953,46 @@ function setDarkMode(isDark) {
   // neu gezeichnet. Das macht den Dark-Mode-Toggle praktisch instant.
   Object.values(charts).forEach(c => { try { c.update('none'); } catch(_) {} });
 }
+// ── App-Version + Update ───────────────────────────────
+// Eine installierte PWA übernimmt einen neuen Stand erst beim ZWEITEN Start:
+// der erste Start installiert den neuen Service Worker, der zweite aktiviert ihn.
+// Diese beiden Helfer machen sichtbar, was gerade läuft, und holen das Update auf
+// Wunsch in einem Schritt.
+
+// Die laufende Version steckt im Namen des Caches, den der Service Worker angelegt
+// hat ("hcc-v74"). Da sw.js beim Aktivieren alle fremden Caches löscht, bleibt im
+// Normalfall genau einer übrig; nur im kurzen Moment zwischen Installation und
+// Aktivierung sind es zwei – deshalb wird der höchste genommen.
+async function versionAnzeigen() {
+  const felder = document.querySelectorAll('.app-version');
+  if (!felder.length) return;
+  let text = 'unbekannt';
+  try {
+    const nummern = (await caches.keys())
+      .filter(k => /^hcc-v\d+$/.test(k))
+      .map(k => parseInt(k.slice(5), 10))
+      .sort((a, b) => a - b);
+    if (nummern.length) text = 'v' + nummern[nummern.length - 1];
+    else text = 'noch nicht installiert';
+  } catch(_) { /* caches-API nicht verfügbar (z. B. ohne HTTPS) */ }
+  felder.forEach(el => { el.textContent = text; });
+}
+
+// Service Worker abmelden, Caches leeren, neu laden. Der Google-Token liegt im
+// localStorage und bleibt unberührt – man muss sich also nicht neu anmelden.
+async function jetztAktualisieren() {
+  const knoepfe = document.querySelectorAll('.update-btn');
+  if (!confirm('Jetzt aktualisieren?\n\nDie App lädt den neuesten Stand vom Server und startet neu. Deine Anmeldung und deine Daten bleiben erhalten.')) return;
+  knoepfe.forEach(b => { b.disabled = true; b.textContent = 'Wird geladen…'; });
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const namen = await caches.keys();
+    await Promise.all(namen.map(n => caches.delete(n)));
+  } catch(_) {}
+  location.reload();
+}
+
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
   const btns = document.querySelectorAll('.refresh-btn');

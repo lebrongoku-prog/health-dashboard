@@ -312,6 +312,20 @@ body.dark #bottom-nav {
 .chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chart-head .chart-filter{margin:0;flex:0 0 auto;flex-wrap:nowrap}
 
+/* ── App-Version + Update (Ende der Übersicht) ───────────
+   Bewusst unauffällig: eine Wartungsfunktion, die selten gebraucht wird und den
+   Blick nicht von den Gesundheitsdaten wegziehen soll. */
+.app-karte .stats-list{margin-bottom:.6rem}
+.update-btn{
+  width:100%;min-height:42px;padding:.55rem .9rem;
+  font-family:inherit;font-size:.78rem;font-weight:700;
+  color:#fff;background:var(--tab-color,#0891B2);
+  border:none;border-radius:10px;cursor:pointer;
+}
+.update-btn:active{transform:scale(.985)}
+.update-btn:disabled{opacity:.55;cursor:default}
+.app-hinweis{font-size:.63rem;color:var(--txt3);line-height:1.5;margin-top:.45rem}
+
 /* Bezugszeitraum-Etikett: markiert Kacheln, deren Zahlen NICHT dem Zeitfilter folgen.
    Bewusst zurückhaltend – es soll einordnen, nicht um Aufmerksamkeit konkurrieren. */
 .scope-badge{
