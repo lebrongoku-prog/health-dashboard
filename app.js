@@ -1708,7 +1708,7 @@ function pgHerz() {
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>❤️ Ruhepuls-Einordnung ${infoI('restHR')}</h3>
-        <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
+        <p class="split2-sub">
           Ø ${zahl(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
         <div class="goal-list">
@@ -1726,7 +1726,7 @@ function pgHerz() {
       </div>
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>💙 HRV-Einordnung ${infoI('hrv')}</h3>
-        <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.5rem">
+        <p class="split2-sub">
           Ø ${zahl(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
         <div class="goal-list">
