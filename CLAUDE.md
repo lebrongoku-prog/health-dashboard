@@ -149,6 +149,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Tooltips:** ein zentrales System für Maus **und** Fingertipp. Neue Tooltip-Anker gehören in
   `TT_TAP_SELECTOR`; `openTooltip()`/`closeTooltips()` regeln den Rest. Reine CSS-`:hover`-
   Tooltips brauchen zusätzlich eine `.tt-open`-Regel, sonst sind sie am iPhone unerreichbar.
+- **Einordnungs-Karten (`.chart-card.split2`):** linke Spalte `.goal-list` (Balken),
+  rechte Spalte `.stats-list` (Werte). Beide sind ein Raster aus **vier gleich hohen
+  Zeilen** — sonst bestimmt jede Liste ihre Zeilenhöhe selbst (Balken- vs. Textzeile)
+  und die Spalten laufen nach unten auseinander. Der Wert rechts bleibt `nowrap`;
+  bei Platzmangel wird das Label gekürzt, denn ein umgebrochener Wert macht die
+  Zeile zweizeilig und hebt die Höhengleichheit wieder auf.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,

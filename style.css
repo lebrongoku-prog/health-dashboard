@@ -441,19 +441,28 @@ body.dark .chart-filter .range-select{background:#0F172A}
 /* Zweispaltige Einordnungs-/Verteilungs-Karten: Balken links, Werte (Fußnoten) rechts –
    spart Höhe, nutzt die Breite. h3/Ø-Zeile spannen voll, Balken + Stats stehen oben-bündig
    nebeneinander. Schrift in diesen Karten etwas kompakter, damit es aufs iPhone passt. */
-.chart-card.split2{display:grid;grid-template-columns:1fr 0.82fr;column-gap:.7rem;align-items:start}
+.chart-card.split2{display:grid;grid-template-columns:1fr 0.82fr;column-gap:.7rem;align-items:stretch}
 .chart-card.split2>h3,.chart-card.split2>p{grid-column:1 / -1}
-.chart-card.split2 .stats-list{margin-top:.25rem !important}
-.chart-card.split2 .goal-row{margin:.28rem 0;gap:.4rem}
 .chart-card.split2 .goal-lbl{flex:0 0 68px;font-size:.62rem;white-space:nowrap}
 .chart-card.split2 .goal-val{font-size:.62rem;grid-template-columns:1.4rem 2.4rem;column-gap:.3rem}
+
+/* Beide Spalten teilen sich vier gleich hohe Zeilen, damit die Texte links und rechts
+   auf derselben Hoehe stehen. Vorher bestimmte jede Liste ihre Zeilenhoehe selbst
+   (Balkenzeile vs. Textzeile), wodurch die Spalten nach unten auseinanderliefen und
+   die rechte Spalte kuerzer wirkte als die linke. */
+.chart-card.split2 .goal-list,
+.chart-card.split2 .stats-list{display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:0;margin:.4rem 0 0}
+.chart-card.split2 .goal-row,
+.chart-card.split2 .stat-row{margin:0;padding:0;gap:.4rem;align-items:center}
 /* Einordnungs-Karten: keine Trennlinien in der rechten Spalte. Sie machten die
    Spalte hoeher als die linke mit den Balken und damit die ganze Karte hoeher,
    ohne etwas zu gliedern - die Zeilen stehen ohnehin einzeln. */
-.chart-card.split2 .stat-row{padding:.1rem 0;border-bottom:none}
-.chart-card.split2 .stats-list{gap:.05rem}
-.chart-card.split2 .stat-lbl{font-size:.62rem}
-.chart-card.split2 .stat-val{font-size:.66rem}
+.chart-card.split2 .stat-row{border-bottom:none}
+/* Der Wert bleibt einzeilig, notfalls wird das Label gekuerzt. Ein Umbruch im Wert
+   (z.B. "81d (100%)") wuerde die Zeile zweizeilig machen und die Hoehengleichheit
+   mit der linken Spalte wieder aufheben. */
+.chart-card.split2 .stat-lbl{font-size:.62rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-card.split2 .stat-val{font-size:.66rem;white-space:nowrap;flex:0 0 auto}
 
 /* Health Score tooltip / komponenten */
 
