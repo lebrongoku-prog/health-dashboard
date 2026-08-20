@@ -956,7 +956,9 @@ document.addEventListener('keydown', e => {
 window.addEventListener('scroll', () => { if (_ttOpenEl) closeTooltips(); }, true);
 
 const GRID_COLOR = 'rgba(148,163,184,0.18)';
-const gx = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:9}}};
+// Nur waagrechte Gitterlinien: die senkrechten trennten lediglich die Kategorien,
+// die ohnehin durch die Achsenbeschriftung getrennt sind.
+const gx = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:9}}};
 const gy = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:9}}};
 
 // ═══════════════════════════════════════════════════════════
@@ -1962,15 +1964,7 @@ function pgSchlaf() {
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
           ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`, `var(--txt2)`)}
-          ${(()=>{
-            // Einordnung statt Wertung durch Farbe. Vorher war "am Wochenende länger"
-            // hier grün, in den Muster-Insights aber orange als sozialer Jetlag – zwei
-            // gegenteilige Urteile zur selben Tatsache, einen Bildschirm auseinander.
-            const d=slWknd-slWeek;
-            if(d>=0.75) return `<div class="stat-hint">Deutlich mehr Schlaf am Wochenende deutet auf einen <strong>sozialen Jetlag</strong> hin: Unter der Woche fehlt Schlaf, der am Wochenende nachgeholt wird. Ein gleichmässiger Rhythmus ist erholsamer.</div>`;
-            if(Math.abs(d)<=0.25) return `<div class="stat-hint">Sehr gleichmässiger Rhythmus über die ganze Woche – erholsamer als ein Nachholen am Wochenende.</div>`;
-            return '';
-          })()}`:``}
+`:``}
         </div>`:''}
       </div>
     </div>
@@ -2169,6 +2163,12 @@ async function pgTraining() {
   // NOTE: _woByDate was removed — it filtered to runSpeed-dates only, excluding indoor workouts
   const woRows=D.map(r=>({date:r.date,_woDurMin:workoutData[r.date]?.durationMin??null,_woDistKm:workoutData[r.date]?.distanceKm??null}));
   const {alignSum:tASwo}=timeDim(woRows);
+  // Gesamtwerte des dargestellten Zeitraums – Summe ueber alle Tage des Fensters,
+  // unabhaengig von der gewaehlten Aggregation (Tag/Woche/Monat).
+  const summe = feld => { const v = woRows.map(r=>r[feld]).filter(x=>x!=null);
+    return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+  const minGesamt  = summe('_woDurMin');
+  const distGesamt = summe('_woDistKm');
   const minSm_wo=tASwo('_woDurMin');
   const distSm_wo=tASwo('_woDistKm');
 
@@ -2178,7 +2178,7 @@ async function pgTraining() {
   const distSmD=_train1m?distSm_wo.map((v,i)=>minSmD[i]!=null?v:null):distSm_wo;
 
   // 1M: build full calendar-month arrays + Monday indices for week gridlines
-  let _1mLabels=tL, _1mKeys=tKeys, _1mMinData=minSmD, _1mDistData=distSmD, _1mMoIdx=new Set();
+  let _1mLabels=tL, _1mKeys=tKeys, _1mMinData=minSmD, _1mDistData=distSmD;
   if(timeRange==='1m'){
     const _rd=new Date(referenceDate+'T00:00:00');
     const _yr=_rd.getFullYear(), _mo=_rd.getMonth();
@@ -2189,7 +2189,6 @@ async function pgTraining() {
     _1mKeys=_moDays;
     _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
-    _moDays.forEach((d,i)=>{if(new Date(d+'T00:00:00').getDay()===1)_1mMoIdx.add(i);});
   }
 
   // hasAny stützt sich allein auf das Workout-Sheet – keine Health-CSV-Felder mehr.
@@ -2215,6 +2214,7 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+          ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
           ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`, `var(--txt2)`)}`:''}
@@ -2225,7 +2225,8 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
-          ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
+          ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
+        ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,2)} km`)}`:''}
           ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,2)} km`, `var(--txt2)`)}`:''}
         </div>
@@ -2641,6 +2642,8 @@ function _injectTopbar(name) {
   _injectChartFilters(name); // Filter-Controls in die Diagramm-Karten setzen
   // Disable-State der Pfeile + Label gleich nach Inject korrekt setzen
   updateNavUI();
+  // Erst hier steht die endgueltige Hoehe fest – die Filterleisten sind gesetzt.
+  if (name === currentScreen) blickAnkerWiederherstellen();
 }
 
 // Render einen Tab (oder gibt zurück, wenn schon gerendert)
@@ -2895,9 +2898,10 @@ function initScrollHideNav() {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
-  if (t.closest('.nav-prev')) { navPrev(); return; }
-  if (t.closest('.nav-next')) { navNext(); return; }
+  if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
+  if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
   if (t.closest('.nav-today')) {
+    blickAnkerMerken(t);
     if (allData.length) {
       referenceDate = allData[allData.length-1].date;
       updateNavUI();
@@ -2991,6 +2995,43 @@ async function jetztAktualisieren() {
     await Promise.all(namen.map(n => caches.delete(n)));
   } catch(_) {}
   location.reload();
+}
+
+// ── Blickposition ueber einen Re-Render retten ─────────
+// Ein Klick auf die Pfeile baut den ganzen Tab neu auf. Aendert sich dabei die
+// Gesamthoehe – etwa weil im neuen Zeitraum weniger Trainings vorliegen –, klemmt
+// der Browser die Scrollposition und die Ansicht springt. Am staerksten trifft es
+// das unterste Diagramm (VO2max), weil dessen Position von allem darueber abhaengt.
+// Deshalb: die ausloesende Diagramm-Karte als Anker merken und sie danach wieder
+// an dieselbe Stelle im Sichtfenster setzen.
+let _blickAnker = null;   // { canvasId, abstandOben }
+
+function blickAnkerMerken(el) {
+  _blickAnker = null;
+  const karte = el && el.closest ? el.closest('.chart-card') : null;
+  const canvas = karte ? karte.querySelector('canvas') : null;
+  const screenEl = document.getElementById('screen-' + currentScreen);
+  if (!canvas || !canvas.id || !screenEl) return;
+  _blickAnker = {
+    canvasId: canvas.id,
+    abstandOben: karte.getBoundingClientRect().top - screenEl.getBoundingClientRect().top
+  };
+}
+
+function blickAnkerWiederherstellen() {
+  const anker = _blickAnker;
+  if (!anker) return;
+  _blickAnker = null;
+  // Synchron statt in requestAnimationFrame: getBoundingClientRect erzwingt ohnehin
+  // ein Layout, die neuen Hoehen stehen also bereits fest. Ein Frame abzuwarten
+  // wuerde den Sprung zusaetzlich sichtbar machen - und in einer nicht gezeichneten
+  // Seite (Hintergrund-Tab) feuert der Frame gar nicht.
+  const screenEl = document.getElementById('screen-' + currentScreen);
+  const canvas = screenEl ? screenEl.querySelector('canvas[id="' + anker.canvasId + '"]') : null;
+  const karte = canvas ? canvas.closest('.chart-card') : null;
+  if (!karte) return;
+  const ist = karte.getBoundingClientRect().top - screenEl.getBoundingClientRect().top;
+  screenEl.scrollTop += (ist - anker.abstandOben);
 }
 
 // ── Refresh Button ─────────────────────────────────────

@@ -133,6 +133,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Pfeil deuten. Der Kasten ist ein eigenes `.info-tt`-Element (kein `::after`), damit
   `openTooltip` ihn am Bildschirmrand einklemmen kann.
 - **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
+  **Nur waagrechte Gitterlinien** — `gx` setzt `grid:{display:false}`; die senkrechten
+  trennten nur Kategorien, die die Achsenbeschriftung ohnehin trennt.
+- **Blickposition beim Navigieren:** ein Klick auf `‹ ›` baut den Tab neu auf. Ändert
+  sich dabei die Gesamthöhe, klemmt der Browser die Scrollposition und die Ansicht
+  springt — am stärksten beim untersten Diagramm. `blickAnkerMerken()` merkt sich die
+  auslösende Karte, `blickAnkerWiederherstellen()` setzt sie in `_injectTopbar` zurück
+  an dieselbe Stelle. Bewusst **synchron**: `getBoundingClientRect` erzwingt ohnehin ein
+  Layout, und in einer nicht gezeichneten Seite feuert `requestAnimationFrame` nie.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
