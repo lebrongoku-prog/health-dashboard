@@ -154,12 +154,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zeilen** — sonst bestimmt jede Liste ihre Zeilenhöhe selbst (Balken- vs. Textzeile)
   und die Spalten laufen nach unten auseinander. Der Wert rechts bleibt `nowrap`;
   bei Platzmangel wird das Label gekürzt, denn ein umgebrochener Wert macht die
-  Zeile zweizeilig und hebt die Höhengleichheit wieder auf. Kompakter wird die
-  Karte über Abstände und **Zeilenhöhe**, nie über die Schriftgröße: die steht
-  im **Type Scale** (`.stat-lbl`/`.goal-lbl`/… mit `!important`) und ist dort die
-  einzige Quelle. Größenangaben im `split2`-Block waren deshalb wirkungslos und
-  sind entfernt. Die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine
-  Angabe an der Zeile wird nicht geerbt und muss ebenfalls dort ansetzen.
+  Zeile zweizeilig und hebt die Höhengleichheit wieder auf. Die Kartenhöhe ist auf
+  Wunsch **123 px** (Herz-Karten mit Ø-Zeile 145 px) — Abstände und Zeilenhöhe
+  entsprechen den übrigen Karten, hier also nichts eigens straffen.
+  Schriftgrößen stehen im **Type Scale** (`.stat-lbl`/`.goal-lbl`/… mit
+  `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
+  Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
+  an der Zeile wird nicht geerbt.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
