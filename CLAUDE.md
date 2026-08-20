@@ -38,6 +38,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - `.claude/_render-test.html` — Render-Prüfstand: ersetzt OAuth und Sheets-API durch erfundene
   Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
   `?scenario=normal|nodata|woerror|stale`. Nur Entwicklung, nicht Teil der App.
+  Zusätzlich `?raf=timer`: ersetzt `requestAnimationFrame` durch einen Timer. Nötig,
+  weil der verdeckte Vorschau-Pane nicht zeichnet — dort feuert weder `rAF` noch ein
+  `scroll`-Event, und framegebundene Logik (Auto-Hide der Nav, Blickanker) liesse sich
+  sonst nicht prüfen. Scroll-Events im Test selbst auslösen (`dispatchEvent`); und
+  `currentScreen` folgt dem Scroll des `#tab-container`, der ebenfalls angestossen
+  werden muss, sonst hält die App weiter den alten Tab für aktiv.
 - **Cruft (bereits in `.gitignore`):** `archive/` (alte Versionen), `.DS_Store`,
   `.claude/settings.local.json`.
 
@@ -94,6 +100,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **nicht** als Text gezeigt — sie steht auf der Zeitachse.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
+- **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
+  (`initScrollHideNav`). Scrollen blendet sie **nie wieder ein** — auch nicht beim
+  Zurückscrollen und nicht am Seitenanfang. Zurück kommt sie nur über einen Tipp auf
+  den freien Kartenhintergrund. Die letzte Scrollposition wird **pro Tab** gemerkt:
+  eine gemeinsame Variable täuschte beim Tabwechsel einen Sprung vor (Tab A bei 800,
+  Tab B bei 0) und blendete bei der ersten Bewegung im neuen Tab aus. Solange nur das
+  Zurückscrollen wieder einblendete, fiel das nicht auf.
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
   funktionieren Wochenend-Tönung und Markierung nicht. `timeDim` liefert beides mit;

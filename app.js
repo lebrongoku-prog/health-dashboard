@@ -2852,11 +2852,14 @@ function initTabScrollSync() {
 
 // Auto-Hide nur noch für Bottom-Nav (Topbar ist jetzt Teil des Scroll-Inhalts
 // und rollt natürlich nach oben raus, keine separate Animation nötig).
-let _navLastScrollY = 0;
 function initScrollHideNav() {
   const nav = document.getElementById('bottom-nav');
   if (!nav) return;
   const tickingByTab = new Map();
+  // Letzte Scrollposition PRO Tab. Eine gemeinsame Variable täuschte beim Tabwechsel
+  // einen Sprung vor (Tab A steht bei 800, Tab B bei 0) und blendete die Leiste bei
+  // der ersten Bewegung im neuen Tab aus, obwohl dort kaum gescrollt wurde.
+  const letzteYProTab = new Map();
   TAB_ORDER.forEach(tabName => {
     const screenEl = document.getElementById('screen-'+tabName);
     if (!screenEl) return;
@@ -2867,10 +2870,12 @@ function initScrollHideNav() {
       requestAnimationFrame(() => {
         tickingByTab.set(tabName, false);
         const y = screenEl.scrollTop;
-        const dy = y - _navLastScrollY;
+        const dy = y - (letzteYProTab.has(tabName) ? letzteYProTab.get(tabName) : y);
+        letzteYProTab.set(tabName, y);
+        // Scrollen blendet die Leiste nur AUS. Zurück kommt sie ausschliesslich über
+        // einen Tipp auf den freien Kartenhintergrund – auch beim Zurückscrollen und
+        // am Seitenanfang bleibt sie weg. So gewünscht.
         if (y > 60 && dy > 4) nav.classList.add('nav-hidden');
-        else if (dy < -4 || y < 30) nav.classList.remove('nav-hidden');
-        _navLastScrollY = y;
       });
     }, { passive: true });
   });

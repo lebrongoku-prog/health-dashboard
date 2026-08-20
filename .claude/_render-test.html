@@ -46,8 +46,20 @@
 //                 und Zeilen mit unsinnigem Datum müssen verworfen werden
 //   dubletten   – dieselben Tage stehen mehrfach im Sheet (so wie es das Apps-Script
 //                 beim Refresh erzeugen kann) → dürfen nur EINMAL gezählt werden
+//
+// Zusatzschalter ?raf=timer – ersetzt requestAnimationFrame durch einen Timer, damit
+// sich frame-gebundene Logik auch im verdeckten Vorschau-Pane pruefen laesst.
 // ═══════════════════════════════════════════════════════════
 const SC = new URLSearchParams(location.search).get('scenario') || 'normal';
+
+// Der Vorschau-Pane zeichnet nicht, wenn er verdeckt ist – requestAnimationFrame feuert
+// dort nie. Logik, die daran haengt (Auto-Hide der Bottom-Nav, Blickanker beim
+// Datums-Navigieren), laesst sich so nicht pruefen. Mit ?raf=timer wird nur der
+// Taktgeber auf einen Timer umgestellt; der gepruefte Code bleibt unveraendert.
+if (new URLSearchParams(location.search).get('raf') === 'timer') {
+  window.requestAnimationFrame = cb => setTimeout(() => cb(performance.now()), 16);
+  window.cancelAnimationFrame = id => clearTimeout(id);
+}
 
 // Service Worker abmelden und Caches leeren. Sonst liefert eine frühere Registrierung
 // auf localhost weiter die ALTE app.js aus – man prüft dann ahnungslos den Vorstand.
