@@ -141,8 +141,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nie. Der Tipp läuft über einen eigenen `click`-Listener am Canvas
   (`zeichneDiagramm`) und ist davon unberührt.
 - **Fusszeilen der Diagramme:** `.stats-list.diagramm-fuss` (Trennlinie oben). Der Wert
-  steht im selben Grau wie sein Label; nur Werte mit eigener Aussage bekommen über
-  `statZeile(…, farbe)` eine Farbe — die kommt als Inline-Stil und schlägt die Regel.
+  ist genauso gesetzt wie sein Label — gleiches Grau, gleiche Schriftstärke. Nur Werte
+  mit eigener Aussage bekommen über `statZeile(…, farbe)` eine **Signalfarbe**; sie
+  tragen dann ein `style`-Attribut und bleiben farbig und fett, woran man sie erkennt.
+  Deshalb dort **nie** `var(--txt2)` als Farbe übergeben: Grau ist bereits der Standard,
+  die Angabe machte den Wert nur unnötig fett. Gleiches gilt für den Fall „kein
+  Signal" — dann `null` übergeben, nicht eine graue Farbe.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,

@@ -1947,10 +1947,10 @@ function pgSchlaf() {
         </div>
         <div class="chart-wrap" style="height:186px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
-          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':'var(--txt2)')}`:''}
+          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
-          ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`, `var(--txt2)`)}
+          ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`)}
 `:``}
         </div>`:''}
       </div>
@@ -2200,7 +2200,7 @@ async function pgTraining() {
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
-          ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`, `var(--txt2)`)}`:''}
+          ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
@@ -2211,7 +2211,7 @@ async function pgTraining() {
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,2)} km`)}`:''}
-          ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,2)} km`, `var(--txt2)`)}`:''}
+          ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,2)} km`)}`:''}
         </div>
       </div>
     </div>
@@ -2504,7 +2504,7 @@ function pgAktivitaet() {
         <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${stWeek!=null?Math.round(stWeek).toLocaleString('de-CH')+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${stWknd!=null?Math.round(stWknd).toLocaleString('de-CH')+'':'—'}`)}
-          ${stWeek!=null&&stWknd!=null?`${statZeile(`Differenz`, `${stWknd>stWeek?'+':''}${Math.round(stWknd-stWeek).toLocaleString('de-CH')}`, `var(--txt2)`)}`:``}
+          ${stWeek!=null&&stWknd!=null?`${statZeile(`Differenz`, `${stWknd>stWeek?'+':''}${Math.round(stWknd-stWeek).toLocaleString('de-CH')}`)}`:``}
         </div>`:''}
       </div>
       ${calMaAct.some(v=>v!=null)?`<div class="chart-card" style="margin-bottom:0">
@@ -2517,7 +2517,7 @@ function pgAktivitaet() {
         <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${calWeek!=null?Math.round(calWeek).toLocaleString('de-CH')+' kcal':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${calWknd!=null?Math.round(calWknd).toLocaleString('de-CH')+' kcal':'—'}`)}
-          ${calWeek!=null&&calWknd!=null?`${statZeile(`Differenz`, `${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal`, `var(--txt2)`)}`:``}
+          ${calWeek!=null&&calWknd!=null?`${statZeile(`Differenz`, `${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal`)}`:``}
         </div>`:''}
       </div>`:'<div></div>'}
     </div>

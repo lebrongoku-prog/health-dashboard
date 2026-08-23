@@ -426,12 +426,13 @@ body.dark .chart-filter .range-select{background-color:#0F172A}
 .stat-row:last-child{border:none}
 .stat-lbl{font-size:.68rem;color:var(--txt2)}
 .stat-val{font-size:.74rem;font-weight:700}
-/* Fusszeile unter einem Diagramm. Der Wert steht im selben Grau wie sein Label –
-   Schwarz zog den Blick staerker auf sich als das Diagramm darueber. Werte mit
-   eigener Aussage (gruen/rot ueber statZeile) behalten ihre Farbe: die kommt als
-   Inline-Stil und schlaegt diese Regel. */
+/* Fusszeile unter einem Diagramm. Der Wert ist genauso gesetzt wie sein Label:
+   gleiches Grau, gleiche Schriftstaerke. Fett und Schwarz zogen den Blick staerker
+   auf sich als das Diagramm darueber. Ausgenommen sind Werte mit eigener Aussage
+   (gruen/rot/orange ueber statZeile): sie tragen ein style-Attribut und bleiben
+   deshalb farbig und fett – genau daran erkennt man sie. */
 .stats-list.diagramm-fuss{margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem}
-.stats-list.diagramm-fuss .stat-val{color:var(--txt2)}
+.stats-list.diagramm-fuss .stat-val:not([style]){color:var(--txt2);font-weight:400}
 
 /* Fitness bar */
 .fit-bar-wrap{margin:.6rem 0}
