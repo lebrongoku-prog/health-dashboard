@@ -1711,11 +1711,6 @@ function pgHerz() {
 
   document.getElementById("screen-herz").innerHTML=`
     ${pgBanner('❤️','Herz','Ist mein Herz-Kreislauf-System stabil oder zeigt es Belastung?','#7F1D1D','#EF4444')}
-    ${herzInterpret?`<div class="rec-card" style="--rec-color:${herzInterpret.color};margin-bottom:.7rem">
-      <div class="rec-status" style="background:${herzInterpret.color}22;color:${herzInterpret.color}">❤️ ${herzInterpret.status}</div>
-      <div class="rec-title">Herz-Kreislauf Einordnung ${infoI('baseline')} ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
-      <div class="rec-text">${herzInterpret.text}</div>
-    </div>`:''}
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>❤️ Ruhepuls-Einordnung ${infoI('restHR')}</h3>
@@ -1768,6 +1763,14 @@ function pgHerz() {
            zu den beiden Einordnungs-Karten weiter oben. Auf einem 375-px-Bildschirm
            scrollt man sonst an denselben vier Zahlen zweimal vorbei. -->
     </div>
+
+    <!-- Die Einordnung stand zuoberst und wurde auf Wunsch ans Ende gesetzt:
+         erst die Zahlen und Verläufe, dann deren Deutung. -->
+    ${herzInterpret?`<div class="rec-card" style="--rec-color:${herzInterpret.color}">
+      <div class="rec-status" style="background:${herzInterpret.color}22;color:${herzInterpret.color}">❤️ ${herzInterpret.status}</div>
+      <div class="rec-title">Herz-Kreislauf Einordnung ${infoI('baseline')} ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
+      <div class="rec-text">${herzInterpret.text}</div>
+    </div>`:''}
 `;
 
   if(tHD){
@@ -2371,36 +2374,32 @@ function vo2Abschnitt(D, P) {
   const v2D=mittel(v2r,'vo2max'), v2P=mittel(P.filter(r=>r.vo2max!=null),'vo2max');
   const v2Trend=v2D&&v2P?prozentDiff(v2D,v2P):null;
   const _vo2Cat=(v)=>{
-    if(v==null)return['Keine Daten','#94A3B8',0];
-    if(v>=55)return['Exzellent','#2563EB',92];
-    if(v>=47)return['Überdurchschnittlich','#10B981',74];
-    if(v>=42)return['Durchschnittlich','#84CC16',55];
-    if(v>=35)return['Unterdurchschnittlich','#F97316',35];
-    return['Niedrig','#EF4444',15];
+    if(v==null)return['Keine Daten','#94A3B8'];
+    if(v>=55)return['Exzellent','#2563EB'];
+    if(v>=47)return['Überdurchschnittlich','#10B981'];
+    if(v>=42)return['Durchschnittlich','#84CC16'];
+    if(v>=35)return['Unterdurchschnittlich','#F97316'];
+    return['Niedrig','#EF4444'];
   };
-  const [v2cat,v2catColor,v2pctPos]=_vo2Cat(v2D);
+  const [v2cat,v2catColor]=_vo2Cat(v2D);
   const {labels:_v2tL,align:_v2tA,hasData:_v2tHD,keys:_v2Keys,keyTyp:_v2KeyTyp}=timeDim(D,true,true);
   const v2MaFull=_v2tA('vo2max');
 
+  // Die frühere Karte "Fitness-Einordnung" ist aufgelöst: ihr farbiger Skalenbalken ist
+  // entfallen, ihre Werte stehen als Fusszeile unter dem Verlauf – wie bei den
+  // Schlafphasen. Die Einordnung selbst ("Durchschnittlich") ist als erste Zeile
+  // mitgewandert, sonst ginge sie mit dem Balken verloren.
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
-    <div class="chart-card">
-      <h3>📊 Fitness-Einordnung ${infoI('vo2max')}</h3>
-      <p style="font-size:.72rem;color:var(--txt2);margin-bottom:.6rem">VO₂max aktuell: <strong>${zahl(v2D,1)} ml/kg/min</strong> – <span style="color:${v2catColor};font-weight:700">${v2cat}</span></p>
-      <div class="fit-bar-wrap">
-        <div class="fit-bar"><div class="fit-marker" style="left:${v2pctPos}%"></div></div>
-        <div class="fit-labels"><span>Niedrig<br>&lt;35</span><span>Unter-Ø<br>35–42</span><span>Ø<br>42–47</span><span>Über-Ø<br>47–55</span><span>Top<br>&gt;55</span></div>
-      </div>
-      <span class="fit-cat-badge" style="background:${v2catColor}20;color:${v2catColor}">${v2cat}</span>
-      <div class="stats-list" style="margin-top:.8rem">
-        ${statZeile(`Trend`, `${v2Trend!=null?(v2Trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}`, `${v2Trend!=null&&v2Trend>0?'#10B981':v2Trend!=null&&v2Trend<0?'#EF4444':'#94A3B8'}`)}
+    <div class="chart-card" style="margin-bottom:0">
+      <h3>🫁 VO₂max-Verlauf ${infoI('vo2max')}</h3>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max${v2D!=null?` · Ø <strong>${zahl(v2D,1)}</strong>`:''}</div></div>
+      <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
+      <div class="stats-list diagramm-fuss">
+        ${statZeile(`Einordnung`, `${v2cat}`, `${v2catColor}`)}
+        ${statZeile(`Trend`, `${v2Trend!=null?(v2Trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}`, `${v2Trend!=null&&v2Trend>0?'#10B981':v2Trend!=null&&v2Trend<0?'#EF4444':null}`)}
         ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+v2Trend.toFixed(1)+'%':'—'}`)}
         ${statZeile(`Messungen`, `${v2r.length}`)}
       </div>
-    </div>
-    <div class="chart-card" style="margin-bottom:0">
-      <h3>🫁 VO₂max-Verlauf</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max${v2D!=null?` · Ø <strong>${zahl(v2D,1)}</strong>`:''}</div></div>
-      <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
     </div>`;
 
   function zeichnen() {

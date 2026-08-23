@@ -218,6 +218,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **Herz-Tab:** die Einordnungs-Karte (`rec-card`) steht **zuunterst**, nach dem
+  Verlaufs-Diagramm — erst die Zahlen, dann deren Deutung.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart aus `runSpeed`,
   VO₂max-Sektion (zuunterst) aus `r.vo2max`.
 

@@ -434,13 +434,6 @@ body.dark .chart-filter .range-select{background-color:#0F172A}
 .stats-list.diagramm-fuss{margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem}
 .stats-list.diagramm-fuss .stat-val:not([style]){color:var(--txt2);font-weight:400}
 
-/* Fitness bar */
-.fit-bar-wrap{margin:.6rem 0}
-.fit-bar{height:10px;border-radius:5px;background:linear-gradient(90deg,#EF4444 0%,#F97316 20%,#EAB308 40%,#84CC16 60%,#10B981 80%,#2563EB 100%);position:relative}
-.fit-marker{position:absolute;top:-3px;width:4px;height:16px;background:var(--txt);border-radius:2px;transform:translateX(-50%)}
-.fit-labels{display:flex;justify-content:space-between;font-size:.62rem;color:var(--txt3);margin-top:.3rem}
-.fit-cat-badge{display:inline-block;padding:.2rem .6rem;border-radius:999px;font-size:.73rem;font-weight:700;margin-top:.4rem}
-
 /* Goal rows (Athlet/Sehr gut/etc) */
 .goal-row{display:flex;gap:.5rem;margin:.35rem 0;align-items:center}
 .goal-bar-bg{flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden}
@@ -657,7 +650,6 @@ h5,
 .chart-card h3,
 .rec-title,
 .warn-title,
-.fit-cat-badge,
 .pi-head{
   font-size: 1rem !important;
   line-height: 1.3;
@@ -691,7 +683,6 @@ h5,
 .ti-metric-delta,
 .pi-conf,
 .cl-item,
-.fit-labels,
 .field-hint,
 .pg-banner-sub,
 .debt-tt-title,
