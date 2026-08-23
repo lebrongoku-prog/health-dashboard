@@ -134,6 +134,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Modus `index` nur eine Zeile. Dafür ist `Chart.defaults.plugins.tooltip.animation`
   **aus**: mit Animator berechnet Chart.js Position und Grösse erst über mehrere
   Frames, wodurch ein programmgesteuertes Einblenden unzuverlässig wird.
+  Ebenso ist `Chart.defaults.events = []` — Chart.js reagiert auf **kein** Ereignis
+  selbst. Sonst blendete es sein Tooltip beim Berühren zusätzlich eigenständig ein
+  und holte es nach dem Abschalten sofort zurück: Auf dem iPhone folgt einem
+  Fingertipp ein Maus-Ereignis an derselben Stelle, und ein `mouseout` gibt es dort
+  nie. Der Tipp läuft über einen eigenen `click`-Listener am Canvas
+  (`zeichneDiagramm`) und ist davon unberührt.
+- **Fusszeilen der Diagramme:** `.stats-list.diagramm-fuss` (Trennlinie oben). Der Wert
+  steht im selben Grau wie sein Label; nur Werte mit eigener Aussage bekommen über
+  `statZeile(…, farbe)` eine Farbe — die kommt als Inline-Stil und schlägt die Regel.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,

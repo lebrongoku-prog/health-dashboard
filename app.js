@@ -197,6 +197,14 @@ Chart.defaults.datasets.bar.maxBarThickness    = 26;
 // mit Animator entstehen sie erst über mehrere Frames, was ein programmgesteuertes
 // Einblenden unzuverlässig macht.
 Chart.defaults.plugins.tooltip.animation = false;
+// Chart.js soll selbst auf KEIN Ereignis reagieren. Das Tooltip haengt damit
+// ausschliesslich an der Markierung: Tipp auf eine Saeule blendet es ein, erneuter
+// Tipp auf dieselbe blendet es aus. Vorher aktivierte Chart.js sein Tooltip beim
+// Beruehren zusaetzlich selbst und blendete es nach dem Abschalten sofort wieder
+// ein – auf dem iPhone folgt einem Fingertipp ein Maus-Ereignis an derselben
+// Stelle, und ein "mouseout" gibt es dort nie. Der Tipp selbst laeuft ueber einen
+// eigenen click-Listener am Canvas (zeichneDiagramm) und ist davon unberuehrt.
+Chart.defaults.events = [];
 
 // Wisch-Plugin für den Datums-Navigator: verschiebt beim Navigieren NUR die
 // Datenfläche (auf chartArea geclippt), sodass X- und Y-Achse/Gitter fix bleiben.
@@ -763,7 +771,10 @@ const markierungPlugin = {
 function _tooltipAnMarkierung(chart) {
   const tt = chart.tooltip;
   if (!tt) return;
-  const leeren = () => { try { tt.setActiveElements([], {x:0,y:0}); } catch(_) {} };
+  const leeren = () => {
+    try { chart.setActiveElements([]); } catch(_) {}   // Hover-Zustand des Charts
+    try { tt.setActiveElements([], {x:0,y:0}); tt.update(true); } catch(_) {}
+  };
   const i = _markIndex(chart);
   if (i < 0) { leeren(); return; }
   // ALLE sichtbaren Datensätze mit echtem Wert an dieser Stelle aktivieren – die
@@ -1783,7 +1794,12 @@ function pgHerz() {
       zielLinie('hrv',    hvMaL.length, 'yR')
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
-        filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV'}},
+        filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV',
+        // Ganze Zahlen mit Einheit: Nachkommastellen sind hier Scheingenauigkeit,
+        // und ohne Einheit sind die beiden Reihen (bpm vs. ms) nicht auseinander-
+        // zuhalten – sie teilen sich im Diagramm eine Skala.
+        callbacks:{label:ctx=>ctx.parsed.y==null?null:
+          `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)} ${ctx.dataset.label==='Ruhepuls'?'bpm':'ms'}`}}},
       scales:{x:gx,
         yL:_yAxis({position:'left',grid:{color:GRID_COLOR}}),
         // Rechte Achse ausgeblendet: sie ist mit der linken synchronisiert und zeigte
@@ -1930,7 +1946,7 @@ function pgSchlaf() {
           ${slD!=null?`<div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø <strong>${alsStdMin(slD)}</strong></div>`:''}
         </div>
         <div class="chart-wrap" style="height:186px"><canvas id="c-sl-dur"></canvas></div>
-        ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':'var(--txt2)')}`:''}
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
@@ -1951,7 +1967,7 @@ function pgSchlaf() {
         <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tief</div>
       </div>
       <div class="chart-wrap" style="height:180px"><canvas id="c-sl-phases"></canvas></div>
-      ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+      ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
         ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
         ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
         ${lD!=null?`${statZeile(`Ø Leichtschlaf`, `${alsStdMin(lD)} – ${lPct}%`)}`:''}
@@ -2180,7 +2196,7 @@ async function pgTraining() {
         <h3>⏱️ Trainingszeit</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-zeit"></canvas></div>
-        <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
@@ -2191,7 +2207,7 @@ async function pgTraining() {
         <h3>📍 Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-strecke"></canvas></div>
-        <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,2)} km`)}`:''}
@@ -2211,7 +2227,7 @@ async function pgTraining() {
       <h3>🏃 Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-tr-pace"></canvas></div>
-      <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+      <div class="stats-list diagramm-fuss">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
         ${paceWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`)}`:''}
       </div>
@@ -2251,11 +2267,10 @@ async function pgTraining() {
     zeichneDiagramm('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:_is1m?2:4}
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
-        if(ctx.raw==null)return null;
-        if(_zeitInH){const h=Math.floor(ctx.raw/60),m=Math.round(ctx.raw%60);return m>0?`${h}h ${m}min`:`${h}h`;}
-        return `${Math.round(ctx.raw)} min`;
-      }}}},
+      // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
+      // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+        label:ctx=>ctx.raw==null?null:fmtMin(ctx.raw)}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
@@ -2486,7 +2501,7 @@ function pgAktivitaet() {
         </div>
         <div class="chart-wrap" style="height:185px"><canvas id="c-steps"></canvas></div>
         ${stWeek!=null||stWknd!=null?`
-        <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${stWeek!=null?Math.round(stWeek).toLocaleString('de-CH')+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${stWknd!=null?Math.round(stWknd).toLocaleString('de-CH')+'':'—'}`)}
           ${stWeek!=null&&stWknd!=null?`${statZeile(`Differenz`, `${stWknd>stWeek?'+':''}${Math.round(stWknd-stWeek).toLocaleString('de-CH')}`, `var(--txt2)`)}`:``}
@@ -2499,7 +2514,7 @@ function pgAktivitaet() {
         </div>
         <div class="chart-wrap" style="height:185px"><canvas id="c-cals"></canvas></div>
         ${calWeek!=null||calWknd!=null?`
-        <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${calWeek!=null?Math.round(calWeek).toLocaleString('de-CH')+' kcal':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${calWknd!=null?Math.round(calWknd).toLocaleString('de-CH')+' kcal':'—'}`)}
           ${calWeek!=null&&calWknd!=null?`${statZeile(`Differenz`, `${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal`, `var(--txt2)`)}`:``}
