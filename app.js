@@ -1550,10 +1550,10 @@ function pgOverview() {
     <div class="chart-card" style="margin-bottom:.7rem">
       <h3 style="margin-bottom:.35rem">Verlauf</h3>
       <div class="chart-legend" style="margin-bottom:.3rem">
-        <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf (h)</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Ruhepuls (bpm)</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV (ms)</div>
-        <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Trainingsmin.':'Schritte'}</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Puls</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV</div>
+        <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Training':'Schritte'}</div>
       </div>
       <div class="chart-wrap" style="height:240px"><canvas id="c-woche"></canvas></div>
     </div>
@@ -1747,9 +1747,9 @@ function pgHerz() {
     <div class="chart-card">
       <h3>❤️ Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
-        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Ruhepuls${hrD!=null?` · Ø <strong>${zahl(hrD,0)} bpm</strong>`:''}</div>
-        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV${hvD!=null?` · Ø <strong>${zahl(hvD,0)} ms</strong>`:''}</div>
-        <div class="cl-item"><span class="cl-line" style="background:rgba(100,116,139,.55)"></span>Ziellinien</div>
+        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
+        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
+        <div class="cl-item"><span class="cl-line" style="background:rgba(100,116,139,.55)"></span>Ziel</div>
       </div>
       <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
       <div class="chart-wrap" style="height:210px"><canvas id="c-herz"></canvas></div>
@@ -1805,6 +1805,7 @@ function pgSchlaf() {
   const lD=mittel(D,'sleepCore')||mittel(D,'lightSleep');
   const slStd=standardabw(D.filter(r=>r.sleepTotal!=null),'sleepTotal');
   const slRows=D.filter(r=>r.sleepTotal!=null);
+  const slZielN = slRows.filter(r=>zielErfuellt('sleepTotal', r.sleepTotal)).length;
   const slMax=slRows.length?Math.max(...slRows.map(r=>r.sleepTotal)):null;
   const slMin=slRows.length?Math.min(...slRows.map(r=>r.sleepTotal)):null;
   // Per-night breakdown for sleep debt tooltip
@@ -1876,20 +1877,6 @@ function pgSchlaf() {
     return mos.map(mo=>{const moR=D.filter(r=>r.date.startsWith(mo));return avgCircTime(moR,sleepEndField,false);});
   })();
 
-  const phaseBar=hasPhases&&slD?`
-    <div class="phase-bar">
-      ${awD!=null?`<div class="phase-seg" style="width:${awD/total*100}%;background:#F97316"></div>`:''}
-      ${remD!=null?`<div class="phase-seg" style="width:${remD/total*100}%;background:#5BC8FA"></div>`:''}
-      ${lD!=null?`<div class="phase-seg" style="width:${lD/total*100}%;background:#2186E8"></div>`:''}
-      ${dpD!=null?`<div class="phase-seg" style="width:${dpD/total*100}%;background:#1E1B6E"></div>`:''}
-    </div>
-    <div class="phase-legend">
-      ${awD!=null?`<div class="pl-item"><span class="pl-dot" style="background:#F97316"></span>Wach ${alsStdMin(awD)} (${awPct}%)</div>`:''}
-      ${remD!=null?`<div class="pl-item"><span class="pl-dot" style="background:#5BC8FA"></span>REM ${alsStdMin(remD)} (${remPct}%)</div>`:''}
-      ${lD!=null?`<div class="pl-item"><span class="pl-dot" style="background:#2186E8"></span>Leicht ${alsStdMin(lD)} (${lPct}%)</div>`:''}
-      ${dpD!=null?`<div class="pl-item"><span class="pl-dot" style="background:#1E1B6E"></span>Tiefschlaf ${alsStdMin(dpD)} (${dpPct}%)</div>`:''}
-    </div>`:hasPhases?'':'';
-
   document.getElementById("screen-schlaf").innerHTML=`
     ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
@@ -1938,12 +1925,13 @@ function pgSchlaf() {
       <div class="chart-card" style="margin-bottom:0">
         <h3>🌙 ${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel (${alsStdMin(ZIELE.sleepTotal.ziel)})</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
           ${slD!=null?`<div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø <strong>${alsStdMin(slD)}</strong></div>`:''}
         </div>
         <div class="chart-wrap" style="height:186px"><canvas id="c-sl-dur"></canvas></div>
-        ${slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':'var(--txt2)')}`:''}
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
           ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`, `var(--txt2)`)}
@@ -1959,20 +1947,16 @@ function pgSchlaf() {
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>Wach</div>
         <div class="cl-item"><span class="cl-dot" style="background:#5BC8FA"></span>REM</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#2186E8"></span>Leichtschlaf</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tiefschlaf</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#2186E8"></span>Leicht</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tief</div>
       </div>
       <div class="chart-wrap" style="height:180px"><canvas id="c-sl-phases"></canvas></div>
-    </div>`:''}
-    ${hasPhases?`<div class="chart-card">
-        <h3>💤 Schlafphasen-Aufteilung (Ø pro Nacht)</h3>
-        ${phaseBar}
-        <div class="stats-list" style="margin-top:.6rem">
-          ${awD!=null?`${statZeile(`Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
-          ${remD!=null?`${statZeile(`REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> (Ziel: 20–25%)`)}`:''}
-          ${lD!=null?`${statZeile(`Leichtschlaf`, `${alsStdMin(lD)} – ${lPct}%`)}`:''}
-          ${dpD!=null?`${statZeile(`Tiefschlaf`, `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> (Ziel: 15–20%)`)}`:''}
-        </div>
+      ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
+        ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
+        ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
+        ${lD!=null?`${statZeile(`Ø Leichtschlaf`, `${alsStdMin(lD)} – ${lPct}%`)}`:''}
+        ${dpD!=null?`${statZeile(`Ø Tiefschlaf`, `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
+      </div>`:''}
     </div>`:''}
 
     ${hasScore?`<div class="chart-card"><h3>⭐ Schlaf-Score Verlauf</h3><div class="chart-wrap" style="height:150px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
@@ -2218,14 +2202,14 @@ async function pgTraining() {
     <div class="chart-card">
       <h3>📈 ${timeRange==='7d'||timeRange==='1m'?'Leistungs-Trend: Distanz & HR pro Training':'Distanz & HR pro Monat'}</h3>
       <div class="chart-legend">
-        ${trendDist.some(v=>v!=null)?`<div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>Distanz [km]</div>`:''}
-        ${trendHR.some(v=>v!=null)?`<div class="cl-item"><span class="cl-line" style="background:#EF4444"></span>HR [bpm]</div>`:''}
+        ${trendDist.some(v=>v!=null)?`<div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>Distanz</div>`:''}
+        ${trendHR.some(v=>v!=null)?`<div class="cl-item"><span class="cl-line" style="background:#EF4444"></span>Puls</div>`:''}
       </div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-wo-trend"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>🏃 Pace pro Training ${infoI('pace')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace [min/km]</div></div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
@@ -2400,7 +2384,7 @@ function vo2Abschnitt(D, P) {
     </div>
     <div class="chart-card" style="margin-bottom:0">
       <h3>🫁 VO₂max-Verlauf</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max [ml/kg/min]${v2D!=null?` · Ø <strong>${zahl(v2D,1)}</strong>`:''}</div></div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max${v2D!=null?` · Ø <strong>${zahl(v2D,1)}</strong>`:''}</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
     </div>`;
 
@@ -2511,7 +2495,7 @@ function pgAktivitaet() {
       ${calMaAct.some(v=>v!=null)?`<div class="chart-card" style="margin-bottom:0">
         <h3>🔥 Aktive Kalorien</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:#34D399"></span>Aktive Kalorien${calDisplayAvg!=null?` · Ø <strong>${calDisplayAvg.toLocaleString('de-CH')} kcal</strong>${calDisplayLbl}`:''}</div>
+          <div class="cl-item"><span class="cl-dot" style="background:#34D399"></span>Kalorien${calDisplayAvg!=null?` · Ø <strong>${calDisplayAvg.toLocaleString('de-CH')}</strong>${calDisplayLbl}`:''}</div>
         </div>
         <div class="chart-wrap" style="height:185px"><canvas id="c-cals"></canvas></div>
         ${calWeek!=null||calWknd!=null?`

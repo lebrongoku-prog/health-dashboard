@@ -102,6 +102,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Diagramme), rutscht die **Leiste** in die zweite Zeile und die Legende bleibt
   einzeilig — nie umgekehrt, sonst wird die Karte höher als vorher. Die Zeitspanne wird
   **nicht** als Text gezeigt — sie steht auf der Zeitachse.
+- **Legendentexte kurz halten.** Neben der Leiste bleiben rund 140 px. Einheiten gehören
+  auf die Achse, nicht in die Legende (`Puls` statt `Ruhepuls · Ø 57 bpm`). Ab drei
+  Einträgen wird es eng, ab vier passt es nicht mehr: allein Punkte und Abstände
+  belegen dann ~70 px. Zweizeilig sind deshalb Wochenverlauf, Schlafdauer und
+  Schlafphasen — dort fehlen 31–46 px.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
 - **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
