@@ -1798,14 +1798,6 @@ function pgSchlaf() {
   const last14sl = allData.slice(-14);
   const sleepDebt = calculateSleepDebt(last14sl);
   const debtLvl = sleepDebtLevel(sleepDebt.perNight);
-  const slD_last = (allData[allData.length-1]||{}).sleepTotal;
-  const slCoachHint = slD_last!=null
-    ? slD_last >= 7.5
-      ? 'Dein Schlaf war ausreichend. Die Erholung wird unterstützt. Eine moderate Trainingsbelastung ist heute möglich.'
-      : slD_last >= 6.5
-        ? 'Dein Schlaf lag leicht unter Zielwert. Vermeide heute sehr intensive Belastung und priorisiere frühere Schlafenszeit.'
-        : 'Schlafdauer unter 6.5h. Heute möglichst auf intensives Training verzichten. Fokus auf Erholung.'
-    : 'Schlafeinschätzung noch nicht verfügbar.';
   const slD=mittel(D,'sleepTotal');
   const scD=mittel(D,'sleepScore'), scP=mittel(P,'sleepScore');
   const dpD=mittel(D,'sleepDeep')||mittel(D,'deepSleep');
@@ -1900,10 +1892,6 @@ function pgSchlaf() {
 
   document.getElementById("screen-schlaf").innerHTML=`
     ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
-    <div class="ch-card">
-      <h4>💬 Was bedeutet das für heute? ${scopeBadge('letzte Nacht')}</h4>
-      <p>${slCoachHint}</p>
-    </div>
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
     <!-- Zeile 2: Schlafqualität-Verteilung | Schlafschuld -->
@@ -1954,7 +1942,7 @@ function pgSchlaf() {
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
           ${slD!=null?`<div class="cl-item"><span class="cl-line" style="background:rgba(124,58,237,.55);border-style:dashed"></span>Ø <strong>${alsStdMin(slD)}</strong></div>`:''}
         </div>
-        <div class="chart-wrap" style="height:155px"><canvas id="c-sl-dur"></canvas></div>
+        <div class="chart-wrap" style="height:186px"><canvas id="c-sl-dur"></canvas></div>
         ${slWeek!=null||slWknd!=null?`<div class="stats-list" style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
@@ -2665,14 +2653,31 @@ function _injectChartFilters(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
   // Eine Leiste pro Diagramm – die frühere gemeinsame Leiste oben im Tab entfällt.
-  // Eingesetzt wird sie NACH dem Titel, damit dieser vollständig lesbar bleibt.
+  // Sie teilt sich die Zeile mit der Legende: Legende links, Zeitfilter rechts.
+  // Neben den TITEL darf sie nicht, dort schnitt sie ihn auf „V…" / „❤️.." zusammen.
   screenEl.querySelectorAll('.chart-card').forEach(card => {
     if (!card.querySelector('canvas')) return;         // nur echte Diagramm-Karten
     if (card.querySelector('.chart-filter')) return;   // nicht doppelt injizieren
+    const legende = card.querySelector(':scope > .chart-legend');
+    if (legende) { legendeMitFilter(legende); return; }
+    // Karte ohne Legende (Schlaf-Score): eigene Zeile unter dem Titel
     const kopf = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
     if (kopf) kopf.insertAdjacentHTML('afterend', chartFilterHTML());
     else card.insertAdjacentHTML('afterbegin', chartFilterHTML());
   });
+}
+
+// Legendenzeile um den Zeitfilter ergänzen. Die vorhandenen Einträge kommen dabei in
+// einen eigenen Block: sonst nimmt eine lange Legende (Ruhepuls & HRV hat drei
+// Einträge) beim Umbruch den Filter mit in die nächste Zeile. So bleibt er rechts
+// auf der Zeile stehen und nur die Einträge selbst brechen um.
+function legendeMitFilter(legende) {
+  const eintraege = document.createElement('div');
+  eintraege.className = 'cl-items';
+  while (legende.firstChild) eintraege.appendChild(legende.firstChild);
+  legende.appendChild(eintraege);
+  legende.insertAdjacentHTML('beforeend', chartFilterHTML());
+  legende.classList.add('mit-filter');
 }
 
 // Nach dem Render eines Tabs: Filter-Controls in die Diagramme setzen und

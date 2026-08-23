@@ -308,6 +308,15 @@ body.dark #bottom-nav {
 .chart-card{background:var(--card);border-radius:var(--r);padding:.7rem .75rem;box-shadow:var(--shadow);margin-bottom:.7rem}
 .chart-card h3{font-size:.85rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem}
 .chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem}
+/* Legendenzeile mit Zeitfilter: Einträge links, Filter rechts auf derselben Zeile.
+   Die Einträge stehen in einem eigenen Block, damit eine lange Legende beim Umbruch
+   nicht den Filter mitnimmt. Reicht die Breite für beides nicht (fünf der elf
+   Diagramme, z.B. Ruhepuls & HRV), rutscht der FILTER in die zweite Zeile und die
+   Legende bleibt einzeilig – nie umgekehrt. Andernfalls würde die Legende mehrzeilig
+   und die Karte höher als vor der Zusammenlegung. */
+.chart-legend.mit-filter{flex-wrap:wrap;align-items:center;gap:.35rem}
+.chart-legend .cl-items{display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;min-width:0;flex:1 1 auto}
+.chart-legend .chart-filter{margin:0 0 0 auto;flex:0 0 auto;flex-wrap:nowrap}
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.66rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
@@ -394,13 +403,15 @@ body.dark .zs-item strong{color:#FDBA74}
 /* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
 /* Eigene Zeile unter dem Diagramm-Titel: volle Breite, dadurch Platz fuer
    Bedienelemente in Fingergroesse (Pfeile 36 px wie im Trainingskalender). */
-.chart-filter{display:flex;align-items:center;gap:.4rem;margin:.15rem 0 .55rem;flex-wrap:wrap}
+/* Enge Abstaende zwischen den Bedienelementen: die Leiste bleibt schmal, ohne dass
+   die Tippflaechen (29 px) kleiner werden. */
+.chart-filter{display:flex;align-items:center;gap:.25rem;margin:.15rem 0 .55rem;flex-wrap:wrap}
 .chart-filter .date-nav{margin-left:auto;gap:.4rem}
-.chart-filter .range-select{height:36px;padding:0 .6rem;font-size:.72rem;font-weight:600;color:var(--txt2);background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit}
+.chart-filter .range-select{height:29px;padding:0 .5rem;font-size:.72rem;font-weight:600;color:var(--txt2);background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit}
 .chart-filter .date-nav{align-items:center;gap:2px}
-.chart-filter .nav-arrow{width:36px;height:36px;font-size:1.15rem;border-radius:9px}
+.chart-filter .nav-arrow{width:29px;height:29px;font-size:1.05rem;border-radius:8px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
-.chart-filter .nav-today{width:auto;min-width:0;height:36px;padding:0 .7rem;font-size:.7rem;font-weight:600;border-radius:9px}
+.chart-filter .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.7rem;font-weight:600;border-radius:8px}
 body.dark .chart-filter .range-select{background:#0F172A}
 
 /* Multi-column layouts */
@@ -579,9 +590,6 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 .pi-text{font-size:.68rem;color:var(--txt2);line-height:1.55}
 
 /* Coaching Hint */
-.ch-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #7C3AED}
-.ch-card h4{font-size:.75rem;font-weight:700;margin-bottom:.3rem}
-.ch-card p{font-size:.68rem;color:var(--txt2);line-height:1.6}
 
 /* Page intro question (kursive Frage) */
 
@@ -647,7 +655,6 @@ h4,
 h5,
 .chart-card h3,
 .rec-title,
-.ch-card h4,
 .warn-title,
 .fit-cat-badge,
 .pi-head{
@@ -657,7 +664,6 @@ h5,
 
 /* Body – Beschreibungstexte, Insight-Rows */
 .pi-text,
-.ch-card p,
 .warn-text,
 .no-data{
   font-size: .85rem !important;

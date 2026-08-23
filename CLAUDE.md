@@ -94,9 +94,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
 - **Bedienelemente:** 🔄 Refresh + 🌙 Dark-Toggle liegen rechtsbündig auf der
   `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
-  **in jeder Diagramm-Karte**, als **eigene Zeile unter dem Titel** (`_injectChartFilters`).
-  Die Zeile unter dem Titel ist Bedingung: **neben** dem Titel belegte die Leiste zwei
-  Drittel der Kopfzeile und schnitt ihn auf „V…" / „❤️.." zusammen. Die Zeitspanne wird
+  **in jeder Diagramm-Karte**, und zwar **rechts in der Legendenzeile**
+  (`legendeMitFilter`); Karten ohne Legende bekommen ihn als eigene Zeile unter dem Titel.
+  **Neben den Titel darf er nicht** — dort belegte er zwei Drittel der Kopfzeile und
+  schnitt ihn auf „V…" / „❤️.." zusammen. Die Legendeneinträge stehen in einem eigenen
+  `.cl-items`-Block: reicht die Breite für Legende **und** Leiste nicht (7 der 11
+  Diagramme), rutscht die **Leiste** in die zweite Zeile und die Legende bleibt
+  einzeilig — nie umgekehrt, sonst wird die Karte höher als vorher. Die Zeitspanne wird
   **nicht** als Text gezeigt — sie steht auf der Zeitachse.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
