@@ -501,17 +501,18 @@ body.dark .chart-filter .range-select{background-color:#0F172A}
    ueber den Minikacheln sass. Seit sie weg ist, sind die Kacheln der einzige Inhalt
    der Karte – der Rest war ungenutzter Raum. */
 .ti-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
-.ti-metric{padding:.55rem .5rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;position:relative;overflow:visible}
-/* ⓘ in die Ecke statt in den Textfluss: auf den schmalen Kacheln (~78 px) rutschte
-   es sonst in eine eigene Zeile und machte die Kacheln unterschiedlich hoch.
-   overflow:visible ist nötig, damit der Erklärungskasten nicht beschnitten wird. */
-.ti-metric .info-i{position:absolute;bottom:.4rem;right:.35rem;width:13px;height:13px}
-/* Die Beschriftung oben ist bei ~62 px Innenbreite bereits randvoll – dort hatte das
-   Symbol entweder eine zweite Zeile erzwungen oder den Text ueberlappt. Unten rechts
-   ist zuverlaessig Platz; die Abweichungszeile bekommt dafuer etwas Rand. */
-.ti-metric-delta{padding-right:15px}
-/* Beschriftung + ⓘ in einer Zeile; bei wenig Platz rutscht das Symbol nicht weg. */
-.ti-metric-lbl{font-size:.66rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
+/* Alle Inhalte mittig – waagrecht wie senkrecht. Die Kacheln sind Grid-Zellen und
+   damit ohnehin alle gleich hoch; der Inhalt sitzt jetzt zentriert darin statt oben
+   links zu kleben. overflow:visible ist nötig, damit der Erklärungskasten des ⓘ
+   nicht beschnitten wird. */
+.ti-metric{padding:.55rem .25rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0;position:relative;overflow:visible}
+/* ⓘ steht wieder im Textfluss hinter der Beschriftung. Frueher sass es absolut in der
+   Ecke, weil es auf den schmalen Kacheln eine zweite Zeile erzwang und sie
+   unterschiedlich hoch machte – seit die Kacheln im Grid gleich hoch sind, spielt das
+   keine Rolle mehr. Absolut positioniert liesse sich der Inhalt nicht zentrieren:
+   die Abweichungszeile brauchte einen einseitigen Rand als Ausgleich. */
+.ti-metric .info-i{width:13px;height:13px}
+.ti-metric-lbl{font-size:.66rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;justify-content:center;gap:.25rem;flex-wrap:wrap}
 .ti-metric-val{font-size:1.07rem;font-weight:800;color:var(--txt);line-height:1.2}
 .ti-metric-delta{font-size:.67rem;font-weight:500;margin-top:.25rem}
 .ti-metric-delta.pos{color:#10B981}
