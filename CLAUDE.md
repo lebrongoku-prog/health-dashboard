@@ -198,6 +198,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **Minikacheln der Übersicht (`.ti-metric`):** Inhalte waagrecht **und** senkrecht
+  zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
+  Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
+  einseitigen Rand als Ausgleich bräuchte. Dass es dabei auf eine zweite Zeile
+  rutschen kann, ist unkritisch: die Kacheln sind Grid-Zellen und ohnehin gleich hoch.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
