@@ -151,8 +151,15 @@ function _parseWorkoutRows(rows) {
   // workoutSheetReady wird vom Aufrufer gesetzt (auch im Fehlerfall) – siehe loadFromAPI.
 }
 
+// Gitterlinien und Achsen laufen bewusst über zwei verschiedene Farben. Vorher trugen
+// beide dieselbe: die waagrechten Hilfslinien waren dadurch von der Achse, die den
+// Datenbereich begrenzt, nicht zu unterscheiden. Das Gitter ist Orientierung im
+// Hintergrund und tritt deutlich zurück, die Achse bleibt die kräftigere Kante.
+const GRID_COLOR   = 'rgba(148,163,184,0.10)';
+const ACHSEN_COLOR = 'rgba(148,163,184,0.38)';
+
 Chart.defaults.color = '#94A3B8';
-Chart.defaults.borderColor = '#E8EDF2';
+Chart.defaults.borderColor = ACHSEN_COLOR;
 Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
 Chart.defaults.font.size = 10;
 
@@ -938,7 +945,6 @@ document.addEventListener('keydown', e => {
 // Beim Scrollen schliessen – ein fix positioniertes Tooltip würde sonst danebenstehen
 window.addEventListener('scroll', () => { if (_ttOpenEl) closeTooltips(); }, true);
 
-const GRID_COLOR = 'rgba(148,163,184,0.18)';
 // Nur waagrechte Gitterlinien: die senkrechten trennten lediglich die Kategorien,
 // die ohnehin durch die Achsenbeschriftung getrennt sind.
 const gx = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:9}}};
@@ -3006,7 +3012,7 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
 // ── Dark Mode ──────────────────────────────────────────
 function applyDarkMode(isDark) {
   document.body.classList.toggle('dark', isDark);
-  Chart.defaults.borderColor = GRID_COLOR;
+  Chart.defaults.borderColor = ACHSEN_COLOR;
   Chart.defaults.color       = isDark ? '#94A3B8' : '#94A3B8';
   // Dark-Toggle-Emoji in allen Topbar-Instanzen aktualisieren
   document.querySelectorAll('.dark-toggle').forEach(btn => {

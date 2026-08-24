@@ -183,6 +183,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
   **Nur waagrechte Gitterlinien** — `gx` setzt `grid:{display:false}`; die senkrechten
   trennten nur Kategorien, die die Achsenbeschriftung ohnehin trennt.
+  Gitter und Achsen tragen **verschiedene** Farben: `GRID_COLOR` (10 %) für die
+  Hilfslinien, `ACHSEN_COLOR` (38 %, via `Chart.defaults.borderColor`) für die Achsen.
+  Mit einer gemeinsamen Farbe war die Begrenzung des Datenbereichs nicht von den
+  Hilfslinien zu unterscheiden. Beide stehen ganz oben, **vor** dem ersten
+  `Chart.defaults`-Zugriff — `const` wird nicht hochgezogen.
 - **Blickposition beim Navigieren:** ein Klick auf `‹ ›` baut den Tab neu auf. Ändert
   sich dabei die Gesamthöhe, klemmt der Browser die Scrollposition und die Ansicht
   springt — am stärksten beim untersten Diagramm. `blickAnkerMerken()` merkt sich die
