@@ -100,8 +100,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   schnitt ihn auf „V…" / „❤️.." zusammen. Die Legendeneinträge stehen in einem eigenen
   `.cl-items`-Block: reicht die Breite für Legende **und** Leiste nicht (7 der 11
   Diagramme), rutscht die **Leiste** in die zweite Zeile und die Legende bleibt
-  einzeilig — nie umgekehrt, sonst wird die Karte höher als vorher. Die Zeitspanne wird
-  **nicht** als Text gezeigt — sie steht auf der Zeitachse.
+  einzeilig — nie umgekehrt, sonst wird die Karte höher als vorher. Ab **1M** steht
+  zwischen „Heute" und dem Dropdown der angezeigte Zeitraum (`zeitraumText()`,
+  z. B. `Jun–Aug 26`); bei Heute/7T nicht, dort steht das Datum auf der Zeitachse.
+- **Ø-Werte gehören in die Fusszeile, nicht ins Diagramm.** Die gestrichelten Ø-Linien
+  sind aus Ruhepuls & HRV, Schlafdauer, Schritte, Kalorien und VO₂max entfernt und
+  stehen dort als erste Fusszeile (beim Schlaf als zweite, unter der Ziel-Zeile).
+  Ziellinien bleiben. Auch aus den Legenden ist der Ø-Wert raus — er stünde sonst
+  doppelt und machte die Legende zu breit für die gemeinsame Zeile mit der Leiste.
 - **Legendentexte kurz halten.** Neben der Leiste bleiben rund 140 px. Einheiten gehören
   auf die Achse, nicht in die Legende (`Puls` statt `Ruhepuls · Ø 57 bpm`). Ab drei
   Einträgen wird es eng, ab vier passt es nicht mehr: allein Punkte und Abstände
