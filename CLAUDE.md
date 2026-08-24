@@ -94,15 +94,19 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
 - **Bedienelemente:** 🔄 Refresh + 🌙 Dark-Toggle liegen rechtsbündig auf der
   `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
-  **in jeder Diagramm-Karte**, und zwar **rechts in der Legendenzeile**
-  (`legendeMitFilter`); Karten ohne Legende bekommen ihn als eigene Zeile unter dem Titel.
-  **Neben den Titel darf er nicht** — dort belegte er zwei Drittel der Kopfzeile und
-  schnitt ihn auf „V…" / „❤️.." zusammen. Die Legendeneinträge stehen in einem eigenen
-  `.cl-items`-Block: reicht die Breite für Legende **und** Leiste nicht (7 der 11
-  Diagramme), rutscht die **Leiste** in die zweite Zeile und die Legende bleibt
-  einzeilig — nie umgekehrt, sonst wird die Karte höher als vorher. Ab **1M** steht
-  zwischen „Heute" und dem Dropdown der angezeigte Zeitraum (`zeitraumText()`,
-  z. B. `Jun–Aug 26`); bei Heute/7T nicht, dort steht das Datum auf der Zeitachse.
+  **in jeder Diagramm-Karte**, verteilt auf **zwei Zeilen**: `filterTitelTeil()` setzt
+  „Heute" + Zeitraum rechts in die **Titelzeile**, `filterLegendenTeil()` das Dropdown
+  + `‹ ›` rechts in die **Legendenzeile** (`legendeMitFilter`). Karten ohne Legende
+  bekommen den zweiten Teil als eigene Zeile. Alles zusammen in einer Zeile ging nicht —
+  dort belegte es zwei Drittel der Breite und schnitt den Titel ab. Die Legendeneinträge
+  stehen in einem eigenen `.cl-items`-Block: reicht die Breite nicht (2 der 11
+  Diagramme), rutschen die **Bedienelemente** in die zweite Zeile und die Legende bleibt
+  einzeilig — nie umgekehrt. Der Zeitraum erscheint erst ab **1M** (`zeitraumText()`,
+  z. B. `Jun–Aug 26`); bei Heute/7T steht das Datum auf der Zeitachse.
+- **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
+  die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
+  Warnzeilen tragen keine. Ausgenommen bleiben die beiden Banner-Knöpfe (🔄/🌙) — ohne
+  Symbol wären sie leer.
 - **Ø-Werte gehören in die Fusszeile, nicht ins Diagramm.** Die gestrichelten Ø-Linien
   sind aus Ruhepuls & HRV, Schlafdauer, Schritte, Kalorien und VO₂max entfernt und
   stehen dort als erste Fusszeile (beim Schlaf als zweite, unter der Ziel-Zeile).

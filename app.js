@@ -122,35 +122,11 @@ function _buildCalHTML(year, month) {
     ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
     ${cells}
   </div>
-  <div style="font-size:.64rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">🏋️ ${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
+  <div style="font-size:.64rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
 // Symbol zur Trainingsart – Stichwortsuche statt exakter Namensliste.
-// Apple liefert die Bezeichnungen lokalisiert und teils eigenwillig übersetzt
-// ("Innenräume Ausführen" für einen Indoor-Lauf). Die frühere Liste verlangte eine
-// wortgenaue Übereinstimmung und verfehlte damit zwei der drei real vorkommenden
-// Arten – die bekamen dann die Standard-Hantel statt des passenden Symbols.
-// REIHENFOLGE IST PRIORITÄT: der erste Treffer gewinnt. Deshalb steht "trail" vor
-// "lauf" und "intervall" ganz oben – sonst würde "Trail-Laufen" als Lauf und
-// "Hochintensives Intervalltraining" als Krafttraining eingestuft.
-const _TYPE_ICONS = [
-  [/intervall|hiit|hochintensiv/i,  '⚡'],
-  [/trail/i,                        '🏔️'],
-  [/funktionstraining|functional/i, '🏋️'],
-  [/kraft|strength/i,               '💪'],
-  [/rad|bike|cycl/i,                '🚴'],
-  [/schwimm|swim/i,                 '🏊'],
-  [/wander|hik/i,                   '🥾'],
-  [/yoga/i,                         '🧘'],
-  [/gehen|walk/i,                   '🚶'],
-  [/lauf|ausführen|run/i,           '🏃']
-];
-function workoutIcon(typeRaw) {
-  const t = String(typeRaw || '');
-  for (const [muster, icon] of _TYPE_ICONS) if (muster.test(t)) return icon;
-  return '🏋️';
-}
 function _parseWorkoutRows(rows) {
   // Sheet values arrive as strings via .toString() – parse to numbers explicitly
   const pN = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
@@ -158,11 +134,9 @@ function _parseWorkoutRows(rows) {
     const date = r['Date'] || r['date'];
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
     const typeRaw = String(r['Type'] || r['type'] || '').trim();
-    const icon = workoutIcon(typeRaw);
     workoutData[date] = {
-      // typeRaw bleibt roh (Grundlage für workoutIcon); typeLabel ist die
-      // Anzeigefassung und deshalb bereits entschärft.
-      date, typeRaw, typeLabel: icon + ' ' + esc(typeRaw || 'Workout'), icon,
+      // typeRaw bleibt roh; typeLabel ist die Anzeigefassung und bereits entschärft.
+      date, typeRaw, typeLabel: esc(typeRaw || 'Workout'),
       durationMin:    pN(r['Duration (min)']),
       distanceKm:     pN(r['Distance (km)']),
       avgHR:          pN(r['Avg HR']),
@@ -891,11 +865,14 @@ function _calTipHTML(ds) {
   const wo = workoutData[ds];
   if (!wo) return '';
   const dateStr = new Date(ds+'T00:00:00').toLocaleDateString('de-CH',{weekday:'short',day:'2-digit',month:'long'});
-  let html = `<div class="cal-tip-title">${wo.icon} ${dateStr}</div>`;
-  if (wo.avgHR)       html += `<div class="cal-tip-row">💓 Ø ${Math.round(wo.avgHR)} bpm${wo.maxHR?` · Max ${wo.maxHR} bpm`:''}</div>`;
-  if (wo.distanceKm)  html += `<div class="cal-tip-row">📍 ${wo.distanceKm.toFixed(2)} km${wo.avgSpeedKph?` · ${fmtPace(paceFromSpeed(wo.avgSpeedKph))}/km`:''}</div>`;
-  if (wo.elevationM)  html += `<div class="cal-tip-row">⛰️ ${Math.round(wo.elevationM)} m ↑</div>`;
-  if (wo.durationMin) html += `<div class="cal-tip-row">⏱️ ${Math.floor(wo.durationMin)} min</div>`;
+  // Die Trainingsart stand hier nur als Symbol – ohne Emojis muss sie ausgeschrieben
+  // werden, sonst ginge sie ersatzlos verloren. Ebenso die Zeilen darunter: statt
+  // Symbolen tragen sie jetzt ihre Bezeichnung.
+  let html = `<div class="cal-tip-title">${wo.typeLabel||'Training'} · ${dateStr}</div>`;
+  if (wo.avgHR)       html += `<div class="cal-tip-row">Puls Ø ${Math.round(wo.avgHR)} bpm${wo.maxHR?` · Max ${wo.maxHR} bpm`:''}</div>`;
+  if (wo.distanceKm)  html += `<div class="cal-tip-row">Strecke ${wo.distanceKm.toFixed(2)} km${wo.avgSpeedKph?` · ${fmtPace(paceFromSpeed(wo.avgSpeedKph))}/km`:''}</div>`;
+  if (wo.elevationM)  html += `<div class="cal-tip-row">Höhe ${Math.round(wo.elevationM)} m ↑</div>`;
+  if (wo.durationMin) html += `<div class="cal-tip-row">Dauer ${Math.floor(wo.durationMin)} min</div>`;
   return html;
 }
 
@@ -1037,7 +1014,7 @@ function zielUebersichtHTML() {
   ).join('');
 
   return `<div class="ziel-status ${alleOk?'ok':'ab'}">
-    <div class="zs-kopf">${alleOk ? '✅' : '⚠️'} <strong>${alleOk
+    <div class="zs-kopf"><strong>${alleOk
       ? `Alle ${pruef.length} Ziele erreicht`
       : `${verfehlt.length} von ${pruef.length} Zielen verfehlt`}</strong>${scopeBadge('letzter Tag')}</div>
     ${alleOk ? '' : `<div class="zs-liste">${details}</div>`}
@@ -1445,14 +1422,14 @@ function dataStandHTML() {
   const loaded = _lastLoadTs
     ? new Date(_lastLoadTs).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})
     : null;
-  return `<div class="pg-banner-stand${stale?' stale':''}">${stale?'⚠️ ':''}Daten bis ${fmtDayShort(newest)}${ageTxt}${loaded?` · geladen ${loaded}`:''}</div>`;
+  return `<div class="pg-banner-stand${stale?' stale':''}">Daten bis ${fmtDayShort(newest)}${ageTxt}${loaded?` · geladen ${loaded}`:''}</div>`;
 }
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
   const dir = delta==null?'neu':delta>0?'pos':'neg';
   const dStr = delta==null?'—':(delta>0?'↑':'↓')+' '+Math.abs(delta).toFixed(1)+'% '+(deltaLabel||trendLabel());
   return `<div class="kpi" style="border-top-color:${color||'transparent'}">
-    <div class="kpi-hd"><span class="kpi-lbl">${label}</span><span class="kpi-ico">${icon}</span></div>
+    <div class="kpi-hd"><span class="kpi-lbl">${label}</span>${icon?`<span class="kpi-ico">${icon}</span>`:''}</div>
     <div class="kpi-val">${value}<span class="kpi-unit">${unit||''}</span></div>
     <div class="kpi-delta ${dir}">${dStr}</div>
     ${sub?`<div class="kpi-sub">${sub}</div>`:''}
@@ -1509,7 +1486,6 @@ function pgOverview() {
     ${zielUebersichtHTML()}
     <!-- Warning signals (only shown when triggered) -->
     ${warnSig ? `<div class="warn-card">
-      <div class="warn-icon">⚠️</div>
       <div>
         <div class="warn-title">Belastungssignal erkannt ${scopeBadge('letzter Tag')}</div>
         <div class="warn-text">${warnSig.text}</div>
@@ -1571,7 +1547,7 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">📊 Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
     <div class="pi-grid">
       ${patternIns.map(p=>{
         let txt=p.text;
@@ -1584,7 +1560,7 @@ function pgOverview() {
     <!-- App-Version + Update: eine installierte PWA übernimmt einen neuen Stand sonst
          erst beim zweiten Start. Der Knopf holt ihn in einem Schritt. -->
     <div class="chart-card app-karte">
-      <h3>⚙️ App</h3>
+      <h3>App</h3>
       <div class="stats-list">
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
       </div>
@@ -1732,7 +1708,7 @@ function pgHerz() {
     ${pgBanner('❤️','Herz','Ist mein Herz-Kreislauf-System stabil oder zeigt es Belastung?','#7F1D1D','#EF4444')}
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
-        <h3>❤️ Ruhepuls-Einordnung ${infoI('restHR')}</h3>
+        <h3>Ruhepuls-Einordnung ${infoI('restHR')}</h3>
         <p class="split2-sub">
           Ø ${zahl(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
@@ -1750,7 +1726,7 @@ function pgHerz() {
         </div>
       </div>
       <div class="chart-card split2" style="margin-bottom:0">
-        <h3>💙 HRV-Einordnung ${infoI('hrv')}</h3>
+        <h3>HRV-Einordnung ${infoI('hrv')}</h3>
         <p class="split2-sub">
           Ø ${zahl(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
@@ -1770,7 +1746,7 @@ function pgHerz() {
     </div>
 
     <div class="chart-card">
-      <h3>❤️ Ruhepuls &amp; HRV</h3>
+      <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
@@ -1782,17 +1758,16 @@ function pgHerz() {
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
       <div class="stats-list diagramm-fuss">
-        ${statZeile(`Ø`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} · ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} · ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} · ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
-        ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} · ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
+        ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
+        ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
+        ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} | ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
       </div>
     </div>
 
     <!-- Die Einordnung stand zuoberst und wurde auf Wunsch ans Ende gesetzt:
          erst die Zahlen und Verläufe, dann deren Deutung. -->
     ${herzInterpret?`<div class="rec-card" style="--rec-color:${herzInterpret.color}">
-      <div class="rec-status" style="background:${herzInterpret.color}22;color:${herzInterpret.color}">❤️ ${herzInterpret.status}</div>
+      <div class="rec-status" style="background:${herzInterpret.color}22;color:${herzInterpret.color}">${herzInterpret.status}</div>
       <div class="rec-title">Herz-Kreislauf Einordnung ${infoI('baseline')} ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
       <div class="rec-text">${herzInterpret.text}</div>
     </div>`:''}
@@ -1919,12 +1894,12 @@ function pgSchlaf() {
 
   document.getElementById("screen-schlaf").innerHTML=`
     ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
-    ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'⭐',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
+    ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
     <!-- Zeile 2: Schlafqualität-Verteilung | Schlafschuld -->
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
-        <h3>📊 Schlafqualität-Verteilung</h3>
+        <h3>Schlafqualität-Verteilung</h3>
         <div class="goal-list">
           <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
           <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
@@ -1939,7 +1914,7 @@ function pgSchlaf() {
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0">
-        <div class="chart-head"><h3>🌙 Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
+        <div class="chart-head"><h3>Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
           ${statZeile(`Zielschlaf pro Nacht`, `${alsStdMin(SLEEP_TARGET_H)}`)}
           ${statZeile(`Letzte Nacht`, `${sleepDebt.last!=null?(sleepDebt.last>0?'−'+alsStdMin(sleepDebt.last):'+'+alsStdMin(-sleepDebt.last)):'—'}`, `${sleepDebt.last!=null?(sleepDebt.last>0?'#EF4444':'#10B981'):'var(--txt3)'}`)}
@@ -1963,7 +1938,7 @@ function pgSchlaf() {
     <!-- Zeile 3: Schlafdauer pro Monat | Schlafphasen-Aufteilung -->
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
-        <h3>🌙 ${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
+        <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
@@ -1983,7 +1958,7 @@ function pgSchlaf() {
     <!-- Verlauf steht auf Wunsch VOR der Aufteilung: erst der zeitliche Verlauf,
          dann die Zusammenfassung als Durchschnitt. -->
     ${hasPhases?`<div class="chart-card">
-      <h3>💤 Schlafphasen-Verlauf</h3>
+      <h3>Schlafphasen-Verlauf</h3>
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>Wach</div>
         <div class="cl-item"><span class="cl-dot" style="background:#5BC8FA"></span>REM</div>
@@ -1999,7 +1974,7 @@ function pgSchlaf() {
       </div>`:''}
     </div>`:''}
 
-    ${hasScore?`<div class="chart-card"><h3>⭐ Schlaf-Score Verlauf</h3><div class="chart-wrap" style="height:150px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
+    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="height:150px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
 
 
   if(tHD){
@@ -2104,7 +2079,7 @@ async function pgTraining() {
     document.getElementById("screen-training").innerHTML=`
       ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?')}
       <div class="no-data">
-        <strong>⚠️ Workout-Daten nicht verfügbar</strong>
+        <strong>Workout-Daten nicht verfügbar</strong>
         ${esc(woProblem)}
         <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Mit 🔄 oben rechts erneut versuchen.</div>
       </div>`;
@@ -2200,7 +2175,7 @@ async function pgTraining() {
   const hasAny=trainDates.length>0;
 
   const noDataCard=`<div class="no-data">
-    <strong>⚠️ Keine Trainingsdaten gefunden</strong>
+    <strong>Keine Trainingsdaten gefunden</strong>
     Im aktuellen Zeitraum ist kein Eintrag im Workout-Sheet vorhanden.
     <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet · erwartete Spalten: <code>Date</code> <code>Type</code> <code>Duration (min)</code> <code>Distance (km)</code> <code>Avg HR</code> <code>Speed (km/h)</code></div>
   </div>`;
@@ -2211,11 +2186,11 @@ async function pgTraining() {
     ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?','#7C2D12','#F97316')}
     <div class="three-col">
       <div class="chart-card" style="margin-bottom:0">
-        <h3 style="margin:0 0 .5rem">🏋️ Trainingskalender</h3>
+        <h3 style="margin:0 0 .5rem">Trainingskalender</h3>
         <div id="cal-training">${_calDate?_buildCalHTML(_calDate.y,_calDate.m):''}</div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3>⏱️ Trainingszeit</h3>
+        <h3>Trainingszeit</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
@@ -2226,7 +2201,7 @@ async function pgTraining() {
         </div>
       </div>
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3>📍 Laufstrecke</h3>
+        <h3>Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="flex:1;min-height:140px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
@@ -2238,7 +2213,7 @@ async function pgTraining() {
       </div>
     </div>
     <div class="chart-card">
-      <h3>📈 ${timeRange==='7d'||timeRange==='1m'?'Leistungs-Trend: Distanz & HR pro Training':'Distanz & HR pro Monat'}</h3>
+      <h3>${timeRange==='7d'||timeRange==='1m'?'Leistungs-Trend: Distanz & HR pro Training':'Distanz & HR pro Monat'}</h3>
       <div class="chart-legend">
         ${trendDist.some(v=>v!=null)?`<div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>Distanz</div>`:''}
         ${trendHR.some(v=>v!=null)?`<div class="cl-item"><span class="cl-line" style="background:#EF4444"></span>Puls</div>`:''}
@@ -2246,7 +2221,7 @@ async function pgTraining() {
       <div class="chart-wrap" style="height:200px"><canvas id="c-wo-trend"></canvas></div>
     </div>
     <div class="chart-card">
-      <h3>🏃 Pace pro Training ${infoI('pace')}</h3>
+      <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list diagramm-fuss">
@@ -2410,7 +2385,7 @@ function vo2Abschnitt(D, P) {
   // mitgewandert, sonst ginge sie mit dem Balken verloren.
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
     <div class="chart-card" style="margin-bottom:0">
-      <h3>🫁 VO₂max-Verlauf ${infoI('vo2max')}</h3>
+      <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div></div>
       <div class="chart-wrap" style="height:200px"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
@@ -2493,7 +2468,7 @@ function pgAktivitaet() {
 
     <!-- Row 2: Schritteziel-Erreichung -->
     <div class="chart-card split2">
-      <h3>🎯 Schritteziel-Erreichung ${infoI('steps')}</h3>
+      <h3>Schritteziel-Erreichung ${infoI('steps')}</h3>
       <div class="goal-list">
         <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">(${(n10k/nTot*100).toFixed(0)}%)</span></span></div>
         <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">(${(n8k/nTot*100).toFixed(0)}%)</span></span></div>
@@ -2511,7 +2486,7 @@ function pgAktivitaet() {
     <!-- Row 3: Schritte + Aktive Kalorien side by side -->
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
-        <h3>🚶 Anzahl Schritte</h3>
+        <h3>Anzahl Schritte</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#059669"></span>Schritte</div>
         </div>
@@ -2525,7 +2500,7 @@ function pgAktivitaet() {
         </div>`:''}
       </div>
       ${calMaAct.some(v=>v!=null)?`<div class="chart-card" style="margin-bottom:0">
-        <h3>🔥 Aktive Kalorien</h3>
+        <h3>Aktive Kalorien</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#34D399"></span>Kalorien</div>
         </div>
@@ -2633,7 +2608,7 @@ const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[] 
 // Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
 // jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
 // Zeitfilter + Datumsnavigator liegen in den einzelnen Diagrammen
-// (siehe chartFilterHTML / _injectChartFilters).
+// (siehe filterTitelTeil / filterLegendenTeil / _injectChartFilters).
 
 // Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
 // Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
@@ -2656,19 +2631,24 @@ function zeitraumText() {
   return monat(mw.s) + ' ' + jahr(mw.s) + '–' + monat(mw.e) + ' ' + jahr(mw.e);
 }
 
-function chartFilterHTML() {
-  const r = timeRange;
-  const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===r?' selected':''}>${lbl}</option>`).join('');
-  const hideNav = r === 'heute';
-  const zeitraum = zeitraumText();
   // Eigene Zeile UNTER dem Diagramm-Titel statt daneben: neben dem Titel belegte die
   // Leiste zwei Drittel der Kopfzeile und schnitt ihn auf „V…" / „❤️.." zusammen.
   // Die Zeitspanne als Text ist bewusst weg – sie steht bereits auf der Zeitachse.
-  return `<div class="chart-filter">
-    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${hideNav?'none':'inline-flex'}">Heute</button>
+// Die Bedienelemente sind auf zwei Zeilen verteilt: "Heute" und der Zeitraum stehen
+// rechts neben dem Kartentitel, Auswahlfeld und Pfeile rechts in der Legendenzeile.
+// So bleibt jede Zeile schmal genug – zusammen belegten sie zwei Drittel einer Zeile.
+function filterTitelTeil() {
+  const zeitraum = zeitraumText();
+  return `<div class="filter-titel">
+    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${timeRange==='heute'?'none':'inline-flex'}">Heute</button>
     ${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}
+  </div>`;
+}
+function filterLegendenTeil() {
+  const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===timeRange?' selected':''}>${lbl}</option>`).join('');
+  return `<div class="filter-legende">
     <select class="range-select" aria-label="Zeitraum">${opts}</select>
-    <div class="date-nav" style="display:${hideNav?'none':'inline-flex'}">
+    <div class="date-nav" style="display:${timeRange==='heute'?'none':'inline-flex'}">
       <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
       <button class="nav-arrow nav-next" aria-label="Vor">›</button>
     </div>
@@ -2684,31 +2664,32 @@ function chartFilterHTML() {
 function _injectChartFilters(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
-  // Eine Leiste pro Diagramm – die frühere gemeinsame Leiste oben im Tab entfällt.
-  // Sie teilt sich die Zeile mit der Legende: Legende links, Zeitfilter rechts.
-  // Neben den TITEL darf sie nicht, dort schnitt sie ihn auf „V…" / „❤️.." zusammen.
+  // Eine Leiste pro Diagramm, auf zwei Zeilen verteilt: "Heute" und der angezeigte
+  // Zeitraum stehen rechts neben dem Titel, Auswahlfeld und Pfeile rechts in der
+  // Legendenzeile. Zusammen in einer Zeile belegten sie zwei Drittel der Breite.
   screenEl.querySelectorAll('.chart-card').forEach(card => {
     if (!card.querySelector('canvas')) return;         // nur echte Diagramm-Karten
-    if (card.querySelector('.chart-filter')) return;   // nicht doppelt injizieren
+    if (card.querySelector('.filter-titel')) return;   // nicht doppelt injizieren
+    const titel = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
+    if (titel) titel.insertAdjacentHTML('beforeend', filterTitelTeil());
     const legende = card.querySelector(':scope > .chart-legend');
     if (legende) { legendeMitFilter(legende); return; }
-    // Karte ohne Legende (Schlaf-Score): eigene Zeile unter dem Titel
-    const kopf = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
-    if (kopf) kopf.insertAdjacentHTML('afterend', chartFilterHTML());
-    else card.insertAdjacentHTML('afterbegin', chartFilterHTML());
+    // Karte ohne Legende (Schlaf-Score): der zweite Teil bekommt eine eigene Zeile.
+    if (titel) titel.insertAdjacentHTML('afterend', `<div class="chart-filter">${filterLegendenTeil()}</div>`);
+    else card.insertAdjacentHTML('afterbegin', `<div class="chart-filter">${filterLegendenTeil()}</div>`);
   });
 }
 
-// Legendenzeile um den Zeitfilter ergänzen. Die vorhandenen Einträge kommen dabei in
-// einen eigenen Block: sonst nimmt eine lange Legende (Ruhepuls & HRV hat drei
-// Einträge) beim Umbruch den Filter mit in die nächste Zeile. So bleibt er rechts
-// auf der Zeile stehen und nur die Einträge selbst brechen um.
+// Legendenzeile um Auswahlfeld und Pfeile ergänzen. Die vorhandenen Einträge kommen
+// dabei in einen eigenen Block: sonst nimmt eine lange Legende beim Umbruch die
+// Bedienelemente mit in die nächste Zeile. So bleiben sie rechts auf der Zeile stehen
+// und nur die Einträge selbst brechen um.
 function legendeMitFilter(legende) {
   const eintraege = document.createElement('div');
   eintraege.className = 'cl-items';
   while (legende.firstChild) eintraege.appendChild(legende.firstChild);
   legende.appendChild(eintraege);
-  legende.insertAdjacentHTML('beforeend', chartFilterHTML());
+  legende.insertAdjacentHTML('beforeend', filterLegendenTeil());
   legende.classList.add('mit-filter');
 }
 
