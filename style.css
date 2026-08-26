@@ -51,7 +51,7 @@ body {
      background-attachment: fixed, das friert iOS ein). */
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-  font-size: 14px;
+  font-size: 15.4px;
   background: transparent;
   color: var(--txt);
   display: flex;
@@ -83,7 +83,7 @@ body.theme-training   { --tab-color: #F97316; }
 .nav-arrow {
   width: 36px; height: 36px;
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--txt2); font-size: 16px;
+  border-radius: 8px; color: var(--txt2); font-size: 17.6px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0;
   font-family: inherit;
@@ -101,7 +101,7 @@ body.dark .dark-toggle { color: #FBBF24; }
   color: var(--txt2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 13px; font-weight: 600;
+  font-size: 14.3px; font-weight: 600;
   cursor: pointer;
   font-family: inherit;
 }
@@ -167,22 +167,22 @@ body.dark .dark-toggle { color: #FBBF24; }
   background: transparent !important;
 }
 .pg-banner-icon {
-  font-size: 2.2rem; line-height: 1;
+  font-size: 2.42rem; line-height: 1;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
 }
 .pg-banner-title {
   color: #fff; font-weight: 800;
-  font-size: 19px; letter-spacing: -.015em; line-height: 1.2;
+  font-size: 20.9px; letter-spacing: -.015em; line-height: 1.2;
 }
 .pg-banner-sub {
   color: rgba(255,255,255,0.82);
-  font-size: 12px; margin-top: 2px;
+  font-size: 13.2px; margin-top: 2px;
 }
 /* Daten-Stand: bis wann Daten vorliegen und wann zuletzt geladen wurde.
    Sitzt auf dem farbigen Banner, daher gedecktes Weiß statt der Text-Variablen. */
 .pg-banner-stand {
   color: rgba(255,255,255,0.62);
-  font-size: 10.5px; margin-top: 3px;
+  font-size: 11.6px; margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
 .pg-banner-stand.stale {
@@ -198,7 +198,7 @@ body.dark .dark-toggle { color: #FBBF24; }
 .pg-act {
   width: 38px; height: 38px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px; line-height: 1; font-family: inherit;
+  font-size: 18.7px; line-height: 1; font-family: inherit;
   background: rgba(255,255,255,0.16);
   border: 1px solid rgba(255,255,255,0.30);
   border-radius: 11px; cursor: pointer;
@@ -241,7 +241,7 @@ body.dark #bottom-nav {
   transition: stroke 0.15s;
 }
 .nav-btn span {
-  font-size: 10px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   color: var(--txt3); letter-spacing: 0.1px;
   transition: color 0.15s;
 }
@@ -260,14 +260,14 @@ body.dark #bottom-nav {
   align-items: center; justify-content: center;
   gap: 16px; padding: 24px; text-align: center;
 }
-.overlay-title { font-size: 1.2rem; font-weight: 700; color: var(--txt); }
-.overlay-sub { font-size: 0.85rem; color: var(--txt2); }
+.overlay-title { font-size: 1.32rem; font-weight: 700; color: var(--txt); }
+.overlay-sub { font-size: .94rem; color: var(--txt2); }
 .btn-google {
   margin-top: 8px;
   padding: 12px 24px;
   background: #4285F4; color: #fff;
   border: none; border-radius: 8px;
-  font-size: 15px; font-weight: 600;
+  font-size: 16.5px; font-weight: 600;
   cursor: pointer; display: flex; align-items: center; gap: 8px;
 }
 .spin {
@@ -277,8 +277,8 @@ body.dark #bottom-nav {
 }
 @keyframes sp { to { transform: rotate(360deg); } }
 @keyframes spin-btn { to { transform: rotate(360deg); } }
-.ld-txt { color: var(--txt2); font-size: 14px; }
-.err-msg { color: #EF4444; font-size: 14px; max-width: 480px; line-height: 1.5; }
+.ld-txt { color: var(--txt2); font-size: 15.4px; }
+.err-msg { color: #EF4444; font-size: 15.4px; max-width: 480px; line-height: 1.5; }
 .refresh-btn.spinning {
   animation: spin-btn 0.8s linear infinite;
   opacity: 0.6; pointer-events: none;
@@ -295,17 +295,17 @@ body.dark #bottom-nav {
 .kpi-grid-1{grid-template-columns:1fr}
 .kpi{background:var(--card);border-radius:var(--r);padding:.65rem .7rem;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;cursor:default;border-top:3px solid transparent}
 .kpi-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}
-.kpi-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)}
-.kpi-ico{font-size:1.01rem}
-.kpi-val{font-size:1.66rem;font-weight:800;letter-spacing:-.03em;line-height:1}
-.kpi-unit{font-size:.8rem;font-weight:500;color:var(--txt2);margin-left:.2rem}
-.kpi-delta{font-size:.67rem;font-weight:600;margin-top:.3rem}
+.kpi-lbl{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)}
+.kpi-ico{font-size:1.11rem}
+.kpi-val{font-size:1.83rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.kpi-unit{font-size:.88rem;font-weight:500;color:var(--txt2);margin-left:.2rem}
+.kpi-delta{font-size:.74rem;font-weight:600;margin-top:.3rem}
 .kpi-delta.pos{color:#10B981}.kpi-delta.neg{color:#EF4444}.kpi-delta.neu{color:var(--txt3)}
-.kpi-sub{font-size:.66rem;color:var(--txt3);margin-top:.2rem}
+.kpi-sub{font-size:.73rem;color:var(--txt3);margin-top:.2rem}
 
 /* Chart cards */
 .chart-card{background:var(--card);border-radius:var(--r);padding:.7rem .75rem;box-shadow:var(--shadow);margin-bottom:.7rem}
-.chart-card h3{font-size:.85rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;min-width:0}
+.chart-card h3{font-size:.94rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;min-width:0}
 .chart-card h3>.filter-titel .nav-arrow,.chart-card h3>.filter-titel .zeitraum-text{font-weight:600}
 .chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem}
 /* Legendenzeile: Einträge links, Auswahlfeld und Pfeile rechts auf derselben Zeile.
@@ -322,7 +322,7 @@ body.dark #bottom-nav {
 .chart-card h3>.filter-titel{margin-left:auto;flex:0 0 auto}
 .filter-titel,.filter-legende{display:flex;align-items:center;gap:.25rem;flex-wrap:nowrap}
 .filter-titel:empty{display:none}
-.cl-item{display:flex;align-items:center;gap:.28rem;font-size:.66rem;color:var(--txt2)}
+.cl-item{display:flex;align-items:center;gap:.28rem;font-size:.73rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
 .chart-wrap{position:relative;overflow:hidden}
@@ -338,19 +338,19 @@ body.dark #bottom-nav {
 .app-karte .stats-list{margin-bottom:.6rem}
 .update-btn{
   width:100%;min-height:42px;padding:.55rem .9rem;
-  font-family:inherit;font-size:.78rem;font-weight:700;
+  font-family:inherit;font-size:.86rem;font-weight:700;
   color:#fff;background:var(--tab-color,#0891B2);
   border:none;border-radius:10px;cursor:pointer;
 }
 .update-btn:active{transform:scale(.985)}
 .update-btn:disabled{opacity:.55;cursor:default}
-.app-hinweis{font-size:.63rem;color:var(--txt3);line-height:1.5;margin-top:.45rem}
+.app-hinweis{font-size:.69rem;color:var(--txt3);line-height:1.5;margin-top:.45rem}
 
 /* Bezugszeitraum-Etikett: markiert Kacheln, deren Zahlen NICHT dem Zeitfilter folgen.
    Bewusst zurückhaltend – es soll einordnen, nicht um Aufmerksamkeit konkurrieren. */
 .scope-badge{
   display:inline-block;flex:0 0 auto;
-  font-size:.58rem;font-weight:600;letter-spacing:.02em;text-transform:none;
+  font-size:.64rem;font-weight:600;letter-spacing:.02em;text-transform:none;
   color:var(--txt3);background:var(--bg);
   border:1px solid var(--border);border-radius:999px;
   padding:.14rem .45rem;white-space:nowrap;line-height:1.4;
@@ -360,8 +360,8 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
 .chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
-.chart-note{font-size:.6rem;color:var(--txt3);margin:-.15rem 0 .4rem;line-height:1.4}
-.stat-hint{font-size:.63rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
+.chart-note{font-size:.66rem;color:var(--txt3);margin:-.15rem 0 .4rem;line-height:1.4}
+.stat-hint{font-size:.69rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
 
 /* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
 .ziel-status{
@@ -369,11 +369,11 @@ body.dark .scope-badge{background:#0F172A}
   padding:.6rem .7rem;margin-bottom:.7rem;border-left:4px solid #10B981;
 }
 .ziel-status.ab{border-left-color:#F97316}
-.zs-kopf{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.78rem;color:var(--txt)}
+.zs-kopf{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.86rem;color:var(--txt)}
 .zs-kopf .scope-badge{margin-left:auto}
 .zs-liste{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
 .zs-item{
-  font-size:.64rem;color:var(--txt2);background:var(--bg);
+  font-size:.7rem;color:var(--txt2);background:var(--bg);
   border:1px solid var(--border);border-radius:8px;padding:.2rem .45rem;
 }
 .zs-item strong{color:#B45309}
@@ -387,14 +387,14 @@ body.dark .zs-item strong{color:#FDBA74}
   display:inline-flex;align-items:center;justify-content:center;
   width:14px;height:14px;flex:0 0 auto;vertical-align:middle;
   border-radius:50%;border:1px solid var(--txt3);color:var(--txt3);
-  font-size:.55rem;font-weight:700;font-style:italic;line-height:1;
+  font-size:.61rem;font-weight:700;font-style:italic;line-height:1;
   cursor:help;position:relative;-webkit-tap-highlight-color:transparent;
 }
 /* Eigenes Element statt ::after, damit openTooltip den Kasten am Bildschirmrand
    verschieben kann. position:fixed – die Koordinaten setzt _placeTooltip. */
 .info-tt{
   position:fixed;width:220px;max-width:calc(100vw - 24px);
-  background:#1E293B;color:#fff;font-size:.63rem;font-weight:500;font-style:normal;
+  background:#1E293B;color:#fff;font-size:.69rem;font-weight:500;font-style:normal;
   line-height:1.45;padding:.5rem .65rem;border-radius:8px;
   box-shadow:0 6px 24px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.09);
   opacity:0;pointer-events:none;transition:opacity .15s;z-index:9999;
@@ -414,14 +414,14 @@ body.dark .zs-item strong{color:#FDBA74}
 .chart-filter .date-nav{margin-left:auto;gap:.4rem}
 /* Angezeigter Zeitraum zwischen "Heute" und dem Auswahlfeld. Bleibt einzeilig – ein
    Umbruch hier zerreisst die Leiste. */
-.chart-filter .zeitraum-text,.filter-titel .zeitraum-text{font-size:.66rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
-.chart-filter .range-select,.filter-legende .range-select{height:29px;padding:0 1.05rem 0 .45rem;font-size:.72rem;font-weight:600;color:var(--txt2);background-color:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2394A3B8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .35rem center;background-size:9px 6px}
+.chart-filter .zeitraum-text,.filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
+.chart-filter .range-select,.filter-legende .range-select{height:29px;padding:0 1.05rem 0 .45rem;font-size:.79rem;font-weight:600;color:var(--txt2);background-color:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2394A3B8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .35rem center;background-size:9px 6px}
 .chart-filter .date-nav{align-items:center;gap:2px}
-.chart-filter .nav-arrow,.filter-titel .nav-arrow,.filter-legende .nav-arrow{width:29px;height:29px;font-size:1.05rem;border-radius:8px}
+.chart-filter .nav-arrow,.filter-titel .nav-arrow,.filter-legende .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
 /* Pfeile 50 % breiter als hoch – sie werden am haeufigsten getippt. */
 .date-nav .nav-arrow{width:44px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
-.chart-filter .nav-today,.filter-titel .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.7rem;font-weight:600;border-radius:8px}
+.chart-filter .nav-today,.filter-titel .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.77rem;font-weight:600;border-radius:8px}
 body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{background-color:#0F172A}
 
 /* Multi-column layouts */
@@ -434,8 +434,8 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
 .stats-list{display:flex;flex-direction:column;gap:.2rem}
 .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding:.22rem 0;border-bottom:1px solid #F8FAFC}
 .stat-row:last-child{border:none}
-.stat-lbl{font-size:.68rem;color:var(--txt2)}
-.stat-val{font-size:.74rem;font-weight:700}
+.stat-lbl{font-size:.75rem;color:var(--txt2)}
+.stat-val{font-size:.81rem;font-weight:700}
 /* Fusszeile unter einem Diagramm. Der Wert ist genauso gesetzt wie sein Label:
    gleiches Grau, gleiche Schriftstaerke. Fett und Schwarz zogen den Blick staerker
    auf sich als das Diagramm darueber. Ausgenommen sind Werte mit eigener Aussage
@@ -448,8 +448,8 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
 .goal-row{display:flex;gap:.5rem;margin:.35rem 0;align-items:center}
 .goal-bar-bg{flex:1;height:7px;background:#F1F5F9;border-radius:4px;overflow:hidden}
 .goal-bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
-.goal-lbl{font-size:.67rem;color:var(--txt2);flex:0 0 118px;overflow:hidden}
-.goal-val{font-size:.67rem;font-weight:700;display:inline-grid;grid-template-columns:2rem 3.8rem;align-items:center;white-space:nowrap;vertical-align:middle}
+.goal-lbl{font-size:.74rem;color:var(--txt2);flex:0 0 118px;overflow:hidden}
+.goal-val{font-size:.74rem;font-weight:700;display:inline-grid;grid-template-columns:2rem 3.8rem;align-items:center;white-space:nowrap;vertical-align:middle}
 .goal-num{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 
 /* Zweispaltige Einordnungs-/Verteilungs-Karten: Balken links, Werte (Fußnoten) rechts –
@@ -457,7 +457,7 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
    nebeneinander. Schrift in diesen Karten etwas kompakter, damit es aufs iPhone passt. */
 .chart-card.split2{display:grid;grid-template-columns:1fr 0.82fr;column-gap:.7rem;align-items:stretch}
 .chart-card.split2>h3,.chart-card.split2>p{grid-column:1 / -1}
-.chart-card.split2>.split2-sub{font-size:.72rem;color:var(--txt2);margin-bottom:.5rem}
+.chart-card.split2>.split2-sub{font-size:.79rem;color:var(--txt2);margin-bottom:.5rem}
 .chart-card.split2 .goal-lbl{flex:0 0 68px;white-space:nowrap}
 .chart-card.split2 .goal-val{grid-template-columns:1.4rem 2.4rem;column-gap:.3rem}
 
@@ -482,13 +482,13 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
 /* Health Score tooltip / komponenten */
 
 /* No-data / hints */
-.no-data{background:var(--card);border-radius:var(--r);padding:1.5rem;box-shadow:var(--shadow);text-align:center;color:var(--txt3);font-size:.84rem;line-height:1.7;margin-bottom:.7rem}
+.no-data{background:var(--card);border-radius:var(--r);padding:1.5rem;box-shadow:var(--shadow);text-align:center;color:var(--txt3);font-size:.92rem;line-height:1.7;margin-bottom:.7rem}
 .no-data strong{color:var(--txt2);display:block;margin-bottom:.4rem}
-.field-hint{font-size:.66rem;background:#F8FAFC;border-radius:6px;padding:.5rem .7rem;margin-top:.6rem;text-align:left;color:var(--txt2);line-height:1.8}
-.field-hint code{font-family:monospace;font-size:.73rem;color:var(--accent);background:#EEF2FF;padding:.05rem .25rem;border-radius:3px}
+.field-hint{font-size:.73rem;background:#F8FAFC;border-radius:6px;padding:.5rem .7rem;margin-top:.6rem;text-align:left;color:var(--txt2);line-height:1.8}
+.field-hint code{font-family:monospace;font-size:.8rem;color:var(--accent);background:#EEF2FF;padding:.05rem .25rem;border-radius:3px}
 
 /* Misc */
-.badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.7rem;font-weight:700}
+.badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.77rem;font-weight:700}
 
 /* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
    Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
@@ -515,9 +515,9 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
    keine Rolle mehr. Absolut positioniert liesse sich der Inhalt nicht zentrieren:
    die Abweichungszeile brauchte einen einseitigen Rand als Ausgleich. */
 .ti-metric .info-i{width:13px;height:13px}
-.ti-metric-lbl{font-size:.66rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;justify-content:center;gap:.25rem;flex-wrap:wrap}
-.ti-metric-val{font-size:1.07rem;font-weight:800;color:var(--txt);line-height:1.2}
-.ti-metric-delta{font-size:.67rem;font-weight:500;margin-top:.25rem}
+.ti-metric-lbl{font-size:.73rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;justify-content:center;gap:.25rem;flex-wrap:wrap}
+.ti-metric-val{font-size:1.18rem;font-weight:800;color:var(--txt);line-height:1.2}
+.ti-metric-delta{font-size:.74rem;font-weight:500;margin-top:.25rem}
 .ti-metric-delta.pos{color:#10B981}
 .ti-metric-delta.neg{color:#EF4444}
 .ti-metric-delta.neu{color:var(--txt3)}
@@ -526,18 +526,18 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
 
 /* Recommendation Card */
 .rec-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);border-left:4px solid var(--rec-color,#0891B2);display:flex;flex-direction:column}
-.rec-status{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;font-size:.73rem;font-weight:700;margin-bottom:.5rem}
-.rec-title{font-size:.82rem;font-weight:800;margin-bottom:.3rem}
-.rec-text{font-size:.7rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
+.rec-status{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;font-size:.8rem;font-weight:700;margin-bottom:.5rem}
+.rec-title{font-size:.9rem;font-weight:800;margin-bottom:.3rem}
+.rec-text{font-size:.77rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
 
 /* Score Drivers */
 
 /* Warning Card */
 .warn-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #F97316;display:flex;gap:.7rem;align-items:flex-start}
-.warn-title{font-size:.8rem;font-weight:700;margin-bottom:.2rem}
-.warn-text{font-size:.73rem;color:var(--txt2);line-height:1.55}
+.warn-title{font-size:.88rem;font-weight:700;margin-bottom:.2rem}
+.warn-text{font-size:.8rem;color:var(--txt2);line-height:1.55}
 .warn-signals{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem}
-.warn-sig{font-size:.64rem;padding:.1rem .4rem;border-radius:999px;background:#FFF7ED;color:#C2410C;font-weight:600}
+.warn-sig{font-size:.7rem;padding:.1rem .4rem;border-radius:999px;background:#FFF7ED;color:#C2410C;font-weight:600}
 body.dark .warn-sig{background:#431407;color:#FB923C}
 
 /* Baseline Comparison */
@@ -547,11 +547,11 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 .debt-bar-bg{height:10px;border-radius:5px;background:#F1F5F9;overflow:hidden}
 .debt-bar-fill{height:100%;border-radius:5px;transition:width .5s ease}
 .debt-tt-wrap{position:relative;cursor:help}
-.debt-tt{position:fixed;background:#1E293B;color:#F1F5F9;border-radius:10px;padding:.7rem .9rem;font-size:.66rem;line-height:1.5;min-width:270px;box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:9999;opacity:0;pointer-events:none;transition:opacity .15s;border:1px solid rgba(255,255,255,.09)}
+.debt-tt{position:fixed;background:#1E293B;color:#F1F5F9;border-radius:10px;padding:.7rem .9rem;font-size:.73rem;line-height:1.5;min-width:270px;box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:9999;opacity:0;pointer-events:none;transition:opacity .15s;border:1px solid rgba(255,255,255,.09)}
 .debt-tt.visible{opacity:1}
 .debt-tt::after{content:'';position:absolute;top:100%;left:var(--arrow-left,50%);transform:translateX(-50%);border:6px solid transparent;border-top-color:#1E293B}
-.debt-tt-title{font-size:.69rem;font-weight:700;margin-bottom:.45rem;border-bottom:1px solid rgba(255,255,255,.13);padding-bottom:.3rem;opacity:.9}
-.debt-tt-hd{display:grid;grid-template-columns:5.2rem 3.8rem 5rem;gap:.2rem;font-size:.62rem;opacity:.5;padding-bottom:.2rem;margin-bottom:.1rem}
+.debt-tt-title{font-size:.76rem;font-weight:700;margin-bottom:.45rem;border-bottom:1px solid rgba(255,255,255,.13);padding-bottom:.3rem;opacity:.9}
+.debt-tt-hd{display:grid;grid-template-columns:5.2rem 3.8rem 5rem;gap:.2rem;font-size:.68rem;opacity:.5;padding-bottom:.2rem;margin-bottom:.1rem}
 .debt-tt-row{display:grid;grid-template-columns:5.2rem 3.8rem 5rem;gap:.2rem;align-items:center;padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .debt-tt-row:last-child{border:none}
 .debt-tt-date{color:rgba(241,245,249,.6)}
@@ -577,8 +577,8 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
   opacity:0;transition:opacity .15s;
 }
 #cal-tip.visible{opacity:1}
-.cal-tip-title{font-weight:700;font-size:.68rem;margin-bottom:.3rem;color:var(--txt)}
-.cal-tip-row{font-size:.63rem;color:var(--txt2);margin:.1rem 0}
+.cal-tip-title{font-weight:700;font-size:.75rem;margin-bottom:.3rem;color:var(--txt)}
+.cal-tip-row{font-size:.69rem;color:var(--txt2);margin:.1rem 0}
 
 /* Tap-Zustand der reinen CSS-Tooltips – Gegenstück zu den :hover-Regeln,
    damit sie auch ohne Mauszeiger (iPhone) erreichbar sind. *//* EW Check */
@@ -588,9 +588,9 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 .pi-grid>*{min-width:0;overflow:hidden}
 .pi-card{background:var(--card);border-radius:var(--r);padding:.75rem .85rem;box-shadow:var(--shadow);border-top:3px solid #E2E8F0}
 .pi-head{display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem}
-.pi-icon{font-size:1.03rem;flex-shrink:0}
-.pi-conf{font-size:.64rem;font-weight:700;color:var(--txt2)}
-.pi-text{font-size:.68rem;color:var(--txt2);line-height:1.55}
+.pi-icon{font-size:1.13rem;flex-shrink:0}
+.pi-conf{font-size:.7rem;font-weight:700;color:var(--txt2)}
+.pi-text{font-size:.75rem;color:var(--txt2);line-height:1.55}
 
 /* Coaching Hint */
 
@@ -638,7 +638,7 @@ body.dark .debt-bar-bg { background: #334155; }
 
 /* Display L – große, plakative Zahlen */
 .kpi-val{
-  font-size: 2rem !important;
+  font-size: 2.2rem !important;
   line-height: 1.1;
   letter-spacing: -.02em !important;
 }
@@ -646,7 +646,7 @@ body.dark .debt-bar-bg { background: #334155; }
 /* Display M – Mini-Werte, Banner-Titel, Score-Kategorie */
 .ti-metric-val,
 .pg-banner-title{
-  font-size: 1.2rem !important;
+  font-size: 1.32rem !important;
   line-height: 1.2;
 }
 
@@ -660,7 +660,7 @@ h5,
 .rec-title,
 .warn-title,
 .pi-head{
-  font-size: 1rem !important;
+  font-size: 1.1rem !important;
   line-height: 1.3;
 }
 
@@ -668,7 +668,7 @@ h5,
 .pi-text,
 .warn-text,
 .no-data{
-  font-size: .85rem !important;
+  font-size: .94rem !important;
   line-height: 1.5;
 }
 
@@ -682,7 +682,7 @@ h5,
 .kpi-unit,
 .kpi-delta,
 .kpi-sub{
-  font-size: .75rem !important;
+  font-size: .83rem !important;
   line-height: 1.4;
 }
 
@@ -700,14 +700,14 @@ h5,
 .warn-sig,
 .warn-signals,
 .badge{
-  font-size: .65rem !important;
+  font-size: .72rem !important;
   line-height: 1.4;
 }
 
 /* Bottom-Nav Tab-Labels bleiben klein – iOS-Tab-Konvention */
 #bottom-nav .nav-btn,
 #bottom-nav .nav-btn span {
-  font-size: 10px !important;
+  font-size: 11px !important;
 }
 
 /* Chart.js Tooltips und Legenden rendern auf Canvas – CSS hat dort keinen Einfluss */

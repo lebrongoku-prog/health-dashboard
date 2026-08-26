@@ -109,20 +109,20 @@ function _buildCalHTML(year, month) {
     const ring=isToday?'box-shadow:0 0 0 2px #F97316;':'';
     const fw=isTrain||isToday?'700':'400';
     cells+=`<div class="cal-cell${isTrain?' cal-train':''}"${isTrain?` data-day="${ds}" tabindex="0" role="button" aria-label="Training am ${ds}"`:''}>
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.74rem;font-weight:${fw};${ring}">${d}</div>
+      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.81rem;font-weight:${fw};${ring}">${d}</div>
     </div>`;
   }
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-    <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
-    <span style="font-size:.72rem;font-weight:700;color:var(--txt)">${monthStr}</span>
-    <button class="nav-arrow" style="width:32px;height:32px;font-size:.9rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
+    <button class="nav-arrow" style="width:32px;height:32px;font-size:.99rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
+    <span style="font-size:.79rem;font-weight:700;color:var(--txt)">${monthStr}</span>
+    <button class="nav-arrow" style="width:32px;height:32px;font-size:.99rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:.3rem">
-    ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
+    ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
     ${cells}
   </div>
-  <div style="font-size:.64rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
+  <div style="font-size:.7rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
@@ -161,7 +161,7 @@ const ACHSEN_COLOR = 'rgba(148,163,184,0.38)';
 Chart.defaults.color = '#94A3B8';
 Chart.defaults.borderColor = ACHSEN_COLOR;
 Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif";
-Chart.defaults.font.size = 10;
+Chart.defaults.font.size = 11;
 
 // Schlankere Balken in ALLEN Diagrammen (Chart.js-Standard: 0.9 / 0.8).
 // barPercentage      = Breite des Balkens innerhalb seines Slots
@@ -947,8 +947,8 @@ window.addEventListener('scroll', () => { if (_ttOpenEl) closeTooltips(); }, tru
 
 // Nur waagrechte Gitterlinien: die senkrechten trennten lediglich die Kategorien,
 // die ohnehin durch die Achsenbeschriftung getrennt sind.
-const gx = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:9}}};
-const gy = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:9}}};
+const gx = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}}};
+const gy = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:10}}};
 
 // ═══════════════════════════════════════════════════════════
 // Zielwerte – EINE Quelle für alle Soll/Ist-Vergleiche
@@ -1553,7 +1553,7 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
+    <div style="font-size:.79rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
     <div class="pi-grid">
       ${patternIns.map(p=>{
         let txt=p.text;
@@ -1605,7 +1605,7 @@ function pgOverview() {
         scales:{
           x:{...gx},
           yL:{position:'left',...gy,suggestedMin:0,suggestedMax:10,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}},
-          yR:{position:'right',display:true,grid:{display:false},ticks:{color:'#94A3B8',font:{size:9}},suggestedMin:30,suggestedMax:100}
+          yR:{position:'right',display:true,grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}},suggestedMin:30,suggestedMax:100}
         }
       }
     });
@@ -1791,7 +1791,7 @@ function pgHerz() {
       _yMax=Math.ceil(_hi/_yStep)*_yStep;        // auf Schritt aufrunden
       if(_yMin===_yMax)_yMax=_yMin+_yStep;
     }
-    const _yAxis=extra=>({min:_yMin,max:_yMax,ticks:{color:'#94A3B8',font:{size:9},stepSize:_yStep,callback:v=>Math.round(v)},...extra});
+    const _yAxis=extra=>({min:_yMin,max:_yMax,ticks:{color:'#94A3B8',font:{size:10},stepSize:_yStep,callback:v=>Math.round(v)},...extra});
     zeichneDiagramm('c-herz',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
@@ -1928,7 +1928,7 @@ function pgSchlaf() {
           ${statZeile(`Summe über ${sleepDebt.nDays} Nächte`, `${sleepDebt.total!=null?(sleepDebt.total>0?'−'+alsStdMin(sleepDebt.total):'+'+alsStdMin(-sleepDebt.total)):'—'}`, `${sleepDebt.total!=null?(sleepDebt.total>0?'#EF4444':'#10B981'):'var(--txt3)'}`)}
         </div>
         <div class="debt-bar-wrap">
-          ${sleepDebt.perNight!=null?`<div style="font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">${debtLvl.label} · Balken voll bei Ø ${alsStdMin(SLEEP_DEBT_FULL_BAR_H)} Defizit pro Nacht</div>
+          ${sleepDebt.perNight!=null?`<div style="font-size:.66rem;color:var(--txt3);margin-bottom:.3rem">${debtLvl.label} · Balken voll bei Ø ${alsStdMin(SLEEP_DEBT_FULL_BAR_H)} Defizit pro Nacht</div>
           <div class="debt-tt-wrap" tabindex="0" role="button" aria-label="Zusammensetzung der Schlafschuld anzeigen">
             <div class="debt-bar-bg"><div class="debt-bar-fill" style="width:${Math.min(100,Math.max(0,(sleepDebt.perNight/SLEEP_DEBT_FULL_BAR_H)*100))}%;background:${debtLvl.color}"></div></div>
             <div class="debt-tt">
@@ -2075,7 +2075,7 @@ async function pgTraining() {
   //    fehlgeschlagener Abruf nicht in einem dauerhaften Ladezustand endet.
   //    Muss VOR der Auswertung stehen: sonst würde mit noch leerem workoutData gerechnet.
   if(!workoutSheetReady){
-    document.getElementById("screen-training").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;height:180px;color:var(--txt3);font-size:.8rem">⏳ Workout-Daten werden geladen…</div>`;
+    document.getElementById("screen-training").innerHTML=`<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;height:180px;color:var(--txt3);font-size:.88rem">⏳ Workout-Daten werden geladen…</div>`;
     await _awaitWorkoutSheet(10000);
   }
   const woProblem = !workoutSheetReady
@@ -2332,7 +2332,7 @@ async function pgTraining() {
           x:{...gx,ticks:{...gx.ticks,maxRotation:45,minRotation:30}},
           yL:{position:'left',...gy,ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}},
           yR:{position:'right',grid:{display:false},
-            ticks:{color:'#94A3B8',font:{size:9},callback:v=>Math.round(v)+' bpm'},
+            ticks:{color:'#94A3B8',font:{size:10},callback:v=>Math.round(v)+' bpm'},
             min:100,max:woHR.some(v=>v!=null)?Math.ceil((Math.max(...woHR.filter(v=>v!=null))+10)/10)*10:200}
         }
       }
