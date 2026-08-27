@@ -325,7 +325,17 @@ body.dark #bottom-nav {
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.73rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
-.chart-wrap{position:relative;overflow:hidden}
+.chart-wrap{position:relative;overflow:hidden;height:var(--h,200px)}
+/* Die beiden Trainings-Diagramme teilen sich eine Zeile und wachsen mit ihr mit. */
+.chart-wrap.chart-wrap-flex{height:auto;flex:1;min-height:var(--h,200px)}
+/* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
+   Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
+   sondern zu hoch FUER SEINE BREITE. Deshalb hier knapp ein Drittel flacher; im
+   Querformat bleibt die volle Hoehe. Ein Faktor, eine Stelle: hier drehen. */
+@media (orientation: portrait) {
+  .chart-wrap{height:calc(var(--h,200px) * .7)}
+  .chart-wrap.chart-wrap-flex{min-height:calc(var(--h,200px) * .7)}
+}
 
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}

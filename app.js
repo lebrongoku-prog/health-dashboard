@@ -1548,7 +1548,7 @@ function pgOverview() {
         <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV</div>
         <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Training':'Schritte'}</div>
       </div>
-      <div class="chart-wrap" style="height:360px"><canvas id="c-woche"></canvas></div>
+      <div class="chart-wrap" style="--h:360px"><canvas id="c-woche"></canvas></div>
     </div>
 
     <!-- Pattern Insights -->
@@ -1759,7 +1759,7 @@ function pgHerz() {
         <div class="cl-item"><span class="cl-line" style="background:rgba(100,116,139,.55)"></span>Ziel</div>
       </div>
       <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
-      <div class="chart-wrap" style="height:315px"><canvas id="c-herz"></canvas></div>
+      <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
       <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
@@ -1949,7 +1949,7 @@ function pgSchlaf() {
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
         </div>
-        <div class="chart-wrap" style="height:279px"><canvas id="c-sl-dur"></canvas></div>
+        <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
@@ -1971,7 +1971,7 @@ function pgSchlaf() {
         <div class="cl-item"><span class="cl-dot" style="background:#2186E8"></span>Leicht</div>
         <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tief</div>
       </div>
-      <div class="chart-wrap" style="height:270px"><canvas id="c-sl-phases"></canvas></div>
+      <div class="chart-wrap" style="--h:270px"><canvas id="c-sl-phases"></canvas></div>
       ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
         ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
         ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
@@ -1980,7 +1980,7 @@ function pgSchlaf() {
       </div>`:''}
     </div>`:''}
 
-    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="height:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
+    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
 
 
   if(tHD){
@@ -2198,7 +2198,7 @@ async function pgTraining() {
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
         <h3>Trainingszeit</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
-        <div class="chart-wrap" style="flex:1;min-height:210px"><canvas id="c-tot-zeit"></canvas></div>
+        <div class="chart-wrap chart-wrap-flex" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
@@ -2209,7 +2209,7 @@ async function pgTraining() {
       <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
         <h3>Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
-        <div class="chart-wrap" style="flex:1;min-height:210px"><canvas id="c-tot-strecke"></canvas></div>
+        <div class="chart-wrap chart-wrap-flex" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
@@ -2224,12 +2224,12 @@ async function pgTraining() {
         ${trendDist.some(v=>v!=null)?`<div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>Distanz</div>`:''}
         ${trendHR.some(v=>v!=null)?`<div class="cl-item"><span class="cl-line" style="background:#EF4444"></span>Puls</div>`:''}
       </div>
-      <div class="chart-wrap" style="height:300px"><canvas id="c-wo-trend"></canvas></div>
+      <div class="chart-wrap" style="--h:300px"><canvas id="c-wo-trend"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div></div>
-      <div class="chart-wrap" style="height:300px"><canvas id="c-tr-pace"></canvas></div>
+      <div class="chart-wrap" style="--h:300px"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
         ${paceWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`)}`:''}
@@ -2393,7 +2393,7 @@ function vo2Abschnitt(D, P) {
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div></div>
-      <div class="chart-wrap" style="height:300px"><canvas id="c-vo2"></canvas></div>
+      <div class="chart-wrap" style="--h:300px"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
         ${statZeile(`Einordnung`, `${v2cat}`, `${v2catColor}`)}
@@ -2496,7 +2496,7 @@ function pgAktivitaet() {
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#059669"></span>Schritte</div>
         </div>
-        <div class="chart-wrap" style="height:278px"><canvas id="c-steps"></canvas></div>
+        <div class="chart-wrap" style="--h:278px"><canvas id="c-steps"></canvas></div>
         ${stDisplayAvg!=null||stWeek!=null||stWknd!=null?`
         <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Schritte`, `${stDisplayAvg!=null?stDisplayAvg.toLocaleString('de-CH'):'—'}`)}
@@ -2510,7 +2510,7 @@ function pgAktivitaet() {
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:#34D399"></span>Kalorien</div>
         </div>
-        <div class="chart-wrap" style="height:278px"><canvas id="c-cals"></canvas></div>
+        <div class="chart-wrap" style="--h:278px"><canvas id="c-cals"></canvas></div>
         ${calDisplayAvg!=null||calWeek!=null||calWknd!=null?`
         <div class="stats-list diagramm-fuss">
           ${statZeile(`Ø Kalorien`, `${calDisplayAvg!=null?Math.round(calDisplayAvg).toLocaleString('de-CH')+' kcal':'—'}`)}

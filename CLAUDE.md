@@ -197,6 +197,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
+- **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
+  Das CSS staffelt sie nach Orientierung: im Querformat die volle Höhe, im Hochformat
+  **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist
+  die Karte nur halb so breit, dieselbe Höhe lässt das Diagramm fast quadratisch
+  wirken. Der Faktor steht an **einer** Stelle (`@media (orientation: portrait)`).
+  Die beiden Trainings-Diagramme teilen sich eine Zeile und nutzen
+  `.chart-wrap-flex` mit `min-height` statt `height`.
 - **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
 - **Tooltips:** ein zentrales System für Maus **und** Fingertipp. Neue Tooltip-Anker gehören in
   `TT_TAP_SELECTOR`; `openTooltip()`/`closeTooltips()` regeln den Rest. Reine CSS-`:hover`-
