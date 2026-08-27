@@ -247,6 +247,21 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
 - **Herz-Tab:** die Einordnungs-Karte (`rec-card`) steht **zuunterst**, nach dem
   Verlaufs-Diagramm — erst die Zahlen, dann deren Deutung.
+- **Vergleichsdiagramm (`c-kombi`, zuoberst im Training-Tab):** vier Reihen —
+  Trainingszeit (Balken), Puls, Laufstrecke, Pace (Linien). `KOMBI_REIHEN` ist die
+  **einzige** Quelle für Farbe, Einheit, Achse und Format; die Legende, die Datensätze
+  und die Fusszeilen werden daraus erzeugt. Die Legendeneinträge sind `<button>` —
+  sonst würde der Hintergrund-Tipp die Bottom-Nav umschalten. Die Auswahl liegt in
+  `_kombiAktiv` **ausserhalb** von `pgTraining`, sonst wäre sie nach jedem Re-Render
+  zurückgesetzt; die letzte aktive Reihe lässt sich nicht abschalten.
+  **Zwei Achsen nach Grössenordnung:** links Minuten + bpm, rechts km + min/km. Eine
+  Achse erscheint nur, wenn eine ihrer Reihen aktiv ist.
+  **Ab 3M zeigen Zeit UND Strecke den Ø pro Training**, nicht die Summe — als Summen
+  (500+ min, 100+ km) drückten sie Puls und Pace auf derselben Achse platt. Die
+  Fusszeile `Total` nennt weiterhin die echte Summe, eine `chart-note` sagt es an.
+  **Fusszeilen:** `Total` überspringt Puls und Pace (`summierbar:false`) und entfällt
+  ganz, wenn keine summierbare Reihe aktiv ist; die Ø-Zeilen zeigen alle aktiven
+  Reihen, getrennt durch `|`.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
   `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
   aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei

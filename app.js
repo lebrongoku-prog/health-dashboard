@@ -1813,6 +1813,10 @@ function pgHerz() {
   }
 }
 
+// Welche Reihen des Vergleichsdiagramms sind eingeblendet? Ueberlebt Re-Render und
+// Tabwechsel – sonst waere die Auswahl nach jedem Klick auf die Zeitpfeile zurueck.
+let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
+
 // ── Schlaf ─────────────────────────────────────────────
 function pgSchlaf() {
   const D=filtered(), P=prevPeriod();
@@ -2076,6 +2080,24 @@ async function pgTraining() {
     return;
   }
 
+  // ── Vergleichsdiagramm: vier Reihen, per Legende ein- und ausblendbar ──
+  // Achsenpaare nach Groessenordnung: links Minuten und bpm, rechts Kilometer und
+  // Pace. Ohne diese Paarung waere jede Reihe neben dem Puls (120-180) eine flache
+  // Linie am unteren Rand.
+  const KOMBI_REIHEN = [
+    {id:'zeit',    label:'Zeit',    farbe:'#F97316', achse:'yL', typ:'bar',
+     fmt:v=>fmtMin(v),            summierbar:true},
+    {id:'hr',      label:'Puls',    farbe:'#EF4444', achse:'yL', typ:'line',
+     fmt:v=>Math.round(v)+' bpm', summierbar:false},
+    // Nicht das Orange des Laufstrecke-Diagramms: neben der orangen Zeitreihe waeren
+    // die beiden hier kaum auseinanderzuhalten. Teal steht deutlich gegen Orange,
+    // Rot und Violett.
+    {id:'strecke', label:'Strecke', farbe:'#0891B2', achse:'yR', typ:'line',
+     fmt:v=>zahl(v,2)+' km',      summierbar:true},
+    {id:'pace',    label:'Pace',    farbe:'#7C3AED', achse:'yR', typ:'line',
+     fmt:v=>fmtPace(v)+' min/km', summierbar:false}
+  ];
+
   // ── Trainingstage im aktuellen Filterzeitraum ──
   // Quelle ist ausschließlich das Workout-Sheet (workoutData). Tage mit runSpeed
   // in Health-CSV, die NICHT im Workout-Sheet stehen, zählen nicht mehr als Training.
@@ -2115,6 +2137,9 @@ async function pgTraining() {
   const distWkndAvg=_avgNn(_wkndIdx.map(i=>trendDist[i]));
   const paceWkdAvg=_avgNn(_wkdIdx.map(i=>trendPace[i]));
   const paceWkndAvg=_avgNn(_wkndIdx.map(i=>trendPace[i]));
+  const hrWkdAvg=_avgNn(_wkdIdx.map(i=>trendHR[i]));
+  const hrWkndAvg=_avgNn(_wkndIdx.map(i=>trendHR[i]));
+  const paceGesamt=_avgNn(trendPace), hrGesamt=_avgNn(trendHR);
 
   // Totals for period
 
@@ -2141,8 +2166,14 @@ async function pgTraining() {
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
   // NOTE: _woByDate was removed — it filtered to runSpeed-dates only, excluding indoor workouts
-  const woRows=D.map(r=>({date:r.date,_woDurMin:workoutData[r.date]?.durationMin??null,_woDistKm:workoutData[r.date]?.distanceKm??null}));
-  const {alignSum:tASwo}=timeDim(woRows);
+  const woRows=D.map(r=>({date:r.date,_woDurMin:workoutData[r.date]?.durationMin??null,_woDistKm:workoutData[r.date]?.distanceKm??null,
+    _woHR:workoutData[r.date]?.avgHR??null,
+    // Pace mit demselben Rueckgriff wie im Pace-Diagramm: erst GPS, dann Uhr.
+    _woPace:(()=>{const kmh=r.runSpeed>0?r.runSpeed:(workoutData[r.date]?.avgSpeedKph>0?workoutData[r.date].avgSpeedKph:null);
+      return kmh!=null?paceFromSpeed(kmh):null;})(),
+    // Zaehlt die Trainings je Zeitraum – gebraucht fuer "Oe pro Training".
+    _woAnzahl:workoutData[r.date]?1:null}));
+  const {align:tAvgWo,alignSum:tASwo}=timeDim(woRows);
   // Gesamtwerte des dargestellten Zeitraums – Summe ueber alle Tage des Fensters,
   // unabhaengig von der gewaehlten Aggregation (Tag/Woche/Monat).
   const summe = feld => { const v = woRows.map(r=>r[feld]).filter(x=>x!=null);
@@ -2159,6 +2190,7 @@ async function pgTraining() {
 
   // 1M: build full calendar-month arrays + Monday indices for week gridlines
   let _1mLabels=tL, _1mKeys=tKeys, _1mMinData=minSmD, _1mDistData=distSmD;
+  let _1mHRData=tAvgWo('_woHR'), _1mPaceData=tAvgWo('_woPace');
   if(timeRange==='1m'){
     const _rd=new Date(referenceDate+'T00:00:00');
     const _yr=_rd.getFullYear(), _mo=_rd.getMonth();
@@ -2169,6 +2201,10 @@ async function pgTraining() {
     _1mKeys=_moDays;
     _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
+    _1mHRData=_moDays.map(d=>workoutData[d]?.avgHR??null);
+    _1mPaceData=_moDays.map(d=>{const row=_bd[d];
+      const kmh=row?.runSpeed>0?row.runSpeed:(workoutData[d]?.avgSpeedKph>0?workoutData[d].avgSpeedKph:null);
+      return kmh!=null?paceFromSpeed(kmh):null;});
   }
 
   // hasAny stützt sich allein auf das Workout-Sheet – keine Health-CSV-Felder mehr.
@@ -2184,6 +2220,17 @@ async function pgTraining() {
 
   document.getElementById("screen-training").innerHTML=`
     ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?','#7C2D12','#F97316')}
+    <div class="chart-card">
+      <h3>Vergleich</h3>
+      <div class="chart-legend">
+        ${KOMBI_REIHEN.map(r=>`<button type="button" class="cl-item kombi-schalter${_kombiAktiv[r.id]?'':' aus'}" data-reihe="${r.id}" aria-pressed="${_kombiAktiv[r.id]?'true':'false'}">
+          <span class="${r.typ==='bar'?'cl-dot':'cl-line'}" style="background:${r.farbe}"></span>${r.label}</button>`).join('')}
+      </div>
+      ${!is7D()&&timeRange!=='1m'?`<div class="chart-note">Zeit und Strecke als Ø pro Training, damit sie neben Puls und Pace lesbar bleiben – die Summen stehen unten als Total.</div>`:''}
+      <div class="chart-wrap" style="--h:300px"><canvas id="c-kombi"></canvas></div>
+      <div class="stats-list diagramm-fuss" id="kombi-fuss"></div>
+    </div>
+
     <div class="three-col">
       <div class="chart-card" style="margin-bottom:0">
         <h3 style="margin:0 0 .5rem">Trainingskalender</h3>
@@ -2248,6 +2295,70 @@ async function pgTraining() {
     const el=document.getElementById('cal-training');
     if(el) el.innerHTML=_buildCalHTML(_calDate.y,_calDate.m);
   };
+
+  // ── Vergleichsdiagramm ──────────────────────────────────────────────────────
+  {
+    const _1m = timeRange==='1m';
+    const kLbls = _1m?_1mLabels:tL, kKeys = _1m?_1mKeys:tKeys, kKeyTyp = _1m?'tag':tKeyTyp;
+    // Ab 3M zeigt die Zeitreihe den Durchschnitt PRO TRAINING statt der Monatssumme.
+    // Sonst stuende sie bei 500+ Minuten neben einem Puls von 140 und drueckte ihn
+    // auf der gemeinsamen Achse zu einer flachen Linie. Die Fusszeile "Total" nennt
+    // weiterhin die Summe.
+    const proTraining = !is7D() && !_1m;
+    // Beide summierbaren Reihen gleich behandeln. Nur die Zeit umzustellen reichte
+    // nicht: die Strecke stuende als Monatssumme bei 100-160 km und drueckte die
+    // Pace (rund 5.5) auf der gemeinsamen rechten Achse platt.
+    const jeTraining = feld => { const sm=tASwo(feld), an=tASwo('_woAnzahl');
+      return sm.map((v,i)=> v!=null&&an[i]>0 ? v/an[i] : null); };
+    const kZeit    = _1m ? _1mMinData  : proTraining ? jeTraining('_woDurMin') : minSmD;
+    const kStrecke = _1m ? _1mDistData : proTraining ? jeTraining('_woDistKm') : distSmD;
+    const kHR   = _1m?_1mHRData:tAvgWo('_woHR');
+    const kPace = _1m?_1mPaceData:tAvgWo('_woPace');
+    const kDaten = {zeit:kZeit, hr:kHR, strecke:kStrecke, pace:kPace};
+
+    // Fusszeile: pro Zeile alle aktiven Reihen, die dort eine sinnvolle Zahl haben.
+    // "Total" laesst Puls und Pace aus - eine Summe von Pulswerten sagt nichts.
+    const kGesamt = {zeit:minGesamt, strecke:distGesamt, hr:hrGesamt, pace:paceGesamt};
+    const kWkd    = {zeit:minWeek,  strecke:distWkdAvg,  hr:hrWkdAvg,  pace:paceWkdAvg};
+    const kWknd   = {zeit:minWknd,  strecke:distWkndAvg, hr:hrWkndAvg, pace:paceWkndAvg};
+    window._kombiFussHTML = () => {
+      const zeile = (label, quelle, nurSummierbare) => {
+        const teile = KOMBI_REIHEN
+          .filter(r => _kombiAktiv[r.id] && (!nurSummierbare || r.summierbar) && quelle[r.id]!=null)
+          .map(r => r.fmt(quelle[r.id]));
+        return teile.length ? statZeile(label, teile.join(' | ')) : '';
+      };
+      return zeile('Total', kGesamt, true)
+           + zeile('Ø Wochentag (Mo–Fr)', kWkd, false)
+           + zeile('Ø Wochenende (Sa–So)', kWknd, false);
+    };
+
+    window._kombiZeichnen = () => {
+      const aktiv = KOMBI_REIHEN.filter(r => _kombiAktiv[r.id]);
+      const achseAktiv = id => aktiv.some(r => r.achse === id);
+      zeichneDiagramm('c-kombi',{__keys:kKeys,__keyTyp:kKeyTyp,type:'bar',
+        data:{labels:kLbls,datasets:aktiv.map(r=>({
+          label:r.label, data:kDaten[r.id], type:r.typ, yAxisID:r.achse,
+          ...(r.typ==='bar'
+            ? {backgroundColor:r.farbe+'CC', borderRadius:4}
+            : {borderColor:r.farbe, backgroundColor:'transparent', borderWidth:2,
+               tension:.3, pointRadius:3, pointBackgroundColor:r.farbe, spanGaps:true, fill:false})
+        }))},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+            label:ctx=>{ if(ctx.raw==null) return null;
+              const r = KOMBI_REIHEN.find(x=>x.label===ctx.dataset.label);
+              return r ? `${r.label}: ${r.fmt(ctx.raw)}` : null; }}}},
+          scales:{x:gx,
+            // Eine Achse erscheint nur, wenn mindestens eine ihrer Reihen aktiv ist.
+            yL:{...gy, display:achseAktiv('yL'), position:'left'},
+            yR:{...gy, display:achseAktiv('yR'), position:'right', grid:{drawOnChartArea:false}}}}});
+      const fuss = document.getElementById('kombi-fuss');
+      if (fuss) fuss.innerHTML = window._kombiFussHTML();
+    };
+  }
+
+  window._kombiZeichnen();
 
   // ── Totale Laufzeit & Laufstrecke ──
   {
@@ -2940,6 +3051,22 @@ function initScrollHideNav() {
     nav.classList.toggle('nav-hidden');
   });
 }
+
+// Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die
+// Schalter sind <button>, damit der Hintergrund-Tipp (Bottom-Nav) sie ausnimmt.
+document.body.addEventListener('click', (e) => {
+  const schalter = e.target.closest('.kombi-schalter');
+  if (!schalter) return;
+  const id = schalter.dataset.reihe;
+  // Die letzte aktive Reihe bleibt an - ein leeres Diagramm hilft niemandem.
+  if (_kombiAktiv[id] && Object.values(_kombiAktiv).filter(Boolean).length === 1) return;
+  _kombiAktiv[id] = !_kombiAktiv[id];
+  document.querySelectorAll('.kombi-schalter[data-reihe="'+id+'"]').forEach(b => {
+    b.classList.toggle('aus', !_kombiAktiv[id]);
+    b.setAttribute('aria-pressed', _kombiAktiv[id] ? 'true' : 'false');
+  });
+  if (typeof window._kombiZeichnen === 'function') window._kombiZeichnen();
+});
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────
 // Topbar-Buttons werden per Delegation auf document.body verkabelt,
