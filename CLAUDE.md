@@ -168,7 +168,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Das Ziel muss dabei im Sichtbereich bleiben, sonst liegt die Naht ausserhalb und alle
   Balken sehen einfarbig aus: beim Schlaf über `min = Ziel − 0.5`, bei den Schritten über
   `suggestedMax = Ziel × 1.05` (die Achse startet dort bei 0, die Gefahr liegt oben).
-  Zusätzlich tönt ein `zielBand`-Plugin die Fläche **oberhalb** des Ziels.
+  Zusätzlich markiert in beiden eine graue gestrichelte `zielLinie` den Zielwert. Sie
+  braucht dort `stack:'ziel'` — ohne eigenen Stapel addiert Chart.js sie auf die
+  gestapelten Balken und sie läge beim Schlaf bei 15h statt 7h30. Die früher getönte
+  Fläche oberhalb des Ziels (`zielBand`-Plugin) ist auf Wunsch entfallen.
 - **Farbe bedeutet Bewertung, nie Richtung.** Ob eine Abweichung gut oder schlecht ist, kommt
   aus `ZIELE[key].richtung` — ein sinkender Ruhepuls ist grün, obwohl der Wert fällt. Reine
   Beschreibungen (z. B. „Differenz Wochentag/Wochenende") bleiben neutral grau.
