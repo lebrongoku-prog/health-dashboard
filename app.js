@@ -2096,7 +2096,17 @@ async function pgTraining() {
   // minField removed – durationMin comes exclusively from Workout Data sheet (workoutData)
 
   // New chart data — durationMin + distanceKm from CSV workout files
-  const trendPace=trendDates.map(d=>{const row=D.find(r=>r.date===d);return row?.runSpeed>0?Math.round((60/row.runSpeed)*100)/100:null;});
+  // Pace vorrangig aus runSpeed (Health-Sheet, GPS-gemessen). Fehlt der Wert, springt
+  // die Geschwindigkeit aus dem Workout-Sheet ein – bei Indoor-Läufen gibt es kein GPS,
+  // dort schätzt die Uhr über die Armbewegung. Ohne diesen Rückgriff fehlte für jeden
+  // Lauf auf dem Laufband der Punkt im Diagramm, obwohl der Trainingstag selbst
+  // (aus dem Workout-Sheet) korrekt erkannt wurde.
+  const trendPace=trendDates.map(d=>{
+    const row=D.find(r=>r.date===d);
+    const kmh = row?.runSpeed>0 ? row.runSpeed
+              : (workoutData[d]?.avgSpeedKph>0 ? workoutData[d].avgSpeedKph : null);
+    return kmh!=null ? Math.round(paceFromSpeed(kmh)*100)/100 : null;
+  });
   // Werktags / Wochenende splits for new chart footers
   const _wkdIdx=trendDates.reduce((a,d,i)=>{const wd=new Date(d+'T00:00:00').getDay();if(wd>=1&&wd<=5)a.push(i);return a;},[]);
   const _wkndIdx=trendDates.reduce((a,d,i)=>{const wd=new Date(d+'T00:00:00').getDay();if(wd===0||wd===6)a.push(i);return a;},[]);

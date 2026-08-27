@@ -114,11 +114,17 @@ for (let i = N_DAYS - 1; i >= endOffset; i--) {
     ds + ' 23:' + String(Math.floor(rnd()*59)).padStart(2,'0'),
     ds + ' 07:' + String(Math.floor(rnd()*59)).padStart(2,'0')
   ]);
+  // Jeder vierte Lauf ist ein Indoor-Lauf: die Uhr misst dort keine GPS-Geschwindigkeit,
+  // im Health-Sheet bleibt runSpeed leer. Das Workout-Sheet liefert trotzdem eine
+  // geschaetzte Speed. Genau der Fall, in dem die Pace frueher fehlte.
+  const indoor = train && rnd() < 0.25;
+  if (indoor) health[health.length-1][12] = '';
   if (train) {
     const speed = 9.5 + rnd()*3, dur = 28 + rnd()*55;
     // Bezeichnungen wie sie Apple/Health Auto Export tatsächlich liefert – inklusive
     // der eigenwilligen Übersetzungen, an denen die frühere exakte Namensliste scheiterte.
-    workout.push([ds, ['Outdoor Ausführen','Hochintensives Intervalltraining','Innenräume Ausführen','Trail-Laufen'][Math.floor(rnd()*4)],
+    workout.push([ds, indoor ? 'Innenräume Ausführen'
+      : ['Outdoor Ausführen','Hochintensives Intervalltraining','Trail-Laufen'][Math.floor(rnd()*3)],
       dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30),
       Math.round(165+rnd()*20), speed.toFixed(2), Math.round(rnd()*260), Math.round(1200+rnd()*1600)]);
   }

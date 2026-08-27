@@ -38,6 +38,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - `.claude/_render-test.html` — Render-Prüfstand: ersetzt OAuth und Sheets-API durch erfundene
   Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
   `?scenario=normal|nodata|woerror|stale`. Nur Entwicklung, nicht Teil der App.
+  Jeder vierte Lauf ist dort ein **Indoor-Lauf**: `runSpeed` leer, Workout-Speed
+  vorhanden — der Fall, in dem die Pace früher fehlte.
   Zusätzlich `?raf=timer`: ersetzt `requestAnimationFrame` durch einen Timer. Nötig,
   weil der verdeckte Vorschau-Pane nicht zeichnet — dort feuert weder `rAF` noch ein
   `scroll`-Event, und framegebundene Logik (Auto-Hide der Nav, Blickanker) liesse sich
@@ -245,8 +247,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
 - **Herz-Tab:** die Einordnungs-Karte (`rec-card`) steht **zuunterst**, nach dem
   Verlaufs-Diagramm — erst die Zahlen, dann deren Deutung.
-- **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart aus `runSpeed`,
-  VO₂max-Sektion (zuunterst) aus `r.vo2max`.
+- **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
+  `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
+  aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei
+  Indoor-Läufen fehlt — ohne ihn blieb dort jeder Punkt leer, obwohl der Trainingstag
+  selbst (aus dem Workout-Sheet) erkannt wurde.
 
 - **App-Version:** `versionAnzeigen()` liest die laufende Version aus den Namen der
   Caches (`hcc-vNN`) — `sw.js` löscht beim Aktivieren alle fremden, es bleibt genau
