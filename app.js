@@ -1773,6 +1773,7 @@ function pgHerz() {
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
       <div class="stats-list diagramm-fuss">
+        ${statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
         ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
         ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
         ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} | ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
