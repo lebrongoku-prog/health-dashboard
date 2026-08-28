@@ -694,19 +694,29 @@ function _cssFarbe(name, fallback) {
 }
 
 // ── Ebene 1: Wochenenden tönen (nur bei Tagesauflösung) ──
-const wochenendePlugin = {
-  id: 'wochenende',
+// Feiner Strich am Wochenanfang – nur im 1M-Fenster, wo eine ganze Kalenderwoche
+// als Block erkennbar sein soll. Die frueher getoenten Wochenendspalten sind
+// entfallen: sie legten eine zweite Flaeche unter die Daten und stoerten dort, wo
+// ohnehin schon Ziel- und Markierungsflaechen liegen.
+const wochentrennerPlugin = {
+  id: 'wochentrenner',
   beforeDatasetsDraw(chart) {
-    if (chart.$keyTyp !== 'tag' || !chart.$keys) return;
+    if (timeRange !== '1m' || chart.$keyTyp !== 'tag' || !chart.$keys) return;
     const a = chart.chartArea; if (!a) return;
     const ctx = chart.ctx;
     ctx.save();
-    ctx.fillStyle = document.body.classList.contains('dark')
-      ? 'rgba(148,163,184,.10)' : 'rgba(100,116,139,.075)';
+    ctx.strokeStyle = ACHSEN_COLOR;
+    ctx.lineWidth = 1;
     chart.$keys.forEach((d, i) => {
-      if (!isWeekend(d)) return;
-      const sp = _spalte(chart, i);
-      ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
+      // Montag = Wochenanfang. Der Strich liegt auf der linken Kante seiner Spalte,
+      // also genau zwischen Sonntag und Montag. Der ganz linke entfaellt – dort ist
+      // schon die Achse.
+      if (i === 0 || new Date(d + 'T00:00:00').getDay() !== 1) return;
+      const x = Math.round(_spalte(chart, i).links) + 0.5;   // .5 = knackige 1px-Linie
+      ctx.beginPath();
+      ctx.moveTo(x, a.top);
+      ctx.lineTo(x, a.bottom);
+      ctx.stroke();
     });
     ctx.restore();
   }
@@ -799,7 +809,7 @@ function _chartTipp(chart, evt) {
   setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : k);
 }
 
-Chart.register(wochenendePlugin, markierungPlugin);
+Chart.register(wochentrennerPlugin, markierungPlugin);
 
 function killCharts() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -1795,8 +1805,13 @@ function pgHerz() {
     zeichneDiagramm('c-herz',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
-      zielLinie('restHR', hrMaL.length, 'yL'),
-      zielLinie('hrv',    hvMaL.length, 'yR')
+      // Ø-Linien in der Farbe ihrer Reihe statt der beiden grauen Ziellinien: bei zwei
+      // Kurven auf einer Skala liessen sich zwei gleich graue Hilfslinien nicht
+      // zuordnen. Die Zielwerte stehen in der Statuszeile der Übersicht.
+      {label:'Ø Ruhepuls',data:hrMaL.map(()=>hrD),borderColor:'#EF4444',borderDash:[5,4],
+       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yL'},
+      {label:'Ø HRV',data:hvMaL.map(()=>hvD),borderColor:'#2563EB',borderDash:[5,4],
+       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yR'}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
         filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV',
@@ -2013,9 +2028,15 @@ function pgSchlaf() {
       {label:'bis Ziel',data:_slBis,backgroundColor:'rgba(124,58,237,.85)',stack:'s',
        borderRadius:ctx=>_slUeber[ctx.dataIndex]>0?0:5},
       {label:'über Ziel',data:_slUeber,backgroundColor:'rgba(124,58,237,.32)',stack:'s',borderRadius:5},
-      // Eigener Stapel: sonst addiert Chart.js die Linie auf die Balken darunter und
-      // sie läge bei 15h statt bei 7h30.
-      {...zielLinie('sleepTotal', tL.length), stack:'ziel'}
+      // Beide Hilfslinien brauchen einen EIGENEN Stapel: sonst addiert Chart.js sie auf
+      // die Balken darunter und sie lägen bei 15h statt bei 7h30.
+      // Ziel: durchgezogen und im Grün, das die App für erreichte Ziele nutzt.
+      {label:'Ziel Schlaf',data:tL.map(()=>_slZiel),borderColor:'#10B981',borderWidth:1.5,
+       pointRadius:0,tension:0,fill:false,type:'line',spanGaps:true,stack:'ziel'},
+      // Ø gestrichelt in der Farbe der Balken.
+      ...(slD!=null?[{label:'Ø Schlafdauer',data:tL.map(()=>slD),borderColor:'rgba(124,58,237,.85)',
+       borderDash:[5,4],borderWidth:1.5,pointRadius:0,tension:0,fill:false,type:'line',
+       spanGaps:true,stack:'ziel-avg'}]:[])
     ]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
         // Der Balken ist aus zwei Segmenten aufgebaut, gemeint ist aber EINE Nacht:
@@ -2643,7 +2664,11 @@ function pgAktivitaet() {
        borderRadius:ctx=>_stUeber[ctx.dataIndex]>0?0:5},
       {label:'über Ziel',data:_stUeber,backgroundColor:'rgba(5,150,105,.32)',stack:'s',borderRadius:5},
       // Eigener Stapel: sonst addiert Chart.js die Linie auf die Balken darunter.
-      {...zielLinie('steps', tL.length), stack:'ziel'}
+      // Ziellinie entfällt – die Farbnaht der gestapelten Balken markiert das Ziel
+      // bereits. Stattdessen der Ø des Zeitraums, gestrichelt in der Balkenfarbe.
+      ...(stDisplayAvg!=null?[{label:'Ø Schritte',data:tL.map(()=>stDisplayAvg),
+       borderColor:'rgba(5,150,105,.85)',borderDash:[5,4],borderWidth:1.5,pointRadius:0,
+       tension:0,fill:false,type:'line',spanGaps:true,stack:'ziel'}]:[])
     ];
     // Das Ziel MUSS im Sichtbereich liegen. Bleibt man einen ganzen Zeitraum darunter,
     // läge die Farbnaht sonst über der Achse – alle Balken sähen einfarbig aus und die

@@ -119,6 +119,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Einträgen wird es eng, ab vier passt es nicht mehr: allein Punkte und Abstände
   belegen dann ~70 px. Zweizeilig sind deshalb Wochenverlauf, Schlafdauer und
   Schlafphasen — dort fehlen 31–46 px.
+- **Wochentrenner statt Wochenend-Tönung:** `wochentrennerPlugin` zieht **nur im
+  1M-Fenster** einen feinen Strich (`ACHSEN_COLOR`) auf die linke Kante jeder
+  Montagsspalte — die Grenze Sonntag/Montag. Die früher grau getönten Wochenendspalten
+  sind entfallen: sie legten eine zweite Fläche unter die Daten, wo ohnehin Ziel- und
+  Markierungsflächen liegen. Bei 7T liegt der Montag auf Index 0 (dort steht die
+  Achse), ab 3M gibt es keine Tagesschlüssel — in beiden Fällen erscheint nichts.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
 - **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
@@ -130,7 +136,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zurückscrollen wieder einblendete, fiel das nicht auf.
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
-  funktionieren Wochenend-Tönung und Markierung nicht. `timeDim` liefert beides mit;
+  funktionieren Wochentrenner und Markierung nicht. `timeDim` liefert beides mit;
   Diagramme mit eigener Achse (Training) setzen es selbst.
 - **Markierung:** Tipp auf eine Säule hebt sie in **allen** Diagrammen der App hervor —
   synchronisiert über das **Datum**, nicht über die Position (die 3. Säule im Trainings-
@@ -170,9 +176,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Das Ziel muss dabei im Sichtbereich bleiben, sonst liegt die Naht ausserhalb und alle
   Balken sehen einfarbig aus: beim Schlaf über `min = Ziel − 0.5`, bei den Schritten über
   `suggestedMax = Ziel × 1.05` (die Achse startet dort bei 0, die Gefahr liegt oben).
-  Zusätzlich markiert in beiden eine graue gestrichelte `zielLinie` den Zielwert. Sie
-  braucht dort `stack:'ziel'` — ohne eigenen Stapel addiert Chart.js sie auf die
-  gestapelten Balken und sie läge beim Schlaf bei 15h statt 7h30. Die früher getönte
+  Hilfslinien in diesen beiden brauchen `stack:'ziel'` (bzw. einen eigenen Stapelnamen)
+  — ohne eigenen Stapel addiert Chart.js sie auf die gestapelten Balken und sie lägen
+  beim Schlaf bei 15h statt 7h30. Beim Schlaf markiert eine **durchgezogene grüne**
+  Linie (`#10B981`, dasselbe Grün wie erreichte Ziele in den Fusszeilen) den Zielwert,
+  dazu eine gestrichelte Ø-Linie in Balkenfarbe. Bei den Schritten gibt es **keine**
+  Ziellinie mehr — nur die gestrichelte Ø-Linie in Balkenfarbe.
+  Im Diagramm **Ruhepuls & HRV** stehen statt der beiden grauen Ziellinien die
+  **Ø-Linien in der Farbe ihrer Reihe** (rot/blau): zwei gleich graue Hilfslinien
+  liessen sich bei zwei Kurven auf einer Skala nicht zuordnen. Die früher getönte
   Fläche oberhalb des Ziels (`zielBand`-Plugin) ist auf Wunsch entfallen.
 - **Farbe bedeutet Bewertung, nie Richtung.** Ob eine Abweichung gut oder schlecht ist, kommt
   aus `ZIELE[key].richtung` — ein sinkender Ruhepuls ist grün, obwohl der Wert fällt. Reine
