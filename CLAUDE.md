@@ -169,10 +169,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
-  **Ausnahme Schlafdauer- und Schritte-Diagramm:** dort keine `zielLinie`, sondern ein
-  zweifarbig gestapelter Balken (bis Ziel kräftig, Überschuss hell) — die Farbnaht IST
-  die Ziellinie. Beim Schlaf ausserdem, weil Ø-Linie und Ziellinie nur ~20 Min.
-  auseinanderlagen und optisch verschmolzen.
+  **Ausnahme Schritte-Diagramm:** dort keine `zielLinie`, sondern ein zweifarbig
+  gestapelter Balken (bis Ziel kräftig, Überschuss hell) — die Farbnaht IST die
+  Ziellinie.
+  **Schlafdauer-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
+  kräftig wenn die Nacht das Ziel erreicht, hell wenn nicht (`_slFarbe`). Die
+  gestapelte Struktur bleibt nur wegen der runden Ecke bestehen, beide Segmente
+  tragen dieselbe Farbe. Den Zielwert markiert die grüne Linie, nicht mehr eine
+  Farbnaht. Die Legende heisst deshalb „Ziel erreicht / verfehlt".
+  Bei Monatsauflösung bezieht sich die Farbe auf den **Monatsdurchschnitt** — die
+  Fusszeile zählt daneben die echten Nächte (24M: 4 kräftige Balken, 69 von 120).
   Das Ziel muss dabei im Sichtbereich bleiben, sonst liegt die Naht ausserhalb und alle
   Balken sehen einfarbig aus: beim Schlaf über `min = Ziel − 0.5`, bei den Schritten über
   `suggestedMax = Ziel × 1.05` (die Achse startet dort bei 0, die Gefahr liegt oben).

@@ -1965,8 +1965,8 @@ function pgSchlaf() {
       <div class="chart-card" style="margin-bottom:0">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>bis Ziel</div>
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>darüber</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>Ziel erreicht</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
         </div>
         <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
@@ -2015,19 +2015,20 @@ function pgSchlaf() {
     // mehr als 7h30, läge die Farbnaht sonst unterhalb der Achse – alle Balken sähen
     // einfarbig aus und die Zielerreichung wäre nicht mehr ablesbar.
     _slY.min = Math.min(_slY.min, ZIELE.sleepTotal.ziel - 0.5);
-    // Zweifarbiger Balken statt zusätzlicher Ziellinie: der Teil bis zum Ziel ist
-    // kräftig, der Überschuss darüber hell. Die Farbnaht liegt exakt auf 7h30 und
-    // IST damit die Ziellinie – gezeichnet werden muss keine. Vorher lagen hier
-    // zwei gestrichelte Linien (Ø und Ziel) nur ~20 Minuten auseinander und
-    // verschmolzen optisch zu einem unklaren Doppelstrich.
+    // Die Farbe gilt dem GANZEN Balken, nicht mehr einzelnen Segmenten: kräftig, wenn
+    // die Nacht das Ziel erreicht, hell wenn nicht. Zuvor war jeder Balken bis 7h30
+    // kräftig und darüber hell – man sah den Überschuss, aber nicht auf einen Blick,
+    // welche Nächte das Ziel verfehlten. Den Zielwert markiert jetzt die grüne Linie.
     const _slZiel = ZIELE.sleepTotal.ziel;
     const _slBis  = slMa.map(v=>v==null?null:Math.min(v,_slZiel));
     const _slUeber= slMa.map(v=>v==null?null:Math.max(0,v-_slZiel));
+    const _slErreicht = i => slMa[i]!=null && slMa[i] >= _slZiel;
+    const _slFarbe = ctx => _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:[
       // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
-      {label:'bis Ziel',data:_slBis,backgroundColor:'rgba(124,58,237,.85)',stack:'s',
+      {label:'bis Ziel',data:_slBis,backgroundColor:_slFarbe,stack:'s',
        borderRadius:ctx=>_slUeber[ctx.dataIndex]>0?0:5},
-      {label:'über Ziel',data:_slUeber,backgroundColor:'rgba(124,58,237,.32)',stack:'s',borderRadius:5},
+      {label:'über Ziel',data:_slUeber,backgroundColor:_slFarbe,stack:'s',borderRadius:5},
       // Beide Hilfslinien brauchen einen EIGENEN Stapel: sonst addiert Chart.js sie auf
       // die Balken darunter und sie lägen bei 15h statt bei 7h30.
       // Ziel: durchgezogen und im Grün, das die App für erreichte Ziele nutzt.
