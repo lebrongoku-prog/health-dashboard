@@ -226,8 +226,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist
   die Karte nur halb so breit, dieselbe Höhe lässt das Diagramm fast quadratisch
   wirken. Der Faktor steht an **einer** Stelle (`@media (orientation: portrait)`).
-  Die beiden Trainings-Diagramme teilen sich eine Zeile und nutzen
-  `.chart-wrap-flex` mit `min-height` statt `height`.
+  Alle Diagramm-Karten stehen einzeln untereinander — das frühere dreispaltige
+  Raster im Training-Tab (`three-col`) und die Klasse `.chart-wrap-flex` sind mit
+  der Neusortierung entfallen.
 - **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
 - **Tooltips:** ein zentrales System für Maus **und** Fingertipp. Neue Tooltip-Anker gehören in
   `TT_TAP_SELECTOR`; `openTooltip()`/`closeTooltips()` regeln den Rest. Reine CSS-`:hover`-
@@ -264,9 +265,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
-- **Herz-Tab:** die Einordnungs-Karte (`rec-card`) steht **zuunterst**, nach dem
-  Verlaufs-Diagramm — erst die Zahlen, dann deren Deutung.
-- **Vergleichsdiagramm (`c-kombi`, zuoberst im Training-Tab):** vier Reihen —
+- **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
+  **Herz** Ruhepuls & HRV → Ruhepuls-Einordnung → HRV-Einordnung → Herz-Kreislauf-
+  Einordnung. **Schlaf** Schlaf-Score-Kachel → Schlafdauer → Schlafschuld →
+  Schlafphasen-Verlauf → Schlafqualität-Verteilung → Schlaf-Score-Verlauf.
+  **Schritte** Anzahl Schritte → Aktive Kalorien → Schritteziel-Erreichung.
+  **Training** Trainingskalender → Trainingszeit → Vergleich → Laufstrecke →
+  Leistungs-Trend → Pace → VO₂max. Überall gilt: erst die Verläufe, dann die
+  Einordnung — erst die Zahlen, dann deren Deutung.
+- **Vergleichsdiagramm (`c-kombi`, im Training-Tab nach Kalender und Trainingszeit):** vier Reihen —
   Trainingszeit (Balken), Puls, Laufstrecke, Pace (Linien). `KOMBI_REIHEN` ist die
   **einzige** Quelle für Farbe, Einheit, Achse und Format; die Legende, die Datensätze
   und die Fusszeilen werden daraus erzeugt. Die Legendeneinträge sind `<button>` —

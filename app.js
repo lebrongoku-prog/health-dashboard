@@ -1722,6 +1722,25 @@ function pgHerz() {
 
   document.getElementById("screen-herz").innerHTML=`
     ${pgBanner('❤️','Herz','Ist mein Herz-Kreislauf-System stabil oder zeigt es Belastung?','#7F1D1D','#EF4444')}
+    <div class="chart-card">
+      <h3>Ruhepuls &amp; HRV</h3>
+      <div class="chart-legend">
+        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
+        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
+      </div>
+      <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
+      <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
+      <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
+           dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
+           waeren acht Stueck und damit laenger als das Diagramm darueber. -->
+      <div class="stats-list diagramm-fuss">
+        ${statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
+        ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
+        ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
+        ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} | ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
+      </div>
+    </div>
+
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>Ruhepuls-Einordnung ${infoI('restHR')}</h3>
@@ -1758,25 +1777,6 @@ function pgHerz() {
           ${statZeile(`Konsistenz`, `${hvKons}`, `${hvKonsFarbe}`)}
           ${statZeile(`Messpunkte`, `${hvf.length}d <span style="color:var(--txt3)">(${D.length>0?(hvf.length/D.length*100).toFixed(0):'—'}%)</span>`)}
         </div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h3>Ruhepuls &amp; HRV</h3>
-      <div class="chart-legend">
-        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
-        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
-      </div>
-      <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
-      <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
-      <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
-           dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
-           waeren acht Stueck und damit laenger als das Diagramm darueber. -->
-      <div class="stats-list diagramm-fuss">
-        ${statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
-        ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} | ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
       </div>
     </div>
 
@@ -1921,24 +1921,26 @@ function pgSchlaf() {
     ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
-    <!-- Zeile 2: Schlafqualität-Verteilung | Schlafschuld -->
-    <div class="two-col-eq">
-      <div class="chart-card split2" style="margin-bottom:0">
-        <h3>Schlafqualität-Verteilung</h3>
-        <div class="goal-list">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">(${(n6to7/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">(${(nBelow6/nTot*100).toFixed(0)}%)</span></span></div>
+      <div class="chart-card">
+        <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
+        <div class="chart-legend" style="margin-bottom:.3rem">
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
+          <div class="cl-item"><span class="cl-line" style="background:#10B981"></span>Ziel</div>
+          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(124,58,237,.85)"></span>Ø</div>
         </div>
-        <div class="stats-list">
-          ${statZeile(`Beste Nacht`, `${alsStdMin(slMax)}`, `#10B981`)}
-          ${statZeile(`Kürzeste Nacht`, `${alsStdMin(slMin)}`, `#EF4444`)}
-          ${statZeile(`Konsistenz`, `${consLabel}`, `${consColor}`)}
-          ${statZeile(`Messpunkte`, `${slRows.length}d <span style="color:var(--txt3)">(${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
-        </div>
+        <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
+        ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
+          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
+          ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
+          ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
+          ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
+          ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`)}
+`:``}
+        </div>`:''}
       </div>
-      <div class="chart-card" style="margin-bottom:0">
+
+      <div class="chart-card">
         <div class="chart-head"><h3>Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
           ${statZeile(`Zielschlaf pro Nacht`, `${alsStdMin(SLEEP_TARGET_H)}`)}
@@ -1958,29 +1960,7 @@ function pgSchlaf() {
           </div>`:''}
         </div>
       </div>
-    </div>
 
-    <!-- Zeile 3: Schlafdauer pro Monat | Schlafphasen-Aufteilung -->
-    <div class="two-col-eq">
-      <div class="chart-card" style="margin-bottom:0">
-        <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
-        <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
-          <div class="cl-item"><span class="cl-line" style="background:#10B981"></span>Ziel</div>
-          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(124,58,237,.85)"></span>Ø</div>
-        </div>
-        <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
-        ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
-          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
-          ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
-          ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
-          ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
-          ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`)}
-`:``}
-        </div>`:''}
-      </div>
-    </div>
 
     <!-- Verlauf steht auf Wunsch VOR der Aufteilung: erst der zeitliche Verlauf,
          dann die Zusammenfassung als Durchschnitt. -->
@@ -2000,6 +1980,22 @@ function pgSchlaf() {
         ${dpD!=null?`${statZeile(`Ø Tiefschlaf`, `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
       </div>`:''}
     </div>`:''}
+
+      <div class="chart-card split2">
+        <h3>Schlafqualität-Verteilung</h3>
+        <div class="goal-list">
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">(${(n6to7/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">(${(nBelow6/nTot*100).toFixed(0)}%)</span></span></div>
+        </div>
+        <div class="stats-list">
+          ${statZeile(`Beste Nacht`, `${alsStdMin(slMax)}`, `#10B981`)}
+          ${statZeile(`Kürzeste Nacht`, `${alsStdMin(slMin)}`, `#EF4444`)}
+          ${statZeile(`Konsistenz`, `${consLabel}`, `${consColor}`)}
+          ${statZeile(`Messpunkte`, `${slRows.length}d <span style="color:var(--txt3)">(${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+        </div>
+      </div>
 
     ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
 
@@ -2244,6 +2240,23 @@ async function pgTraining() {
 
   document.getElementById("screen-training").innerHTML=`
     ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?','#7C2D12','#F97316')}
+      <div class="chart-card">
+        <h3 style="margin:0 0 .5rem">Trainingskalender</h3>
+        <div id="cal-training">${_calDate?_buildCalHTML(_calDate.y,_calDate.m):''}</div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Trainingszeit</h3>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
+        <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
+        <div class="stats-list diagramm-fuss">
+          ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
+          ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
+          ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
+          ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
+        </div>
+      </div>
+
     <div class="chart-card">
       <h3>Vergleich</h3>
       <div class="chart-legend">
@@ -2255,26 +2268,10 @@ async function pgTraining() {
       <div class="stats-list diagramm-fuss" id="kombi-fuss"></div>
     </div>
 
-    <div class="three-col">
-      <div class="chart-card" style="margin-bottom:0">
-        <h3 style="margin:0 0 .5rem">Trainingskalender</h3>
-        <div id="cal-training">${_calDate?_buildCalHTML(_calDate.y,_calDate.m):''}</div>
-      </div>
-      <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
-        <h3>Trainingszeit</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
-        <div class="chart-wrap chart-wrap-flex" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
-        <div class="stats-list diagramm-fuss">
-          ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
-          ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
-          ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
-          ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
-        </div>
-      </div>
-      <div class="chart-card" style="margin-bottom:0;display:flex;flex-direction:column">
+      <div class="chart-card">
         <h3>Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
-        <div class="chart-wrap chart-wrap-flex" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
+        <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
@@ -2282,7 +2279,7 @@ async function pgTraining() {
           ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,2)} km`)}`:''}
         </div>
       </div>
-    </div>
+
     <div class="chart-card">
       <h3>${timeRange==='7d'||timeRange==='1m'?'Leistungs-Trend: Distanz & HR pro Training':'Distanz & HR pro Monat'}</h3>
       <div class="chart-legend">
@@ -2602,23 +2599,6 @@ function pgAktivitaet() {
     ${pgBanner('🚶','Schritte','Tägliche Bewegung, Schritte & Kalorienverbrauch','#064E3B','#10B981')}
 
     <!-- Row 2: Schritteziel-Erreichung -->
-    <div class="chart-card split2">
-      <h3>Schritteziel-Erreichung ${infoI('steps')}</h3>
-      <div class="goal-list">
-        <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">(${(n10k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">(${(n8k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">5k – 8k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n5k/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n5k}</span><span style="color:var(--txt3)">(${(n5k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 5.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nU5k/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nU5k}</span><span style="color:var(--txt3)">(${(nU5k/nTot*100).toFixed(0)}%)</span></span></div>
-      </div>
-      <div class="stats-list">
-        ${statZeile(`Bester Tag`, `${stMax!=null?Math.round(stMax).toLocaleString('de-CH'):'—'}`, `#10B981`)}
-        ${statZeile(`Schlechtester Tag`, `${stMin!=null?Math.round(stMin).toLocaleString('de-CH'):'—'}`, `#EF4444`)}
-        ${statZeile(`Längste Streak`, `${maxStreak} Tage`)}
-        ${statZeile(`Messpunkte`, `${stRows.length}d <span style="color:var(--txt3)">(${D.length>0?(stRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
-      </div>
-    </div>
-
-    <!-- Row 3: Schritte + Aktive Kalorien side by side -->
     <div class="two-col-eq">
       <div class="chart-card" style="margin-bottom:0">
         <h3>Anzahl Schritte</h3>
@@ -2650,6 +2630,22 @@ function pgAktivitaet() {
           ${calWeek!=null&&calWknd!=null?`${statZeile(`Differenz`, `${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal`)}`:``}
         </div>`:''}
       </div>`:'<div></div>'}
+    </div>
+
+    <div class="chart-card split2">
+      <h3>Schritteziel-Erreichung ${infoI('steps')}</h3>
+      <div class="goal-list">
+        <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">(${(n10k/nTot*100).toFixed(0)}%)</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">(${(n8k/nTot*100).toFixed(0)}%)</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">5k – 8k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n5k/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n5k}</span><span style="color:var(--txt3)">(${(n5k/nTot*100).toFixed(0)}%)</span></span></div>
+        <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 5.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nU5k/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nU5k}</span><span style="color:var(--txt3)">(${(nU5k/nTot*100).toFixed(0)}%)</span></span></div>
+      </div>
+      <div class="stats-list">
+        ${statZeile(`Bester Tag`, `${stMax!=null?Math.round(stMax).toLocaleString('de-CH'):'—'}`, `#10B981`)}
+        ${statZeile(`Schlechtester Tag`, `${stMin!=null?Math.round(stMin).toLocaleString('de-CH'):'—'}`, `#EF4444`)}
+        ${statZeile(`Längste Streak`, `${maxStreak} Tage`)}
+        ${statZeile(`Messpunkte`, `${stRows.length}d <span style="color:var(--txt3)">(${D.length>0?(stRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+      </div>
     </div>
     `;
 
