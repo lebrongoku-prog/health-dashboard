@@ -1766,7 +1766,6 @@ function pgHerz() {
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
-        <div class="cl-item"><span class="cl-line" style="background:rgba(100,116,139,.55)"></span>Ziel</div>
       </div>
       <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
       <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
@@ -1965,8 +1964,10 @@ function pgSchlaf() {
       <div class="chart-card" style="margin-bottom:0">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>Ziel erreicht</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
+          <div class="cl-item"><span class="cl-line" style="background:#10B981"></span>Ziel</div>
+          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(124,58,237,.85)"></span>Ø</div>
         </div>
         <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
@@ -2621,7 +2622,9 @@ function pgAktivitaet() {
       <div class="chart-card" style="margin-bottom:0">
         <h3>Anzahl Schritte</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:#059669"></span>Schritte</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(5,150,105,.85)"></span>erreicht</div>
+          <div class="cl-item"><span class="cl-dot" style="background:rgba(5,150,105,.32)"></span>verfehlt</div>
+          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(5,150,105,.85)"></span>Ø</div>
         </div>
         <div class="chart-wrap" style="--h:278px"><canvas id="c-steps"></canvas></div>
         ${stDisplayAvg!=null||stWeek!=null||stWknd!=null?`
@@ -2659,11 +2662,15 @@ function pgAktivitaet() {
     const _stZiel = ZIELE.steps.ziel;
     const _stBis   = stMa.map(v=>v==null?null:Math.min(v,_stZiel));
     const _stUeber = stMa.map(v=>v==null?null:Math.max(0,v-_stZiel));
+    // Wie beim Schlaf: die Farbe gilt dem GANZEN Balken, nicht einzelnen Segmenten.
+    // Kräftig, wenn der Tag das Schritteziel erreicht, hell wenn nicht.
+    const _stFarbe = ctx => (stMa[ctx.dataIndex]!=null && stMa[ctx.dataIndex] >= _stZiel)
+      ? 'rgba(5,150,105,.85)' : 'rgba(5,150,105,.32)';
     const dsSteps=[
       // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
-      {label:'bis Ziel',data:_stBis,backgroundColor:'rgba(5,150,105,.85)',stack:'s',
+      {label:'bis Ziel',data:_stBis,backgroundColor:_stFarbe,stack:'s',
        borderRadius:ctx=>_stUeber[ctx.dataIndex]>0?0:5},
-      {label:'über Ziel',data:_stUeber,backgroundColor:'rgba(5,150,105,.32)',stack:'s',borderRadius:5},
+      {label:'über Ziel',data:_stUeber,backgroundColor:_stFarbe,stack:'s',borderRadius:5},
       // Eigener Stapel: sonst addiert Chart.js die Linie auf die Balken darunter.
       // Ziellinie entfällt – die Farbnaht der gestapelten Balken markiert das Ziel
       // bereits. Stattdessen der Ø des Zeitraums, gestrichelt in der Balkenfarbe.

@@ -114,6 +114,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   stehen dort als erste Fusszeile (beim Schlaf als zweite, unter der Ziel-Zeile).
   Ziellinien bleiben. Auch aus den Legenden ist der Ø-Wert raus — er stünde sonst
   doppelt und machte die Legende zu breit für die gemeinsame Zeile mit der Leiste.
+- **Legendenmarker:** `.cl-dot` (Punkt) und `.cl-line` (Strich); `.cl-line.cl-strich`
+  ist die gestrichelte Variante für Ø-Linien. Ihre Farbe kommt inline als **`color`**,
+  nicht als `background` — der Verlauf liest sie über `currentColor`. Die Regel muss
+  **nach** `.cl-line` stehen, sonst gewinnt dessen `background`.
 - **Legendentexte kurz halten.** Neben der Leiste bleiben rund 140 px. Einheiten gehören
   auf die Achse, nicht in die Legende (`Puls` statt `Ruhepuls · Ø 57 bpm`). Ab drei
   Einträgen wird es eng, ab vier passt es nicht mehr: allein Punkte und Abstände
@@ -169,11 +173,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
-  **Ausnahme Schritte-Diagramm:** dort keine `zielLinie`, sondern ein zweifarbig
-  gestapelter Balken (bis Ziel kräftig, Überschuss hell) — die Farbnaht IST die
-  Ziellinie.
-  **Schlafdauer-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
-  kräftig wenn die Nacht das Ziel erreicht, hell wenn nicht (`_slFarbe`). Die
+  **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
+  kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Die
   gestapelte Struktur bleibt nur wegen der runden Ecke bestehen, beide Segmente
   tragen dieselbe Farbe. Den Zielwert markiert die grüne Linie, nicht mehr eine
   Farbnaht. Die Legende heisst deshalb „Ziel erreicht / verfehlt".

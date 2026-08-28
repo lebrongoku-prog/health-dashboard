@@ -330,6 +330,11 @@ body.dark #bottom-nav {
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.73rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
+/* Gestrichelte Variante des Legendenstrichs – fuer Ø-Linien. Ihre Farbe kommt inline
+   als "color", der Verlauf zeichnet daraus die Striche. Muss NACH .cl-line stehen,
+   sonst gewinnt dessen background. */
+.cl-line.cl-strich{background:transparent;
+  background-image:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px)}
 .chart-wrap{position:relative;overflow:hidden;height:var(--h,200px)}
 /* Die beiden Trainings-Diagramme teilen sich eine Zeile und wachsen mit ihr mit. */
 .chart-wrap.chart-wrap-flex{height:auto;flex:1;min-height:var(--h,200px)}
