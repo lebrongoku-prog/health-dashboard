@@ -53,6 +53,8 @@ function _memo(key, berechnen) {
 }
 let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
+const PLAN_BLATT = 'Laufplan';      // Blattname im Workout-Spreadsheet
+let planData = {};                  // { 'JJJJ-MM-TT': { km, notiz } }
 let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
 let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
 
@@ -123,6 +125,25 @@ function _buildCalHTML(year, month) {
     ${cells}
   </div>
   <div style="font-size:.7rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
+}
+
+// ── Laufplan-Zeilen parsen ─────────────────────────────
+// Spalten: Date | Distance (km) | Note. Das Datum kann als Text oder als echtes
+// Datum im Sheet stehen – beides wird auf JJJJ-MM-TT gebracht.
+function _parsePlanRows(values) {
+  planData = {};
+  if (!values.length) return;
+  const kopf = values[0].map(h => String(h).trim());
+  const iDat = kopf.findIndex(h => /^date$/i.test(h));
+  const iKm  = kopf.findIndex(h => /dist/i.test(h));
+  const iNot = kopf.findIndex(h => /note|notiz/i.test(h));
+  if (iDat < 0) return;
+  values.slice(1).forEach(row => {
+    const d = String(row[iDat] ?? '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const km = iKm >= 0 ? parseFloat(String(row[iKm] ?? '').replace(',', '.')) : NaN;
+    planData[d] = { km: isNaN(km) ? null : km, notiz: iNot >= 0 ? String(row[iNot] ?? '').trim() : '' };
+  });
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
@@ -218,7 +239,7 @@ const showErr = m => {
 
 // ── Daten von Apps Script API laden ───────────────────
 // Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
-async function _fetchSheet(sheetId) {
+async function _fetchSheet(sheetId, blattName) {
   // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, sauber neu anmelden
   // statt erst auf den 401 vom Server zu warten.
   if (!accessToken || Date.now() > tokenExpiry - 60_000) {
@@ -233,7 +254,11 @@ async function _fetchSheet(sheetId) {
   if (metaRes.status === 401) return { authError: true };
   if (!metaRes.ok) throw new Error('Sheets API Fehler ' + metaRes.status + ': ' + await metaRes.text());
   const meta = await metaRes.json();
-  const tabName = meta.sheets[0].properties.title;
+  // Standard ist das erste Blatt; blattName holt gezielt ein anderes (Laufplan).
+  const tabName = blattName
+    ? (meta.sheets.find(x => x.properties.title === blattName) || {}).properties?.title
+    : meta.sheets[0].properties.title;
+  if (!tabName) return { values: [], fehlt: true };   // Blatt gibt es noch nicht
   const dataRes = await fetch(
     'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/' + encodeURIComponent(tabName),
     { headers: { 'Authorization': 'Bearer ' + accessToken } }
@@ -315,6 +340,14 @@ async function loadFromAPI() {
     } finally {
       workoutSheetReady = true;
     }
+
+    // Laufplan (eigenes Blatt im Workout-Spreadsheet). Fehlt es noch, bleibt der
+    // Plan leer – die App legt es nicht an, das macht das Apps Script beim ersten
+    // Speichern. Ein Fehler hier darf den Rest der App nicht aufhalten.
+    try {
+      const plan = await _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT);
+      _parsePlanRows(plan.values || []);
+    } catch(_) { planData = {}; }
 
   } catch(e) { showErr('Fehler beim Laden: ' + e.message); return false; }
   _lastLoadTs = Date.now();
@@ -2552,6 +2585,38 @@ function vo2Abschnitt(D, P) {
   return { html, zeichnen };
 }
 
+// Plan-Termin speichern oder loeschen. Laeuft ueber das Apps Script, damit der
+// OAuth-Scope der App bei "nur lesen" bleiben kann. mode:'no-cors' liefert keine
+// auswertbare Antwort – deshalb wird der Plan anschliessend neu aus dem Sheet
+// gelesen und daran erkannt, ob es geklappt hat.
+const PLAN_URL = REFRESH_URL.split('?')[0];
+const PLAN_TOKEN = (REFRESH_URL.match(/token=([^&]+)/) || [])[1] || '';
+let _planLaeuft = false;
+
+async function planSpeichern(datum, km, notiz) {
+  return _planSenden({ plan:'add', datum, km: km ?? '', notiz: notiz ?? '' });
+}
+async function planLoeschen(datum) {
+  return _planSenden({ plan:'del', datum });
+}
+async function _planSenden(felder) {
+  if (_planLaeuft) return false;
+  _planLaeuft = true;
+  const p = new URLSearchParams({ token: PLAN_TOKEN, ...felder });
+  try {
+    await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
+    // Kurz warten, dann gegenlesen: erst das Sheet entscheidet, was gilt.
+    await new Promise(r => setTimeout(r, 1200));
+    const frisch = await _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT);
+    _parsePlanRows(frisch.values || []);
+    return true;
+  } catch(_) {
+    return false;
+  } finally {
+    _planLaeuft = false;
+  }
+}
+
 // ── Laufplan ───────────────────────────────────────────
 // Ersetzt den frueheren Schritte-Tab. Quelle sind die Laufeinheiten aus dem
 // Workout-Sheet; wo "Dashboard Data" denselben Wert fuehrt (Strecke, Pace), hat es
@@ -2632,6 +2697,7 @@ function laufKalenderHTML() {
     if (t.ausserhalb) return `<div class="lp-tag ausserhalb"></div>`;
     const klassen = ['lp-tag'];
     if (t.lauf) klassen.push('gelaufen');
+    if (planData[t.ds]) klassen.push('geplant');
     if (t.zukunft) klassen.push('zukunft');
     if (t.ds === _lpAuswahl) klassen.push('gewaehlt');
     const stil = t.lauf ? ` style="--lauf-farbe:${t.lauf.art.farbe}"` : '';
@@ -2658,11 +2724,28 @@ function laufKalenderHTML() {
 
 // Beschreibung unter dem Kalender – zeigt den angetippten Tag.
 function laufDetailHTML(datum) {
-  if (!datum) return `<div class="lp-detail-leer">Tippe einen Tag an, um die Einheit zu sehen.</div>`;
+  if (!datum) return `<div class="lp-detail-leer">Tippe einen Tag an, um die Einheit zu sehen oder einen Termin zu setzen.</div>`;
   const l = laufEinheit(datum);
+  const plan = planData[datum];
   const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}</div>`;
-  if (!l) return kopf + `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
-  return kopf + laufWerteHTML(l);
+  const geplant = plan
+    ? `<div class="lp-plan-zeile">
+         <span class="lp-plan-marke">geplant</span>
+         <span>${plan.km != null ? zahl(plan.km,1)+' km' : 'Lauf'}${plan.notiz ? ' · '+esc(plan.notiz) : ''}</span>
+         <button type="button" class="lp-plan-weg" data-planweg="${datum}">entfernen</button>
+       </div>`
+    : '';
+  const formular = `
+    <form class="lp-plan-form" data-planform="${datum}">
+      <input type="number" step="0.1" min="0" name="km" inputmode="decimal"
+             placeholder="km" value="${plan && plan.km != null ? plan.km : ''}" aria-label="Geplante Kilometer">
+      <input type="text" name="notiz" maxlength="60" placeholder="Notiz (optional)"
+             value="${plan ? esc(plan.notiz) : ''}" aria-label="Notiz">
+      <button type="submit">${plan ? 'Ändern' : 'Termin setzen'}</button>
+    </form>`;
+  const ist = l ? laufWerteHTML(l)
+                : `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
+  return kopf + geplant + ist + formular;
 }
 
 // Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
@@ -3143,10 +3226,36 @@ function initScrollHideNav() {
   });
 }
 
+// Plan-Termin setzen oder aendern.
+document.body.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-planform]');
+  if (!form) return;
+  e.preventDefault();
+  const datum = form.dataset.planform;
+  const knopf = form.querySelector('button[type=submit]');
+  const vorher = knopf.textContent;
+  knopf.disabled = true; knopf.textContent = 'Speichert…';
+  const ok = await planSpeichern(datum, form.km.value.trim(), form.notiz.value.trim());
+  knopf.disabled = false; knopf.textContent = vorher;
+  if (!ok) { knopf.textContent = 'Fehlgeschlagen'; return; }
+  if (currentScreen === 'laufplan') _renderTab('laufplan');
+});
+
+// Plan-Termin entfernen.
+document.body.addEventListener('click', async (e) => {
+  const weg = e.target.closest('[data-planweg]');
+  if (!weg) return;
+  e.preventDefault(); e.stopPropagation();
+  weg.disabled = true; weg.textContent = 'Entfernt…';
+  await planLoeschen(weg.dataset.planweg);
+  if (currentScreen === 'laufplan') _renderTab('laufplan');
+});
+
 // Laufkalender und Einheitenliste: Tipp auf einen Tag zeigt die Einheit, erneuter
 // Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
 // ueberlebt damit den Re-Render.
 document.body.addEventListener('click', (e) => {
+  if (e.target.closest('.lp-plan-form, [data-planweg]')) return;   // eigene Handler
   const ziel = e.target.closest('[data-lauftag]');
   if (!ziel) return;
   const tag = ziel.dataset.lauftag;

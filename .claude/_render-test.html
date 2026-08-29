@@ -159,14 +159,41 @@ if (SC === 'dubletten') {
   letzte.forEach(r => health.push(r));
 }
 
+// Laufplan-Blatt: der Pruefstand haelt es im Speicher und beantwortet damit sowohl
+// das Lesen (Sheets-API) als auch das Schreiben (Apps-Script-Aufruf). So laesst sich
+// der ganze Weg Termin setzen -> speichern -> neu lesen pruefen, ohne Google.
+const planBlatt = [['Date','Distance (km)','Note']];
+(function(){ const d=new Date(); d.setDate(d.getDate()+2);
+  planBlatt.push([ymd(d), '8', 'Langer Lauf']); })();
+
 const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
 const ok = body => Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
 
-window.fetch = (url) => {
+window.fetch = (url, opt) => {
   const u = String(url);
+  // Apps-Script-Aufruf: Plan-Termin setzen oder loeschen.
+  if (u.includes('script.google.com')) {
+    const p = new URLSearchParams(u.split('?')[1] || '');
+    const datum = p.get('datum');
+    if (p.get('plan') && datum) {
+      const i = planBlatt.findIndex((r,n) => n>0 && r[0] === datum);
+      if (p.get('plan') === 'del') { if (i>0) planBlatt.splice(i,1); }
+      else {
+        const zeile = [datum, p.get('km') || '', p.get('notiz') || ''];
+        if (i>0) planBlatt[i] = zeile; else planBlatt.push(zeile);
+      }
+      window.__planSchreibvorgaenge = (window.__planSchreibvorgaenge||0) + 1;
+    }
+    return ok({});
+  }
   if (u.includes('sheets.googleapis.com')) {
     const isWorkout = u.includes(WORKOUT_ID);
+    // Blattnamen-Abfrage: das Workout-Spreadsheet fuehrt zwei Blaetter.
+    if (u.includes('?fields=')) return ok({ sheets: isWorkout
+      ? [{ properties:{ title:'Data' } }, { properties:{ title:'Laufplan' } }]
+      : [{ properties:{ title:'Data' } }] });
+    if (decodeURIComponent(u).includes('/values/Laufplan')) return ok({ values: planBlatt });
     // Die Fehlermeldung enthält bewusst Auszeichnungscode: sie landet in der
     // Fehlerkarte des Training-Tabs und ist damit ein echter Weg von einem
     // fremden Text auf den Bildschirm. Muss als Text erscheinen, nicht ausgeführt.

@@ -302,6 +302,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
   `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
   Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
+- **Planverwaltung (einzelne Termine):** Blatt **`Laufplan`** im Workout-Spreadsheet
+  (`Date | Distance (km) | Note`). Gelesen wird es mit dem normalen Nur-Lese-Scope über
+  `_fetchSheet(id, blattName)` — die Funktion nahm vorher immer `sheets[0]`.
+  **Geschrieben wird ausschliesslich über das Apps Script** (`doPost` → `planEndpunkt`),
+  damit der OAuth-Scope `spreadsheets.readonly` bleiben kann. Das Script legt das Blatt
+  beim ersten Speichern selbst an und sortiert nach Datum.
+  `mode:'no-cors'` liefert keine auswertbare Antwort, deshalb liest `_planSenden` den
+  Plan nach 1.2 s **neu aus dem Sheet** — die Anzeige zeigt also immer den Sheet-Stand,
+  nie die blosse Eingabe. Im Kalender ist ein geplanter Tag ein Ring (`.geplant`), ein
+  gelaufener der gefüllte Kern; beides zusammen ist möglich.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
   `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
   aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei

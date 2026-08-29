@@ -47,8 +47,72 @@ function doPost(e) {
   if (params.token !== SECRET) {
     return ContentService.createTextOutput('Unauthorized');
   }
+  // Laufplan-Termine: die App schickt sie per POST (mode:'no-cors', daher ohne
+  // auswertbare Antwort - sie liest den Plan danach neu aus dem Sheet).
+  if (params.plan) {
+    try { return planEndpunkt(params); }
+    catch (err) { return ContentService.createTextOutput('Fehler: ' + err); }
+  }
   writeToSheet();
   return ContentService.createTextOutput('OK');
+}
+
+// ── Laufplan ───────────────────────────────────────────────────
+// Einzelne Termine in einem eigenen Blatt des Workout-Spreadsheets. Die App liest
+// es mit ihrem Nur-Lese-Recht; geschrieben wird ausschliesslich hier.
+var PLAN_BLATT = 'Laufplan';
+
+function planBlatt() {
+  var ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID);
+  var sh = ss.getSheetByName(PLAN_BLATT);
+  if (!sh) {
+    sh = ss.insertSheet(PLAN_BLATT);
+    sh.appendRow(['Date', 'Distance (km)', 'Note']);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function planEndpunkt(p) {
+  var sh = planBlatt();
+  var datum = String(p.datum || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
+    return ContentService.createTextOutput('Ungueltiges Datum');
+  }
+  var werte = sh.getDataRange().getValues();
+  // Zeile dieses Datums suchen - ein Datum kommt hoechstens einmal vor.
+  var zeile = -1;
+  for (var i = 1; i < werte.length; i++) {
+    if (planDatumStr(werte[i][0]) === datum) { zeile = i + 1; break; }
+  }
+
+  if (p.plan === 'del') {
+    if (zeile > 0) sh.deleteRow(zeile);
+    return ContentService.createTextOutput('OK geloescht');
+  }
+
+  var km    = p.km ? Number(String(p.km).replace(',', '.')) : '';
+  var notiz = String(p.notiz || '').slice(0, 200);
+  if (zeile > 0) {
+    sh.getRange(zeile, 1, 1, 3).setValues([[datum, km, notiz]]);
+  } else {
+    sh.appendRow([datum, km, notiz]);
+    // Nach Datum sortieren, damit das Blatt auch von Hand lesbar bleibt.
+    if (sh.getLastRow() > 2) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, 3).sort({ column: 1, ascending: true });
+    }
+  }
+  return ContentService.createTextOutput('OK gespeichert');
+}
+
+// Das Blatt kann Datumswerte als Date ODER als Text enthalten - beides auf
+// JJJJ-MM-TT bringen. Ohne das schluege der Abgleich bei von Hand getippten
+// Zeilen fehl.
+function planDatumStr(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v || '').trim().slice(0, 10);
 }
 
 // ── Einen Tag verarbeiten ──────────────────────────────────────
