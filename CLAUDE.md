@@ -81,7 +81,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `mkC(id,cfg)`; danach `_injectTopbar(name)` → `_injectChartFilters` + `updateNavUI`.
 - **Chart-Registry:** `charts` (Instanzen nach Canvas-ID), `tabCharts` (IDs pro Tab, für
   Destroy beim Re-Render).
-- **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','aktivitaet','training']` (5 Tabs).
+- **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','laufplan','training']` (5 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
 - **Übersicht (`pgOverview`):** Zielstatus-Zeile → Tageswert-Kacheln → Verlaufs-Chart →
@@ -288,6 +288,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Fusszeilen:** `Total` überspringt Puls und Pace (`summierbar:false`) und entfällt
   ganz, wenn keine summierbare Reihe aktiv ist; die Ø-Zeilen zeigen alle aktiven
   Reihen, getrennt durch `|`.
+- **Laufplan-Tab (`pgLaufplan`):** ersetzt seit 29.08.2026 den früheren Schritte-Tab
+  (Farbe Grün beibehalten; `pgAktivitaet` samt `c-steps`/`c-cals` ist entfernt — die
+  Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
+  Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, springt beim
+  Rendern zur laufenden Woche) → Wochenumfang gegen `ZIELE.laufKm` → Bestleistungen →
+  Liste der Einheiten. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
+  klappt zu; die Auswahl liegt in `_lpAuswahl` **ausserhalb** der Seitenfunktion.
+  **Datenquellen:** `laufEinheit(datum)` setzt eine Einheit aus beiden Sheets zusammen.
+  Strecke und Pace kommen bevorzugt aus *Dashboard Data* (`distKm`, `runSpeed`), sonst
+  aus dem Workout-Sheet. Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
+  Workout-Sheet. Kalorien ebenfalls von dort (`Energy (kJ)` ÷ 4.184) — `activeCal` im
+  Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
+  `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
+  Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
   `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
   aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei

@@ -975,7 +975,8 @@ const ZIELE = {
   hrv:        { label:'HRV',          ziel:50,    richtung:'hoch', fmt:v=>Math.round(v)+' ms' },
   steps:      { label:'Schritte',     ziel:10000, richtung:'hoch', fmt:v=>Math.round(v).toLocaleString('de-CH') },
   trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche' },
-  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) }
+  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) },
+  laufKm:     { label:'Laufkilometer', ziel:25,  richtung:'hoch', fmt:v=>zahl(v,1)+' km/Woche' }
 };
 // Erfüllt der Wert das Ziel? null, wenn kein Wert vorliegt.
 function zielErfuellt(key, wert) {
@@ -2551,166 +2552,226 @@ function vo2Abschnitt(D, P) {
   return { html, zeichnen };
 }
 
-// ── Aktivität ──────────────────────────────────────────
-function pgAktivitaet() {
-  const D=filtered();
-  const stD=mittel(D,'steps');
-  const calField=findField(D,'activeCal','activeEnergyBurned','activeCalories','calories','activeEnergy','moveCalories');
-  const calD=calField?mittel(D,calField):null;
+// ── Laufplan ───────────────────────────────────────────
+// Ersetzt den frueheren Schritte-Tab. Quelle sind die Laufeinheiten aus dem
+// Workout-Sheet; wo "Dashboard Data" denselben Wert fuehrt (Strecke, Pace), hat es
+// Vorrang. Trainingszeit, Puls und Hoehenmeter gibt es nur im Workout-Sheet.
 
-  const stRows=D.filter(r=>r.steps!=null);
-  const n10k=stRows.filter(r=>r.steps>=10000).length;
-  const n8k=stRows.filter(r=>r.steps>=8000&&r.steps<10000).length;
-  const n5k=stRows.filter(r=>r.steps>=5000&&r.steps<8000).length;
-  const nU5k=stRows.filter(r=>r.steps<5000).length;
-  const nTot=stRows.length||1;
-  const stMax=stRows.length?Math.max(...stRows.map(r=>r.steps)):null;
-  const stMin=stRows.length?Math.min(...stRows.map(r=>r.steps)):null;
+// Welche Trainingsarten zaehlen als Lauf? Stichwortsuche wie bei workoutIcon –
+// Apple liefert je nach Sprache "Outdoor Ausfuehren", "Innenraeume Ausfuehren",
+// "Trail-Laufen" oder englische Namen.
+const LAUF_ARTEN = [
+  { id:'outdoor',   label:'Outdoor',   farbe:'#10B981', muster:/outdoor|draussen/i },
+  { id:'indoor',    label:'Indoor',    farbe:'#38BDF8', muster:/indoor|innenr/i },
+  { id:'trail',     label:'Trail',     farbe:'#A16207', muster:/trail/i },
+  { id:'intervall', label:'Intervall', farbe:'#F97316', muster:/intervall|hiit|hochintensiv/i }
+];
+function laufArt(typeRaw) {
+  const t = String(typeRaw || '');
+  // Intervall und Trail zuerst: sie stehen oft zusammen mit "Outdoor" im Namen.
+  for (const a of LAUF_ARTEN) if (a.id !== 'outdoor' && a.muster.test(t)) return a;
+  return LAUF_ARTEN[0];
+}
+function istLauf(typeRaw) {
+  return /lauf|ausf(ü|ue)hren|run|jog/i.test(String(typeRaw || ''));
+}
 
-  // Week vs weekend
-  const stSplit=splitWeekWknd(stRows);
-  const stWeek=mittel(stSplit.wkd,'steps');
-  const stWknd=mittel(stSplit.wknd,'steps');
+// Eine Laufeinheit aus beiden Quellen zusammensetzen.
+function laufEinheit(datum) {
+  const w = workoutData[datum];
+  if (!w || !istLauf(w.typeRaw)) return null;
+  const tag = allData.find(r => r.date === datum) || {};
+  // Strecke und Pace: erst Dashboard Data, dann Workout-Sheet.
+  const streckeKm = tag.distKm != null ? tag.distKm : w.distanceKm;
+  const kmh = tag.runSpeed > 0 ? tag.runSpeed : (w.avgSpeedKph > 0 ? w.avgSpeedKph : null);
+  return {
+    datum, art: laufArt(w.typeRaw), typLabel: w.typeLabel,
+    dauerMin: w.durationMin,
+    streckeKm,
+    // Energy steht im Sheet in Kilojoule – 1 kcal = 4.184 kJ.
+    kcal: w.activeEnergyKJ != null ? w.activeEnergyKJ / 4.184 : null,
+    pace: kmh != null ? paceFromSpeed(kmh) : null,
+    puls: w.avgHR, maxPuls: w.maxHR,
+    hoehe: w.elevationM
+  };
+}
+// Alle Laufeinheiten, neueste zuerst.
+function alleLaeufe() {
+  return Object.keys(workoutData).sort().reverse()
+    .map(laufEinheit).filter(Boolean);
+}
 
-  // Calorie weekday/weekend averages
-  const calSplit=splitWeekWknd(calField?D.filter(r=>r[calField]!=null):[]);
-  const calWeek=calSplit.wkd.length?mittel(calSplit.wkd,calField):null;
-  const calWknd=calSplit.wknd.length?mittel(calSplit.wknd,calField):null;
+// Jahreskalender wie in FitTrack: 52 Wochen à 7 Kästchen, waagrecht scrollbar.
+// Gefuellt = an dem Tag gelaufen, Farbe nach Laufart. Antippen beschreibt den Tag
+// darunter. Zeigt immer das laufende Kalenderjahr.
+let _lpAuswahl = null;   // angetippter Tag (Datum) – ueberlebt Re-Render
 
-  // Streak: consecutive days >= 8k
-  let maxStreak=0,cur=0;
-  stRows.forEach(r=>{if(r.steps>=8000){cur++;maxStreak=Math.max(maxStreak,cur);}else cur=0;});
+function laufKalenderHTML() {
+  const jahr = new Date(referenceDate + 'T00:00:00').getFullYear();
+  const heute = toLocalDateStr(new Date());
+  const proTag = {};
+  alleLaeufe().forEach(l => { proTag[l.datum] = l; });
 
-  // Display avg: always daily average, regardless of time filter
-  const stDisplayAvg=stD!=null?Math.round(stD):null;
-  const calDisplayAvg=calD!=null?Math.round(calD):null;
-
-  const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
-  const stMa=tA('steps');   // Ø pro Tag (Durchschnitt der Tageswerte pro Zeitbucket)
-  const calMaAct=calField?tA(calField):tL.map(()=>null);  // Ø pro Tag
-
-  // Init calendar to latest data month if not yet set
-  if(!_calDate && allData.length){
-    const ld=allData[allData.length-1].date;
-    _calDate={y:parseInt(ld.slice(0,4)),m:parseInt(ld.slice(5,7))-1};
+  // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt.
+  const ersterJan = new Date(jahr, 0, 1);
+  const versatz = (ersterJan.getDay() + 6) % 7;          // Mo=0
+  const start = new Date(jahr, 0, 1 - versatz);
+  const wochen = [];
+  for (let w = 0; w < 53; w++) {
+    const tage = [];
+    for (let t = 0; t < 7; t++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w*7 + t);
+      const ds = toLocalDateStr(d);
+      tage.push({ ds, ausserhalb: d.getFullYear() !== jahr, zukunft: ds > heute, lauf: proTag[ds] });
+    }
+    wochen.push(tage);
+    if (tage[0].ds > toLocalDateStr(new Date(jahr, 11, 31))) break;
   }
 
-  document.getElementById("screen-aktivitaet").innerHTML=`
-    ${pgBanner('🚶','Schritte','Tägliche Bewegung, Schritte & Kalorienverbrauch','#064E3B','#10B981')}
+  const zellen = wochen.map(woche => `<div class="lp-woche">` + woche.map(t => {
+    if (t.ausserhalb) return `<div class="lp-tag ausserhalb"></div>`;
+    const klassen = ['lp-tag'];
+    if (t.lauf) klassen.push('gelaufen');
+    if (t.zukunft) klassen.push('zukunft');
+    if (t.ds === _lpAuswahl) klassen.push('gewaehlt');
+    const stil = t.lauf ? ` style="--lauf-farbe:${t.lauf.art.farbe}"` : '';
+    return `<div class="${klassen.join(' ')}" data-lauftag="${t.ds}"${stil}></div>`;
+  }).join('') + `</div>`).join('');
 
-    <!-- Row 2: Schritteziel-Erreichung -->
-    <div class="two-col-eq">
-      <div class="chart-card" style="margin-bottom:0">
-        <h3>Anzahl Schritte</h3>
-        <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(5,150,105,.85)"></span>erreicht</div>
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(5,150,105,.32)"></span>verfehlt</div>
-          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(5,150,105,.85)"></span>Ø</div>
-        </div>
-        <div class="chart-wrap" style="--h:278px"><canvas id="c-steps"></canvas></div>
-        ${stDisplayAvg!=null||stWeek!=null||stWknd!=null?`
-        <div class="stats-list diagramm-fuss">
-          ${statZeile(`Ø Schritte`, `${stDisplayAvg!=null?stDisplayAvg.toLocaleString('de-CH'):'—'}`)}
-          ${statZeile(`Ø Wochentag (Mo–Fr)`, `${stWeek!=null?Math.round(stWeek).toLocaleString('de-CH')+'':'—'}`)}
-          ${statZeile(`Ø Wochenende (Sa–So)`, `${stWknd!=null?Math.round(stWknd).toLocaleString('de-CH')+'':'—'}`)}
-          ${stWeek!=null&&stWknd!=null?`${statZeile(`Differenz`, `${stWknd>stWeek?'+':''}${Math.round(stWknd-stWeek).toLocaleString('de-CH')}`)}`:``}
-        </div>`:''}
-      </div>
-      ${calMaAct.some(v=>v!=null)?`<div class="chart-card" style="margin-bottom:0">
-        <h3>Aktive Kalorien</h3>
-        <div class="chart-legend" style="margin-bottom:.3rem">
-          <div class="cl-item"><span class="cl-dot" style="background:#34D399"></span>Kalorien</div>
-        </div>
-        <div class="chart-wrap" style="--h:278px"><canvas id="c-cals"></canvas></div>
-        ${calDisplayAvg!=null||calWeek!=null||calWknd!=null?`
-        <div class="stats-list diagramm-fuss">
-          ${statZeile(`Ø Kalorien`, `${calDisplayAvg!=null?Math.round(calDisplayAvg).toLocaleString('de-CH')+' kcal':'—'}`)}
-          ${statZeile(`Ø Wochentag (Mo–Fr)`, `${calWeek!=null?Math.round(calWeek).toLocaleString('de-CH')+' kcal':'—'}`)}
-          ${statZeile(`Ø Wochenende (Sa–So)`, `${calWknd!=null?Math.round(calWknd).toLocaleString('de-CH')+' kcal':'—'}`)}
-          ${calWeek!=null&&calWknd!=null?`${statZeile(`Differenz`, `${calWknd>calWeek?'+':''}${Math.round(calWknd-calWeek).toLocaleString('de-CH')} kcal`)}`:``}
-        </div>`:''}
-      </div>`:'<div></div>'}
+  const wochentage = ['Mo','','Mi','','Fr','','So']
+    .map(t => `<div class="lp-wtag">${t}</div>`).join('');
+
+  return `
+    <div class="lp-kal-kopf">
+      <span class="lp-kal-jahr">${jahr}</span>
+      <span class="lp-kal-zahl">${alleLaeufe().filter(l=>l.datum.startsWith(jahr)).length} Läufe</span>
+    </div>
+    <div class="lp-kal">
+      <div class="lp-wtage">${wochentage}</div>
+      <div class="lp-scroll"><div class="lp-raster">${zellen}</div></div>
+    </div>
+    <div class="lp-legende">
+      ${LAUF_ARTEN.map(a=>`<span class="lp-leg"><span class="lp-punkt" style="background:${a.farbe}"></span>${a.label}</span>`).join('')}
+    </div>
+    <div class="lp-detail" id="lp-detail">${laufDetailHTML(_lpAuswahl)}</div>`;
+}
+
+// Beschreibung unter dem Kalender – zeigt den angetippten Tag.
+function laufDetailHTML(datum) {
+  if (!datum) return `<div class="lp-detail-leer">Tippe einen Tag an, um die Einheit zu sehen.</div>`;
+  const l = laufEinheit(datum);
+  const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}</div>`;
+  if (!l) return kopf + `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
+  return kopf + laufWerteHTML(l);
+}
+
+// Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
+function laufWerteHTML(l) {
+  const zeile = (label, wert) => wert == null ? '' : statZeile(label, wert);
+  return `<div class="lp-art" style="color:${l.art.farbe}">${esc(l.typLabel)}</div>
+    <div class="stats-list">
+      ${zeile('Trainingszeit', l.dauerMin!=null?fmtMin(l.dauerMin):null)}
+      ${zeile('Strecke',       l.streckeKm!=null?zahl(l.streckeKm,2)+' km':null)}
+      ${zeile('Kalorien',      l.kcal!=null?Math.round(l.kcal).toLocaleString('de-CH')+' kcal':null)}
+      ${zeile('Ø Pace',        l.pace!=null?fmtPace(l.pace)+' min/km':null)}
+      ${zeile('Ø Herzfrequenz',l.puls!=null?Math.round(l.puls)+' bpm':null)}
+      ${zeile('Höhenmeter',    l.hoehe!=null?Math.round(l.hoehe)+' m':null)}
+    </div>`;
+}
+
+function pgLaufplan() {
+  const laeufe = alleLaeufe();
+  const D = filtered();
+  const imFenster = laeufe.filter(l => D.some(r => r.date === l.datum));
+
+  // ── Wochenumfang gegen das Ziel ──
+  const woMap = {};
+  laeufe.forEach(l => { const w = getWeekMonday(l.datum);
+    if (!woMap[w]) woMap[w] = { km:0, min:0, n:0 };
+    if (l.streckeKm != null) woMap[w].km += l.streckeKm;
+    if (l.dauerMin  != null) woMap[w].min += l.dauerMin;
+    woMap[w].n++; });
+  const dieseWoche = woMap[getWeekMonday(referenceDate)] || { km:0, min:0, n:0 };
+  const zielKm = ZIELE.laufKm.ziel;
+  const zielAnteil = Math.min(100, Math.round(dieseWoche.km / zielKm * 100));
+
+  // ── Bestleistungen über den gesamten Bestand ──
+  const mit = f => laeufe.filter(l => l[f] != null);
+  const best = (f, kleinerIstBesser) => { const v = mit(f);
+    if (!v.length) return null;
+    return v.reduce((a,b) => (kleinerIstBesser ? (b[f] < a[f]) : (b[f] > a[f])) ? b : a); };
+  const schnellster = best('pace', true);
+  const laengster   = best('streckeKm', false);
+  const hoechster   = best('hoehe', false);
+
+  const bestZeile = (label, l, wert) => l ? statZeile(label,
+    `${wert} <span style="color:var(--txt3)">${fmtDayShort(l.datum)}</span>`) : '';
+
+  document.getElementById("screen-laufplan").innerHTML = `
+    ${pgBanner('🏃','Laufplan','Meine Laufeinheiten im Überblick')}
+
+    <div class="chart-card">
+      <h3>Laufkalender</h3>
+      ${laufKalenderHTML()}
     </div>
 
-    <div class="chart-card split2">
-      <h3>Schritteziel-Erreichung ${infoI('steps')}</h3>
-      <div class="goal-list">
-        <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 10.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n10k/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${n10k}</span><span style="color:var(--txt3)">(${(n10k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">8k – 10k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n8k/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n8k}</span><span style="color:var(--txt3)">(${(n8k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">5k – 8k</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n5k/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n5k}</span><span style="color:var(--txt3)">(${(n5k/nTot*100).toFixed(0)}%)</span></span></div>
-        <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 5.000</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nU5k/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nU5k}</span><span style="color:var(--txt3)">(${(nU5k/nTot*100).toFixed(0)}%)</span></span></div>
+    <div class="chart-card">
+      <h3>Diese Woche</h3>
+      <div class="lp-woche-zahl" style="color:${dieseWoche.km>=zielKm?'#10B981':'var(--txt)'}">
+        ${zahl(dieseWoche.km,1)} <span class="lp-woche-einheit">von ${zielKm} km</span>
       </div>
+      <div class="goal-bar-bg" style="margin:.5rem 0 .2rem">
+        <div class="goal-bar-fill" style="width:${zielAnteil}%;background:${dieseWoche.km>=zielKm?'#10B981':'#84CC16'}"></div>
+      </div>
+      <div class="stats-list diagramm-fuss">
+        ${statZeile('Einheiten', `${dieseWoche.n}`)}
+        ${statZeile('Zeit', dieseWoche.min>0?fmtMin(dieseWoche.min):'—')}
+        ${statZeile('Noch bis zum Ziel', dieseWoche.km>=zielKm
+          ? `<span style="color:#10B981">erreicht</span>`
+          : `${zahl(zielKm-dieseWoche.km,1)} km`)}
+      </div>
+    </div>
+
+    ${laeufe.length ? `<div class="chart-card">
+      <h3>Bestleistungen ${scopeBadge('gesamter Datenbestand')}</h3>
       <div class="stats-list">
-        ${statZeile(`Bester Tag`, `${stMax!=null?Math.round(stMax).toLocaleString('de-CH'):'—'}`, `#10B981`)}
-        ${statZeile(`Schlechtester Tag`, `${stMin!=null?Math.round(stMin).toLocaleString('de-CH'):'—'}`, `#EF4444`)}
-        ${statZeile(`Längste Streak`, `${maxStreak} Tage`)}
-        ${statZeile(`Messpunkte`, `${stRows.length}d <span style="color:var(--txt3)">(${D.length>0?(stRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+        ${bestZeile('Schnellste Pace', schnellster, schnellster?fmtPace(schnellster.pace)+' min/km':'')}
+        ${bestZeile('Längster Lauf',   laengster,   laengster?zahl(laengster.streckeKm,2)+' km':'')}
+        ${bestZeile('Meiste Höhenmeter', hoechster, hoechster?Math.round(hoechster.hoehe)+' m':'')}
       </div>
-    </div>
-    `;
+    </div>` : ''}
 
-  if(tHD){
-    // Chart 1: Schritte
-    // Zielerreichung wie beim Schlafdauer-Diagramm: zweifarbig gestapelter Balken statt
-    // einer gestrichelten Ziellinie. Der Teil bis 10'000 ist kräftig, der Überschuss
-    // darüber hell – die Farbnaht liegt exakt auf dem Ziel und IST damit die Ziellinie.
-    // Vorher färbte sich der ganze Balken um; man sah, DASS ein Tag das Ziel reisst,
-    // aber nicht, um wie viel.
-    const _stZiel = ZIELE.steps.ziel;
-    const _stBis   = stMa.map(v=>v==null?null:Math.min(v,_stZiel));
-    const _stUeber = stMa.map(v=>v==null?null:Math.max(0,v-_stZiel));
-    // Wie beim Schlaf: die Farbe gilt dem GANZEN Balken, nicht einzelnen Segmenten.
-    // Kräftig, wenn der Tag das Schritteziel erreicht, hell wenn nicht.
-    const _stFarbe = ctx => (stMa[ctx.dataIndex]!=null && stMa[ctx.dataIndex] >= _stZiel)
-      ? 'rgba(5,150,105,.85)' : 'rgba(5,150,105,.32)';
-    const dsSteps=[
-      // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
-      {label:'bis Ziel',data:_stBis,backgroundColor:_stFarbe,stack:'s',
-       borderRadius:ctx=>_stUeber[ctx.dataIndex]>0?0:5},
-      {label:'über Ziel',data:_stUeber,backgroundColor:_stFarbe,stack:'s',borderRadius:5},
-      // Eigener Stapel: sonst addiert Chart.js die Linie auf die Balken darunter.
-      // Ziellinie entfällt – die Farbnaht der gestapelten Balken markiert das Ziel
-      // bereits. Stattdessen der Ø des Zeitraums, gestrichelt in der Balkenfarbe.
-      ...(stDisplayAvg!=null?[{label:'Ø Schritte',data:tL.map(()=>stDisplayAvg),
-       borderColor:'rgba(5,150,105,.85)',borderDash:[5,4],borderWidth:1.5,pointRadius:0,
-       tension:0,fill:false,type:'line',spanGaps:true,stack:'ziel'}]:[])
-    ];
-    // Das Ziel MUSS im Sichtbereich liegen. Bleibt man einen ganzen Zeitraum darunter,
-    // läge die Farbnaht sonst über der Achse – alle Balken sähen einfarbig aus und die
-    // Zielerreichung wäre nicht mehr ablesbar. Die 5 % Luft darüber sind nötig, damit
-    // die Naht nicht auf der Oberkante klebt und das getönte Band sichtbar bleibt.
-    const _stY={...gy,stacked:true,suggestedMax:_stZiel*1.05,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}};
-    zeichneDiagramm('c-steps',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:dsSteps},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>{
-        // Der Balken ist aus zwei Segmenten aufgebaut, gemeint ist aber EIN Tag:
-        // nur das untere Segment beschriften, und zwar mit der Gesamtzahl.
-        if(ctx.datasetIndex!==0) return null;
-        const gesamt=stMa[ctx.dataIndex];
-        if(gesamt==null) return null;
-        const _isAvg=timeRange!=='7d'&&timeRange!=='1m';
-        const alsZahl=v=>Math.round(v).toLocaleString('de-CH');
-        const fehlt=_stZiel-gesamt;
-        return [
-          `${_isAvg?'Ø ':''}${alsZahl(gesamt)} Schritte`,
-          fehlt>0 ? `${alsZahl(fehlt)} unter Ziel` : `${alsZahl(-fehlt)} über Ziel`
-        ];
-      }}}},
-        scales:{x:{...gx,stacked:true},y:_stY}}});
-    // Chart 2: Aktive Kalorien (bar)
-    if(calMaAct.some(v=>v!=null)){
-      const dsCals=[
-        {label:'Kalorien',data:calMaAct,backgroundColor:calMaAct.map(v=>v!=null&&calDisplayAvg!=null&&v>=calDisplayAvg?'rgba(52,211,153,.80)':'rgba(148,163,184,.45)'),borderRadius:5,type:'bar'}
-      ];
-      zeichneDiagramm('c-cals',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:dsCals},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?'Ø '+Math.round(ctx.raw).toLocaleString('de-CH')+' kcal':null}}},
-          scales:{x:gx,y:{...gy,ticks:{...gy.ticks,callback:v=>Math.round(v).toLocaleString('de-CH')}}}}});
+    <div class="chart-card">
+      <div class="chart-head"><h3>Einheiten</h3>${scopeBadge('gewählter Zeitraum')}</div>
+      ${imFenster.length ? `<div class="lp-liste">
+        ${imFenster.map(l => `<button type="button" class="lp-eintrag${_lpAuswahl===l.datum?' offen':''}" data-lauftag="${l.datum}">
+          <span class="lp-eintrag-punkt" style="background:${l.art.farbe}"></span>
+          <span class="lp-eintrag-tag">${fmtDayShort(l.datum)}</span>
+          <span class="lp-eintrag-werte">${l.streckeKm!=null?zahl(l.streckeKm,2)+' km':'—'}${l.pace!=null?' · '+fmtPace(l.pace)+'/km':''}</span>
+        </button>
+        ${_lpAuswahl===l.datum?`<div class="lp-eintrag-detail">${laufWerteHTML(l)}</div>`:''}`).join('')}
+      </div>` : `<div class="no-data">Im gewählten Zeitraum ist keine Laufeinheit erfasst.</div>`}
+    </div>
+`;
+
+  // Wie in FitTrack zur laufenden Woche scrollen – sonst startet das Jahresraster
+  // im Januar und der aktuelle Stand liegt ausserhalb des Sichtfelds. Synchron:
+  // getBoundingClientRect erzwingt ohnehin ein Layout, und im verdeckten Tab
+  // feuert requestAnimationFrame nie.
+  const scroll = document.querySelector('#screen-laufplan .lp-scroll');
+  if (scroll) {
+    const heute = scroll.querySelector('.lp-tag:not(.zukunft):not(.ausserhalb):last-of-type');
+    const spalten = scroll.querySelectorAll('.lp-woche').length;
+    if (spalten) {
+      const proSpalte = scroll.scrollWidth / spalten;
+      const wocheJetzt = Math.floor((new Date(referenceDate+'T00:00:00') - new Date(new Date(referenceDate+'T00:00:00').getFullYear(),0,1)) / 604800000);
+      scroll.scrollLeft = Math.max(0, (wocheJetzt + 1) * proSpalte - scroll.clientWidth);
     }
   }
 }
 
 // ── Navigation ─────────────────────────────────────────
-const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,aktivitaet:pgAktivitaet,training:pgTraining};
-
+const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,laufplan:pgLaufplan,training:pgTraining};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
 function pgBanner(icon,title,sub){
@@ -2722,12 +2783,12 @@ function pgBanner(icon,title,sub){
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
 // ═══════════════════════════════════════════════════════════
-const TAB_ORDER = ['overview','herz','schlaf','aktivitaet','training'];
+const TAB_ORDER = ['overview','herz','schlaf','laufplan','training'];
 let currentScreen = 'overview';
 let _suppressScrollSync = false;
 let _currentRenderingTab = null;
 const _renderedTabs = new Set();
-const tabCharts = { overview:[], herz:[], schlaf:[], aktivitaet:[], training:[] };
+const tabCharts = { overview:[], herz:[], schlaf:[], laufplan:[], training:[] };
 
 // Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
 // jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
@@ -2889,7 +2950,7 @@ const TAB_THEME_COLORS = {
   overview:   '#0891B2',
   herz:       '#EF4444',
   schlaf:     '#7C3AED',
-  aktivitaet: '#10B981',
+  laufplan:   '#10B981',
   training:   '#F97316'
 };
 function _setStatusBarColor(name) {
@@ -2908,7 +2969,7 @@ const THEME_GRADIENTS = {
   overview:   'linear-gradient(135deg, #0C4A6E, #0891B2)',
   herz:       'linear-gradient(135deg, #7F1D1D, #EF4444)',
   schlaf:     'linear-gradient(135deg, #1E3A8A, #7C3AED)',
-  aktivitaet: 'linear-gradient(135deg, #064E3B, #10B981)',
+  laufplan:   'linear-gradient(135deg, #064E3B, #10B981)',
   training:   'linear-gradient(135deg, #7C2D12, #F97316)'
 };
 // Pro Wisch-Frame aufrufen. progress = container.scrollLeft / clientWidth
@@ -3081,6 +3142,17 @@ function initScrollHideNav() {
     nav.classList.toggle('nav-hidden');
   });
 }
+
+// Laufkalender und Einheitenliste: Tipp auf einen Tag zeigt die Einheit, erneuter
+// Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
+// ueberlebt damit den Re-Render.
+document.body.addEventListener('click', (e) => {
+  const ziel = e.target.closest('[data-lauftag]');
+  if (!ziel) return;
+  const tag = ziel.dataset.lauftag;
+  _lpAuswahl = (_lpAuswahl === tag) ? null : tag;
+  if (currentScreen === 'laufplan') _renderTab('laufplan');
+});
 
 // Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die
 // Schalter sind <button>, damit der Hintergrund-Tipp (Bottom-Nav) sie ausnimmt.

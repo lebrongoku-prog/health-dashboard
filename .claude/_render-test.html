@@ -18,7 +18,7 @@
     <section id="screen-overview"   class="screen"></section>
     <section id="screen-herz"       class="screen"></section>
     <section id="screen-schlaf"     class="screen"></section>
-    <section id="screen-aktivitaet" class="screen"></section>
+    <section id="screen-laufplan"   class="screen"></section>
     <section id="screen-training"   class="screen"></section>
   </div>
 </div>
@@ -26,7 +26,7 @@
   <button class="nav-btn active" id="nav-overview"   data-tab="overview"><span>Übersicht</span></button>
   <button class="nav-btn"        id="nav-herz"       data-tab="herz"><span>Herz</span></button>
   <button class="nav-btn"        id="nav-schlaf"     data-tab="schlaf"><span>Schlaf</span></button>
-  <button class="nav-btn"        id="nav-aktivitaet" data-tab="aktivitaet"><span>Schritte</span></button>
+  <button class="nav-btn"        id="nav-laufplan"   data-tab="laufplan"><span>Laufplan</span></button>
   <button class="nav-btn"        id="nav-training"   data-tab="training"><span>Training</span></button>
 </nav>
 
@@ -143,6 +143,15 @@ if (SC === 'inject') {
   health.push(['kein Datum', '7.0', '58', '55', '8000', '380', '45', '', '', '', '', '', '', '', '', '']);
 }
 
+// Ein Tag, an dem beide Sheets die Strecke fuehren – mit klar verschiedenen Zahlen.
+// Dashboard Data muss gewinnen (Strecke, Pace), Workout Data die uebrigen Werte liefern.
+if (SC === 'quellen') {
+  const ds = ymd(new Date());
+  const zeile = health.find(r => r[0] === ds);
+  if (zeile) { zeile[13] = '7.77'; zeile[12] = '12.00'; }   // distKm, runSpeed
+  workout.push([ds, 'Outdoor Ausführen', '44', '3.33', '145', '170', '6.00', '99', '1673']);
+}
+
 // Dubletten-Szenario: die letzten drei Tage stehen ein zweites Mal im Sheet – genau
 // das Muster aus Leonards echtem Schlafschuld-Tooltip, wo Nächte doppelt auftauchten.
 if (SC === 'dubletten') {
@@ -168,6 +177,9 @@ window.fetch = (url) => {
   }
   return ok({});
 };
+// Rohdaten offenlegen, damit sich im Test nachweisen laesst, aus WELCHEM Sheet ein
+// angezeigter Wert stammt (die App selbst ist eine IIFE und gibt nichts preis).
+window.__health = health; window.__workout = workout;
 console.log('[Prüfstand] Szenario:', SC, '· Health-Zeilen:', health.length-1, '· Workouts:', workout.length-1);
 </script>
 <script src="/app.js"></script>

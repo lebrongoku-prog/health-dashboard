@@ -71,7 +71,7 @@ body {
 body.theme-overview   { --tab-color: #0891B2; }
 body.theme-herz       { --tab-color: #EF4444; }
 body.theme-schlaf     { --tab-color: #7C3AED; }
-body.theme-aktivitaet { --tab-color: #10B981; }
+body.theme-laufplan { --tab-color: #10B981; }
 body.theme-training   { --tab-color: #F97316; }
 
 /* ── Topbar pro Tab (inline) ─────────────────────────────
@@ -769,3 +769,46 @@ h5,
   body.dark #bottom-nav { border-left-color: #334155; border-right-color: #334155; }
   #bottom-nav.nav-hidden { transform: translateX(-50%) translateY(110%); }
 }
+
+/* ── Laufplan ───────────────────────────────────────────
+   Jahresraster nach dem Vorbild von FitTrack: 53 Wochenspalten à 7 Kästchen,
+   waagrecht scrollbar. overflow-y MUSS hidden sein – sonst macht der Browser aus
+   der Y-Achse ebenfalls "auto" und das Raster liesse sich senkrecht verschieben. */
+.lp-kal{display:flex;gap:.3rem;align-items:flex-start}
+.lp-wtage{display:flex;flex-direction:column;gap:3px;flex:0 0 auto;padding-top:1px}
+.lp-wtag{height:14px;font-size:.6rem;line-height:14px;color:var(--txt3)}
+.lp-scroll{overflow-x:auto;overflow-y:hidden;flex:1 1 auto;padding:2px 0}
+.lp-raster{display:flex;gap:3px;width:max-content}
+.lp-woche{display:flex;flex-direction:column;gap:3px}
+.lp-tag{width:14px;height:14px;border-radius:3px;background:var(--border);flex:0 0 auto}
+.lp-tag.gelaufen{background:var(--lauf-farbe)}
+.lp-tag.zukunft{opacity:.35}
+.lp-tag.ausserhalb{background:transparent}
+.lp-tag[data-lauftag]{cursor:pointer}
+.lp-tag.gewaehlt{outline:2px solid var(--txt);outline-offset:1px}
+.lp-kal-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem}
+.lp-kal-jahr{font-size:.83rem;font-weight:700}
+.lp-kal-zahl{font-size:.72rem;color:var(--txt2)}
+.lp-legende{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.5rem}
+.lp-leg{display:flex;align-items:center;gap:.25rem;font-size:.72rem;color:var(--txt2)}
+.lp-punkt{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
+.lp-detail-leer{font-size:.75rem;color:var(--txt3)}
+.lp-detail-tag{font-size:.79rem;font-weight:700;margin-bottom:.3rem}
+.lp-art{font-size:.72rem;font-weight:600;margin-bottom:.2rem}
+
+/* Wochenumfang */
+.lp-woche-zahl{font-size:1.65rem;font-weight:800;line-height:1.1}
+.lp-woche-einheit{font-size:.83rem;font-weight:600;color:var(--txt2)}
+
+/* Liste der Einheiten – jeder Eintrag ist ein Knopf, damit der Hintergrund-Tipp
+   (Bottom-Nav) ihn ausnimmt. */
+.lp-liste{display:flex;flex-direction:column}
+.lp-eintrag{display:flex;align-items:center;gap:.5rem;width:100%;padding:.45rem 0;
+  background:none;border:0;border-bottom:1px solid var(--border);cursor:pointer;
+  font:inherit;color:inherit;text-align:left;-webkit-tap-highlight-color:transparent}
+.lp-eintrag-punkt{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.lp-eintrag-tag{font-size:.79rem;font-weight:600;flex:0 0 auto}
+.lp-eintrag-werte{font-size:.79rem;color:var(--txt2);margin-left:auto;white-space:nowrap}
+.lp-eintrag.offen{border-bottom-color:transparent}
+.lp-eintrag-detail{padding:.1rem 0 .6rem;border-bottom:1px solid var(--border)}
