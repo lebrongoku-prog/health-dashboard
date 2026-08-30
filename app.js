@@ -3,16 +3,37 @@ const CLIENT_ID        = '185114707171-tto1teeec25d9sgkeobme666ndpdip7k.apps.goo
 const REDIRECT_URI     = 'https://lebrongoku-prog.github.io/health-dashboard/';
 const HEALTH_SHEET_ID  = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
-const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbyN4HSh5ai3ZBpCkGjuxHVlE0IagpLtUT-gyLgzRfAXZT4wPahzRJUbZTMvUiaT0djA/exec?refresh=true&token=I4C1c9csK02bAvQbF2cLnUuEsgfJbtWjzzGAPaHnd-Vn';
+// Auslöser fuer den Import Drive → Sheet. Nur DAS kann die App nicht selbst: an die
+// Health-Auto-Export-Dateien in Drive kommt allein das Apps Script.
+// Ohne Passwort im Aufruf – das stand hier frueher und war damit oeffentlich. Statt-
+// dessen schickt die App ihren Google-Zugang mit, und das Skript prueft ihn, indem es
+// damit die (private) Tabelle anfragt: wer sie lesen darf, darf auch den Import
+// ausloesen. Der Zugang steht im POST-Rumpf, nicht in der Adresse – Adressen landen
+// in Server-Protokollen, Rumpfdaten nicht.
+const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbyN4HSh5ai3ZBpCkGjuxHVlE0IagpLtUT-gyLgzRfAXZT4wPahzRJUbZTMvUiaT0djA/exec';
 
 let accessToken = null, tokenExpiry = 0;
+// Seit die App selbst ins Sheet schreibt, braucht sie Schreibrechte. Frueher lief das
+// Schreiben ueber das Apps Script, das mit einem Passwort im Quelltext abgesichert war –
+// und der ist oeffentlich, also konnte jeder Laufplan-Eintraege aendern. Jetzt gilt:
+// schreiben darf nur, wer als Leonard bei Google angemeldet ist.
+const SCOPE_SCHREIBEN = 'https://www.googleapis.com/auth/spreadsheets';
+// Ein aelterer Token traegt nur das Leserecht. Lesen soll damit weiterlaufen; erst der
+// erste Schreibversuch bittet um eine neue Anmeldung. Deshalb wird die tatsaechlich
+// erteilte Berechtigung mitgefuehrt – `includes` genuegt nicht, weil
+// '…/spreadsheets.readonly' den kurzen Namen als Teilstring enthaelt.
+let darfSchreiben = false;
+function _scopeAuswerten(scopeText) {
+  darfSchreiben = String(scopeText || '').split(/[\s+]+/).includes(SCOPE_SCHREIBEN);
+  try { localStorage.setItem('g_scope', scopeText || ''); } catch(_) {}
+}
 
 function signIn() {
   location.href = 'https://accounts.google.com/o/oauth2/v2/auth'
     + '?client_id='    + encodeURIComponent(CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
     + '&response_type=token'
-    + '&scope='        + encodeURIComponent('https://www.googleapis.com/auth/spreadsheets.readonly')
+    + '&scope='        + encodeURIComponent(SCOPE_SCHREIBEN)
     + '&prompt=select_account';
 }
 function _checkHashToken() {
@@ -23,6 +44,7 @@ function _checkHashToken() {
   if (!t) return false;
   const exp = parseInt(p.get('expires_in') || '3600');
   accessToken = t; tokenExpiry = Date.now() + (exp - 60) * 1000;
+  _scopeAuswerten(p.get('scope'));
   // localStorage statt sessionStorage: Token überlebt PWA-Schließen/Restart.
   // Nach ~1h Ablauf wird er bei der nächsten Anfrage wegen 401 automatisch verworfen.
   try { localStorage.setItem('g_token', accessToken); localStorage.setItem('g_expiry', String(tokenExpiry)); } catch(_) {}
@@ -34,7 +56,11 @@ function _initAuth() {
   try {
     const t = localStorage.getItem('g_token');
     const exp = parseInt(localStorage.getItem('g_expiry') || '0');
-    if (t && Date.now() < exp) { accessToken = t; tokenExpiry = exp; return true; }
+    if (t && Date.now() < exp) {
+      accessToken = t; tokenExpiry = exp;
+      darfSchreiben = String(localStorage.getItem('g_scope') || '').split(/[\s+]+/).includes(SCOPE_SCHREIBEN);
+      return true;
+    }
   } catch(_) {}
   return false;
 }
@@ -2699,88 +2725,227 @@ function vo2Abschnitt(D, P) {
   return { html, zeichnen };
 }
 
-// Plan-Termin speichern oder loeschen. Laeuft ueber das Apps Script, damit der
-// OAuth-Scope der App bei "nur lesen" bleiben kann. mode:'no-cors' liefert keine
-// auswertbare Antwort – deshalb wird der Plan anschliessend neu aus dem Sheet
-// gelesen und daran erkannt, ob es geklappt hat.
-const PLAN_URL = REFRESH_URL.split('?')[0];
-const PLAN_TOKEN = (REFRESH_URL.match(/token=([^&]+)/) || [])[1] || '';
+// ── Schreiben ins Sheet ────────────────────────────────────────────────────
+// Frueher lief jede Aenderung ueber das Apps Script, abgesichert mit einem Passwort,
+// das in app.js steht – und app.js ist oeffentlich. Damit konnte JEDER Laufplan-
+// Eintraege anlegen, aendern und loeschen. Ein Passwort im Quelltext einer Webseite
+// laesst sich grundsaetzlich nicht geheim halten, also faellt es ersatzlos weg:
+// Die App schreibt jetzt selbst ueber die Sheets-API, mit derselben Google-Anmeldung,
+// mit der sie liest. Schreiben kann damit nur noch, wer als Leonard angemeldet ist.
+//
+// Zweiter Gewinn: der frueher noetige Umweg entfaellt. `mode:'no-cors'` lieferte keine
+// auswertbare Antwort, deshalb wurde blind gesendet, 1.2 s gewartet und im Sheet
+// nachgelesen, ob etwas angekommen ist – daher die zeitweise verschwundenen km-Werte.
+// Jetzt antwortet Google sofort und eindeutig.
+const PLAN_SPALTEN       = ['Date','Distance (km)','Note'];
+const LP_KOPF_SPALTEN    = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf'];
+const LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
 
-// Schreiben braucht eine gueltige Google-Anmeldung – nicht fuer das Senden selbst
-// (das laeuft ueber das Apps Script mit eigenem Schluessel), sondern fuer das
-// anschliessende Gegenlesen aus dem Sheet. Ohne Anmeldung kaeme der Wert im Sheet an,
-// die Anzeige zeigte aber weiter den alten Stand: derselbe Fall wie "verschwundene
-// km-Werte". Deshalb gar nicht erst senden, sondern sichtbar ablehnen.
+// Blattname in A1-Schreibweise. Ohne Anfuehrungszeichen bricht jeder Name mit
+// Sonderzeichen – 'Laufplan-Einheiten!A2' liest Google als Rechnung.
+function _a1(blatt, bereich) { return `'${String(blatt).replace(/'/g, "''")}'!${bereich}`; }
+// Spaltenbuchstabe zu einer 1-basierten Nummer (1→A). Mehr als 26 Spalten hat hier
+// kein Blatt, der Zweig darueber ist trotzdem billiger als ein spaeterer Fehler.
+function _spalteBuchstabe(n) {
+  let s = '';
+  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - r - 1) / 26; }
+  return s;
+}
+
+async function _sheetsRuf(pfad, opt = {}) {
+  const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + pfad, {
+    ...opt,
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json', ...(opt.headers || {}) }
+  });
+  if (res.status === 401 || res.status === 403) {
+    // 403 heisst hier fast immer: der Token traegt nur das Leserecht (alte Anmeldung).
+    darfSchreiben = false;
+    throw new Error('AUTH');
+  }
+  if (!res.ok) throw new Error('Google meldet ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  return res.json();
+}
+
+// Blatt anlegen, falls es fehlt – bisher tat das Apps Script beim ersten Speichern.
+async function _blattSicherstellen(sheetId, blatt) {
+  let titel = _tabsCache[sheetId];
+  if (!Array.isArray(titel) || !titel.includes(blatt)) {
+    const frisch = await _tabsHolen(sheetId);
+    if (frisch.authError) throw new Error('AUTH');
+    titel = frisch.titel;
+  }
+  if (titel.includes(blatt)) return;
+  await _sheetsRuf(sheetId + ':batchUpdate', { method: 'POST',
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: blatt, gridProperties: { frozenRowCount: 1 } } } }] }) });
+  _tabsMerken(sheetId, titel.concat(blatt));
+}
+
+async function _werteSetzen(sheetId, bereich, werte) {
+  return _sheetsRuf(sheetId + '/values/' + encodeURIComponent(bereich) + '?valueInputOption=RAW',
+    { method: 'PUT', body: JSON.stringify({ values: werte }) });
+}
+
+// Blatt lesen, die Zeilen umbauen lassen, alles zurueckschreiben.
+// Ein Rundumschlag statt einzelner Zeilenbefehle: Anlegen, Aendern und Loeschen laufen
+// ueber denselben Weg, das Blatt bleibt sortiert, und es braucht keine Zeilennummern,
+// die zwischen Lesen und Schreiben veralten koennten. Die Blaetter sind klein
+// (Termine und Planeinheiten, keine Messdaten) – der Aufwand faellt nicht ins Gewicht.
+// Rueckgabe: die neuen Werte inklusive Kopfzeile, also genau das, was jetzt im Sheet
+// steht. Damit laesst sich der lokale Stand ohne zweiten Abruf nachziehen.
+async function _blattUmschreiben(sheetId, blatt, spalten, umbauen) {
+  await _blattSicherstellen(sheetId, blatt);
+  const alt = await _fetchSheet(sheetId, blatt);
+  if (alt.authError) throw new Error('AUTH');
+  // Kopfzeile nur berichtigen, wenn sie fehlt oder nicht mehr stimmt – etwa weil das
+  // Blatt neu ist oder eine spaeter hinzugekommene Spalte fehlt (so wie damals
+  // „Wettkampf", die in bestehenden Blaettern sonst fuer immer leer bliebe).
+  const kopfIst = (alt.values || [])[0] || [];
+  if (spalten.some((sp, i) => String(kopfIst[i] ?? '') !== sp)) {
+    await _werteSetzen(sheetId, _a1(blatt, 'A1'), [spalten]);
+  }
+  const altZeilen = (alt.values || []).slice(1);
+  const breite = spalten.length;
+  const neu = umbauen(altZeilen.map(r => r.slice())).map(r => {
+    const z = r.slice(0, breite).map(v => v == null ? '' : v);
+    while (z.length < breite) z.push('');
+    return z;
+  });
+  if (neu.length) await _werteSetzen(sheetId, _a1(blatt, 'A2'), neu);
+  // Ueberhang leeren: hat das Blatt vorher mehr Zeilen gehabt (Loeschen), blieben die
+  // alten sonst unter den neuen stehen.
+  if (altZeilen.length > neu.length) {
+    const von = neu.length + 2, bis = altZeilen.length + 1;
+    await _sheetsRuf(sheetId + '/values/' + encodeURIComponent(
+      _a1(blatt, `A${von}:${_spalteBuchstabe(breite)}${bis}`)) + ':clear', { method: 'POST', body: '{}' });
+  }
+  return [spalten, ...neu];
+}
+
+// Darf ueberhaupt geschrieben werden? Zwei Gruende koennen dagegen sprechen:
+// keine gueltige Anmeldung, oder eine Anmeldung von vor der Umstellung, die nur das
+// Leserecht traegt. Beides wird sichtbar gemeldet statt still zu scheitern – ein
+// Wert, der scheinbar gespeichert ist und beim naechsten Aufbau wieder verschwindet,
+// war der schlimmste der frueheren Fehler.
 function _schreibenErlaubt() {
-  if (accessToken) return true;
-  _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. Oben anmelden und erneut versuchen.';
-  hinweisAuthZeigen();
-  if (currentScreen === 'laufplan') _renderTab('laufplan');
-  return false;
+  if (!accessToken) {
+    _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. Oben anmelden und erneut versuchen.';
+    hinweisAuthZeigen();
+    if (currentScreen === 'laufplan') _renderTab('laufplan');
+    return false;
+  }
+  if (!darfSchreiben) {
+    _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. Oben anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
+    hinweisSchreibrechtZeigen();
+    if (currentScreen === 'laufplan') _renderTab('laufplan');
+    return false;
+  }
+  return true;
 }
 
-async function planSpeichern(datum, km, notiz) {
-  return _planSenden({ plan:'add', datum, km: km ?? '', notiz: notiz ?? '' });
-}
-async function planLoeschen(datum) {
-  return _planSenden({ plan:'del', datum });
-}
-function _planSenden(felder) {
-  _lpKette = _lpKette.then(() => _planSendenJetzt(felder), () => _planSendenJetzt(felder));
-  return _lpKette;
-}
-async function _planSendenJetzt(felder) {
+// Gemeinsame Huelle aller Schreibvorgaenge: Berechtigung pruefen, Fehler in eine
+// verstaendliche Meldung uebersetzen, Ergebnis als true/false zurueckgeben.
+async function _schreibVorgang(tun) {
   if (!_schreibenErlaubt()) return false;
-  const p = new URLSearchParams({ token: PLAN_TOKEN, ...felder });
   try {
-    await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
-    // Kurz warten, dann gegenlesen: erst das Sheet entscheidet, was gilt.
-    await new Promise(r => setTimeout(r, 1200));
-    const frisch = await _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT);
-    _parsePlanRows(frisch.values || []);
+    await tun();
+    _lpFehler = null;
     return true;
-  } catch(_) {
+  } catch (e) {
+    if (e.message === 'AUTH') {
+      _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. Oben anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
+      hinweisSchreibrechtZeigen();
+    } else {
+      _lpFehler = 'Nicht gespeichert: ' + e.message;
+    }
     return false;
   }
 }
 
-// Plan speichern/loeschen und Einheiten setzen – alles ueber dasselbe Muster wie
-// die Einzeltermine: senden, kurz warten, aus dem Sheet gegenlesen.
-async function lpPlanSpeichern(plan) {
-  return _lpSenden({ lp:'planSpeichern', id: plan.id || '', name: plan.name || '',
-    notizen: plan.notizen || '', start: plan.start || '', ende: plan.ende || '',
-    wochen: plan.wochen || '', lauftage: (plan.lauftage || []).join(','),
-    archiviert: plan.archiviert ? '1' : '', wettkampf: plan.wettkampf || '' });
-}
-async function lpPlanLoeschen(id) { return _lpSenden({ lp:'planLoeschen', id }); }
-async function lpEinheitSpeichern(e) {
-  return _lpSenden({ lp:'einheitSpeichern', id:e.planId, woche:e.woche, wochentag:e.wochentag,
-    datum:e.datum||'', strecke:e.strecke??'', zeit:e.zeit??'', zone:e.zone||'' });
-}
 // Alle Schreibvorgaenge laufen nacheinander durch EINE Kette. Vorher stand hier ein
 // Riegel (`if (_planLaeuft) return false`), der jeden Aufruf verwarf, welcher waehrend
 // eines laufenden startete – tippte man mehrere Felder zuegig hintereinander, kam nur
 // das erste an und die uebrigen Werte verschwanden beim naechsten Neuaufbau.
 let _lpKette = Promise.resolve();
-function _lpSenden(felder) {
-  _lpKette = _lpKette.then(() => _lpSendenJetzt(felder), () => _lpSendenJetzt(felder));
+function _inKette(tun) {
+  _lpKette = _lpKette.then(() => _schreibVorgang(tun), () => _schreibVorgang(tun));
   return _lpKette;
 }
-async function _lpSendenJetzt(felder) {
-  if (!_schreibenErlaubt()) return false;
-  const p = new URLSearchParams({ token: PLAN_TOKEN });
-  Object.entries(felder).forEach(([k,v]) => p.set(k, v == null ? '' : String(v)));
-  try {
-    await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
-    await new Promise(r => setTimeout(r, 1200));
-    const [kopf, einh] = await Promise.all([
-      _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT),
-      _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)
-    ]);
-    _parsePlaene(kopf.values || [], einh.values || []);
-    return true;
-  } catch(_) { return false; }
+
+// ── Einzelne Termine (Blatt „Laufplan") ──
+async function planSpeichern(datum, km, notiz) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(datum || ''))) return false;
+  const wert  = km != null && km !== '' ? Number(String(km).replace(',', '.')) : '';
+  const text  = String(notiz ?? '').slice(0, 200);
+  return _inKette(async () => {
+    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, PLAN_BLATT, PLAN_SPALTEN, zeilen => {
+      const ohne = zeilen.filter(r => String(r[0] ?? '').trim().slice(0, 10) !== datum);
+      ohne.push([datum, isNaN(wert) ? '' : wert, text]);
+      // Sortiert halten, damit das Blatt auch von Hand lesbar bleibt.
+      return ohne.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    });
+    _parsePlanRows(werte);
+  });
 }
+async function planLoeschen(datum) {
+  return _inKette(async () => {
+    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, PLAN_BLATT, PLAN_SPALTEN,
+      zeilen => zeilen.filter(r => String(r[0] ?? '').trim().slice(0, 10) !== String(datum)));
+    _parsePlanRows(werte);
+  });
+}
+
+// ── Laufplaene und ihre Einheiten ──
+// Nach jedem Schreiben wird der lokale Stand aus GENAU dem nachgezogen, was im Sheet
+// steht – nicht aus der Eingabe. Damit bleibt das Sheet die massgebliche Quelle, ohne
+// dass es dafuer einen zweiten Abruf braucht.
+async function _lpNachziehen(kopfWerte, einheitWerte) {
+  const kopf = kopfWerte || (await _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT)).values || [];
+  const einh = einheitWerte || (await _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)).values || [];
+  _parsePlaene(kopf, einh);
+}
+
+async function lpPlanSpeichern(plan) {
+  const id = String(plan.id || '').trim() || ('lp' + Date.now());
+  const zeile = [id, String(plan.name || '').slice(0, 120), String(plan.notizen || '').slice(0, 500),
+    String(plan.start || ''), String(plan.ende || ''), Number(plan.wochen || 0) || '',
+    (plan.lauftage || []).join(','), plan.archiviert ? 'ja' : '', String(plan.wettkampf || '')];
+  return _inKette(async () => {
+    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_PLAENE_BLATT, LP_KOPF_SPALTEN, zeilen => {
+      const i = zeilen.findIndex(r => String(r[0] ?? '').trim() === id);
+      if (i >= 0) zeilen[i] = zeile; else zeilen.push(zeile);
+      return zeilen;
+    });
+    await _lpNachziehen(werte, null);
+  });
+}
+
+async function lpPlanLoeschen(id) {
+  return _inKette(async () => {
+    // Erst die Einheiten, dann der Plan: bricht der zweite Schritt ab, bleiben keine
+    // Einheiten ohne zugehoerigen Plan zurueck – die waeren unsichtbar und unloeschbar.
+    const einh = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT, LP_EINHEIT_SPALTEN,
+      zeilen => zeilen.filter(r => String(r[0] ?? '').trim() !== String(id)));
+    const kopf = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_PLAENE_BLATT, LP_KOPF_SPALTEN,
+      zeilen => zeilen.filter(r => String(r[0] ?? '').trim() !== String(id)));
+    await _lpNachziehen(kopf, einh);
+  });
+}
+
+async function lpEinheitSpeichern(e) {
+  const zeile = [String(e.planId || ''), Number(e.woche || 0), String(e.wochentag || ''),
+    String(e.datum || ''), e.strecke != null && e.strecke !== '' ? Number(String(e.strecke).replace(',', '.')) : '',
+    e.zeit != null && e.zeit !== '' ? Number(e.zeit) : '', String(e.zone || '')];
+  return _inKette(async () => {
+    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT, LP_EINHEIT_SPALTEN, zeilen => {
+      const i = zeilen.findIndex(r => String(r[0] ?? '') === String(e.planId) &&
+        String(r[1] ?? '') === String(e.woche) && String(r[2] ?? '') === String(e.wochentag));
+      if (i >= 0) zeilen[i] = zeile; else zeilen.push(zeile);
+      return zeilen;
+    });
+    await _lpNachziehen(null, werte);
+  });
+}
+
 
 // Alle Tage, an denen laut einem Plan ein Lauf vorgesehen ist. Ergaenzt die freien
 // Einzeltermine aus planData – beide erscheinen im Kalender als "geplant".
@@ -2812,8 +2977,13 @@ function _planEinheitAm(datum) {
 function _lpZeitAusText(text) {
   const t = String(text ?? '').trim().toLowerCase().replace(',', '.');
   if (!t) return '';
-  // Nur eine Zahl: Minuten – ausser es haengt ein "h" dran.
-  const nur = t.match(/^(\d+(?:\.\d+)?)\s*(h|std)?$/);
+  // Nur eine Zahl: Minuten – ausser es haengt ein "h" dran. Die Minuten-Einheit muss
+  // mitgelesen werden, sonst frisst die App ihre eigene Ausgabe nicht mehr:
+  // fmtMin(30) schreibt "30 min" ins Feld zurueck, und das passte auf KEINE der
+  // beiden Formen – beim naechsten Speichern derselben Zeile (etwa weil nur die
+  // Kilometer geaendert wurden) verschwand die Zeit stillschweigend. Betroffen war
+  // jede Einheit unter einer Stunde; ab 60 min ("1h 15min") griff die zweite Form.
+  const nur = t.match(/^(\d+(?:\.\d+)?)\s*(h|std)?\s*(?:m|min)?$/);
   if (nur) return Math.round(parseFloat(nur[1]) * (nur[2] ? 60 : 1));
   // Stunden und Minuten in einem: "1:15", "1h15", "1h 15min"
   const beides = t.match(/^(\d+)\s*(?::|h|std)\s*(\d+)?\s*(?:m|min)?$/);
@@ -4043,9 +4213,15 @@ function hinweisAuthZeigen() {
   const stand = allData.length ? fmtDayShort(allData[allData.length-1].date) : '—';
   hinweisZeigen('auth', `Daten bis ${stand} · Anmeldung nötig zum Aktualisieren`, 'Anmelden');
 }
+// Eigener Zustand fuer den Fall „angemeldet, aber nur mit Leserecht": nach der
+// Umstellung auf das Schreiben ueber die Google-Anmeldung tragen alte Anmeldungen
+// die neue Erlaubnis noch nicht. Lesen laeuft weiter, nur das Speichern fragt nach.
+function hinweisSchreibrechtZeigen() {
+  hinweisZeigen('recht', 'Zum Speichern einmal neu anmelden', 'Anmelden');
+}
 document.body.addEventListener('click', (e) => {
   if (!e.target.closest('.hinweis-akt')) return;
-  if (_hinweisZustand === 'auth') { signIn(); return; }
+  if (_hinweisZustand === 'auth' || _hinweisZustand === 'recht') { signIn(); return; }
   if (_hinweisZustand === 'neu')  { hinweisAus(); _refreshAfterStateChange(); }
 });
 
@@ -4067,7 +4243,7 @@ async function hintergrundLaden() {
   const ergebnis = await loadFromAPI({ still: true });
   if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
   if (ergebnis !== true) return;               // Netzfehler: der alte Stand bleibt stehen
-  if (_hinweisZustand === 'auth') hinweisAus();
+  if (_hinweisZustand === 'auth') hinweisAus();   // 'recht' bleibt stehen – es gilt weiter
   // Identischer Stand – der Normalfall, wenn die App kurz nacheinander geoeffnet wird.
   // Dann nichts anfassen: ein Neuaufbau saehe nach Ruckeln aus, ohne etwas zu zeigen.
   if (datenStand() === vorher) return;
@@ -4088,8 +4264,13 @@ async function refreshData() {
   if (!accessToken) { hinweisAuthZeigen(); return; }
   const btns = document.querySelectorAll('.refresh-btn');
   btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
-  // 1. Apps Script: Drive → Sheet aktualisieren
-  try { await fetch(REFRESH_URL, { mode: 'no-cors' }); } catch(_) {}
+  // 1. Apps Script: Drive → Sheet aktualisieren. `no-cors` liefert keine auswertbare
+  //    Antwort; ob es gewirkt hat, zeigt Schritt 3 – die Daten kommen aus dem Sheet.
+  try {
+    await fetch(REFRESH_URL, { method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ refresh: true, zugang: accessToken }) });
+  } catch(_) {}
   // 2. Kurz warten bis Sheet bereit ist
   await new Promise(r => setTimeout(r, 4000));
   // 3. Daten neu aus Sheet laden

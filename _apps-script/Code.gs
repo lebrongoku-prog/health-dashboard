@@ -8,7 +8,6 @@
 // initSheet, restoreFromBackup, …) liegen in Maintenance.gs.
 // ================================================================
 
-var SECRET           = 'I4C1c9csK02bAvQbF2cLnUuEsgfJbtWjzzGAPaHnd-Vn';
 var WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
 
 function onOpen() {
@@ -18,207 +17,65 @@ function onOpen() {
     .addToUi();
 }
 
-// ── Refresh-Trigger (einziger Zweck dieses Endpoints) ─────────
-function doGet(e) {
-  var p = e && e.parameter ? e.parameter : {};
-
-  // Secret-Token prüfen
-  if (p.token !== SECRET) {
-    return ContentService.createTextOutput(JSON.stringify({ error: 'Unauthorized' }))
-      .setMimeType(ContentService.MimeType.JSON);
+// ── Zugangspruefung ────────────────────────────────────────────
+// Frueher stand hier ein festes Passwort (var SECRET). Es musste zugleich in app.js
+// stehen, damit die App es mitschicken kann – und app.js liefert GitHub Pages an
+// jeden aus. Damit konnte jeder, der das Projekt fand, diesen Endpunkt bedienen und
+// Laufplan-Eintraege anlegen, aendern und loeschen.
+//
+// Ein Passwort im Quelltext einer Webseite laesst sich grundsaetzlich nicht geheim
+// halten. Deshalb ist es ersatzlos entfallen. Stattdessen schickt die App ihren
+// Google-Zugang mit, und hier wird geprueft, ob dieser Zugang die (private) Tabelle
+// lesen darf. Wer das darf, ist berechtigt – wer nicht, kommt nicht weiter. Ein
+// Fremder kann sich keinen solchen Zugang beschaffen: Google liefert ihn nur an die
+// hinterlegte Adresse der App zurueck.
+//
+// Die Laufplan-Endpunkte sind ganz entfallen; die App schreibt inzwischen selbst
+// ueber die Sheets-API. Uebrig bleibt der Import Drive → Sheet, denn NUR das Skript
+// kommt an die Health-Auto-Export-Dateien in Drive.
+function zugangGueltig(zugang) {
+  if (!zugang || String(zugang).length < 20) return false;
+  try {
+    var res = UrlFetchApp.fetch(
+      'https://sheets.googleapis.com/v4/spreadsheets/' + WORKOUT_SHEET_ID + '?fields=spreadsheetId',
+      { headers: { Authorization: 'Bearer ' + zugang }, muteHttpExceptions: true });
+    return res.getResponseCode() === 200;
+  } catch (err) {
+    return false;
   }
+}
 
-  // Optional: Sheets aktualisieren
-  if (p.refresh === 'true') {
-    try {
-      writeToSheet();
-    } catch(err) {
-      return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+function antwort(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// GET macht bewusst nichts mehr. Der Import laeuft ueber POST, weil der Google-Zugang
+// dort in den Rumpf gehoert: Adressen landen in Server-Protokollen, Rumpfdaten nicht.
+function doGet(e) {
+  return antwort({ ok: true, hinweis: 'Import per POST mit {"refresh":true,"zugang":"<Google-Token>"}' });
+}
+
 function doPost(e) {
-  var params = e && e.parameter ? e.parameter : {};
-  if (params.token !== SECRET) {
-    return ContentService.createTextOutput('Unauthorized');
+  var daten = {};
+  try { daten = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { daten = {}; }
+
+  if (!zugangGueltig(daten.zugang)) {
+    return antwort({ error: 'Unauthorized' });
   }
-  // Laufplan-Termine: die App schickt sie per POST (mode:'no-cors', daher ohne
-  // auswertbare Antwort - sie liest den Plan danach neu aus dem Sheet).
-  if (params.plan) {
-    try { return planEndpunkt(params); }
-    catch (err) { return ContentService.createTextOutput('Fehler: ' + err); }
+  if (daten.refresh) {
+    try { writeToSheet(); }
+    catch (err) { return antwort({ error: String(err) }); }
   }
-  // Laufplaene (Kopfdaten) und ihre geplanten Einheiten.
-  if (params.lp) {
-    try { return laufplanEndpunkt(params); }
-    catch (err) { return ContentService.createTextOutput('Fehler: ' + err); }
-  }
-  writeToSheet();
-  return ContentService.createTextOutput('OK');
+  return antwort({ ok: true });
 }
 
-// ── Laufplan ───────────────────────────────────────────────────
-// Einzelne Termine in einem eigenen Blatt des Workout-Spreadsheets. Die App liest
-// es mit ihrem Nur-Lese-Recht; geschrieben wird ausschliesslich hier.
-var PLAN_BLATT = 'Laufplan';
+// Hinweis: Die frueheren Laufplan-Endpunkte (planEndpunkt, planBlatt, planDatumStr,
+// laufplanEndpunkt, lpBlatt, lpZeileFinden samt LP_*-Konstanten) sind entfallen.
+// Die App legt die Blaetter 'Laufplan', 'Laufplaene' und 'Laufplan-Einheiten' jetzt
+// selbst an und schreibt direkt ueber die Sheets-API – abgesichert durch die
+// Google-Anmeldung statt durch ein Passwort im oeffentlichen Quelltext.
 
-function planBlatt() {
-  var ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID);
-  var sh = ss.getSheetByName(PLAN_BLATT);
-  if (!sh) {
-    sh = ss.insertSheet(PLAN_BLATT);
-    sh.appendRow(['Date', 'Distance (km)', 'Note']);
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-
-function planEndpunkt(p) {
-  var sh = planBlatt();
-  var datum = String(p.datum || '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
-    return ContentService.createTextOutput('Ungueltiges Datum');
-  }
-  var werte = sh.getDataRange().getValues();
-  // Zeile dieses Datums suchen - ein Datum kommt hoechstens einmal vor.
-  var zeile = -1;
-  for (var i = 1; i < werte.length; i++) {
-    if (planDatumStr(werte[i][0]) === datum) { zeile = i + 1; break; }
-  }
-
-  if (p.plan === 'del') {
-    if (zeile > 0) sh.deleteRow(zeile);
-    return ContentService.createTextOutput('OK geloescht');
-  }
-
-  var km    = p.km ? Number(String(p.km).replace(',', '.')) : '';
-  var notiz = String(p.notiz || '').slice(0, 200);
-  if (zeile > 0) {
-    sh.getRange(zeile, 1, 1, 3).setValues([[datum, km, notiz]]);
-  } else {
-    sh.appendRow([datum, km, notiz]);
-    // Nach Datum sortieren, damit das Blatt auch von Hand lesbar bleibt.
-    if (sh.getLastRow() > 2) {
-      sh.getRange(2, 1, sh.getLastRow() - 1, 3).sort({ column: 1, ascending: true });
-    }
-  }
-  return ContentService.createTextOutput('OK gespeichert');
-}
-
-// Das Blatt kann Datumswerte als Date ODER als Text enthalten - beides auf
-// JJJJ-MM-TT bringen. Ohne das schluege der Abgleich bei von Hand getippten
-// Zeilen fehl.
-function planDatumStr(v) {
-  if (v instanceof Date) {
-    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  }
-  return String(v || '').trim().slice(0, 10);
-}
-
-// ── Einen Tag verarbeiten ──────────────────────────────────────
-function parseDay(date, metrics) {
-  var d = { date: date };
-  metrics.forEach(function(m) {
-    var pts = m.data || [];
-    switch (m.name) {
-      case 'step_count':                       d.steps         = Math.round(S(pts));         break;
-      case 'walking_running_distance':         d.distKm        = R1(S(pts));                 break;
-      case 'active_energy':                    d.activeCal     = Math.round(S(pts) / 4.184); break;
-      case 'basal_energy_burned':              d.basalCal      = Math.round(S(pts) / 4.184); break;
-      case 'heart_rate':
-        if (pts.length) {
-          var hrAvg = pts[0].Avg, hrMin = pts[0].Min, hrMax = pts[0].Max;
-          if (!hrAvg) {
-            var vals = pts.map(function(p){ return p.qty||0; }).filter(function(v){ return v>0; });
-            if (vals.length) {
-              hrAvg = vals.reduce(function(a,b){ return a+b; },0) / vals.length;
-              hrMin = Math.min.apply(null, vals);
-              hrMax = Math.max.apply(null, vals);
-            }
-          }
-          d.hrAvg = Math.round(hrAvg||0);
-          d.hrMin = Math.round(hrMin||0);
-          d.hrMax = Math.round(hrMax||0);
-        }
-        break;
-      case 'resting_heart_rate':               d.restHR        = Math.round(A(pts));         break;
-      case 'heart_rate_variability':           d.hrv           = Math.round(A(pts));         break;
-      case 'blood_oxygen_saturation':          d.spo2          = R1(A(pts));                 break;
-      case 'respiratory_rate':                 d.respRate      = R1(A(pts));                 break;
-      case 'sleep_analysis':
-        if (pts[0]) {
-          var s        = pts[0];
-          d.sleepTotal = R1(s.totalSleep || 0);
-          d.sleepCore  = R1(s.core       || 0);
-          d.sleepRem   = R1(s.rem        || 0);
-          d.sleepDeep  = R1(s.deep       || 0);
-          d.sleepAwake = R1(s.awake      || 0);
-          d.sleepStart = extractTime(s.sleepStart || s.inBedStart);
-          d.sleepEnd   = extractTime(s.sleepEnd   || s.inBedEnd);
-        }
-        break;
-      case 'vo2_max':                          d.vo2max        = R1(A(pts));                 break;
-      case 'apple_exercise_time':              d.exerciseMin   = Math.round(S(pts));         break;
-      case 'apple_stand_time':                 d.standMin      = Math.round(S(pts));         break;
-      case 'apple_stand_hour':                 d.standHours    = Math.round(S(pts));         break;
-      case 'flights_climbed':                  d.flights       = Math.round(S(pts));         break;
-      case 'time_in_daylight':                 d.daylight      = Math.round(S(pts));         break;
-      case 'apple_sleeping_wrist_temperature': d.wristTemp     = R1(A(pts));                 break;
-      case 'breathing_disturbances':           d.breathDisturb = R1(A(pts));                 break;
-      case 'running_speed':      if (pts.length) d.runSpeed    = R1(A(pts));                 break;
-      case 'running_power':      if (pts.length) d.runPower    = Math.round(A(pts));         break;
-      case 'walking_speed':                    d.walkSpeed     = R1(A(pts));                 break;
-      case 'physical_effort':                  d.physEffort    = R1(A(pts));                 break;
-      case 'walking_heart_rate_average':       d.walkHR        = Math.round(A(pts));         break;
-    }
-  });
-  return d;
-}
-
-// ── Hilfsfunktion: Zeit aus Datetime-String extrahieren ────────
-function extractTime(dtStr) {
-  if (!dtStr) return null;
-  var m = String(dtStr).match(/\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2})/);
-  return m ? m[1] : null;
-}
-
-// ── Mathe-Hilfsfunktionen ──────────────────────────────────────
-function S(d)  { return d.reduce(function(a,x){ return a+(x.qty||0); }, 0); }
-function A(d)  { return d.length ? S(d) / d.length : 0; }
-function R1(v) { return Math.round(v * 10) / 10; }
-
-// ================================================================
-// GOOGLE SHEETS EXPORT
-// ================================================================
-
-var SHEET_NAME = 'Health Dashboard Data';
-var COLUMNS = [
-  'date','steps','distKm','activeCal','basalCal',
-  'hrAvg','hrMin','hrMax','restHR','hrv','spo2','respRate',
-  'sleepTotal','sleepCore','sleepRem','sleepDeep','sleepAwake',
-  'vo2max','exerciseMin','standMin','standHours','flights',
-  'daylight','wristTemp','breathDisturb','runSpeed','runPower',
-  'walkSpeed','physEffort','walkHR',
-  'sleepStart','sleepEnd'
-];
-
-function getHealthFolder() {
-  var parent = DriveApp.getFolderById('1akYBt8MyyvS03yxxWgxAV-lYOeqKdrL_');
-  var subs = parent.getFoldersByName('Health Data');
-  if (subs.hasNext()) return subs.next();
-  throw new Error('Ordner nicht gefunden: Health Data');
-}
-
-// Pro Datum genau eine Datei zurückgeben.
-// Google Drive ERSETZT eine gleichnamige Datei nicht, sondern legt eine zweite daneben.
-// Exportiert Health Auto Export für denselben Tag mehrmals, lagen bisher mehrere
-// Dateien mit identischem Namen im Ordner – und jede erzeugte eine eigene Sheet-Zeile.
-// Bei Mehrfachtreffern gewinnt die zuletzt geänderte Datei.
 function getAllHealthFiles() {
   var folder = getHealthFolder();
   var files = folder.getFiles();
@@ -614,84 +471,3 @@ function importWorkoutData() {
   return ss.getId();
 }
 
-// ── Laufplaene ─────────────────────────────────────────────────
-// Zwei Blaetter, damit der Plan im Sheet von Hand lesbar bleibt:
-//   Laufplaene         – eine Zeile je Plan
-//   Laufplan-Einheiten – eine Zeile je geplanter Einheit
-var LP_PLAENE   = 'Laufplaene';
-var LP_EINHEITEN = 'Laufplan-Einheiten';
-var LP_KOPF_SPALTEN = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf'];
-var LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
-
-function lpBlatt(name, spalten) {
-  // Nachtrag: fehlt einem bestehenden Blatt eine spaeter ergaenzte Spalte, wird sie
-  // hier angehaengt. Ohne das bliebe "Wettkampf" in alten Blaettern fuer immer leer.
-  var vorhanden = SpreadsheetApp.openById(WORKOUT_SHEET_ID).getSheetByName(name);
-  if (vorhanden && vorhanden.getLastColumn() < spalten.length) {
-    vorhanden.getRange(1, 1, 1, spalten.length).setValues([spalten]);
-  }
-  var ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID);
-  var sh = ss.getSheetByName(name);
-  if (!sh) {
-    sh = ss.insertSheet(name);
-    sh.appendRow(spalten);
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-
-function laufplanEndpunkt(p) {
-  var was = String(p.lp || '');
-
-  if (was === 'planSpeichern') {
-    var sh = lpBlatt(LP_PLAENE, LP_KOPF_SPALTEN);
-    var id = String(p.id || '').trim() || ('lp' + Date.now());
-    var zeile = lpZeileFinden(sh, id);
-    var werte = [id, String(p.name || '').slice(0,120), String(p.notizen || '').slice(0,500),
-                 String(p.start || ''), String(p.ende || ''), Number(p.wochen || 0) || '',
-                 String(p.lauftage || ''), String(p.archiviert || '') === '1' ? 'ja' : '',
-                 String(p.wettkampf || '')];
-    if (zeile > 0) sh.getRange(zeile, 1, 1, werte.length).setValues([werte]);
-    else sh.appendRow(werte);
-    return ContentService.createTextOutput('OK ' + id);
-  }
-
-  if (was === 'planLoeschen') {
-    var shP = lpBlatt(LP_PLAENE, LP_KOPF_SPALTEN);
-    var z = lpZeileFinden(shP, String(p.id || ''));
-    if (z > 0) shP.deleteRow(z);
-    // Zugehoerige Einheiten mitloeschen – von unten nach oben, sonst verschieben
-    // sich die Zeilennummern waehrend des Loeschens.
-    var shE = lpBlatt(LP_EINHEITEN, LP_EINHEIT_SPALTEN);
-    var daten = shE.getDataRange().getValues();
-    for (var i = daten.length - 1; i >= 1; i--) {
-      if (String(daten[i][0]) === String(p.id)) shE.deleteRow(i + 1);
-    }
-    return ContentService.createTextOutput('OK geloescht');
-  }
-
-  if (was === 'einheitSpeichern') {
-    var shE2 = lpBlatt(LP_EINHEITEN, LP_EINHEIT_SPALTEN);
-    var daten2 = shE2.getDataRange().getValues();
-    var treffer = -1;
-    for (var j = 1; j < daten2.length; j++) {
-      if (String(daten2[j][0]) === String(p.id) &&
-          String(daten2[j][1]) === String(p.woche) &&
-          String(daten2[j][2]) === String(p.wochentag)) { treffer = j + 1; break; }
-    }
-    var w = [String(p.id||''), Number(p.woche||0), String(p.wochentag||''), String(p.datum||''),
-             p.strecke ? Number(String(p.strecke).replace(',','.')) : '',
-             p.zeit ? Number(p.zeit) : '', String(p.zone || '')];
-    if (treffer > 0) shE2.getRange(treffer, 1, 1, w.length).setValues([w]);
-    else shE2.appendRow(w);
-    return ContentService.createTextOutput('OK Einheit');
-  }
-
-  return ContentService.createTextOutput('Unbekannte Aktion');
-}
-
-function lpZeileFinden(sh, id) {
-  var daten = sh.getDataRange().getValues();
-  for (var i = 1; i < daten.length; i++) if (String(daten[i][0]) === id) return i + 1;
-  return -1;
-}

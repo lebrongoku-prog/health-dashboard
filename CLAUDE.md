@@ -9,9 +9,11 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
 - **Vanilla JS**, keine Frameworks, **kein Build-Step**. `app.js` ist eine große IIFE.
 - **Chart.js 4.5.0** via CDN (in `index.html`, `defer`).
 - **PWA**: Service Worker (`sw.js`, Cache-First-Shell) + `manifest.json`.
-- **Daten**: Google Sheets, befüllt/aktualisiert über **Google Apps Script**
-  (`_apps-script/`). Auth: **Google OAuth**, Token in `localStorage`. `REFRESH_URL` stößt
-  Drive→Sheet-Refresh an. (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
+- **Daten**: Google Sheets. Auth: **Google OAuth**, Token in `localStorage`, Scope
+  `spreadsheets` (**Lesen UND Schreiben** — siehe „Schreiben ins Sheet"). Die App liest
+  und schreibt selbst über die Sheets-API. Das **Apps Script** (`_apps-script/`) macht
+  nur noch das eine, was die App nicht kann: den Import Drive→Sheet (`REFRESH_URL`).
+  (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
   Der zuletzt geladene Stand liegt zusätzlich als Kopie im `localStorage` — die App
   startet daraus (siehe „Sofortstart aus dem Zwischenspeicher").
 
@@ -41,12 +43,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
   `?scenario=normal|nodata|woerror|stale|inject|dubletten|quellen`. Nur Entwicklung,
   nicht Teil der App. Für die Datenschicht zusätzlich: `?auth=aus` (kein gültiger Token
-  → die App muss aus dem Zwischenspeicher weiterlaufen), `?cache=behalten`
+  → die App muss aus dem Zwischenspeicher weiterlaufen), `?auth=lesen` (Anmeldung von
+  vor der Schreib-Umstellung: Lesen läuft, Speichern muss nach neuer Anmeldung fragen),
+  `?cache=behalten`
   (Zwischenspeicher NICHT leeren — erst normal laden, dann damit neu laden),
   `?netz=langsam` (jede Antwort 1.5 s später), `?tipp=sofort` (Nutzer tippt gleich nach
   dem Start → Hinweisleiste statt stillem Neuzeichnen). Messpunkte:
   `window.__ersterChartMs` / `__ersteAntwortMs` (belegen den Sofortstart), `__anfragen`
-  (meta/werte/script), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
+  (meta/werte/**schreiben**/script), `__lpPlaene`/`__lpEinheiten`/`__planBlatt` (der
+  simulierte Sheet-Inhalt — der Prüfstand bildet das Schreiben über die Sheets-API
+  nach, nicht mehr den entfallenen Apps-Script-Weg), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
   sie racet jede Prüfung von aussen gegen die Antwortzeit).
   Jeder vierte Lauf ist dort ein **Indoor-Lauf**: `runSpeed` leer, Workout-Speed
   vorhanden — der Fall, in dem die Pace früher fehlte.
@@ -86,6 +92,39 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Datumszeilen werden beim Einlesen zusammengeführt (das Apps-Script schreibt beim Refresh
   die letzten Tage neu und kann Dubletten erzeugen; ungefiltert zählte so ein Tag in jeden
   Durchschnitt doppelt). `workoutData` = nach Datum gekeyt, dadurch von Haus aus eindeutig.
+- **Schreiben ins Sheet — über die Google-Anmeldung, NICHT über ein Passwort.**
+  Bis 30.08.2026 lief jede Änderung über das Apps Script, abgesichert mit `var SECRET`.
+  Dasselbe Passwort musste in `app.js` stehen, damit die App es mitschicken kann — und
+  `app.js` liefert GitHub Pages an jeden aus. **Jeder, der das Projekt fand, konnte
+  Laufplan-Einträge anlegen, ändern und löschen** (nachgewiesen: der Endpunkt
+  antwortete auf den öffentlichen Schlüssel mit `{"ok":true}`). Ein Passwort im
+  Quelltext einer Webseite lässt sich grundsätzlich nicht geheim halten — Wechseln oder
+  das Repo privat machen hilft nicht, weil `app.js` öffentlich bleiben MUSS.
+  Deshalb: **`SECRET` ist ersatzlos entfallen.** Nie wieder ein Geheimnis in `app.js`.
+  - `_blattUmschreiben(sheetId, blatt, spalten, umbauen)` ist der **einzige** Schreibweg:
+    Blatt lesen → Zeilen umbauen lassen → alles zurückschreiben (`values PUT` ab A2,
+    Überhang per `values:clear`). Ein Rundumschlag statt einzelner Zeilenbefehle —
+    Anlegen, Ändern und Löschen laufen gleich, das Blatt bleibt sortiert, und es braucht
+    keine Zeilennummern, die zwischen Lesen und Schreiben veralten. Die Blätter sind
+    klein (Termine und Planeinheiten, keine Messdaten).
+  - Blattnamen in A1-Schreibweise **immer quoten** (`_a1`) — `Laufplan-Einheiten!A2`
+    liest Google sonst als Rechnung.
+  - Die Kopfzeile wird nur berichtigt, wenn sie fehlt oder nicht stimmt. Das ersetzt die
+    Spaltennachrüstung, die früher `lpBlatt` im Apps Script übernahm.
+  - Der lokale Stand wird aus **genau dem** nachgezogen, was geschrieben wurde — kein
+    zweiter Abruf, kein Warten. Der frühere Umweg (`mode:'no-cors'` → 1.2 s warten →
+    Sheet gegenlesen) war die Ursache der zeitweise verschwundenen km-Werte.
+  - `darfSchreiben` führt mit, ob die Anmeldung den Schreib-Scope trägt. Eine Anmeldung
+    von vor der Umstellung darf weiter **lesen**; erst der erste Schreibversuch bittet um
+    eine neue. Die Prüfung muss auf **exakte** Scope-Gleichheit gehen —
+    `includes('auth/spreadsheets')` trifft auch `…/spreadsheets.readonly`.
+  - `_schreibenErlaubt()` lehnt sichtbar ab (Warnkarte + Hinweisleiste), statt still zu
+    scheitern. Ein Wert, der scheinbar gespeichert ist und beim nächsten Aufbau wieder
+    verschwindet, war der schlimmste der früheren Fehler.
+  - **Der Refresh-Auslöser** trägt kein Passwort mehr: die App schickt ihren
+    Google-Zugang im **POST-Rumpf** (Adressen landen in Server-Protokollen, Rumpfdaten
+    nicht), und `zugangGueltig()` im Apps Script prüft ihn, indem es damit die private
+    Tabelle anfragt — wer sie lesen darf, darf auch den Import auslösen.
 - **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
   auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
   Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
@@ -115,9 +154,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zeitfilter aus dem Zwischenspeicher weiter, die Hinweisleiste oben
   (`#hinweis-oben`, ein Element für beide Zustände) bietet die Anmeldung an, und die
   App-Karte zeigt „Google-Anmeldung — abgelaufen". **Schreiben ist dann gesperrt**
-  (`_schreibenErlaubt()`): das Senden selbst liefe zwar über das Apps Script mit
-  eigenem Schlüssel, aber das anschliessende Gegenlesen aus dem Sheet nicht — der Wert
-  käme an, die Anzeige zeigte weiter den alten Stand.
+  (`_schreibenErlaubt()`) — seit der Umstellung schon deshalb, weil die App ohne
+  Anmeldung gar nicht mehr ins Sheet schreiben kann.
 - **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
   Workout- oder Laufplan-Blatt, bleibt der vorhandene Stand stehen (`still &&
   vorhanden` → nur `console.warn`). Sonst hätte eine kurze Netzstörung den
@@ -125,8 +163,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Blattnamen-Zwischenspeicher (`hcc_blattnamen_v1`):** `_fetchSheet` fragte vor jedem
   Wertabruf, wie die Blätter heissen — fünf Extraanfragen pro Start für eine Angabe,
   die sich nie ändert. Die Liste liegt jetzt lokal; neu geholt wird sie nur, wenn ein
-  gesuchtes Blatt fehlt (das Apps Script legt die Laufplan-Blätter erst beim ersten
-  Speichern an). `_tabsHolen` bündelt parallele Aufrufe, sonst schickten die fünf
+  gesuchtes Blatt fehlt (die Laufplan-Blätter entstehen erst beim ersten Speichern —
+  seit der Umstellung legt sie `_blattSicherstellen` an, vorher das Apps Script).
+  `_tabsHolen` bündelt parallele Aufrufe, sonst schickten die fünf
   gleichzeitigen Abrufe wieder fünf identische Namensanfragen los.
 - **`loadFromAPI` lädt alle fünf Blätter gleichzeitig** (`Promise.all`), nicht mehr
   nacheinander. Die Nebenblätter fangen ihre Fehler selbst ab (`.catch(alsFehler)`),
@@ -430,23 +469,21 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (`_currentRenderingTab` in `pgBanner`).
 - **Laufpläne im Sheet:** zwei weitere Blätter im Workout-Spreadsheet, damit der Plan
   dort von Hand lesbar bleibt: **`Laufplaene`** (ID, Name, Notizen, Start, Ende, Wochen,
-  Lauftage, Archiviert) und **`Laufplan-Einheiten`** (PlanID, Woche, Wochentag, Datum,
-  Strecke, Zeit, Herzzone). Geschrieben wird wie bei den Einzelterminen ausschliesslich
-  über das Apps Script (`laufplanEndpunkt`), gelesen mit dem Nur-Lese-Scope.
+  Lauftage, Archiviert, Wettkampf) und **`Laufplan-Einheiten`** (PlanID, Woche,
+  Wochentag, Datum, Strecke, Zeit, Herzzone). Gelesen **und geschrieben** wird direkt
+  über die Sheets-API (`_blattUmschreiben`); die Spaltenlisten stehen in
+  `LP_KOPF_SPALTEN` / `LP_EINHEIT_SPALTEN` in `app.js` — sie sind seit dem Wegfall der
+  Apps-Script-Endpunkte die einzige Quelle dafür.
   `geplanteTage()` führt Planeinheiten **und** freie Einzeltermine zusammen — beide
   erscheinen im Kalender als „geplant". Das Datum einer Planeinheit rechnet
   `_lpDatumAus` aus Startwoche + Wochennummer + Wochentag, es muss also nicht im Sheet
   stehen.
 - **Planverwaltung (einzelne Termine):** Blatt **`Laufplan`** im Workout-Spreadsheet
-  (`Date | Distance (km) | Note`). Gelesen wird es mit dem normalen Nur-Lese-Scope über
+  (`Date | Distance (km) | Note`, Spalten in `PLAN_SPALTEN`). Gelesen über
   `_fetchSheet(id, blattName)` — die Funktion nahm vorher immer `sheets[0]`.
-  **Geschrieben wird ausschliesslich über das Apps Script** (`doPost` → `planEndpunkt`),
-  damit der OAuth-Scope `spreadsheets.readonly` bleiben kann. Das Script legt das Blatt
-  beim ersten Speichern selbst an und sortiert nach Datum.
-  `mode:'no-cors'` liefert keine auswertbare Antwort, deshalb liest `_planSenden` den
-  Plan nach 1.2 s **neu aus dem Sheet** — die Anzeige zeigt also immer den Sheet-Stand,
-  nie die blosse Eingabe. Im Kalender ist ein geplanter Tag ein Ring (`.geplant`), ein
-  gelaufener der gefüllte Kern; beides zusammen ist möglich.
+  Geschrieben über `_blattUmschreiben`, das nach Datum sortiert zurückschreibt, damit
+  das Blatt von Hand lesbar bleibt. Im Kalender ist ein geplanter Tag ein Ring
+  (`.geplant`), ein gelaufener der gefüllte Kern; beides zusammen ist möglich.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
   `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
   aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei
@@ -461,6 +498,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 
 ## Gotchas
 - **Cache-Bump nicht vergessen** — häufigste Fehlerquelle.
+- **NIE ein Geheimnis in `app.js`, `index.html`, `style.css` oder `sw.js`.** GitHub Pages
+  liefert diese Dateien an jeden aus — ein Schlüssel darin ist veröffentlicht, egal wie
+  er heisst. Genau daran hing der Apps-Script-`SECRET`, mit dem Fremde Laufplan-Einträge
+  ändern konnten. Braucht etwas eine Absicherung, führt sie über die Google-Anmeldung
+  (Sheets-API direkt) oder über eine Prüfung des Google-Zugangs im Apps Script
+  (`zugangGueltig`). Das Repo privat zu machen hilft NICHT: `app.js` bleibt öffentlich.
+- **`_apps-script/` ist Referenz, kein Deploy.** Änderungen dort wirken erst, wenn der
+  Code im Apps-Script-Projekt eingefügt UND als **neue Version bereitgestellt** wird.
 - **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
   **Programmdateien**; `hcc_daten_v1` im `localStorage` hält die **Messdaten**. Der
   Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen
