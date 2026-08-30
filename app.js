@@ -55,6 +55,7 @@ let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
 const PLAN_BLATT = 'Laufplan';      // Blattname im Workout-Spreadsheet
 let planData = {};                  // { 'JJJJ-MM-TT': { km, notiz } }
+let planListe = [];                 // Laufpläne (Kopfdaten) – für die Rahmen im Kalender
 let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
 let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
 
@@ -2677,49 +2678,82 @@ function laufKalenderHTML() {
   const proTag = {};
   alleLaeufe().forEach(l => { proTag[l.datum] = l; });
 
-  // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt.
-  const ersterJan = new Date(jahr, 0, 1);
-  const versatz = (ersterJan.getDay() + 6) % 7;          // Mo=0
-  const start = new Date(jahr, 0, 1 - versatz);
-  const wochen = [];
-  for (let w = 0; w < 53; w++) {
-    const tage = [];
+  // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt – so stehen die
+  // Wochentagszeilen ueber das ganze Jahr an derselben Stelle.
+  const jan1 = new Date(jahr, 0, 1), dez31 = new Date(jahr, 11, 31);
+  const start = new Date(jan1);
+  start.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
+  const wochen = Math.ceil((Math.round((dez31 - start) / 86400000) + 1) / 7);
+
+  let zellen = '', monate = '', letzterMonat = -1;
+  for (let w = 0; w < wochen; w++) {
+    const wStart = new Date(start); wStart.setDate(start.getDate() + w * 7);
+    // Monatsname, sobald eine Woche einen neuen Monat beginnt.
+    const m = wStart.getMonth();
+    const zeigen = m !== letzterMonat && wStart.getDate() <= 7;
+    monate += `<span class="lp-monat">${zeigen ? wStart.toLocaleDateString('de-DE',{month:'short'}) : ''}</span>`;
+    if (zeigen) letzterMonat = m;
+
+    zellen += '<div class="lp-woche">';
     for (let t = 0; t < 7; t++) {
-      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w*7 + t);
+      const d = new Date(wStart); d.setDate(wStart.getDate() + t);
       const ds = toLocalDateStr(d);
-      tage.push({ ds, ausserhalb: d.getFullYear() !== jahr, zukunft: ds > heute, lauf: proTag[ds] });
+      const ausserhalb = d.getFullYear() !== jahr;
+      const kl = ['lp-tag'];
+      if (ausserhalb) kl.push('ausserhalb');
+      if (!ausserhalb && planData[ds]) kl.push('geplant');
+      if (!ausserhalb && proTag[ds])   kl.push('gelaufen');
+      if (ds > heute) kl.push('zukunft');
+      if (ds === heute) kl.push('heute');
+      if (ds === _lpAuswahl) kl.push('gewaehlt');
+      const zustand = proTag[ds]
+        ? (planData[ds] ? 'geplant und gelaufen' : 'zusätzlich gelaufen')
+        : (planData[ds] ? (ds > heute ? 'geplant' : 'geplant, nicht gelaufen') : 'kein Lauf');
+      zellen += `<span class="${kl.join(' ')}" data-lauftag="${ds}" role="button" tabindex="0"
+        aria-label="${d.toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}, ${zustand}"></span>`;
     }
-    wochen.push(tage);
-    if (tage[0].ds > toLocalDateStr(new Date(jahr, 11, 31))) break;
+    zellen += '</div>';
   }
 
-  const zellen = wochen.map(woche => `<div class="lp-woche">` + woche.map(t => {
-    if (t.ausserhalb) return `<div class="lp-tag ausserhalb"></div>`;
-    const klassen = ['lp-tag'];
-    if (t.lauf) klassen.push('gelaufen');
-    if (planData[t.ds]) klassen.push('geplant');
-    if (t.zukunft) klassen.push('zukunft');
-    if (t.ds === _lpAuswahl) klassen.push('gewaehlt');
-    const stil = t.lauf ? ` style="--lauf-farbe:${t.lauf.art.farbe}"` : '';
-    return `<div class="${klassen.join(' ')}" data-lauftag="${t.ds}"${stil}></div>`;
-  }).join('') + `</div>`).join('');
-
-  const wochentage = ['Mo','','Mi','','Fr','','So']
-    .map(t => `<div class="lp-wtag">${t}</div>`).join('');
+  const wochentage = ['Mo','','Mi','','Fr','','So'].map(t=>`<span>${t}</span>`).join('');
+  const anzahl = Object.keys(proTag).filter(d => d.startsWith(jahr)).length;
 
   return `
     <div class="lp-kal-kopf">
       <span class="lp-kal-jahr">${jahr}</span>
-      <span class="lp-kal-zahl">${alleLaeufe().filter(l=>l.datum.startsWith(jahr)).length} Läufe</span>
+      <span class="lp-kal-zahl">${anzahl} Läufe</span>
     </div>
-    <div class="lp-kal">
-      <div class="lp-wtage">${wochentage}</div>
-      <div class="lp-scroll"><div class="lp-raster">${zellen}</div></div>
-    </div>
-    <div class="lp-legende">
-      ${LAUF_ARTEN.map(a=>`<span class="lp-leg"><span class="lp-punkt" style="background:${a.farbe}"></span>${a.label}</span>`).join('')}
+    <div class="lp-scroll">
+      <div class="lp-inner">
+        <div class="lp-monate">${monate}</div>
+        <div class="lp-body">
+          <div class="lp-wtage">${wochentage}</div>
+          <div class="lp-gridwrap">
+            <div class="lp-baender">${planBaenderHTML(start, wochen)}</div>
+            <div class="lp-raster">${zellen}</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="lp-detail" id="lp-detail">${laufDetailHTML(_lpAuswahl)}</div>`;
+}
+
+// Laufzeit eines Plans als Rahmen um seine Wochenspalten – ohne Fuellung, damit die
+// Kaestchen darunter lesbar bleiben. Spaltenbreite kommt aus derselben CSS-Variable
+// wie die Kaestchen, damit Rahmen und Raster nicht auseinanderlaufen.
+function planBaenderHTML(rasterStart, wochen) {
+  if (!planListe.length) return '';
+  const spalte = ds => {
+    const d = new Date(ds + 'T00:00:00');
+    return Math.floor(Math.round((d - rasterStart) / 86400000) / 7);
+  };
+  return planListe.filter(p => p.start && p.ende).map(p => {
+    const a = Math.max(0, spalte(p.start)), b = Math.min(wochen - 1, spalte(p.ende));
+    if (b < a) return '';
+    return `<div class="lp-band${p.archiviert ? ' archiviert' : ''}"
+      style="left:calc(${a} * (var(--lp-zelle) + 3px)); width:calc(${b - a + 1} * (var(--lp-zelle) + 3px) - 3px)"
+      title="${esc(p.name)}"></div>`;
+  }).join('');
 }
 
 // Beschreibung unter dem Kalender – zeigt den angetippten Tag.

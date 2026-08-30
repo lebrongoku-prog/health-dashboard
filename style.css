@@ -771,27 +771,50 @@ h5,
 }
 
 /* ── Laufplan ───────────────────────────────────────────
-   Jahresraster nach dem Vorbild von FitTrack: 53 Wochenspalten à 7 Kästchen,
-   waagrecht scrollbar. overflow-y MUSS hidden sein – sonst macht der Browser aus
-   der Y-Achse ebenfalls "auto" und das Raster liesse sich senkrecht verschieben. */
-.lp-kal{display:flex;gap:.3rem;align-items:flex-start}
-.lp-wtage{display:flex;flex-direction:column;gap:3px;flex:0 0 auto;padding-top:1px}
-.lp-wtag{height:14px;font-size:.6rem;line-height:14px;color:var(--txt3)}
-.lp-scroll{overflow-x:auto;overflow-y:hidden;flex:1 1 auto;padding:2px 0}
-.lp-raster{display:flex;gap:3px;width:max-content}
+   Jahreskalender nach dem Vorbild von FitTrack. Zwei Schichten pro Tag: die Flaeche
+   sagt, ob laut Plan ein Lauf vorgesehen war, der Kern, ob er stattgefunden hat.
+   Bewusst KEINE Abstufung nach Strecke – der Kalender beantwortet nur "gelaufen
+   oder nicht". */
+:root { --lp-zelle: 14px; --lp-label-w: 20px; --lp-label-gap: 3px; --lp-pad-x: 1px;
+        --lp-band-over: 3px; --lp-mask-over: 6px; --lp-monate-gap: 8px; }
+/* NUR waagrecht scrollen: sobald eine Achse nicht mehr "visible" ist, macht der
+   Browser aus der anderen ebenfalls "auto" – das Raster liesse sich sonst senkrecht
+   verschieben. Das Polster oben und unten nimmt den Ueberstand der Plan-Rahmen auf. */
+.lp-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:4px var(--lp-pad-x)}
+.lp-scroll::-webkit-scrollbar{display:none}
+.lp-inner{display:inline-block;vertical-align:top;min-width:100%}
+.lp-monate{display:flex;gap:3px;margin-left:calc(var(--lp-label-w) + var(--lp-label-gap));margin-bottom:var(--lp-monate-gap)}
+.lp-monat{width:var(--lp-zelle);flex:0 0 var(--lp-zelle);font-size:.66rem;color:var(--txt3);white-space:nowrap}
+.lp-body{display:flex;gap:var(--lp-label-gap)}
+/* Bleibt beim Scrollen stehen. Die Abdeckung wird als Pseudo-Element gemalt, damit sie
+   auch das Polster links und den Spalt zum Raster deckt, ohne die Spaltenbreite zu
+   veraendern. */
+.lp-wtage{display:flex;flex-direction:column;gap:3px;flex:0 0 var(--lp-label-w);position:sticky;left:0;z-index:2}
+.lp-wtage::before{content:'';position:absolute;top:calc(-1 * var(--lp-mask-over));bottom:calc(-1 * var(--lp-mask-over));
+  left:calc(-1 * var(--lp-pad-x));right:calc(-1 * var(--lp-label-gap));background:var(--card);z-index:-1}
+.lp-wtage span{height:var(--lp-zelle);font-size:.66rem;line-height:var(--lp-zelle);color:var(--txt3)}
+.lp-gridwrap{position:relative}
+.lp-raster{display:flex;gap:3px;position:relative;z-index:1}
 .lp-woche{display:flex;flex-direction:column;gap:3px}
-.lp-tag{width:14px;height:14px;border-radius:3px;background:var(--border);flex:0 0 auto}
-.lp-tag.gelaufen{background:var(--lauf-farbe)}
-.lp-tag.zukunft{opacity:.35}
-.lp-tag.ausserhalb{background:transparent}
-.lp-tag[data-lauftag]{cursor:pointer}
-.lp-tag.gewaehlt{outline:2px solid var(--txt);outline-offset:1px}
+.lp-tag{position:relative;width:var(--lp-zelle);height:var(--lp-zelle);border-radius:4px;display:block;
+  background:var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lp-tag.geplant{background:#CDE7E1}
+.lp-tag.gelaufen::before{content:'';position:absolute;inset:3px;border-radius:2px;background:#0F766E}
+.lp-tag.zukunft{opacity:.45}
+.lp-tag.ausserhalb{opacity:.25;pointer-events:none}
+/* Ringe INNEN zeichnen – aussen ragten sie ueber das Kaestchen und wurden in der
+   ersten Spalte von der Abdeckung der Wochentagsspalte verschluckt. */
+.lp-tag.heute{box-shadow:inset 0 0 0 1.5px var(--tab-color)}
+.lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.5px var(--txt)}
+/* Laufzeit eines Plans: Rahmen um die Wochenspalten, ohne Fuellung. Liegt unter dem
+   Raster, damit die Kaestchen lesbar bleiben. */
+.lp-baender{position:absolute;inset:0;pointer-events:none;z-index:0}
+.lp-band{position:absolute;top:calc(-1 * var(--lp-band-over));bottom:calc(-1 * var(--lp-band-over));
+  border:1.5px solid #0F766E;border-radius:5px;box-sizing:border-box}
+.lp-band.archiviert{opacity:.5}
 .lp-kal-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem}
 .lp-kal-jahr{font-size:.83rem;font-weight:700}
 .lp-kal-zahl{font-size:.72rem;color:var(--txt2)}
-.lp-legende{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.5rem}
-.lp-leg{display:flex;align-items:center;gap:.25rem;font-size:.72rem;color:var(--txt2)}
-.lp-punkt{width:9px;height:9px;border-radius:2px;flex-shrink:0}
 .lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
 .lp-detail-leer{font-size:.75rem;color:var(--txt3)}
 .lp-detail-tag{font-size:.79rem;font-weight:700;margin-bottom:.3rem}
