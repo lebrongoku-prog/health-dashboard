@@ -837,9 +837,6 @@ h5,
 .lp-eintrag.offen{border-bottom-color:transparent}
 .lp-eintrag-detail{padding:.1rem 0 .6rem;border-bottom:1px solid var(--border)}
 
-/* Geplante Termine: Ring um das Kaestchen (wie FitTracks "planned"-Flaeche),
-   der gefuellte Kern bleibt der tatsaechlich gelaufene Tag. */
-.lp-tag.geplant{box-shadow:inset 0 0 0 2px var(--tab-color)}
 .lp-plan-zeile{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
   font-size:.75rem;color:var(--txt2);margin-bottom:.4rem}
 .lp-plan-marke{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
@@ -882,6 +879,9 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-feld input,.lp-feld textarea,.lp-einheit input,.lp-einheit select{
   font:inherit;font-size:.83rem;padding:.35rem .5rem;border:1px solid var(--border);
   border-radius:8px;background:var(--bg);color:var(--txt);min-width:0}
+/* Ein date-Feld ist von Haus aus hoeher als ein number-Feld. Ohne feste Hoehe stuenden
+   Start, Ende und Wochen unterschiedlich hoch nebeneinander. */
+.lp-feld input{height:31px;box-sizing:border-box}
 .lp-feld textarea{resize:vertical}
 .lp-feld-reihe{display:flex;gap:.5rem}
 .lp-feld-reihe>.lp-feld{flex:1 1 0;min-width:0}
@@ -912,7 +912,7 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-wochen{margin-top:.7rem;display:flex;flex-direction:column;gap:.3rem}
 .lp-wochenkopf{display:flex;align-items:center;justify-content:space-between;width:100%;
   background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .55rem;
-  font:inherit;font-size:.83rem;font-weight:600;color:inherit;cursor:pointer;
+  font:inherit;font-size:.72rem;font-weight:600;color:inherit;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .lp-wocheninhalt{display:flex;flex-direction:column;gap:.35rem;padding:.4rem 0 .2rem}
 /* Das hidden-Attribut allein genuegt nicht: eine display-Regel im Stylesheet schlaegt

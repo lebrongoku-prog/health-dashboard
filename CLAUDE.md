@@ -300,8 +300,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Liste der Einheiten. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
   klappt zu; die Auswahl liegt in `_lpAuswahl` **ausserhalb** der Seitenfunktion.
   **Datenquellen:** `laufEinheit(datum)` setzt eine Einheit aus beiden Sheets zusammen.
-  Strecke und Pace kommen bevorzugt aus *Dashboard Data* (`distKm`, `runSpeed`), sonst
-  aus dem Workout-Sheet. Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
+  Die **Strecke kommt immer aus dem Workout-Sheet** (`distanceKm`) — genau wie im
+  Training-Tab. Das Health-Sheet führt unter `distKm` einen abweichenden Tageswert;
+  beide Tabs zeigten dadurch unterschiedliche Kilometer für denselben Lauf. Die Pace
+  nimmt weiterhin `runSpeed` und greift nur ersatzweise auf die Workout-Geschwindigkeit
+  zurück (GPS schlägt die Schätzung der Uhr). Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
   Workout-Sheet. Kalorien ebenfalls von dort (`Energy (kJ)` ÷ 4.184) — `activeCal` im
   Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
   `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die

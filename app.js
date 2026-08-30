@@ -2794,8 +2794,10 @@ function laufEinheit(datum) {
   const w = workoutData[datum];
   if (!w || !istLauf(w.typeRaw)) return null;
   const tag = allData.find(r => r.date === datum) || {};
-  // Strecke und Pace: erst Dashboard Data, dann Workout-Sheet.
-  const streckeKm = tag.distKm != null ? tag.distKm : w.distanceKm;
+  // Strecke IMMER aus dem Workout-Sheet – so wie im Training-Tab. Das Health-Sheet
+  // fuehrt unter distKm einen abweichenden Tageswert; beide Tabs zeigten dadurch
+  // unterschiedliche Kilometer fuer denselben Lauf.
+  const streckeKm = w.distanceKm;
   const kmh = tag.runSpeed > 0 ? tag.runSpeed : (w.avgSpeedKph > 0 ? w.avgSpeedKph : null);
   return {
     datum, art: laufArt(w.typeRaw), typLabel: w.typeLabel,
@@ -3088,7 +3090,9 @@ function lpSeiteVerwaltung() {
     return `<div class="chart-card lp-plankarte${offen?' offen':''}">
       <button type="button" class="lp-plankopf" data-lpplan="${p.id}">
         <span class="lp-plantitel">${esc(p.name)}</span>
-        <span class="lp-planzeit">${p.start?fmtDayShort(p.start):'ohne Datum'}${p.ende?' – '+fmtDayShort(p.ende):''}</span>
+        <span class="lp-planzeit">${p.start?fmtDayShort(p.start):'ohne Datum'}${p.ende?' – '+fmtDayShort(p.ende):''}${
+          (()=>{ const w = _lpWochenAus(p.start, p.ende);
+                 return w ? ` (${w} ${w===1?'Woche':'Wochen'})` : ''; })()}</span>
         <span class="lp-planpfeil">${offen?'▾':'▸'}</span>
       </button>
       ${offen ? lpPlanDetail(p) : ''}
@@ -3541,7 +3545,7 @@ function initScrollHideNav() {
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
     // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
     // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
     nav.classList.toggle('nav-hidden');
   });
 }
@@ -3704,7 +3708,18 @@ document.body.addEventListener('click', (e) => {
   if (!ziel) return;
   const tag = ziel.dataset.lauftag;
   _lpAuswahl = (_lpAuswahl === tag) ? null : tag;
-  if (currentScreen === 'laufplan') _renderTab('laufplan');
+  if (currentScreen !== 'laufplan') return;
+  // Waagrechte Position des Jahresrasters und senkrechte des Tabs merken: der
+  // Neuaufbau setzt beide zurueck, und der Kalender spraenge zum Jahresanfang.
+  const screenEl = document.getElementById('screen-laufplan');
+  const vorher = {
+    kalender: screenEl?.querySelector('.lp-scroll')?.scrollLeft ?? null,
+    seite: screenEl?.scrollTop ?? 0
+  };
+  _renderTab('laufplan');
+  const sc = document.querySelector('#screen-laufplan .lp-scroll');
+  if (sc && vorher.kalender != null) sc.scrollLeft = vorher.kalender;
+  if (screenEl) screenEl.scrollTop = vorher.seite;
 });
 
 // Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die
