@@ -812,9 +812,9 @@ h5,
 .lp-band{position:absolute;top:calc(-1 * var(--lp-band-over));bottom:calc(-1 * var(--lp-band-over));
   border:1.5px solid #0F766E;border-radius:5px;box-sizing:border-box}
 .lp-band.archiviert{opacity:.5}
-.lp-kal-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem}
-.lp-kal-jahr{font-size:.83rem;font-weight:700}
-.lp-kal-zahl{font-size:.72rem;color:var(--txt2)}
+/* Anzahl der Laeufe rechtsbuendig in der Titelzeile – das h3 ist bereits ein
+   Flex-Container, deshalb genuegt margin-left:auto. */
+.lp-kal-zahl{font-size:.72rem;font-weight:500;color:var(--txt2);margin-left:auto}
 .lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
 .lp-detail-leer{font-size:.75rem;color:var(--txt3)}
 .lp-detail-tag{font-size:.79rem;font-weight:700;margin-bottom:.3rem}
@@ -861,6 +861,7 @@ body.dark .lp-plan-form input{background:#0F172A}
   padding:9px 6px;border-radius:9px;cursor:pointer;-webkit-tap-highlight-color:transparent;
   font-family:inherit;transition:background .15s,color .15s}
 .seg-btn.active{background:#fff;color:#065F46;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.pg-act.lp-neu{color:#fff;font-weight:700;line-height:1}
 
 /* ── Planverwaltung ── */
 .lp-plankarte.offen{box-shadow:0 0 0 1.5px var(--tab-color), var(--shadow)}

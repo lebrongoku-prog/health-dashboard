@@ -2779,6 +2779,7 @@ let _lpAuswahl = null;   // angetippter Tag (Datum) – ueberlebt Re-Render
 let _lpSeite = 'plan';   // 'plan' = Aktueller Laufplan, 'verwaltung' = Planverwaltung
 let _lpOffenerPlan = null;   // ID des aufgeklappten Plans in der Verwaltung
 let _lpOffeneWoche = null;   // aufgeklappte Woche innerhalb eines Plans
+let _lpFehler = null;        // Hinweis, wenn das Speichern nicht angekommen ist
 
 function laufKalenderHTML() {
   const jahr = new Date(referenceDate + 'T00:00:00').getFullYear();
@@ -2828,10 +2829,7 @@ function laufKalenderHTML() {
   const anzahl = Object.keys(proTag).filter(d => d.startsWith(jahr)).length;
 
   return `
-    <div class="lp-kal-kopf">
-      <span class="lp-kal-jahr">${jahr}</span>
-      <span class="lp-kal-zahl">${anzahl} Läufe</span>
-    </div>
+    <h3>Laufkalender ${jahr}<span class="lp-kal-zahl">${anzahl} Läufe</span></h3>
     <div class="lp-scroll">
       <div class="lp-inner">
         <div class="lp-monate">${monate}</div>
@@ -2960,7 +2958,6 @@ function lpSeiteAktuell() {
 
   return `
     <div class="chart-card">
-      <h3>Laufkalender</h3>
       ${laufKalenderHTML()}
     </div>
 
@@ -3036,8 +3033,11 @@ function lpSeiteVerwaltung() {
     </div>`;
   };
   return `
+    ${_lpFehler ? `<div class="warn-card"><div class="warn-icon">⚠️</div><div>
+      <div class="warn-title">Speichern fehlgeschlagen</div>
+      <div class="warn-text">${esc(_lpFehler)}</div></div></div>` : ''}
     ${aktive.length ? aktive.map(karte).join('') : `<div class="chart-card"><div class="no-data">
-      Noch kein Laufplan. Tippe oben auf „Neuer Plan“, um einen anzulegen.</div></div>`}
+      Noch kein Laufplan. Tippe oben rechts auf „＋“, um einen anzulegen.</div></div>`}
     ${archiv.length ? `<div class="lp-archiv-titel">Archiv</div>${archiv.map(karte).join('')}` : ''}
   `;
 }
@@ -3492,13 +3492,21 @@ document.body.addEventListener('click', async (e) => {
     _lpOffeneWoche = _lpOffeneWoche === k ? null : k; _renderTab('laufplan'); return; }
 
   // Neuen Plan anlegen
-  if (e.target.closest('.lp-neu')) {
+  const neuKnopf = e.target.closest('.lp-neu');
+  if (neuKnopf) {
     const id = 'lp' + Date.now();
     const heute = toLocalDateStr(new Date());
-    const ok = await lpPlanSpeichern({ id, name:'Neuer Laufplan', notizen:'',
+    neuKnopf.disabled = true;
+    await lpPlanSpeichern({ id, name:'Neuer Laufplan', notizen:'',
       start: getWeekMonday(heute), ende: addDays(getWeekMonday(heute), 8*7-1),
       wochen: 8, lauftage:['Di','Do','So'] });
-    if (ok) { _lpSeite = 'verwaltung'; _lpOffenerPlan = id; }
+    neuKnopf.disabled = false;
+    _lpSeite = 'verwaltung';
+    // Gegenprobe am Sheet: mode:'no-cors' meldet keinen Fehler zurueck, auch wenn das
+    // Apps Script den Endpunkt gar nicht kennt. Nur das Gegenlesen zeigt, ob der Plan
+    // wirklich angelegt wurde – sonst waere der Knopf scheinbar wirkungslos.
+    if (planListe.some(p => p.id === id)) { _lpOffenerPlan = id; _lpFehler = null; }
+    else _lpFehler = 'Der Plan wurde nicht gespeichert. Vermutlich fehlt der Laufplan-Teil im Apps Script: Code aus _apps-script/Code.gs übernehmen und das Skript neu bereitstellen.';
     _renderTab('laufplan');
     return;
   }
