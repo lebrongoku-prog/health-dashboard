@@ -910,16 +910,10 @@ body.dark .lp-feld input,body.dark .lp-feld textarea,
 body.dark .lp-einheit input,body.dark .lp-einheit select,
 body.dark .lp-wochenkopf{background:#0F172A}
 
-/* Muster-Abschnitt der Übersicht: die Überschrift ist ein Knopf. Als <button> nimmt
-   ihn der Hintergrund-Tipp (Bottom-Nav) automatisch aus. */
-.pi-titel{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;width:100%;
-  background:none;border:0;padding:0;margin:.3rem 0 .4rem;cursor:pointer;
-  font:inherit;font-size:.79rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:.07em;color:var(--txt3);text-align:left;-webkit-tap-highlight-color:transparent}
-.pi-pfeil{margin-left:auto;font-size:.9rem;letter-spacing:0}
-
-/* "Weitere Auswertungen" in Herz und Schlaf: volle Kartenbreite, aber transparent –
-   der Knopf soll die Karten darueber nicht ueberstrahlen. */
+/* Aufklapp-Knopf: "Weitere Auswertungen" (Herz, Schlaf) und "Muster & Zusammenhänge"
+   (Übersicht) teilen sich diese Klasse – volle Kartenbreite, aber transparent, damit
+   der Knopf die Karten darueber nicht ueberstrahlt. Als <button> nimmt ihn der
+   Hintergrund-Tipp (Bottom-Nav) automatisch aus. */
 .weitere-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;
   background:rgba(255,255,255,.12);border:0;border-radius:var(--r);
   padding:.6rem .75rem;margin-bottom:.7rem;cursor:pointer;

@@ -1574,10 +1574,8 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <button type="button" class="pi-titel" data-musterklapp aria-expanded="${_musterOffen?'true':'false'}">
-      <span>Muster &amp; Zusammenhänge</span>
-      ${scopeBadge('gesamter Datenbestand')}
-      <span class="pi-pfeil">${_musterOffen?'▾':'▸'}</span>
+    <button type="button" class="weitere-btn" data-musterklapp aria-expanded="${_musterOffen?'true':'false'}">
+      Muster &amp; Zusammenhänge${scopeBadge('gesamter Datenbestand')}<span class="weitere-pfeil">${_musterOffen?'▾':'▸'}</span>
     </button>
     <div class="pi-grid" style="${_musterOffen?'':'display:none'}">
       ${patternIns.map(p=>{
@@ -2903,17 +2901,43 @@ function pgLaufplan() {
   if (_lpSeite === 'plan') lpKalenderScrollen();
 }
 
-// Kalender beim Rendern zur laufenden Woche schieben – sonst startet das Jahresraster
-// im Januar. Synchron, weil im verdeckten Tab kein requestAnimationFrame feuert.
+// Kalender beim Rendern so schieben, dass die laufende Woche in der MITTE des
+// Ausschnitts steht – sonst startet das Jahresraster im Januar und der heutige Tag
+// liegt weit rechts ausserhalb. Frueher sass die Woche am rechten Rand
+// (`(w+1)*proSpalte - clientWidth`); auf breiten Ausschnitten begann die Ansicht
+// dadurch im Maerz und heute klebte an der Kante.
+// Synchron, weil im verdeckten Tab kein requestAnimationFrame feuert.
 function lpKalenderScrollen() {
   const scroll = document.querySelector('#screen-laufplan .lp-scroll');
   if (!scroll) return;
-  const spalten = scroll.querySelectorAll('.lp-woche').length;
-  if (!spalten) return;
-  const proSpalte = scroll.scrollWidth / spalten;
-  const jahrStart = new Date(new Date(referenceDate+'T00:00:00').getFullYear(), 0, 1);
-  const wocheJetzt = Math.floor((new Date(referenceDate+'T00:00:00') - jahrStart) / 604800000);
-  scroll.scrollLeft = Math.max(0, (wocheJetzt + 1) * proSpalte - scroll.clientWidth);
+  const spaltenEls = scroll.querySelectorAll('.lp-woche');
+  if (!spaltenEls.length) return;
+
+  // Rasterbeginn exakt wie in laufKalenderHTML: Montag der Woche, die den 1. Januar
+  // enthaelt. Wird hier anders gerechnet, zeigt die Mitte auf die falsche Spalte.
+  const jahr  = new Date(referenceDate+'T00:00:00').getFullYear();
+  const jan1  = new Date(jahr, 0, 1);
+  const start = new Date(jan1);
+  start.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
+
+  // Auf heute zentrieren, solange heute im gezeigten Jahr liegt – blaettert man den
+  // Zeitfilter in ein anderes Jahr, ist das Bezugsdatum der sinnvolle Anker.
+  const heute = new Date(toLocalDateStr(new Date())+'T00:00:00');
+  const ziel  = heute.getFullYear() === jahr ? heute : new Date(referenceDate+'T00:00:00');
+  // In ganzen Tagen runden: eine reine ms-Division kippt an der Zeitumstellung um
+  // einen halben Tag und damit gelegentlich um eine ganze Spalte.
+  const tage    = Math.round((ziel - start) / 86400000);
+  const spalte  = Math.max(0, Math.min(spaltenEls.length - 1, Math.floor(tage / 7)));
+
+  // Position ueber getBoundingClientRect statt offsetLeft: Letzteres bezieht sich auf
+  // den naechsten positionierten Vorfahren, der hier nicht der Scroller sein muss.
+  const rC = scroll.getBoundingClientRect();
+  const rS = spaltenEls[spalte].getBoundingClientRect();
+  // Ohne vermessenen Ausschnitt kaeme statt der Mitte der rechte Rand heraus – dann
+  // lieber nichts tun und es dem naechsten Aufbau ueberlassen.
+  if (!scroll.clientWidth || !rS.width) return;
+  const mitte = scroll.scrollLeft + (rS.left - rC.left) + rS.width / 2 - scroll.clientWidth / 2;
+  scroll.scrollLeft = Math.max(0, Math.min(mitte, scroll.scrollWidth - scroll.clientWidth));
 }
 
 // ── Seite 1: Aktueller Laufplan ────────────────────────

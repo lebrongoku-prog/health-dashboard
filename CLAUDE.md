@@ -274,6 +274,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **Aufklapp-Knöpfe teilen eine Klasse:** „Weitere Auswertungen" (Herz, Schlaf) und
+  „Muster & Zusammenhänge" (Übersicht) tragen beide `.weitere-btn` und sehen damit
+  identisch aus. Der Muster-Knopf hatte vorher als `.pi-titel` das Aussehen einer
+  Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
+  zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
+  nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt.
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
   Diagramm; der Rest liegt hinter einem Knopf über die volle Kartenbreite
   (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das schliessende
@@ -312,8 +318,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Laufplan-Tab (`pgLaufplan`):** ersetzt seit 29.08.2026 den früheren Schritte-Tab
   (Farbe Grün beibehalten; `pgAktivitaet` samt `c-steps`/`c-cals` ist entfernt — die
   Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
-  Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, springt beim
-  Rendern zur laufenden Woche) → Wochenumfang gegen `ZIELE.laufKm` → Bestleistungen →
+  Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, schiebt beim
+  Rendern den heutigen Tag in die **Mitte** des Ausschnitts — `lpKalenderScrollen()`)
+  → Wochenumfang gegen `ZIELE.laufKm` → Bestleistungen →
   Liste der Einheiten. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
   klappt zu; die Auswahl liegt in `_lpAuswahl` **ausserhalb** der Seitenfunktion.
   **Datenquellen:** `laufEinheit(datum)` setzt eine Einheit aus beiden Sheets zusammen.
@@ -326,6 +333,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
   `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
   Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
+  **Waagrechte Startposition (`lpKalenderScrollen`):** der heutige Tag steht in der
+  Mitte. Früher stand die laufende Woche am rechten Rand
+  (`(w+1)*proSpalte − clientWidth`); auf breiteren Ausschnitten begann die Ansicht
+  dadurch im März und heute klebte an der Kante. Der Rasterbeginn muss **exakt wie in
+  `laufKalenderHTML`** gerechnet werden (Montag der Woche, die den 1. Januar enthält),
+  sonst zeigt die Mitte auf die falsche Spalte, und die Tagesdifferenz wird gerundet —
+  eine reine ms-Division kippt an der Zeitumstellung um eine ganze Spalte. Die Position
+  kommt aus `getBoundingClientRect`, nicht aus `offsetLeft`: Letzteres bezieht sich auf
+  den nächsten positionierten Vorfahren, der hier nicht der Scroller sein muss. Bei
+  `clientWidth === 0` bricht die Funktion ab — sonst käme statt der Mitte der rechte
+  Rand heraus und bliebe dort stehen. Der Tipp auf einen Tag sichert die Position vorher
+  und setzt sie nach dem Re-Render zurück, springt also **nicht** zur Mitte.
 - **Laufplan-Tab: zwei Seiten** über einen Segment-Umschalter (`.seg-toggle`, Layout aus
   FitTrack übernommen). `_lpSeite` merkt die Wahl über Re-Render hinweg.
   **Aktueller Laufplan** = Kalender, laufender Plan, Wochenumfang, Bestleistungen,
