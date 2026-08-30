@@ -53,6 +53,11 @@ function doPost(e) {
     try { return planEndpunkt(params); }
     catch (err) { return ContentService.createTextOutput('Fehler: ' + err); }
   }
+  // Laufplaene (Kopfdaten) und ihre geplanten Einheiten.
+  if (params.lp) {
+    try { return laufplanEndpunkt(params); }
+    catch (err) { return ContentService.createTextOutput('Fehler: ' + err); }
+  }
   writeToSheet();
   return ContentService.createTextOutput('OK');
 }
@@ -607,4 +612,79 @@ function importWorkoutData() {
     + (entfernt > 0 ? ' · ' + entfernt + ' Dublette(n) entfernt' : ''));
   Logger.log('Workout Sheet ID (für Dashboard): ' + ss.getId());
   return ss.getId();
+}
+
+// ── Laufplaene ─────────────────────────────────────────────────
+// Zwei Blaetter, damit der Plan im Sheet von Hand lesbar bleibt:
+//   Laufplaene         – eine Zeile je Plan
+//   Laufplan-Einheiten – eine Zeile je geplanter Einheit
+var LP_PLAENE   = 'Laufplaene';
+var LP_EINHEITEN = 'Laufplan-Einheiten';
+var LP_KOPF_SPALTEN = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert'];
+var LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
+
+function lpBlatt(name, spalten) {
+  var ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID);
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow(spalten);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function laufplanEndpunkt(p) {
+  var was = String(p.lp || '');
+
+  if (was === 'planSpeichern') {
+    var sh = lpBlatt(LP_PLAENE, LP_KOPF_SPALTEN);
+    var id = String(p.id || '').trim() || ('lp' + Date.now());
+    var zeile = lpZeileFinden(sh, id);
+    var werte = [id, String(p.name || '').slice(0,120), String(p.notizen || '').slice(0,500),
+                 String(p.start || ''), String(p.ende || ''), Number(p.wochen || 0) || '',
+                 String(p.lauftage || ''), String(p.archiviert || '') === '1' ? 'ja' : ''];
+    if (zeile > 0) sh.getRange(zeile, 1, 1, werte.length).setValues([werte]);
+    else sh.appendRow(werte);
+    return ContentService.createTextOutput('OK ' + id);
+  }
+
+  if (was === 'planLoeschen') {
+    var shP = lpBlatt(LP_PLAENE, LP_KOPF_SPALTEN);
+    var z = lpZeileFinden(shP, String(p.id || ''));
+    if (z > 0) shP.deleteRow(z);
+    // Zugehoerige Einheiten mitloeschen – von unten nach oben, sonst verschieben
+    // sich die Zeilennummern waehrend des Loeschens.
+    var shE = lpBlatt(LP_EINHEITEN, LP_EINHEIT_SPALTEN);
+    var daten = shE.getDataRange().getValues();
+    for (var i = daten.length - 1; i >= 1; i--) {
+      if (String(daten[i][0]) === String(p.id)) shE.deleteRow(i + 1);
+    }
+    return ContentService.createTextOutput('OK geloescht');
+  }
+
+  if (was === 'einheitSpeichern') {
+    var shE2 = lpBlatt(LP_EINHEITEN, LP_EINHEIT_SPALTEN);
+    var daten2 = shE2.getDataRange().getValues();
+    var treffer = -1;
+    for (var j = 1; j < daten2.length; j++) {
+      if (String(daten2[j][0]) === String(p.id) &&
+          String(daten2[j][1]) === String(p.woche) &&
+          String(daten2[j][2]) === String(p.wochentag)) { treffer = j + 1; break; }
+    }
+    var w = [String(p.id||''), Number(p.woche||0), String(p.wochentag||''), String(p.datum||''),
+             p.strecke ? Number(String(p.strecke).replace(',','.')) : '',
+             p.zeit ? Number(p.zeit) : '', String(p.zone || '')];
+    if (treffer > 0) shE2.getRange(treffer, 1, 1, w.length).setValues([w]);
+    else shE2.appendRow(w);
+    return ContentService.createTextOutput('OK Einheit');
+  }
+
+  return ContentService.createTextOutput('Unbekannte Aktion');
+}
+
+function lpZeileFinden(sh, id) {
+  var daten = sh.getDataRange().getValues();
+  for (var i = 1; i < daten.length; i++) if (String(daten[i][0]) === id) return i + 1;
+  return -1;
 }

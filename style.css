@@ -853,3 +853,60 @@ h5,
   border:0;border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer;flex:0 0 auto}
 .lp-plan-form button:disabled{opacity:.6}
 body.dark .lp-plan-form input{background:#0F172A}
+
+/* ── Laufplan: Seitenumschalter (Layout aus FitTrack) ── */
+.seg-toggle{display:flex;gap:4px;margin:0 0 .7rem;background:rgba(255,255,255,.22);
+  border-radius:12px;padding:4px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.seg-btn{flex:1;border:none;background:transparent;color:#fff;font-size:.86rem;font-weight:600;
+  padding:9px 6px;border-radius:9px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  font-family:inherit;transition:background .15s,color .15s}
+.seg-btn.active{background:#fff;color:#065F46;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+
+/* ── Planverwaltung ── */
+.lp-plankarte.offen{box-shadow:0 0 0 1.5px var(--tab-color), var(--shadow)}
+.lp-plankopf{display:flex;align-items:center;gap:.5rem;width:100%;background:none;border:0;
+  padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lp-plantitel{font-size:.94rem;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lp-planzeit{font-size:.72rem;color:var(--txt2);margin-left:auto;white-space:nowrap}
+.lp-planpfeil{font-size:.8rem;color:var(--txt3);flex:0 0 auto}
+.lp-archiv-titel{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--txt3);margin:.2rem 0 .4rem}
+.lp-plandetail{margin-top:.7rem;border-top:1px solid var(--border);padding-top:.6rem}
+.lp-planform{display:flex;flex-direction:column;gap:.5rem}
+.lp-feld{display:flex;flex-direction:column;gap:.2rem;flex:1;min-width:0}
+.lp-feld>span{font-size:.72rem;font-weight:600;color:var(--txt2)}
+.lp-feld input,.lp-feld textarea,.lp-einheit input,.lp-einheit select{
+  font:inherit;font-size:.83rem;padding:.35rem .5rem;border:1px solid var(--border);
+  border-radius:8px;background:var(--bg);color:var(--txt);min-width:0}
+.lp-feld textarea{resize:vertical}
+.lp-feld-reihe{display:flex;gap:.5rem}
+.lp-tagwahl-reihe{display:flex;gap:.3rem;flex-wrap:wrap}
+.lp-tagwahl{display:flex;align-items:center;gap:.2rem;font-size:.79rem;
+  border:1px solid var(--border);border-radius:8px;padding:.25rem .4rem;cursor:pointer}
+.lp-tagwahl input{margin:0}
+.lp-planaktionen{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem}
+.lp-knopf-haupt,.lp-knopf-neben,.lp-knopf-weg{font:inherit;font-size:.79rem;font-weight:600;
+  padding:.4rem .7rem;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.lp-knopf-haupt{background:var(--tab-color);color:#fff;border-color:var(--tab-color)}
+.lp-knopf-neben{background:transparent;color:var(--txt2);border-color:var(--border)}
+.lp-knopf-weg{background:transparent;color:#EF4444;border-color:#EF4444}
+.lp-knopf-haupt:disabled,.lp-knopf-neben:disabled,.lp-knopf-weg:disabled{opacity:.6}
+
+/* Wochen ein- und ausklappbar */
+.lp-wochen{margin-top:.7rem;display:flex;flex-direction:column;gap:.3rem}
+.lp-wochenkopf{display:flex;align-items:center;justify-content:space-between;width:100%;
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .55rem;
+  font:inherit;font-size:.83rem;font-weight:600;color:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.lp-wocheninhalt{display:flex;flex-direction:column;gap:.35rem;padding:.4rem 0 .2rem}
+.lp-einheit{display:flex;align-items:center;gap:.3rem}
+.lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
+.lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
+.lp-einheit input{flex:1 1 3rem;width:100%}
+.lp-einheit select{flex:0 0 4.2rem}
+.lp-einheit button{flex:0 0 auto;font:inherit;font-size:.83rem;padding:.3rem .5rem;border:0;
+  border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer}
+.lp-hinweis{font-size:.75rem;color:var(--txt3);padding:.3rem 0}
+body.dark .lp-feld input,body.dark .lp-feld textarea,
+body.dark .lp-einheit input,body.dark .lp-einheit select,
+body.dark .lp-wochenkopf{background:#0F172A}

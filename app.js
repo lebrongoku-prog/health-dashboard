@@ -55,7 +55,11 @@ let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
 const PLAN_BLATT = 'Laufplan';      // Blattname im Workout-Spreadsheet
 let planData = {};                  // { 'JJJJ-MM-TT': { km, notiz } }
-let planListe = [];                 // Laufpläne (Kopfdaten) – für die Rahmen im Kalender
+let planListe = [];                 // Laufpläne (Kopfdaten)
+let planEinheiten = [];             // geplante Einheiten aller Pläne
+const LP_PLAENE_BLATT = 'Laufplaene';
+const LP_EINHEITEN_BLATT = 'Laufplan-Einheiten';
+const WOCHENTAGE = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
 let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
 
@@ -145,6 +149,46 @@ function _parsePlanRows(values) {
     const km = iKm >= 0 ? parseFloat(String(row[iKm] ?? '').replace(',', '.')) : NaN;
     planData[d] = { km: isNaN(km) ? null : km, notiz: iNot >= 0 ? String(row[iNot] ?? '').trim() : '' };
   });
+}
+
+// ── Laufpläne parsen ───────────────────────────────────
+function _parsePlaene(kopfWerte, einheitWerte) {
+  planListe = []; planEinheiten = [];
+  if (kopfWerte.length > 1) {
+    const k = kopfWerte[0].map(h => String(h).trim().toLowerCase());
+    const sp = name => k.findIndex(h => h.startsWith(name));
+    const iId=sp('id'), iName=sp('name'), iNot=sp('notiz'), iStart=sp('start'),
+          iEnde=sp('ende'), iWo=sp('wochen'), iTage=sp('lauftage'), iArch=sp('archiv');
+    kopfWerte.slice(1).forEach(r => {
+      const id = String(r[iId] ?? '').trim();
+      if (!id) return;
+      planListe.push({
+        id, name: String(r[iName] ?? '').trim() || 'Ohne Namen',
+        notizen: iNot>=0 ? String(r[iNot] ?? '').trim() : '',
+        start: String(r[iStart] ?? '').trim().slice(0,10),
+        ende:  String(r[iEnde]  ?? '').trim().slice(0,10),
+        wochen: parseInt(r[iWo]) || 0,
+        // Lauftage stehen als "Mo,Mi,Fr" im Sheet.
+        lauftage: String(r[iTage] ?? '').split(',').map(x=>x.trim()).filter(Boolean),
+        archiviert: /ja|1|true/i.test(String(r[iArch] ?? ''))
+      });
+    });
+  }
+  if (einheitWerte.length > 1) {
+    const k = einheitWerte[0].map(h => String(h).trim().toLowerCase());
+    const sp = name => k.findIndex(h => h.startsWith(name));
+    const iId=sp('plan'), iWo=sp('woche'), iTag=sp('wochentag'), iDat=sp('datum'),
+          iStr=sp('strecke'), iZeit=sp('zeit'), iZone=sp('herzzone');
+    einheitWerte.slice(1).forEach(r => {
+      const id = String(r[iId] ?? '').trim();
+      if (!id) return;
+      const zahlOderNull = v => { const n = parseFloat(String(v ?? '').replace(',','.')); return isNaN(n) ? null : n; };
+      planEinheiten.push({ planId:id, woche: parseInt(r[iWo]) || 0,
+        wochentag: String(r[iTag] ?? '').trim(), datum: String(r[iDat] ?? '').trim().slice(0,10),
+        strecke: zahlOderNull(r[iStr]), zeit: zahlOderNull(r[iZeit]),
+        zone: iZone>=0 ? String(r[iZone] ?? '').trim() : '' });
+    });
+  }
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
@@ -349,6 +393,16 @@ async function loadFromAPI() {
       const plan = await _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT);
       _parsePlanRows(plan.values || []);
     } catch(_) { planData = {}; }
+
+    // Laufpläne und ihre Einheiten – beide Blätter sind optional, das Apps Script
+    // legt sie erst beim ersten Speichern an.
+    try {
+      const [kopf, einh] = await Promise.all([
+        _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT),
+        _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)
+      ]);
+      _parsePlaene(kopf.values || [], einh.values || []);
+    } catch(_) { planListe = []; planEinheiten = []; }
 
   } catch(e) { showErr('Fehler beim Laden: ' + e.message); return false; }
   _lastLoadTs = Date.now();
@@ -2618,6 +2672,57 @@ async function _planSenden(felder) {
   }
 }
 
+// Plan speichern/loeschen und Einheiten setzen – alles ueber dasselbe Muster wie
+// die Einzeltermine: senden, kurz warten, aus dem Sheet gegenlesen.
+async function lpPlanSpeichern(plan) {
+  return _lpSenden({ lp:'planSpeichern', id: plan.id || '', name: plan.name || '',
+    notizen: plan.notizen || '', start: plan.start || '', ende: plan.ende || '',
+    wochen: plan.wochen || '', lauftage: (plan.lauftage || []).join(','),
+    archiviert: plan.archiviert ? '1' : '' });
+}
+async function lpPlanLoeschen(id) { return _lpSenden({ lp:'planLoeschen', id }); }
+async function lpEinheitSpeichern(e) {
+  return _lpSenden({ lp:'einheitSpeichern', id:e.planId, woche:e.woche, wochentag:e.wochentag,
+    datum:e.datum||'', strecke:e.strecke??'', zeit:e.zeit??'', zone:e.zone||'' });
+}
+async function _lpSenden(felder) {
+  if (_planLaeuft) return false;
+  _planLaeuft = true;
+  const p = new URLSearchParams({ token: PLAN_TOKEN });
+  Object.entries(felder).forEach(([k,v]) => p.set(k, v == null ? '' : String(v)));
+  try {
+    await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
+    await new Promise(r => setTimeout(r, 1200));
+    const [kopf, einh] = await Promise.all([
+      _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT),
+      _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)
+    ]);
+    _parsePlaene(kopf.values || [], einh.values || []);
+    return true;
+  } catch(_) { return false; }
+  finally { _planLaeuft = false; }
+}
+
+// Alle Tage, an denen laut einem Plan ein Lauf vorgesehen ist. Ergaenzt die freien
+// Einzeltermine aus planData – beide erscheinen im Kalender als "geplant".
+function geplanteTage() {
+  const tage = { ...planData };
+  planListe.filter(p => !p.archiviert && p.start && p.ende).forEach(p => {
+    planEinheiten.filter(e => e.planId === p.id).forEach(e => {
+      const d = e.datum || _lpDatumAus(p, e.woche, e.wochentag);
+      if (d) tage[d] = { km: e.strecke, notiz: e.zone || '', ausPlan: p.name };
+    });
+  });
+  return tage;
+}
+// Datum einer Planeinheit: Woche 1 beginnt am Montag der Startwoche.
+function _lpDatumAus(plan, woche, wochentag) {
+  const i = WOCHENTAGE.indexOf(wochentag);
+  if (i < 0 || !plan.start) return '';
+  const mo = getWeekMonday(plan.start);
+  return addDays(mo, (Math.max(1, woche) - 1) * 7 + i);
+}
+
 // ── Laufplan ───────────────────────────────────────────
 // Ersetzt den frueheren Schritte-Tab. Quelle sind die Laufeinheiten aus dem
 // Workout-Sheet; wo "Dashboard Data" denselben Wert fuehrt (Strecke, Pace), hat es
@@ -2671,12 +2776,16 @@ function alleLaeufe() {
 // Gefuellt = an dem Tag gelaufen, Farbe nach Laufart. Antippen beschreibt den Tag
 // darunter. Zeigt immer das laufende Kalenderjahr.
 let _lpAuswahl = null;   // angetippter Tag (Datum) – ueberlebt Re-Render
+let _lpSeite = 'plan';   // 'plan' = Aktueller Laufplan, 'verwaltung' = Planverwaltung
+let _lpOffenerPlan = null;   // ID des aufgeklappten Plans in der Verwaltung
+let _lpOffeneWoche = null;   // aufgeklappte Woche innerhalb eines Plans
 
 function laufKalenderHTML() {
   const jahr = new Date(referenceDate + 'T00:00:00').getFullYear();
   const heute = toLocalDateStr(new Date());
   const proTag = {};
   alleLaeufe().forEach(l => { proTag[l.datum] = l; });
+  const geplant = geplanteTage();
 
   // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt – so stehen die
   // Wochentagszeilen ueber das ganze Jahr an derselben Stelle.
@@ -2701,14 +2810,14 @@ function laufKalenderHTML() {
       const ausserhalb = d.getFullYear() !== jahr;
       const kl = ['lp-tag'];
       if (ausserhalb) kl.push('ausserhalb');
-      if (!ausserhalb && planData[ds]) kl.push('geplant');
+      if (!ausserhalb && geplant[ds]) kl.push('geplant');
       if (!ausserhalb && proTag[ds])   kl.push('gelaufen');
       if (ds > heute) kl.push('zukunft');
       if (ds === heute) kl.push('heute');
       if (ds === _lpAuswahl) kl.push('gewaehlt');
       const zustand = proTag[ds]
-        ? (planData[ds] ? 'geplant und gelaufen' : 'zusätzlich gelaufen')
-        : (planData[ds] ? (ds > heute ? 'geplant' : 'geplant, nicht gelaufen') : 'kein Lauf');
+        ? (geplant[ds] ? 'geplant und gelaufen' : 'zusätzlich gelaufen')
+        : (geplant[ds] ? (ds > heute ? 'geplant' : 'geplant, nicht gelaufen') : 'kein Lauf');
       zellen += `<span class="${kl.join(' ')}" data-lauftag="${ds}" role="button" tabindex="0"
         aria-label="${d.toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}, ${zustand}"></span>`;
     }
@@ -2797,11 +2906,39 @@ function laufWerteHTML(l) {
 }
 
 function pgLaufplan() {
+  const umschalter = `
+    <div class="seg-toggle">
+      <button class="seg-btn${_lpSeite==='plan'?' active':''}" data-lpseite="plan">Aktueller Laufplan</button>
+      <button class="seg-btn${_lpSeite==='verwaltung'?' active':''}" data-lpseite="verwaltung">Laufplanverwaltung</button>
+    </div>`;
+
+  document.getElementById("screen-laufplan").innerHTML =
+    pgBanner('🏃','Laufplan','Meine Laufeinheiten im Überblick')
+    + umschalter
+    + (_lpSeite === 'plan' ? lpSeiteAktuell() : lpSeiteVerwaltung());
+
+  if (_lpSeite === 'plan') lpKalenderScrollen();
+}
+
+// Kalender beim Rendern zur laufenden Woche schieben – sonst startet das Jahresraster
+// im Januar. Synchron, weil im verdeckten Tab kein requestAnimationFrame feuert.
+function lpKalenderScrollen() {
+  const scroll = document.querySelector('#screen-laufplan .lp-scroll');
+  if (!scroll) return;
+  const spalten = scroll.querySelectorAll('.lp-woche').length;
+  if (!spalten) return;
+  const proSpalte = scroll.scrollWidth / spalten;
+  const jahrStart = new Date(new Date(referenceDate+'T00:00:00').getFullYear(), 0, 1);
+  const wocheJetzt = Math.floor((new Date(referenceDate+'T00:00:00') - jahrStart) / 604800000);
+  scroll.scrollLeft = Math.max(0, (wocheJetzt + 1) * proSpalte - scroll.clientWidth);
+}
+
+// ── Seite 1: Aktueller Laufplan ────────────────────────
+function lpSeiteAktuell() {
   const laeufe = alleLaeufe();
   const D = filtered();
   const imFenster = laeufe.filter(l => D.some(r => r.date === l.datum));
 
-  // ── Wochenumfang gegen das Ziel ──
   const woMap = {};
   laeufe.forEach(l => { const w = getWeekMonday(l.datum);
     if (!woMap[w]) woMap[w] = { km:0, min:0, n:0 };
@@ -2812,25 +2949,29 @@ function pgLaufplan() {
   const zielKm = ZIELE.laufKm.ziel;
   const zielAnteil = Math.min(100, Math.round(dieseWoche.km / zielKm * 100));
 
-  // ── Bestleistungen über den gesamten Bestand ──
   const mit = f => laeufe.filter(l => l[f] != null);
-  const best = (f, kleinerIstBesser) => { const v = mit(f);
-    if (!v.length) return null;
-    return v.reduce((a,b) => (kleinerIstBesser ? (b[f] < a[f]) : (b[f] > a[f])) ? b : a); };
-  const schnellster = best('pace', true);
-  const laengster   = best('streckeKm', false);
-  const hoechster   = best('hoehe', false);
-
+  const best = (f, kleinerBesser) => { const v = mit(f); if (!v.length) return null;
+    return v.reduce((a,b) => (kleinerBesser ? (b[f] < a[f]) : (b[f] > a[f])) ? b : a); };
+  const schnellster = best('pace', true), laengster = best('streckeKm', false), hoechster = best('hoehe', false);
   const bestZeile = (label, l, wert) => l ? statZeile(label,
     `${wert} <span style="color:var(--txt3)">${fmtDayShort(l.datum)}</span>`) : '';
 
-  document.getElementById("screen-laufplan").innerHTML = `
-    ${pgBanner('🏃','Laufplan','Meine Laufeinheiten im Überblick')}
+  const aktiverPlan = planListe.find(p => !p.archiviert && p.start <= referenceDate && p.ende >= referenceDate);
 
+  return `
     <div class="chart-card">
       <h3>Laufkalender</h3>
       ${laufKalenderHTML()}
     </div>
+
+    ${aktiverPlan ? `<div class="chart-card">
+      <div class="chart-head"><h3>${esc(aktiverPlan.name)}</h3>${scopeBadge('laufender Plan')}</div>
+      <div class="stats-list">
+        ${statZeile('Zeitraum', `${fmtDayShort(aktiverPlan.start)} – ${fmtDayShort(aktiverPlan.ende)}`)}
+        ${statZeile('Woche', `${lpWocheNr(aktiverPlan, referenceDate)} von ${aktiverPlan.wochen||'—'}`)}
+        ${statZeile('Lauftage', aktiverPlan.lauftage.join(', ') || '—')}
+      </div>
+    </div>` : ''}
 
     <div class="chart-card">
       <h3>Diese Woche</h3>
@@ -2844,8 +2985,7 @@ function pgLaufplan() {
         ${statZeile('Einheiten', `${dieseWoche.n}`)}
         ${statZeile('Zeit', dieseWoche.min>0?fmtMin(dieseWoche.min):'—')}
         ${statZeile('Noch bis zum Ziel', dieseWoche.km>=zielKm
-          ? `<span style="color:#10B981">erreicht</span>`
-          : `${zahl(zielKm-dieseWoche.km,1)} km`)}
+          ? `<span style="color:#10B981">erreicht</span>` : `${zahl(zielKm-dieseWoche.km,1)} km`)}
       </div>
     </div>
 
@@ -2870,21 +3010,95 @@ function pgLaufplan() {
       </div>` : `<div class="no-data">Im gewählten Zeitraum ist keine Laufeinheit erfasst.</div>`}
     </div>
 `;
+}
 
-  // Wie in FitTrack zur laufenden Woche scrollen – sonst startet das Jahresraster
-  // im Januar und der aktuelle Stand liegt ausserhalb des Sichtfelds. Synchron:
-  // getBoundingClientRect erzwingt ohnehin ein Layout, und im verdeckten Tab
-  // feuert requestAnimationFrame nie.
-  const scroll = document.querySelector('#screen-laufplan .lp-scroll');
-  if (scroll) {
-    const heute = scroll.querySelector('.lp-tag:not(.zukunft):not(.ausserhalb):last-of-type');
-    const spalten = scroll.querySelectorAll('.lp-woche').length;
-    if (spalten) {
-      const proSpalte = scroll.scrollWidth / spalten;
-      const wocheJetzt = Math.floor((new Date(referenceDate+'T00:00:00') - new Date(new Date(referenceDate+'T00:00:00').getFullYear(),0,1)) / 604800000);
-      scroll.scrollLeft = Math.max(0, (wocheJetzt + 1) * proSpalte - scroll.clientWidth);
-    }
+// In welcher Woche des Plans liegt ein Datum?
+function lpWocheNr(plan, datum) {
+  if (!plan.start) return 1;
+  const mo = getWeekMonday(plan.start), moD = getWeekMonday(datum);
+  return Math.floor((new Date(moD+'T00:00:00') - new Date(mo+'T00:00:00')) / 604800000) + 1;
+}
+
+
+// ── Seite 2: Laufplanverwaltung ────────────────────────
+function lpSeiteVerwaltung() {
+  const aktive = planListe.filter(p => !p.archiviert);
+  const archiv = planListe.filter(p => p.archiviert);
+  const karte = p => {
+    const offen = _lpOffenerPlan === p.id;
+    return `<div class="chart-card lp-plankarte${offen?' offen':''}">
+      <button type="button" class="lp-plankopf" data-lpplan="${p.id}">
+        <span class="lp-plantitel">${esc(p.name)}</span>
+        <span class="lp-planzeit">${p.start?fmtDayShort(p.start):'ohne Datum'}${p.ende?' – '+fmtDayShort(p.ende):''}</span>
+        <span class="lp-planpfeil">${offen?'▾':'▸'}</span>
+      </button>
+      ${offen ? lpPlanDetail(p) : ''}
+    </div>`;
+  };
+  return `
+    ${aktive.length ? aktive.map(karte).join('') : `<div class="chart-card"><div class="no-data">
+      Noch kein Laufplan. Tippe oben auf „Neuer Plan“, um einen anzulegen.</div></div>`}
+    ${archiv.length ? `<div class="lp-archiv-titel">Archiv</div>${archiv.map(karte).join('')}` : ''}
+  `;
+}
+
+// Detailseite eines Plans: Kopfdaten, dann Woche für Woche die Lauftage.
+function lpPlanDetail(p) {
+  const tageWahl = WOCHENTAGE.map(t =>
+    `<label class="lp-tagwahl"><input type="checkbox" name="lauftage" value="${t}"
+      ${p.lauftage.includes(t)?'checked':''}>${t}</label>`).join('');
+
+  const wochen = [];
+  for (let w = 1; w <= (p.wochen || 0); w++) {
+    const offen = _lpOffeneWoche === p.id + '#' + w;
+    const einheiten = p.lauftage.map(tag => {
+      const e = planEinheiten.find(x => x.planId===p.id && x.woche===w && x.wochentag===tag) || {};
+      const datum = _lpDatumAus(p, w, tag);
+      return `<form class="lp-einheit" data-lpeinheit="${p.id}|${w}|${tag}">
+        <span class="lp-einheit-tag">${tag}<span class="lp-einheit-datum">${datum?fmtDayShort(datum):''}</span></span>
+        <input type="number" step="0.1" min="0" name="strecke" placeholder="km" inputmode="decimal"
+               value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern">
+        <input type="number" step="1" min="0" name="zeit" placeholder="min" inputmode="numeric"
+               value="${e.zeit ?? ''}" aria-label="Zeit in Minuten">
+        <select name="zone" aria-label="Herzzone">
+          <option value="">Zone</option>
+          ${[1,2,3,4,5].map(z=>`<option value="Z${z}"${e.zone==='Z'+z?' selected':''}>Z${z}</option>`).join('')}
+        </select>
+        <button type="submit" aria-label="Einheit speichern">✓</button>
+      </form>`;
+    }).join('');
+    wochen.push(`<div class="lp-wochenblock">
+      <button type="button" class="lp-wochenkopf" data-lpwoche="${p.id}#${w}">
+        <span>Woche ${w}</span><span class="lp-planpfeil">${offen?'▾':'▸'}</span>
+      </button>
+      ${offen ? `<div class="lp-wocheninhalt">${einheiten || '<div class="lp-hinweis">Erst Lauftage wählen.</div>'}</div>` : ''}
+    </div>`);
   }
+
+  return `<div class="lp-plandetail">
+    <form class="lp-planform" data-lpplanform="${p.id}">
+      <label class="lp-feld"><span>Name</span>
+        <input type="text" name="name" value="${esc(p.name)}" maxlength="120"></label>
+      <label class="lp-feld"><span>Notizen</span>
+        <textarea name="notizen" rows="2" maxlength="500">${esc(p.notizen)}</textarea></label>
+      <div class="lp-feld-reihe">
+        <label class="lp-feld"><span>Start</span>
+          <input type="date" name="start" value="${p.start}"></label>
+        <label class="lp-feld"><span>Ende</span>
+          <input type="date" name="ende" value="${p.ende}"></label>
+      </div>
+      <label class="lp-feld"><span>Dauer (Wochen)</span>
+        <input type="number" name="wochen" min="1" max="52" value="${p.wochen||''}" inputmode="numeric"></label>
+      <div class="lp-feld"><span>Lauftage</span><div class="lp-tagwahl-reihe">${tageWahl}</div></div>
+      <div class="lp-planaktionen">
+        <button type="submit" class="lp-knopf-haupt">Speichern</button>
+        <button type="button" class="lp-knopf-neben" data-lparchiv="${p.id}">${p.archiviert?'Aus Archiv holen':'Archivieren'}</button>
+        <button type="button" class="lp-knopf-weg" data-lploeschen="${p.id}">Löschen</button>
+      </div>
+    </form>
+    ${p.wochen ? `<div class="lp-wochen">${wochen.join('')}</div>`
+               : `<div class="lp-hinweis">Trage eine Dauer in Wochen ein, dann erscheinen hier die einzelnen Wochen.</div>`}
+  </div>`;
 }
 
 // ── Navigation ─────────────────────────────────────────
@@ -2895,7 +3109,7 @@ function pgBanner(icon,title,sub){
   // Refresh + Dark-Toggle sitzen jetzt rechtsbündig direkt auf der Titelzeile
   // (keine eigene Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions"><button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -3260,6 +3474,80 @@ function initScrollHideNav() {
   });
 }
 
+// ── Laufplanverwaltung: Bedienung ──────────────────────
+document.body.addEventListener('click', async (e) => {
+  // Seitenumschalter
+  const seg = e.target.closest('[data-lpseite]');
+  if (seg) { _lpSeite = seg.dataset.lpseite; _renderTab('laufplan'); return; }
+
+  // Plan auf-/zuklappen
+  const kopf = e.target.closest('[data-lpplan]');
+  if (kopf) { const id = kopf.dataset.lpplan;
+    _lpOffenerPlan = _lpOffenerPlan === id ? null : id; _lpOffeneWoche = null;
+    _renderTab('laufplan'); return; }
+
+  // Woche auf-/zuklappen
+  const woche = e.target.closest('[data-lpwoche]');
+  if (woche) { const k = woche.dataset.lpwoche;
+    _lpOffeneWoche = _lpOffeneWoche === k ? null : k; _renderTab('laufplan'); return; }
+
+  // Neuen Plan anlegen
+  if (e.target.closest('.lp-neu')) {
+    const id = 'lp' + Date.now();
+    const heute = toLocalDateStr(new Date());
+    const ok = await lpPlanSpeichern({ id, name:'Neuer Laufplan', notizen:'',
+      start: getWeekMonday(heute), ende: addDays(getWeekMonday(heute), 8*7-1),
+      wochen: 8, lauftage:['Di','Do','So'] });
+    if (ok) { _lpSeite = 'verwaltung'; _lpOffenerPlan = id; }
+    _renderTab('laufplan');
+    return;
+  }
+
+  // Archivieren / zurückholen
+  const arch = e.target.closest('[data-lparchiv]');
+  if (arch) { const p = planListe.find(x => x.id === arch.dataset.lparchiv);
+    if (p) { arch.disabled = true; await lpPlanSpeichern({ ...p, archiviert: !p.archiviert }); }
+    _renderTab('laufplan'); return; }
+
+  // Löschen – mit Rückfrage, der Schritt ist nicht umkehrbar.
+  const weg = e.target.closest('[data-lploeschen]');
+  if (weg) { const p = planListe.find(x => x.id === weg.dataset.lploeschen);
+    if (p && confirm(`Laufplan „${p.name}" mit allen geplanten Einheiten löschen?`)) {
+      weg.disabled = true; await lpPlanLoeschen(p.id); _lpOffenerPlan = null;
+    }
+    _renderTab('laufplan'); return; }
+});
+
+// Plan-Kopfdaten speichern
+document.body.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-lpplanform]');
+  if (!form) return;
+  e.preventDefault();
+  const alt = planListe.find(x => x.id === form.dataset.lpplanform) || {};
+  const knopf = form.querySelector('button[type=submit]');
+  knopf.disabled = true; knopf.textContent = 'Speichert…';
+  await lpPlanSpeichern({ id: alt.id, archiviert: alt.archiviert,
+    name: form.name.value.trim(), notizen: form.notizen.value.trim(),
+    start: form.start.value, ende: form.ende.value, wochen: form.wochen.value,
+    lauftage: [...form.querySelectorAll('input[name=lauftage]:checked')].map(c=>c.value) });
+  _renderTab('laufplan');
+});
+
+// Einzelne Planeinheit speichern
+document.body.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-lpeinheit]');
+  if (!form) return;
+  e.preventDefault();
+  const [planId, woche, wochentag] = form.dataset.lpeinheit.split('|');
+  const p = planListe.find(x => x.id === planId);
+  const knopf = form.querySelector('button[type=submit]');
+  knopf.disabled = true; knopf.textContent = '…';
+  await lpEinheitSpeichern({ planId, woche: +woche, wochentag,
+    datum: p ? _lpDatumAus(p, +woche, wochentag) : '',
+    strecke: form.strecke.value.trim(), zeit: form.zeit.value.trim(), zone: form.zone.value });
+  _renderTab('laufplan');
+});
+
 // Plan-Termin setzen oder aendern.
 document.body.addEventListener('submit', async (e) => {
   const form = e.target.closest('[data-planform]');
@@ -3289,7 +3577,7 @@ document.body.addEventListener('click', async (e) => {
 // Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
 // ueberlebt damit den Re-Render.
 document.body.addEventListener('click', (e) => {
-  if (e.target.closest('.lp-plan-form, [data-planweg]')) return;   // eigene Handler
+  if (e.target.closest('.lp-plan-form, [data-planweg], [data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
   const ziel = e.target.closest('[data-lauftag]');
   if (!ziel) return;
   const tag = ziel.dataset.lauftag;

@@ -302,6 +302,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
   `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
   Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
+- **Laufplan-Tab: zwei Seiten** über einen Segment-Umschalter (`.seg-toggle`, Layout aus
+  FitTrack übernommen). `_lpSeite` merkt die Wahl über Re-Render hinweg.
+  **Aktueller Laufplan** = Kalender, laufender Plan, Wochenumfang, Bestleistungen,
+  Einheitenliste. **Laufplanverwaltung** = Liste der Pläne, jede Karte aufklappbar zur
+  Detailansicht (Name, Notizen, Start, Ende, Wochen, Lauftage) und darunter Woche für
+  Woche die Lauftage mit Strecke, Zeit und Herzzone. Archivierte Pläne stehen unter
+  einer eigenen Überschrift. Der `＋`-Knopf im Banner erscheint **nur** im Laufplan-Tab
+  (`_currentRenderingTab` in `pgBanner`).
+- **Laufpläne im Sheet:** zwei weitere Blätter im Workout-Spreadsheet, damit der Plan
+  dort von Hand lesbar bleibt: **`Laufplaene`** (ID, Name, Notizen, Start, Ende, Wochen,
+  Lauftage, Archiviert) und **`Laufplan-Einheiten`** (PlanID, Woche, Wochentag, Datum,
+  Strecke, Zeit, Herzzone). Geschrieben wird wie bei den Einzelterminen ausschliesslich
+  über das Apps Script (`laufplanEndpunkt`), gelesen mit dem Nur-Lese-Scope.
+  `geplanteTage()` führt Planeinheiten **und** freie Einzeltermine zusammen — beide
+  erscheinen im Kalender als „geplant". Das Datum einer Planeinheit rechnet
+  `_lpDatumAus` aus Startwoche + Wochennummer + Wochentag, es muss also nicht im Sheet
+  stehen.
 - **Planverwaltung (einzelne Termine):** Blatt **`Laufplan`** im Workout-Spreadsheet
   (`Date | Distance (km) | Note`). Gelesen wird es mit dem normalen Nur-Lese-Scope über
   `_fetchSheet(id, blattName)` — die Funktion nahm vorher immer `sheets[0]`.
