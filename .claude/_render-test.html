@@ -10,6 +10,7 @@
 <body class="theme-overview">
 <div class="bg-fade-layer" id="bg-fade-a"></div>
 <div class="bg-fade-layer" id="bg-fade-b"></div>
+<div id="hinweis-oben" hidden><span class="hinweis-txt"></span><button type="button" class="hinweis-akt"></button></div>
 <div id="login-screen" class="overlay-screen" style="display:none"><button onclick="signIn()">Login</button></div>
 <div id="loading" class="overlay-screen"><div class="spin"></div><p class="ld-txt">lädt…</p></div>
 <div id="err-screen" class="overlay-screen" style="display:none"><p class="err-msg" id="err-txt"></p></div>
@@ -47,6 +48,15 @@
 //   dubletten   – dieselben Tage stehen mehrfach im Sheet (so wie es das Apps-Script
 //                 beim Refresh erzeugen kann) → dürfen nur EINMAL gezählt werden
 //
+// Zusatzschalter ?auth=aus       – kein gueltiger Token: die App muss aus dem
+//                 Zwischenspeicher weiterlaufen und die Hinweisleiste oben zeigen
+//                 (frueher: Login-Screen, gar keine Daten).
+// Zusatzschalter ?cache=behalten – den Datei-Zwischenspeicher NICHT leeren. Erst
+//                 normal laden (schreibt ihn), dann damit neu laden: die App muss
+//                 sofort zeichnen und im Hintergrund nachladen.
+// window.__anfragen zaehlt die Netzabrufe (meta/werte/script) – damit laesst sich
+// belegen, dass der Blattnamen-Zwischenspeicher die Meta-Abfragen einspart.
+//
 // Zusatzschalter ?raf=timer – ersetzt requestAnimationFrame durch einen Timer, damit
 // sich frame-gebundene Logik auch im verdeckten Vorschau-Pane pruefen laesst.
 // ═══════════════════════════════════════════════════════════
@@ -77,8 +87,50 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-localStorage.setItem('g_token', 'testtoken');
-localStorage.setItem('g_expiry', String(Date.now() + 3600e3));
+// Anmeldung: standardmaessig gueltig. ?auth=aus simuliert den abgelaufenen Token –
+// die App muss dann aus dem Zwischenspeicher weiterlaufen statt den Login zu zeigen.
+const _P = new URLSearchParams(location.search);
+if (_P.get('auth') === 'aus') {
+  localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry');
+} else {
+  localStorage.setItem('g_token', 'testtoken');
+  localStorage.setItem('g_expiry', String(Date.now() + 3600e3));
+}
+// Zwischenspeicher: standardmaessig leeren, sonst startet jeder Lauf aus dem Stand
+// des vorigen und die Szenarien waeren nicht mehr vergleichbar.
+// ?cache=behalten laesst ihn stehen – so laesst sich der Sofortstart pruefen:
+// einmal normal laden (schreibt den Speicher), dann mit ?cache=behalten neu laden.
+if (_P.get('cache') !== 'behalten') {
+  localStorage.removeItem('hcc_daten_v1');
+  localStorage.removeItem('hcc_blattnamen_v1');
+}
+// Zaehler fuer die Netzanfragen – damit sich belegen laesst, dass der Blattnamen-
+// Zwischenspeicher die Meta-Abfragen wirklich einspart.
+window.__anfragen = { meta: 0, werte: 0, script: 0 };
+// Wann stand das erste Diagramm? Misst den eigentlichen Gewinn des Zwischenspeichers.
+// Ein Beobachter statt einer Abfrage nach dem Laden – nur so ist der Zeitpunkt echt.
+window.__ersterChartMs = null;
+new MutationObserver((_, beob) => {
+  if (document.querySelector('#screen-overview canvas')) {
+    window.__ersterChartMs = Math.round(performance.now());
+    beob.disconnect();
+  }
+}).observe(document.documentElement, { childList: true, subtree: true });
+// Wann kam die erste Netzantwort? Der Vergleich der beiden Zahlen ist der Beleg.
+window.__ersteAntwortMs = null;
+// Fruehe Momentaufnahme der Uebersicht (200 ms nach Start) – belegt, WAS aus dem
+// Zwischenspeicher stand, bevor der Nachlade-Abruf zurueck war. Ohne sie racet jede
+// Pruefung von aussen gegen die Antwortzeit.
+window.__fruehText = null;
+setTimeout(() => { window.__fruehText = (document.getElementById('screen-overview')||{}).innerText || ''; }, 200);
+// ?tipp=sofort simuliert einen Nutzer, der gleich nach dem Start etwas antippt –
+// waehrend das Nachladen noch laeuft. Die App darf dann NICHT still neu zeichnen,
+// sondern muss die Hinweisleiste "Neue Daten geladen" anbieten. Mehrfach gesendet,
+// weil app.js seinen Zuhoerer erst im Lauf des eigenen Starts anmeldet.
+if (_P.get('tipp') === 'sofort') {
+  const stop = setInterval(() => window.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true })), 40);
+  setTimeout(() => clearInterval(stop), 800);
+}
 
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
@@ -180,12 +232,19 @@ const lpEinheiten = [['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit 
 
 const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
-const ok = body => Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
+// ?netz=langsam verzoegert JEDE Antwort um NETZ_MS. Damit laesst sich zeigen, was der
+// Zwischenspeicher bringt: mit ihm stehen die Diagramme sofort, ohne ihn erst danach.
+const NETZ_MS = _P.get('netz') === 'langsam' ? 1500 : 0;
+const ok = body => new Promise(res => setTimeout(() => {
+  if (window.__ersteAntwortMs === null) window.__ersteAntwortMs = Math.round(performance.now());
+  res({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
+}, NETZ_MS));
 
 window.fetch = (url, opt) => {
   const u = String(url);
   // Apps-Script-Aufruf: Plan-Termin setzen oder loeschen.
   if (u.includes('script.google.com')) {
+    window.__anfragen.script++;
     const p = new URLSearchParams(u.split('?')[1] || '');
     const datum = p.get('datum');
     if (p.get('plan') && datum) {
@@ -223,10 +282,11 @@ window.fetch = (url, opt) => {
   if (u.includes('sheets.googleapis.com')) {
     const isWorkout = u.includes(WORKOUT_ID);
     // Blattnamen-Abfrage: das Workout-Spreadsheet fuehrt zwei Blaetter.
-    if (u.includes('?fields=')) return ok({ sheets: isWorkout
+    if (u.includes('?fields=')) { window.__anfragen.meta++; return ok({ sheets: isWorkout
       ? [{properties:{title:'Data'}},{properties:{title:'Laufplan'}},
          {properties:{title:'Laufplaene'}},{properties:{title:'Laufplan-Einheiten'}}]
-      : [{ properties:{ title:'Data' } }] });
+      : [{ properties:{ title:'Data' } }] }); }
+    window.__anfragen.werte++;
     const dec = decodeURIComponent(u);
     if (dec.includes('/values/Laufplaene'))         return ok({ values: lpPlaene });
     if (dec.includes('/values/Laufplan-Einheiten')) return ok({ values: lpEinheiten });
@@ -236,7 +296,6 @@ window.fetch = (url, opt) => {
     // fremden Text auf den Bildschirm. Muss als Text erscheinen, nicht ausgeführt.
     if (isWorkout && SC === 'woerror') return Promise.reject(
       new Error('Simulierter Netzwerkfehler <img src=x onerror="window.__pwned=1">'));
-    if (u.includes('?fields=')) return ok({ sheets:[{ properties:{ title:'Data' } }] });
     return ok({ values: isWorkout ? workout : health });
   }
   return ok({});

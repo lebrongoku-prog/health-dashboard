@@ -35,6 +35,15 @@
 <div class="bg-fade-layer" id="bg-fade-a"></div>
 <div class="bg-fade-layer" id="bg-fade-b"></div>
 
+<!-- Hinweisleiste am oberen Rand. EIN Element fuer zwei Faelle: "Anmeldung noetig"
+     (Daten stammen aus dem Zwischenspeicher) und "Neue Daten verfuegbar" (im
+     Hintergrund geladen, aber noch nicht eingezeichnet). Die Beschriftung setzt
+     hinweisZeigen() in app.js; body.hinweis-an schafft den Platz darueber. -->
+<div id="hinweis-oben" hidden>
+  <span class="hinweis-txt"></span>
+  <button type="button" class="hinweis-akt"></button>
+</div>
+
 <!-- Login-Overlay (vor OAuth) -->
 <div id="login-screen" class="overlay-screen" style="display:none">
   <div class="overlay-title">Health Command Center</div>

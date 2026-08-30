@@ -924,3 +924,33 @@ body.dark .lp-wochenkopf{background:#0F172A}
   -webkit-tap-highlight-color:transparent}
 .weitere-pfeil{font-size:.9rem;line-height:1}
 .weitere-inhalt[hidden]{display:none}
+
+/* ── Hinweisleiste oben ────────────────────────────────────
+   Zwei Faelle, ein Element: "Anmeldung noetig" (Daten aus dem Zwischenspeicher)
+   und "Neue Daten verfuegbar". Dunkel statt in der Tabfarbe, damit sie ueber
+   jedem der fuenf Tab-Hintergruende gleich gut lesbar bleibt und nicht wie ein
+   Teil des jeweiligen Tabs wirkt.
+   Liegt ueber der Bottom-Nav-Ebene (z-index 100), aber unter den Tooltips (9999). */
+#hinweis-oben{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;gap:.6rem;
+  padding:calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) 8px calc(var(--safe-l) + 12px);
+  background:#1E293B;color:#F1F5F9;
+  font-size:.75rem;line-height:1.35;
+  box-shadow:0 2px 10px rgba(0,0,0,.22);
+}
+#hinweis-oben[hidden]{display:none}
+.hinweis-txt{flex:1 1 auto;min-width:0}
+.hinweis-akt{
+  flex:0 0 auto;border:0;border-radius:999px;padding:.34rem .72rem;
+  background:#F1F5F9;color:#0F172A;font:inherit;font-size:.72rem;font-weight:700;
+  cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;
+}
+/* Platz schaffen: die Leiste ist fixiert und wuerde sonst den Tab-Titel verdecken.
+   --hinweis-h misst hinweisZeigen() am Element, weil die Hoehe von der Safe-Area
+   und einem eventuellen Zeilenumbruch abhaengt. */
+body.hinweis-an .screen{
+  /* --hinweis-h ist die GEMESSENE Gesamthoehe der Leiste – die Safe-Area steckt
+     bereits darin. Sie hier noch einmal zu addieren, ergaebe einen doppelten Rand. */
+  padding-top:calc(var(--hinweis-h, 60px) + 8px);
+}

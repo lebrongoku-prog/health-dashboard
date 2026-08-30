@@ -41,6 +41,14 @@ function _initAuth() {
 
 (async () => {
 let allData = [], timeRange = '7d', referenceDate = '';
+// Hat der Nutzer den Zeitraum selbst weggeblättert? Dann darf ein Nachladen im
+// Hintergrund ihn nicht heimlich zurück auf den neuesten Tag setzen.
+let _datumSelbstGewaehlt = false;
+// Erste echte Berührung seit dem Start. Solange sie ausbleibt, darf frisch geladenes
+// Material still eingezeichnet werden; danach nur noch auf Tipp, sonst springt die
+// Ansicht unter dem Finger weg. Bewusst nur Zeigegeräte/Tastatur – ein `scroll`
+// feuert auch, wenn die App selbst scrollt (Tab-Snap beim Start).
+let _beruehrt = false;
 let _lastLoadTs = null; // Zeitpunkt des letzten erfolgreichen Sheet-Abrufs (für den Daten-Stand)
 const charts = {};
 // Cache für allData-abhängige Auswertungen (Baselines, Tages-Empfehlung,
@@ -231,47 +239,100 @@ const showErr = m => {
   document.getElementById('err-txt').textContent = m;
 };
 
-// ── Daten von Apps Script API laden ───────────────────
-// Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
-async function _fetchSheet(sheetId, blattName) {
-  // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, sauber neu anmelden
-  // statt erst auf den 401 vom Server zu warten.
-  if (!accessToken || Date.now() > tokenExpiry - 60_000) {
-    try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
-    signIn();
-    return { authError: true };
+// ── Blattnamen-Zwischenspeicher ───────────────────────
+// Vor jedem Wertabruf fragte die App das Spreadsheet, wie seine Blätter heissen –
+// bei fünf Abrufen also fünf zusätzliche Anfragen pro Start, für eine Angabe, die
+// sich praktisch nie ändert. Die Namensliste liegt jetzt lokal; nur wenn ein
+// gesuchtes Blatt fehlt (das Apps Script legt Laufplan-Blätter erst beim ersten
+// Speichern an), wird sie neu geholt.
+const TABS_KEY = 'hcc_blattnamen_v1';
+let _tabsCache = (() => { try { return JSON.parse(localStorage.getItem(TABS_KEY)) || {}; } catch(_) { return {}; } })();
+function _tabsMerken(sheetId, titel) {
+  _tabsCache[sheetId] = titel;
+  try { localStorage.setItem(TABS_KEY, JSON.stringify(_tabsCache)); } catch(_) {}
+}
+const _tabsLaeuft = {};   // sheetId → laufende Anfrage; buendelt parallele Aufrufe
+function _tabsHolen(sheetId) {
+  // Ohne Buendelung schickten die fuenf gleichzeitigen Blattabrufe fuenf identische
+  // Namensanfragen los – genau das, was der Zwischenspeicher einsparen soll.
+  if (!_tabsLaeuft[sheetId]) {
+    _tabsLaeuft[sheetId] = _tabsHolenJetzt(sheetId).finally(() => { delete _tabsLaeuft[sheetId]; });
   }
-  const metaRes = await fetch(
+  return _tabsLaeuft[sheetId];
+}
+async function _tabsHolenJetzt(sheetId) {
+  const res = await fetch(
     'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '?fields=sheets.properties.title',
     { headers: { 'Authorization': 'Bearer ' + accessToken } }
   );
-  if (metaRes.status === 401) return { authError: true };
-  if (!metaRes.ok) throw new Error('Sheets API Fehler ' + metaRes.status + ': ' + await metaRes.text());
-  const meta = await metaRes.json();
-  // Standard ist das erste Blatt; blattName holt gezielt ein anderes (Laufplan).
-  const tabName = blattName
-    ? (meta.sheets.find(x => x.properties.title === blattName) || {}).properties?.title
-    : meta.sheets[0].properties.title;
+  if (res.status === 401) return { authError: true };
+  if (!res.ok) throw new Error('Sheets API Fehler ' + res.status + ': ' + await res.text());
+  const meta = await res.json();
+  const titel = (meta.sheets || []).map(x => x.properties.title);
+  _tabsMerken(sheetId, titel);
+  return { titel };
+}
+
+// ── Daten von Apps Script API laden ───────────────────
+// Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
+async function _fetchSheet(sheetId, blattName) {
+  // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, gilt er als ungültig.
+  // Hier wird BEWUSST nicht mehr von selbst zur Anmeldung weitergeleitet: seit die
+  // App aus dem Zwischenspeicher startet, liefe sonst jeder Hintergrund-Abruf in
+  // eine Weiterleitung und risse den Nutzer aus der laufenden Ansicht. Der Aufrufer
+  // entscheidet, was mit `authError` geschieht.
+  if (!accessToken || Date.now() > tokenExpiry - 60_000) {
+    accessToken = null; tokenExpiry = 0;
+    try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
+    return { authError: true };
+  }
+  // Blattnamen aus dem Zwischenspeicher; fehlt der gesuchte, einmal frisch holen.
+  let titel = _tabsCache[sheetId];
+  const gesucht = () => blattName ? (titel.includes(blattName) ? blattName : null) : titel[0];
+  if (!Array.isArray(titel) || !titel.length || !gesucht()) {
+    const frisch = await _tabsHolen(sheetId);
+    if (frisch.authError) return { authError: true };
+    titel = frisch.titel;
+  }
+  const tabName = gesucht();
   if (!tabName) return { values: [], fehlt: true };   // Blatt gibt es noch nicht
   const dataRes = await fetch(
     'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/' + encodeURIComponent(tabName),
     { headers: { 'Authorization': 'Bearer ' + accessToken } }
   );
+  if (dataRes.status === 401) return { authError: true };
   if (!dataRes.ok) throw new Error('Daten-Abruf fehlgeschlagen: ' + dataRes.status);
   const json = await dataRes.json();
   return { values: json.values || [] };
 }
 
-async function loadFromAPI() {
+// Laedt alle fuenf Blaetter. `still:true` = Hintergrund-Abruf, waehrend bereits Daten
+// aus dem Zwischenspeicher auf dem Bildschirm stehen: dann darf weder der Login-Screen
+// noch die Fehlerkarte den vorhandenen Stand ueberdecken.
+// Rueckgabe: true (geladen) | 'auth' (Anmeldung noetig) | false (Fehler).
+async function loadFromAPI(opt = {}) {
+  const still = !!opt.still;
   try {
-    // 1. Gesundheitsdaten direkt von Google Sheets laden
-    const health = await _fetchSheet(HEALTH_SHEET_ID);
+    // Alle Blaetter GLEICHZEITIG anfragen. Vorher liefen sie nacheinander: vier
+    // Wartestufen hintereinander, bevor der erste Wert auf dem Bildschirm stand.
+    // Die Nebenblaetter fangen ihre Fehler selbst ab, damit ein fehlendes Laufplan-
+    // Blatt nicht den Gesundheitsteil mitreisst.
+    const alsFehler = e => ({ fehler: e });
+    const [health, workout, plan, lpKopf, lpEinh] = await Promise.all([
+      _fetchSheet(HEALTH_SHEET_ID),
+      _fetchSheet(WORKOUT_SHEET_ID).catch(alsFehler),
+      _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT).catch(alsFehler),
+      _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT).catch(alsFehler),
+      _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT).catch(alsFehler)
+    ]);
     if (health.authError) {
       accessToken = null; tokenExpiry = 0;
       try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'flex';
-      return false;
+      if (!still) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+      }
+      return 'auth';
     }
     if (!health.values || health.values.length < 2) throw new Error('Keine Gesundheitsdaten im Sheet gefunden');
     const hHeaders = health.values[0].map(h => h.trim());
@@ -307,18 +368,24 @@ async function loadFromAPI() {
     const _dubletten = allData.length - _proTag.size;
     if (_dubletten > 0) console.info(`[Daten] ${_dubletten} doppelte Datumszeile(n) zusammengeführt.`);
     allData = [..._proTag.values()];
-    referenceDate = allData[allData.length - 1].date;
+    // Nur auf den neuesten Tag springen, wenn der Nutzer nicht selbst geblättert hat.
+    if (!_datumSelbstGewaehlt || !referenceDate) referenceDate = allData[allData.length - 1].date;
     _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
 
-    // 2. Workout-Daten laden. Ein Fehler hier legt die übrigen Tabs nicht lahm, darf
+    // 2. Workout-Daten. Ein Fehler hier legt die übrigen Tabs nicht lahm, darf
     //    aber nicht stillschweigend verschluckt werden: sonst wartet der Training-Tab
     //    endlos auf Daten, die nie kommen. Deshalb Fehler merken und den Ladeversuch
     //    in jedem Fall als abgeschlossen markieren.
-    workoutLoadError = null;
+    // Beim Hintergrund-Abruf gilt: ein gescheiterter Teil aendert NICHTS. Sonst
+    // taeuschte eine kurze Netzstoerung den Verlust von Daten vor, die im
+    // Zwischenspeicher einwandfrei vorliegen – der Training-Tab waere gegen eine
+    // Fehlerkarte getauscht worden, obwohl alle Trainings da sind.
+    const behalten = still && Object.keys(workoutData).length > 0;
+    if (!behalten) workoutLoadError = null;
     try {
-      const workout = await _fetchSheet(WORKOUT_SHEET_ID);
+      if (workout.fehler) throw workout.fehler;
       if (workout.authError) {
-        workoutLoadError = 'Keine gültige Berechtigung für das Workout-Sheet.';
+        if (!behalten) workoutLoadError = 'Keine gültige Berechtigung für das Workout-Sheet.';
       } else if (workout.values && workout.values.length > 1) {
         const wHeaders = workout.values[0].map(h => h.trim());
         const wRows = workout.values.slice(1).map(row => {
@@ -326,11 +393,15 @@ async function loadFromAPI() {
           wHeaders.forEach((h, i) => { obj[h] = (row[i] ?? '').toString().trim(); });
           return obj;
         });
+        // Leeren statt ergaenzen: _parseWorkoutRows schreibt nur hinein, im Sheet
+        // geloeschte Tage blieben sonst nach einem Neuladen stehen.
+        workoutData = {};
         _parseWorkoutRows(wRows);
       }
       // values.length <= 1 → Sheet enthält nur die Kopfzeile: kein Fehler, nur keine Einträge.
     } catch(e) {
-      workoutLoadError = e.message || 'Unbekannter Fehler beim Abruf.';
+      if (behalten) console.warn('[Daten] Workout-Abruf fehlgeschlagen, alter Stand bleibt:', e.message);
+      else workoutLoadError = e.message || 'Unbekannter Fehler beim Abruf.';
     } finally {
       workoutSheetReady = true;
     }
@@ -338,33 +409,96 @@ async function loadFromAPI() {
     // Laufplan (eigenes Blatt im Workout-Spreadsheet). Fehlt es noch, bleibt der
     // Plan leer – die App legt es nicht an, das macht das Apps Script beim ersten
     // Speichern. Ein Fehler hier darf den Rest der App nicht aufhalten.
-    try {
-      const plan = await _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT);
-      _parsePlanRows(plan.values || []);
-    } catch(_) { planData = {}; }
+    // Auch hier: im Hintergrund nichts leeren, was schon dasteht.
+    if (plan.fehler || plan.authError) { if (!still) planData = {}; }
+    else _parsePlanRows(plan.values || []);
 
     // Laufpläne und ihre Einheiten – beide Blätter sind optional, das Apps Script
     // legt sie erst beim ersten Speichern an.
-    try {
-      const [kopf, einh] = await Promise.all([
-        _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT),
-        _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)
-      ]);
-      _parsePlaene(kopf.values || [], einh.values || []);
-    } catch(_) { planListe = []; planEinheiten = []; }
+    if (lpKopf.fehler || lpEinh.fehler || lpKopf.authError || lpEinh.authError) {
+      if (!still) { planListe = []; planEinheiten = []; }
+    } else _parsePlaene(lpKopf.values || [], lpEinh.values || []);
 
-  } catch(e) { showErr('Fehler beim Laden: ' + e.message); return false; }
+  } catch(e) {
+    // Im Hintergrund-Abruf bleibt der Stand aus dem Zwischenspeicher stehen – eine
+    // Fehlerkarte wuerde funktionierende Daten hinter einer Meldung verstecken.
+    if (still) { console.warn('[Daten] Hintergrund-Abruf fehlgeschlagen:', e.message); return false; }
+    showErr('Fehler beim Laden: ' + e.message); return false;
+  }
   _lastLoadTs = Date.now();
+  datenCacheSchreiben();
   return true;
 }
 
-// ── Auth prüfen, sonst Login-Screen ───────────────────
-if (!_initAuth()) {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  return;
+// ── Zwischenspeicher der Daten ────────────────────────
+// Die App wartete beim Start, bis alle Blätter geladen waren – bei abgelaufener
+// Anmeldung sah man stattdessen nur den Login. Jetzt liegt der zuletzt geladene
+// Stand auf dem Gerät: er erscheint sofort, das Nachladen läuft dahinter.
+// Das Google-Sheet bleibt die massgebliche Quelle; hier steht nur eine Kopie.
+// Die Versionsnummer im Schlüssel verwirft alte Stände automatisch, falls sich
+// später ändert, WIE die Daten eingelesen werden – lieber einmal warten als
+// einen alten Stand falsch deuten.
+const DATEN_KEY = 'hcc_daten_v1';
+
+// Der Inhalt OHNE Zeitstempel – dient zugleich als Fingerabdruck: der Hintergrund-
+// Abruf vergleicht ihn vorher und nachher und zeichnet nur neu, wenn sich wirklich
+// etwas geaendert hat. Sonst blitzte bei jedem Start ein Neuaufbau aller Diagramme
+// auf, obwohl exakt dieselben Zahlen herauskamen.
+function datenStand() {
+  return JSON.stringify({ allData, workoutData, planData, planListe, planEinheiten, workoutLoadError });
 }
-if (!await loadFromAPI()) return;
+
+function datenCacheSchreiben() {
+  try {
+    localStorage.setItem(DATEN_KEY, '{"v":1,"ts":' + (_lastLoadTs || 0) + ',"d":' + datenStand() + '}');
+  } catch(e) {
+    // Voller Speicher: die Kopie ist eine Bequemlichkeit, kein Muss. Den alten
+    // (womöglich noch brauchbaren) Stand aber nicht halb überschrieben stehen lassen.
+    try { localStorage.removeItem(DATEN_KEY); } catch(_) {}
+    console.warn('[Daten] Zwischenspeicher konnte nicht geschrieben werden:', e.name);
+  }
+}
+
+// Füllt die Datenvariablen aus dem Zwischenspeicher. Gibt true zurück, wenn ein
+// brauchbarer Stand da war – nur dann darf die App ohne Netz starten.
+function datenCacheLesen() {
+  let roh, d;
+  try { roh = JSON.parse(localStorage.getItem(DATEN_KEY) || 'null'); } catch(_) { return false; }
+  if (!roh || roh.v !== 1 || !roh.d) return false;
+  d = roh.d; d.ts = roh.ts;
+  if (!Array.isArray(d.allData) || !d.allData.length) return false;
+  // Dieselbe Datumsprüfung wie beim Einlesen aus dem Sheet: der Zwischenspeicher ist
+  // beschreibbar von aussen, also nicht vertrauenswürdiger als eine Sheet-Zelle.
+  const zeilen = d.allData.filter(r => r && typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  if (!zeilen.length) return false;
+  allData = zeilen;
+  allData.sort((a, b) => a.date.localeCompare(b.date));
+  workoutData    = (d.workoutData && typeof d.workoutData === 'object') ? d.workoutData : {};
+  planData       = (d.planData    && typeof d.planData    === 'object') ? d.planData    : {};
+  planListe      = Array.isArray(d.planListe)     ? d.planListe     : [];
+  planEinheiten  = Array.isArray(d.planEinheiten) ? d.planEinheiten : [];
+  workoutLoadError = d.workoutLoadError || null;
+  workoutSheetReady = true;
+  referenceDate  = allData[allData.length - 1].date;
+  _lastLoadTs    = (typeof d.ts === 'number' && d.ts > 0) ? d.ts : null;
+  _analyticsCache = {};
+  return true;
+}
+
+// ── Start: erst der gespeicherte Stand, dann das Nachladen ──
+// Reihenfolge ist wichtig: _initAuth setzt den Token, damit der Hintergrund-Abruf
+// später weiss, ob er überhaupt fragen darf.
+_initAuth();
+const _startAusCache = datenCacheLesen();
+if (!_startAusCache) {
+  // Ohne gespeicherten Stand gibt es nichts zu zeigen – wie bisher: Login bzw. warten.
+  if (!accessToken) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    return;
+  }
+  if ((await loadFromAPI()) !== true) return;
+}
 
 // ── Field detection ────────────────────────────────────
 function findField(rows, ...candidates) {
@@ -475,7 +609,7 @@ function navPrev() {
   if (!referenceDate || !allData.length) return;
   const nr = is7D() ? addDays(referenceDate, -7) : addMonths(referenceDate, -1);
   if (nr < allData[0].date) return;
-  referenceDate = nr;
+  referenceDate = nr; _datumSelbstGewaehlt = true;
   updateNavUI();
   _navSliding = true;
   _refreshAfterStateChange();
@@ -488,7 +622,7 @@ function navNext() {
   const maxDate = allData[allData.length-1].date;
   const nr = is7D() ? addDays(referenceDate, 7) : addMonths(referenceDate, 1);
   if (nr > maxDate) return;
-  referenceDate = nr;
+  referenceDate = nr; _datumSelbstGewaehlt = true;
   updateNavUI();
   _navSliding = true;
   _refreshAfterStateChange();
@@ -1445,11 +1579,20 @@ function datenStandZeilen() {
   // Das Alter wird nur genannt, wenn es auffällig ist; sonst genügt das Datum.
   const stale  = ageDays >= 2;
   const ageTxt = stale ? ` · ${ageDays} Tage alt` : '';
-  const loaded = _lastLoadTs
-    ? new Date(_lastLoadTs).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'}) + ' Uhr'
-    : '—';
+  // Der Ladezeitpunkt ueberlebt jetzt im Zwischenspeicher auch einen App-Neustart.
+  // Eine reine Uhrzeit waere dann irrefuehrend ("19:06" von gestern) – ausserhalb
+  // des heutigen Tages steht deshalb das Datum davor.
+  let loaded = '—';
+  if (_lastLoadTs) {
+    const d = new Date(_lastLoadTs);
+    const zeit = d.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+    loaded = toLocalDateStr(d) === toLocalDateStr(new Date()) ? zeit : fmtDayShort(toLocalDateStr(d)) + ', ' + zeit;
+  }
   return statZeile('Daten bis', fmtDayShort(newest)+ageTxt, stale ? '#F59E0B' : null)
-       + statZeile('Zuletzt geladen', loaded);
+       + statZeile('Zuletzt geladen', loaded)
+       // Ohne gueltige Anmeldung laeuft die App aus dem Zwischenspeicher weiter.
+       // Das gehoert sichtbar hierher, nicht nur in die Leiste oben, die man wegtippt.
+       + (accessToken ? '' : statZeile('Google-Anmeldung', 'abgelaufen', '#F59E0B'));
 }
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
@@ -2132,7 +2275,7 @@ async function pgTraining() {
       <div class="no-data">
         <strong>Workout-Daten nicht verfügbar</strong>
         ${esc(woProblem)}
-        <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Mit 🔄 oben rechts erneut versuchen.</div>
+        <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Erneut versuchen mit „Daten aktualisieren" in der App-Karte der Übersicht.</div>
       </div>`;
     return;
   }
@@ -2563,6 +2706,19 @@ function vo2Abschnitt(D, P) {
 const PLAN_URL = REFRESH_URL.split('?')[0];
 const PLAN_TOKEN = (REFRESH_URL.match(/token=([^&]+)/) || [])[1] || '';
 
+// Schreiben braucht eine gueltige Google-Anmeldung – nicht fuer das Senden selbst
+// (das laeuft ueber das Apps Script mit eigenem Schluessel), sondern fuer das
+// anschliessende Gegenlesen aus dem Sheet. Ohne Anmeldung kaeme der Wert im Sheet an,
+// die Anzeige zeigte aber weiter den alten Stand: derselbe Fall wie "verschwundene
+// km-Werte". Deshalb gar nicht erst senden, sondern sichtbar ablehnen.
+function _schreibenErlaubt() {
+  if (accessToken) return true;
+  _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. Oben anmelden und erneut versuchen.';
+  hinweisAuthZeigen();
+  if (currentScreen === 'laufplan') _renderTab('laufplan');
+  return false;
+}
+
 async function planSpeichern(datum, km, notiz) {
   return _planSenden({ plan:'add', datum, km: km ?? '', notiz: notiz ?? '' });
 }
@@ -2574,6 +2730,7 @@ function _planSenden(felder) {
   return _lpKette;
 }
 async function _planSendenJetzt(felder) {
+  if (!_schreibenErlaubt()) return false;
   const p = new URLSearchParams({ token: PLAN_TOKEN, ...felder });
   try {
     await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
@@ -2610,6 +2767,7 @@ function _lpSenden(felder) {
   return _lpKette;
 }
 async function _lpSendenJetzt(felder) {
+  if (!_schreibenErlaubt()) return false;
   const p = new URLSearchParams({ token: PLAN_TOKEN });
   Object.entries(felder).forEach(([k,v]) => p.set(k, v == null ? '' : String(v)));
   try {
@@ -3722,6 +3880,7 @@ document.body.addEventListener('click', (e) => {
     blickAnkerMerken(t);
     if (allData.length) {
       referenceDate = allData[allData.length-1].date;
+      _datumSelbstGewaehlt = false;   // wieder am neuesten Tag → Nachladen darf mitziehen
       updateNavUI();
       _refreshAfterStateChange();
     }
@@ -3852,10 +4011,81 @@ function blickAnkerWiederherstellen() {
   screenEl.scrollTop += (ist - anker.abstandOben);
 }
 
+// ── Hinweisleiste oben ─────────────────────────────────
+// Zwei Zustaende, ein Element:
+//   'auth' – die Anmeldung ist abgelaufen, gezeigt wird der Stand aus dem
+//            Zwischenspeicher. Der Knopf fuehrt zur Google-Anmeldung.
+//   'neu'  – im Hintergrund wurde frisch geladen, waehrend der Nutzer schon
+//            arbeitete. Der Knopf zeichnet neu.
+// Ohne Zustand verschwindet die Leiste und gibt den Platz wieder frei.
+let _hinweisZustand = null;
+function hinweisZeigen(zustand, text, knopf) {
+  const el = document.getElementById('hinweis-oben');
+  if (!el) return;
+  _hinweisZustand = zustand;
+  el.querySelector('.hinweis-txt').textContent = text;
+  el.querySelector('.hinweis-akt').textContent = knopf;
+  el.hidden = false;
+  document.body.classList.add('hinweis-an');
+  // Hoehe messen und weitergeben: sie haengt an der Safe-Area und daran, ob der
+  // Text umbricht. Ein fester Wert liesse die Leiste je nach Geraet den Tab-Titel
+  // ueberdecken oder eine Luecke stehen.
+  document.body.style.setProperty('--hinweis-h', el.offsetHeight + 'px');
+}
+function hinweisAus() {
+  const el = document.getElementById('hinweis-oben');
+  _hinweisZustand = null;
+  if (el) el.hidden = true;
+  document.body.classList.remove('hinweis-an');
+  document.body.style.removeProperty('--hinweis-h');
+}
+function hinweisAuthZeigen() {
+  const stand = allData.length ? fmtDayShort(allData[allData.length-1].date) : '—';
+  hinweisZeigen('auth', `Daten bis ${stand} · Anmeldung nötig zum Aktualisieren`, 'Anmelden');
+}
+document.body.addEventListener('click', (e) => {
+  if (!e.target.closest('.hinweis-akt')) return;
+  if (_hinweisZustand === 'auth') { signIn(); return; }
+  if (_hinweisZustand === 'neu')  { hinweisAus(); _refreshAfterStateChange(); }
+});
+
+// ── Erste Berührung merken ─────────────────────────────
+// Nur Zeigegeraet und Tastatur: ein `scroll` feuert auch, wenn die App beim Start
+// selbst zum ersten Tab schiebt – das haette jeden Start sofort als "berührt" gezaehlt.
+['pointerdown','touchstart','keydown','wheel'].forEach(typ => {
+  window.addEventListener(typ, () => { _beruehrt = true; }, { once:true, capture:true, passive:true });
+});
+
+// ── Nachladen im Hintergrund ───────────────────────────
+// Laeuft nach dem Start, wenn die Anzeige aus dem Zwischenspeicher kam. Der frische
+// Stand landet direkt in den Datenvariablen; offen ist nur, WANN neu gezeichnet wird:
+// solange der Nutzer nichts angetippt hat, sofort und still – danach erst auf Tipp,
+// sonst springt ihm die Ansicht unter dem Finger weg.
+async function hintergrundLaden() {
+  if (!accessToken) { hinweisAuthZeigen(); return; }
+  const vorher = datenStand();
+  const ergebnis = await loadFromAPI({ still: true });
+  if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
+  if (ergebnis !== true) return;               // Netzfehler: der alte Stand bleibt stehen
+  if (_hinweisZustand === 'auth') hinweisAus();
+  // Identischer Stand – der Normalfall, wenn die App kurz nacheinander geoeffnet wird.
+  // Dann nichts anfassen: ein Neuaufbau saehe nach Ruckeln aus, ohne etwas zu zeigen.
+  if (datenStand() === vorher) return;
+  if (_beruehrt) {
+    hinweisZeigen('neu', 'Neue Daten geladen', 'Anzeigen');
+  } else {
+    updateNavUI();
+    _refreshAfterStateChange();
+  }
+}
+
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
   // Der Knopf traegt jetzt Text statt eines Symbols – deshalb Beschriftung wechseln
   // statt drehen. Der alte Text wird am Element gemerkt und danach zurueckgesetzt.
+  // Ohne gültige Anmeldung gibt es nichts zu holen. Frueher lief der Abruf trotzdem
+  // los und endete stumm – jetzt sagt es die Leiste oben und der Knopf fuehrt hin.
+  if (!accessToken) { hinweisAuthZeigen(); return; }
   const btns = document.querySelectorAll('.refresh-btn');
   btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
   // 1. Apps Script: Drive → Sheet aktualisieren
@@ -3863,12 +4093,15 @@ async function refreshData() {
   // 2. Kurz warten bis Sheet bereit ist
   await new Promise(r => setTimeout(r, 4000));
   // 3. Daten neu aus Sheet laden
-  workoutData = {}; workoutSheetReady = false; workoutLoadError = null;
-  await loadFromAPI();
+  workoutSheetReady = false; workoutLoadError = null;
+  const ergebnis = await loadFromAPI();
   document.querySelectorAll('.refresh-btn').forEach(b => {
     b.disabled = false;
     if (b.dataset.altText) { b.textContent = b.dataset.altText; delete b.dataset.altText; }
   });
+  if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
+  // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
+  if (_hinweisZustand) hinweisAus();
   updateNavUI();
   _refreshAfterStateChange();
 }
@@ -3888,6 +4121,10 @@ showScreen('overview');
 // Übrige Tabs direkt danach im Hintergrund vorrendern (deferred, einer pro Frame),
 // damit beim Wischen kein leeres Panel mehr erscheint.
 _prerenderTabs(TAB_ORDER);
+
+// Kam die Anzeige aus dem Zwischenspeicher, jetzt den frischen Stand nachholen –
+// die App ist zu diesem Zeitpunkt bereits vollstaendig bedienbar.
+if (_startAusCache) hintergrundLaden();
 
 })();
 

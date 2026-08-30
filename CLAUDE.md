@@ -12,6 +12,8 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
 - **Daten**: Google Sheets, befüllt/aktualisiert über **Google Apps Script**
   (`_apps-script/`). Auth: **Google OAuth**, Token in `localStorage`. `REFRESH_URL` stößt
   Drive→Sheet-Refresh an. (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
+  Der zuletzt geladene Stand liegt zusätzlich als Kopie im `localStorage` — die App
+  startet daraus (siehe „Sofortstart aus dem Zwischenspeicher").
 
 ## Deploy
 Git-Repo: `https://github.com/lebrongoku-prog/health-dashboard` (Remote `origin`, Branch `main`).
@@ -37,7 +39,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Port 8124). Nötig, weil der Browser sonst beim Prüfen weiter die alte `app.js` ausliefert.
 - `.claude/_render-test.html` — Render-Prüfstand: ersetzt OAuth und Sheets-API durch erfundene
   Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
-  `?scenario=normal|nodata|woerror|stale`. Nur Entwicklung, nicht Teil der App.
+  `?scenario=normal|nodata|woerror|stale|inject|dubletten|quellen`. Nur Entwicklung,
+  nicht Teil der App. Für die Datenschicht zusätzlich: `?auth=aus` (kein gültiger Token
+  → die App muss aus dem Zwischenspeicher weiterlaufen), `?cache=behalten`
+  (Zwischenspeicher NICHT leeren — erst normal laden, dann damit neu laden),
+  `?netz=langsam` (jede Antwort 1.5 s später), `?tipp=sofort` (Nutzer tippt gleich nach
+  dem Start → Hinweisleiste statt stillem Neuzeichnen). Messpunkte:
+  `window.__ersterChartMs` / `__ersteAntwortMs` (belegen den Sofortstart), `__anfragen`
+  (meta/werte/script), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
+  sie racet jede Prüfung von aussen gegen die Antwortzeit).
   Jeder vierte Lauf ist dort ein **Indoor-Lauf**: `runSpeed` leer, Workout-Speed
   vorhanden — der Fall, in dem die Pace früher fehlte.
   Zusätzlich `?raf=timer`: ersetzt `requestAnimationFrame` durch einen Timer. Nötig,
@@ -76,6 +86,53 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Datumszeilen werden beim Einlesen zusammengeführt (das Apps-Script schreibt beim Refresh
   die letzten Tage neu und kann Dubletten erzeugen; ungefiltert zählte so ein Tag in jeden
   Durchschnitt doppelt). `workoutData` = nach Datum gekeyt, dadurch von Haus aus eindeutig.
+- **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
+  auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
+  Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
+  1. `datenCacheLesen()` füllt `allData`/`workoutData`/`planData`/`planListe`/
+     `planEinheiten` aus `hcc_daten_v1` — die App ist nach ~30 ms bedienbar.
+  2. `hintergrundLaden()` holt danach den frischen Stand. Ist er **identisch**
+     (Fingerabdruck `datenStand()` vorher/nachher), passiert **nichts** — sonst
+     blitzte bei jedem Start ein Neuaufbau aller Diagramme auf.
+  3. Neu gezeichnet wird **still**, solange `_beruehrt` false ist; danach nur noch auf
+     Tipp über die Hinweisleiste („Neue Daten geladen"). `_beruehrt` hört auf
+     `pointerdown`/`touchstart`/`keydown`/`wheel` — **nicht** auf `scroll`, das feuert
+     auch beim eigenen Tab-Snap der App und hätte jeden Start als berührt gezählt.
+  4. `_datumSelbstGewaehlt` schützt die Blätter-Position: hat der Nutzer mit `‹ ›`
+     navigiert, setzt kein Nachladen mehr auf den neuesten Tag zurück. „Heute" löst
+     den Schutz wieder.
+  **Das Sheet bleibt die Quelle** — der Zwischenspeicher ist nur eine Kopie und wird
+  nach jedem erfolgreichen Laden überschrieben. Der Schlüssel trägt eine
+  Versionsnummer (`hcc_daten_v1`): ändert sich, WIE eingelesen wird, hochzählen, dann
+  verwerfen alte Stände sich selbst. Beim Lesen gilt dieselbe Datumsprüfung wie beim
+  Sheet — `localStorage` ist von aussen beschreibbar, also nicht vertrauenswürdiger
+  als eine Sheet-Zelle; alles andere fängt `esc()` beim Rendern ab.
+  **„App-Version aktualisieren" löscht den Datenspeicher NICHT** (nur `caches` + SW),
+  genau wie den Google-Token — sonst wartete man nach jedem Update wieder.
+- **Abgelaufene Anmeldung sperrt nicht mehr:** `_fetchSheet` leitet **nicht** mehr von
+  selbst zu Google weiter (das riss den Nutzer mitten aus der Ansicht), sondern liefert
+  `{authError:true}`; der Aufrufer entscheidet. Ohne Token laufen Anzeige und
+  Zeitfilter aus dem Zwischenspeicher weiter, die Hinweisleiste oben
+  (`#hinweis-oben`, ein Element für beide Zustände) bietet die Anmeldung an, und die
+  App-Karte zeigt „Google-Anmeldung — abgelaufen". **Schreiben ist dann gesperrt**
+  (`_schreibenErlaubt()`): das Senden selbst liefe zwar über das Apps Script mit
+  eigenem Schlüssel, aber das anschliessende Gegenlesen aus dem Sheet nicht — der Wert
+  käme an, die Anzeige zeigte weiter den alten Stand.
+- **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
+  Workout- oder Laufplan-Blatt, bleibt der vorhandene Stand stehen (`still &&
+  vorhanden` → nur `console.warn`). Sonst hätte eine kurze Netzstörung den
+  Training-Tab gegen eine Fehlerkarte getauscht, obwohl alle Trainings vorliegen.
+- **Blattnamen-Zwischenspeicher (`hcc_blattnamen_v1`):** `_fetchSheet` fragte vor jedem
+  Wertabruf, wie die Blätter heissen — fünf Extraanfragen pro Start für eine Angabe,
+  die sich nie ändert. Die Liste liegt jetzt lokal; neu geholt wird sie nur, wenn ein
+  gesuchtes Blatt fehlt (das Apps Script legt die Laufplan-Blätter erst beim ersten
+  Speichern an). `_tabsHolen` bündelt parallele Aufrufe, sonst schickten die fünf
+  gleichzeitigen Abrufe wieder fünf identische Namensanfragen los.
+- **`loadFromAPI` lädt alle fünf Blätter gleichzeitig** (`Promise.all`), nicht mehr
+  nacheinander. Die Nebenblätter fangen ihre Fehler selbst ab (`.catch(alsFehler)`),
+  damit ein fehlendes Laufplan-Blatt nicht den Gesundheitsteil mitreisst.
+  Rückgabe: `true` | `'auth'` | `false` — `'auth'` ist **kein** Fehler, sondern der
+  Auftrag, die Hinweisleiste zu zeigen.
 - **Rendering:** `_renderTab(name)` → Seiten-Funktion `pgOverview`/`pgHerz`/`pgSchlaf`/
   `pgAktivitaet`/`pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
   `mkC(id,cfg)`; danach `_injectTopbar(name)` → `_injectChartFilters` + `updateNavUI`.
@@ -404,6 +461,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 
 ## Gotchas
 - **Cache-Bump nicht vergessen** — häufigste Fehlerquelle.
+- **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
+  **Programmdateien**; `hcc_daten_v1` im `localStorage` hält die **Messdaten**. Der
+  Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen
+  leert, sucht lange.
 - **NIE `toISOString()` für Datums-Strings.** Es rechnet nach UTC um; in der Schweiz
   (UTC+1/+2) kommt dabei der Vortag heraus. Immer `toLocalDateStr(dt)` bzw. `addDays(ds,n)`
   nutzen. Dieser Fehler steckte einmal an sechs Stellen und verfälschte Muster-Insights
