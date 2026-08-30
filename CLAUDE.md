@@ -318,6 +318,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   begonnener Plan zu kurz und die Zeitumstellung kippt das Ergebnis). Das Feld ist
   reine Anzeige und bestimmt zugleich die Zahl der Wochenblöcke.
   Mehrere Wochen bleiben **gleichzeitig** offen (`_lpOffeneWochen` ist ein Set).
+  Der Inhalt jedes Wochenblocks steht **immer** im DOM und wird nur ein-/ausgeblendet;
+  das Auf- und Zuklappen läuft ohne `_renderTab`. Beides zusammen ist Bedingung:
+  baut das Aufklappen die Seite neu, verlieren die Kopffelder darüber (Name, Notizen,
+  Datum, Lauftage) ihre noch nicht gespeicherten Eingaben.
   Die Einheiten **sichern sich selbst** beim Verlassen eines Feldes und **ohne**
   Re-Render: Ein Neuaufbau nähme dem Nutzer Fokus und halb getippte Werte, und beim
   Aufklappen einer anderen Woche gingen die Eingaben verloren. Grüne Umrandung

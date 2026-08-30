@@ -3118,11 +3118,14 @@ function lpPlanDetail(p) {
         </select>
       </div>`;
     }).join('');
+    // Der Inhalt steht IMMER im DOM und wird nur ein- oder ausgeblendet. Wuerde er
+    // beim Aufklappen nachgebaut, muesste die ganze Seite neu rendern – und die
+    // Formularfelder darueber verloeren dabei ihre noch nicht gespeicherten Eingaben.
     wochen.push(`<div class="lp-wochenblock">
-      <button type="button" class="lp-wochenkopf" data-lpwoche="${p.id}#${w}">
+      <button type="button" class="lp-wochenkopf" data-lpwoche="${p.id}#${w}" aria-expanded="${offen?'true':'false'}">
         <span>Woche ${w}</span><span class="lp-planpfeil">${offen?'▾':'▸'}</span>
       </button>
-      ${offen ? `<div class="lp-wocheninhalt">${einheiten || '<div class="lp-hinweis">Erst Lauftage wählen.</div>'}</div>` : ''}
+      <div class="lp-wocheninhalt"${offen?'':' hidden'}>${einheiten || '<div class="lp-hinweis">Erst Lauftage wählen.</div>'}</div>
     </div>`);
   }
 
@@ -3548,8 +3551,17 @@ document.body.addEventListener('click', async (e) => {
   // Woche auf-/zuklappen
   const woche = e.target.closest('[data-lpwoche]');
   if (woche) { const k = woche.dataset.lpwoche;
-    if (_lpOffeneWochen.has(k)) _lpOffeneWochen.delete(k); else _lpOffeneWochen.add(k);
-    _renderTab('laufplan'); return; }
+    const auf = !_lpOffeneWochen.has(k);
+    if (auf) _lpOffeneWochen.add(k); else _lpOffeneWochen.delete(k);
+    // Nur diesen Block umschalten – kein _renderTab, sonst waeren die Eingaben in
+    // den Feldern oberhalb weg, solange sie noch nicht gespeichert sind.
+    const block = woche.closest('.lp-wochenblock');
+    const inhalt = block && block.querySelector('.lp-wocheninhalt');
+    if (inhalt) inhalt.hidden = !auf;
+    woche.setAttribute('aria-expanded', auf ? 'true' : 'false');
+    const pfeil = woche.querySelector('.lp-planpfeil');
+    if (pfeil) pfeil.textContent = auf ? '▾' : '▸';
+    return; }
 
   // Aus der Tagesansicht in den zugehoerigen Plan springen
   const zuPlan = e.target.closest('[data-lpzuplan]');
