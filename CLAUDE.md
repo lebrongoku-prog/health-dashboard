@@ -312,7 +312,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Einheitenliste. **Laufplanverwaltung** = Liste der Pläne, jede Karte aufklappbar zur
   Detailansicht (Name, Notizen, Start, Ende, Wochen, Lauftage) und darunter Woche für
   Woche die Lauftage mit Strecke, Zeit und Herzzone. Archivierte Pläne stehen unter
-  einer eigenen Überschrift. Der `＋`-Knopf im Banner erscheint **nur** im Laufplan-Tab
+  einer eigenen Überschrift.
+  Die **Dauer in Wochen** wird aus Start und Ende gerechnet (`_lpWochenAus`, ab dem
+  Montag der Startwoche und in ganzen Tagen — sonst wird ein mitten in der Woche
+  begonnener Plan zu kurz und die Zeitumstellung kippt das Ergebnis). Das Feld ist
+  reine Anzeige und bestimmt zugleich die Zahl der Wochenblöcke.
+  Mehrere Wochen bleiben **gleichzeitig** offen (`_lpOffeneWochen` ist ein Set).
+  Die Einheiten **sichern sich selbst** beim Verlassen eines Feldes und **ohne**
+  Re-Render: Ein Neuaufbau nähme dem Nutzer Fokus und halb getippte Werte, und beim
+  Aufklappen einer anderen Woche gingen die Eingaben verloren. Grüne Umrandung
+  bestätigt, rote meldet den Fehlschlag. Der `＋`-Knopf im Banner erscheint **nur** im Laufplan-Tab
   (`_currentRenderingTab` in `pgBanner`).
 - **Laufpläne im Sheet:** zwei weitere Blätter im Workout-Spreadsheet, damit der Plan
   dort von Hand lesbar bleibt: **`Laufplaene`** (ID, Name, Notizen, Start, Ende, Wochen,
