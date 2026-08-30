@@ -905,7 +905,7 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-tagwahl-reihe{display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}
 .lp-tagwahl{display:flex;align-items:center;justify-content:center;gap:.15rem;font-size:.72rem;
   min-width:0;
-  border:1px solid var(--border);border-radius:8px;padding:.25rem .4rem;cursor:pointer}
+  border:1px solid var(--border);border-radius:8px;padding:.5rem .4rem;cursor:pointer}
 .lp-tagwahl input{margin:0}
 .lp-planaktionen{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-top:.2rem}
 .lp-knopf-haupt,.lp-knopf-neben,.lp-knopf-weg{font:inherit;font-size:.79rem;font-weight:600;
@@ -925,12 +925,15 @@ body.dark .lp-plan-form input{background:#0F172A}
 /* Das hidden-Attribut allein genuegt nicht: eine display-Regel im Stylesheet schlaegt
    es, und die Woche liesse sich nicht mehr zuklappen. */
 .lp-wocheninhalt[hidden]{display:none}
-.lp-einheit{display:flex;align-items:center;gap:.3rem}
+/* Bei 100 px je Feld passt die Zeile nicht mehr in eine Kartenbreite – sie darf
+   deshalb umbrechen. Der Wochentag bleibt oben links, die Herzzone rutscht bei
+   Bedarf in die zweite Zeile, statt abgeschnitten zu werden. */
+.lp-einheit{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
 .lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
 .lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
 /* Schmaler und mittig: die Felder tragen hoechstens vier Zeichen ("12.5", "1h 15").
    Ohne flex-grow bleiben sie schmal, statt die freie Breite unter sich aufzuteilen. */
-.lp-einheit input{flex:0 0 70px;width:70px;text-align:center}
+.lp-einheit input{flex:0 0 100px;width:100px;text-align:center}
 /* Masseinheit rechts neben dem Feld – ohne sie ist nicht erkennbar, ob im Zeitfeld
    Minuten oder Stunden stehen. */
 .lp-einheit-mass{font-size:.66rem;color:var(--txt3);flex:0 0 auto;margin-left:-.1rem}
