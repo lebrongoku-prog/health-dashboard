@@ -620,10 +620,16 @@ function importWorkoutData() {
 //   Laufplan-Einheiten – eine Zeile je geplanter Einheit
 var LP_PLAENE   = 'Laufplaene';
 var LP_EINHEITEN = 'Laufplan-Einheiten';
-var LP_KOPF_SPALTEN = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert'];
+var LP_KOPF_SPALTEN = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf'];
 var LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
 
 function lpBlatt(name, spalten) {
+  // Nachtrag: fehlt einem bestehenden Blatt eine spaeter ergaenzte Spalte, wird sie
+  // hier angehaengt. Ohne das bliebe "Wettkampf" in alten Blaettern fuer immer leer.
+  var vorhanden = SpreadsheetApp.openById(WORKOUT_SHEET_ID).getSheetByName(name);
+  if (vorhanden && vorhanden.getLastColumn() < spalten.length) {
+    vorhanden.getRange(1, 1, 1, spalten.length).setValues([spalten]);
+  }
   var ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID);
   var sh = ss.getSheetByName(name);
   if (!sh) {
@@ -643,7 +649,8 @@ function laufplanEndpunkt(p) {
     var zeile = lpZeileFinden(sh, id);
     var werte = [id, String(p.name || '').slice(0,120), String(p.notizen || '').slice(0,500),
                  String(p.start || ''), String(p.ende || ''), Number(p.wochen || 0) || '',
-                 String(p.lauftage || ''), String(p.archiviert || '') === '1' ? 'ja' : ''];
+                 String(p.lauftage || ''), String(p.archiviert || '') === '1' ? 'ja' : '',
+                 String(p.wettkampf || '')];
     if (zeile > 0) sh.getRange(zeile, 1, 1, werte.length).setValues([werte]);
     else sh.appendRow(werte);
     return ContentService.createTextOutput('OK ' + id);

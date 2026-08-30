@@ -167,7 +167,7 @@ const planBlatt = [['Date','Distance (km)','Note']];
   planBlatt.push([ymd(d), '8', 'Langer Lauf']); })();
 
 // Laufplaene und ihre Einheiten – zwei weitere Blaetter im Workout-Spreadsheet.
-const lpPlaene = [['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert']];
+const lpPlaene = [['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf']];
 const lpEinheiten = [['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone']];
 (function(){
   const mo = new Date(); mo.setDate(mo.getDate() - ((mo.getDay()+6)%7) - 14);   // vor 2 Wochen
@@ -203,7 +203,7 @@ window.fetch = (url, opt) => {
       const id = p.get('id') || ('lp'+Date.now());
       const zeile = [id, p.get('name')||'', p.get('notizen')||'', p.get('start')||'',
                      p.get('ende')||'', p.get('wochen')||'', p.get('lauftage')||'',
-                     p.get('archiviert')==='1' ? 'ja' : ''];
+                     p.get('archiviert')==='1' ? 'ja' : '', p.get('wettkampf')||''];
       const i = lpPlaene.findIndex((r,n)=>n>0 && r[0]===id);
       if (i>0) lpPlaene[i] = zeile; else lpPlaene.push(zeile);
     } else if (lp === 'planLoeschen') {
@@ -244,6 +244,7 @@ window.fetch = (url, opt) => {
 // Rohdaten offenlegen, damit sich im Test nachweisen laesst, aus WELCHEM Sheet ein
 // angezeigter Wert stammt (die App selbst ist eine IIFE und gibt nichts preis).
 window.__health = health; window.__workout = workout;
+window.__lpPlaene = lpPlaene; window.__lpEinheiten = lpEinheiten;
 console.log('[Prüfstand] Szenario:', SC, '· Health-Zeilen:', health.length-1, '· Workouts:', workout.length-1);
 </script>
 <script src="/app.js"></script>

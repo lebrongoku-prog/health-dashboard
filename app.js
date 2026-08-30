@@ -158,7 +158,8 @@ function _parsePlaene(kopfWerte, einheitWerte) {
     const k = kopfWerte[0].map(h => String(h).trim().toLowerCase());
     const sp = name => k.findIndex(h => h.startsWith(name));
     const iId=sp('id'), iName=sp('name'), iNot=sp('notiz'), iStart=sp('start'),
-          iEnde=sp('ende'), iWo=sp('wochen'), iTage=sp('lauftage'), iArch=sp('archiv');
+          iEnde=sp('ende'), iWo=sp('wochen'), iTage=sp('lauftage'), iArch=sp('archiv'),
+          iWk=sp('wettkampf');
     kopfWerte.slice(1).forEach(r => {
       const id = String(r[iId] ?? '').trim();
       if (!id) return;
@@ -170,7 +171,9 @@ function _parsePlaene(kopfWerte, einheitWerte) {
         wochen: parseInt(r[iWo]) || 0,
         // Lauftage stehen als "Mo,Mi,Fr" im Sheet.
         lauftage: String(r[iTage] ?? '').split(',').map(x=>x.trim()).filter(Boolean),
-        archiviert: /ja|1|true/i.test(String(r[iArch] ?? ''))
+        archiviert: /ja|1|true/i.test(String(r[iArch] ?? '')),
+        // Wettkampftag, auf den der Plan hinarbeitet – darf leer bleiben.
+        wettkampf: iWk>=0 ? String(r[iWk] ?? '').trim().slice(0,10) : ''
       });
     });
   }
@@ -2655,7 +2658,6 @@ function vo2Abschnitt(D, P) {
 // gelesen und daran erkannt, ob es geklappt hat.
 const PLAN_URL = REFRESH_URL.split('?')[0];
 const PLAN_TOKEN = (REFRESH_URL.match(/token=([^&]+)/) || [])[1] || '';
-let _planLaeuft = false;
 
 async function planSpeichern(datum, km, notiz) {
   return _planSenden({ plan:'add', datum, km: km ?? '', notiz: notiz ?? '' });
@@ -2663,9 +2665,11 @@ async function planSpeichern(datum, km, notiz) {
 async function planLoeschen(datum) {
   return _planSenden({ plan:'del', datum });
 }
-async function _planSenden(felder) {
-  if (_planLaeuft) return false;
-  _planLaeuft = true;
+function _planSenden(felder) {
+  _lpKette = _lpKette.then(() => _planSendenJetzt(felder), () => _planSendenJetzt(felder));
+  return _lpKette;
+}
+async function _planSendenJetzt(felder) {
   const p = new URLSearchParams({ token: PLAN_TOKEN, ...felder });
   try {
     await fetch(PLAN_URL + '?' + p.toString(), { method:'POST', mode:'no-cors' });
@@ -2676,8 +2680,6 @@ async function _planSenden(felder) {
     return true;
   } catch(_) {
     return false;
-  } finally {
-    _planLaeuft = false;
   }
 }
 
@@ -2687,16 +2689,23 @@ async function lpPlanSpeichern(plan) {
   return _lpSenden({ lp:'planSpeichern', id: plan.id || '', name: plan.name || '',
     notizen: plan.notizen || '', start: plan.start || '', ende: plan.ende || '',
     wochen: plan.wochen || '', lauftage: (plan.lauftage || []).join(','),
-    archiviert: plan.archiviert ? '1' : '' });
+    archiviert: plan.archiviert ? '1' : '', wettkampf: plan.wettkampf || '' });
 }
 async function lpPlanLoeschen(id) { return _lpSenden({ lp:'planLoeschen', id }); }
 async function lpEinheitSpeichern(e) {
   return _lpSenden({ lp:'einheitSpeichern', id:e.planId, woche:e.woche, wochentag:e.wochentag,
     datum:e.datum||'', strecke:e.strecke??'', zeit:e.zeit??'', zone:e.zone||'' });
 }
-async function _lpSenden(felder) {
-  if (_planLaeuft) return false;
-  _planLaeuft = true;
+// Alle Schreibvorgaenge laufen nacheinander durch EINE Kette. Vorher stand hier ein
+// Riegel (`if (_planLaeuft) return false`), der jeden Aufruf verwarf, welcher waehrend
+// eines laufenden startete – tippte man mehrere Felder zuegig hintereinander, kam nur
+// das erste an und die uebrigen Werte verschwanden beim naechsten Neuaufbau.
+let _lpKette = Promise.resolve();
+function _lpSenden(felder) {
+  _lpKette = _lpKette.then(() => _lpSendenJetzt(felder), () => _lpSendenJetzt(felder));
+  return _lpKette;
+}
+async function _lpSendenJetzt(felder) {
   const p = new URLSearchParams({ token: PLAN_TOKEN });
   Object.entries(felder).forEach(([k,v]) => p.set(k, v == null ? '' : String(v)));
   try {
@@ -2709,7 +2718,6 @@ async function _lpSenden(felder) {
     _parsePlaene(kopf.values || [], einh.values || []);
     return true;
   } catch(_) { return false; }
-  finally { _planLaeuft = false; }
 }
 
 // Alle Tage, an denen laut einem Plan ein Lauf vorgesehen ist. Ergaenzt die freien
@@ -2823,6 +2831,9 @@ function laufKalenderHTML() {
   const proTag = {};
   alleLaeufe().forEach(l => { proTag[l.datum] = l; });
   const geplant = geplanteTage();
+  // Wettkampftage aller nicht archivierten Pläne – im Kalender eigens markiert.
+  const wettkaempfe = {};
+  planListe.forEach(p => { if (!p.archiviert && p.wettkampf) wettkaempfe[p.wettkampf] = p.name; });
 
   // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt – so stehen die
   // Wochentagszeilen ueber das ganze Jahr an derselben Stelle.
@@ -2851,6 +2862,7 @@ function laufKalenderHTML() {
       if (!ausserhalb && proTag[ds])   kl.push('gelaufen');
       if (ds > heute) kl.push('zukunft');
       if (ds === heute) kl.push('heute');
+      if (!ausserhalb && wettkaempfe[ds]) kl.push('wettkampf');
       if (ds === _lpAuswahl) kl.push('gewaehlt');
       const zustand = proTag[ds]
         ? (geplant[ds] ? 'geplant und gelaufen' : 'zusätzlich gelaufen')
@@ -2905,7 +2917,9 @@ function laufDetailHTML(datum) {
   const l = laufEinheit(datum);
   const plan = planData[datum];                 // freier Einzeltermin
   const ausPlan = _planEinheitAm(datum);        // Einheit aus einem Laufplan
-  const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}</div>`;
+  const wk = planListe.find(x => !x.archiviert && x.wettkampf === datum);
+  const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}${
+    wk ? `<span class="lp-wk-marke">Wettkampf · ${esc(wk.name)}</span>` : ''}</div>`;
   // Beide Arten koennen am selben Tag liegen und werden getrennt gezeigt: die
   // Planeinheit gehoert zum Plan und wird dort bearbeitet, der freie Termin hier.
   const ausPlanZeile = ausPlan
@@ -3144,6 +3158,9 @@ function lpPlanDetail(p) {
           <input type="number" name="wochen" value="${_lpWochenAus(p.start,p.ende)||''}" readonly
                  tabindex="-1" aria-label="Dauer in Wochen, ergibt sich aus Start und Ende"></label>
       </div>
+      <label class="lp-feld"><span>Wettkampf (optional)</span>
+        <input type="date" name="wettkampf" value="${p.wettkampf || ''}"
+               aria-label="Tag des Wettkampfs, auf den dieser Plan hinarbeitet"></label>
       <div class="lp-feld"><span>Lauftage</span><div class="lp-tagwahl-reihe">${tageWahl}</div></div>
       <div class="lp-planaktionen">
         <button type="submit" class="lp-knopf-haupt">Speichern</button>
@@ -3580,7 +3597,7 @@ document.body.addEventListener('click', async (e) => {
     neuKnopf.disabled = true;
     await lpPlanSpeichern({ id, name:'Neuer Laufplan', notizen:'',
       start: getWeekMonday(heute), ende: addDays(getWeekMonday(heute), 8*7-1),
-      wochen: 8, lauftage:['Di','Do','So'] });
+      wochen: 8, lauftage:['Di','Do','So'], wettkampf:'' });
     neuKnopf.disabled = false;
     _lpSeite = 'verwaltung';
     // Gegenprobe am Sheet: mode:'no-cors' meldet keinen Fehler zurueck, auch wenn das
@@ -3619,6 +3636,7 @@ document.body.addEventListener('submit', async (e) => {
     name: form.name.value.trim(), notizen: form.notizen.value.trim(),
     start: form.start.value, ende: form.ende.value,
     wochen: _lpWochenAus(form.start.value, form.ende.value),
+    wettkampf: form.wettkampf.value,
     lauftage: [...form.querySelectorAll('input[name=lauftage]:checked')].map(c=>c.value) });
   _renderTab('laufplan');
 });

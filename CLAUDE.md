@@ -322,6 +322,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   das Auf- und Zuklappen läuft ohne `_renderTab`. Beides zusammen ist Bedingung:
   baut das Aufklappen die Seite neu, verlieren die Kopffelder darüber (Name, Notizen,
   Datum, Lauftage) ihre noch nicht gespeicherten Eingaben.
+  **Alle Schreibvorgänge laufen durch EINE Kette** (`_lpKette`) und damit nacheinander.
+  Vorher stand dort ein Riegel, der jeden Aufruf verwarf, welcher während eines
+  laufenden startete — tippte man mehrere Felder zügig, kam nur das erste an.
+  Ein Plan trägt optional ein **Wettkampfdatum** (Spalte `Wettkampf`); dieser Tag
+  bekommt im Kalender einen Ring in `#D97706` und in der Tagesansicht eine Marke.
   Die Einheiten **sichern sich selbst** beim Verlassen eines Feldes und **ohne**
   Re-Render: Ein Neuaufbau nähme dem Nutzer Fokus und halb getippte Werte, und beim
   Aufklappen einer anderen Woche gingen die Eingaben verloren. Grüne Umrandung

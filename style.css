@@ -800,6 +800,12 @@ h5,
 /* Ringe INNEN zeichnen – aussen ragten sie ueber das Kaestchen und wurden in der
    ersten Spalte von der Abdeckung der Wochentagsspalte verschluckt. */
 .lp-tag.heute{box-shadow:inset 0 0 0 1.5px var(--tab-color)}
+/* Wettkampftag: auffaellig, aber ohne die Geplant/Gelaufen-Kodierung zu stoeren –
+   Ring aussen, damit die Flaeche und der Kern darunter lesbar bleiben. Der Ring darf
+   hier nach aussen ragen; er steht nie in der ersten Spalte unter der Abdeckung. */
+.lp-tag.wettkampf{box-shadow:0 0 0 2px #D97706;z-index:3}
+.lp-wk-marke{margin-left:.4rem;font-size:.66rem;font-weight:700;color:#D97706;
+  border:1px solid #D97706;border-radius:999px;padding:.05rem .4rem;white-space:nowrap}
 .lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.5px var(--txt)}
 /* Laufzeit eines Plans: Rahmen um die Wochenspalten, ohne Fuellung. Liegt unter dem
    Raster, damit die Kaestchen lesbar bleiben. */
@@ -909,6 +915,9 @@ body.dark .lp-plan-form input{background:#0F172A}
   font:inherit;font-size:.83rem;font-weight:600;color:inherit;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .lp-wocheninhalt{display:flex;flex-direction:column;gap:.35rem;padding:.4rem 0 .2rem}
+/* Das hidden-Attribut allein genuegt nicht: eine display-Regel im Stylesheet schlaegt
+   es, und die Woche liesse sich nicht mehr zuklappen. */
+.lp-wocheninhalt[hidden]{display:none}
 .lp-einheit{display:flex;align-items:center;gap:.3rem}
 .lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
 .lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
