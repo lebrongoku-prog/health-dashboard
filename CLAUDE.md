@@ -94,6 +94,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 ## UI-/Namens-Konventionen
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
+- **Tab-Titel:** `pgBanner(icon, titel)` zeigt **nur** Emoji und Tabnamen — der
+  erklärende Untertitel und die Zeile „Daten bis … · geladen …" sind entfernt. Der
+  Untertitel wiederholte den Tabnamen, der Daten-Stand stand fünfmal identisch da;
+  er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
+  der App-Karte der Übersicht (`datenStandZeilen()`, ab 2 Tagen Rückstand orange).
 - **Bedienelemente:** 🌙 Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
   (`pgBanner()`), im Laufplan-Tab davor der `＋`-Knopf für einen neuen Plan. Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
@@ -261,7 +266,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `prozentDiff()` statt `pct()`, `monatsMittel`/`wochenSumme` statt `mAvg`/`wSum`.
 - **Gemeinsame Helfer statt Copy-Paste:** `statZeile(label, wert, farbe)` (Label links,
   Wert rechts — 44 Stellen), `splitWeekWknd(rows)` (Wochentag/Wochenende),
-  `fmtPace`/`paceFromSpeed` (Pace), `dataStandHTML()` (Daten-Stand im Banner).
+  `fmtPace`/`paceFromSpeed` (Pace), `datenStandZeilen()` (Daten-Stand in der App-Karte).
 - **`esc()` bei jedem Fremdtext — nicht verhandelbar.** Alles, was NICHT aus diesem Code
   stammt und als **Text** angezeigt wird (Sheet-Zellen, Google-Fehlermeldungen), muss durch
   `esc()`. Die Seiten entstehen per `innerHTML`; ohne `esc()` würde Auszeichnungscode in
@@ -270,21 +275,26 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
-  Diagramm; der Rest liegt hinter einem transparenten Knopf über die volle
-  Kartenbreite (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das
-  schliessende Tag steht im Markup). Zustand in `_weitereOffen`, Start **zu**.
+  Diagramm; der Rest liegt hinter einem Knopf über die volle Kartenbreite
+  (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das schliessende
+  Tag steht im Markup). Zustand in `_weitereOffen`, Start **zu**. Der Knopf trägt
+  **weisse** Schrift auf hellem Weiss-Schleier, **keine** Umrandung und einen feinen
+  Schatten — er sitzt auf dem farbigen Tab-Hintergrund, wo eine Kontur hart wirkte,
+  der Schatten ihn aber weiterhin als Knopf ausweist.
   Das Umschalten ruft `_renderTab` — **nicht** nur ein-/ausblenden: Diagramme, die im
   verborgenen Bereich gezeichnet wurden, behalten Breite 0, und weder `resize()` noch
   `update()` holen sie da heraus. Nur ein Neuaufbau bei sichtbarem Container hilft.
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
-  **Herz** Ruhepuls & HRV → Ruhepuls-Einordnung → HRV-Einordnung → Herz-Kreislauf-
-  Einordnung. **Schlaf** Schlaf-Score-Kachel → Schlafdauer → Schlafschuld →
-  Schlafphasen-Verlauf → Schlafqualität-Verteilung → Schlaf-Score-Verlauf.
-  **Schritte** Anzahl Schritte → Aktive Kalorien → Schritteziel-Erreichung.
-  **Training** Trainingskalender → Trainingszeit → Vergleich → Laufstrecke →
-  Leistungs-Trend → Pace → VO₂max. Überall gilt: erst die Verläufe, dann die
-  Einordnung — erst die Zahlen, dann deren Deutung.
-- **Vergleichsdiagramm (`c-kombi`, im Training-Tab nach Kalender und Trainingszeit):** vier Reihen —
+  **Herz** Ruhepuls & HRV → (Weitere Auswertungen) Ruhepuls-Einordnung →
+  HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →
+  Schlafdauer → (Weitere Auswertungen) Schlafqualität-Verteilung → Schlafschuld →
+  Schlafphasen-Verlauf → Schlaf-Score-Verlauf.
+  **Training** Trainingszeit → Vergleich → Laufstrecke → Leistungs-Trend → Pace →
+  VO₂max. Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
+  dann deren Deutung. Der frühere **Trainingskalender** zuoberst im Training-Tab ist
+  auf Wunsch **ersatzlos entfernt** (samt `_buildCalHTML`, `_calDate`, `#cal-tip`
+  und den `.cal-*`-Regeln) — der Jahreskalender im Laufplan-Tab deckt das ab.
+- **Vergleichsdiagramm (`c-kombi`, im Training-Tab nach der Trainingszeit):** vier Reihen —
   Trainingszeit (Balken), Puls, Laufstrecke, Pace (Linien). `KOMBI_REIHEN` ist die
   **einzige** Quelle für Farbe, Einheit, Achse und Format; die Legende, die Datensätze
   und die Fusszeilen werden daraus erzeugt. Die Legendeneinträge sind `<button>` —
@@ -378,7 +388,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **NIE `toISOString()` für Datums-Strings.** Es rechnet nach UTC um; in der Schweiz
   (UTC+1/+2) kommt dabei der Vortag heraus. Immer `toLocalDateStr(dt)` bzw. `addDays(ds,n)`
   nutzen. Dieser Fehler steckte einmal an sechs Stellen und verfälschte Muster-Insights
-  und Trainingskalender.
+  und Kalenderansichten.
 - **Kein erfundener Platzhalter für fehlende Messwerte.** Fehlt ein Wert, zeigt die App
   „—" statt eines geschätzten Ersatzwerts. Gilt überall.
 - **Testen nur nach SW-Abmeldung.** Ein früher registrierter Service Worker liefert sonst

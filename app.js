@@ -51,7 +51,6 @@ function _memo(key, berechnen) {
   if (!(key in _analyticsCache)) _analyticsCache[key] = berechnen();
   return _analyticsCache[key];
 }
-let _calDate = null; // persists calendar month across re-renders
 let workoutData  = {};      // date → parsed workout row (cached after load)
 const PLAN_BLATT = 'Laufplan';      // Blattname im Workout-Spreadsheet
 let planData = {};                  // { 'JJJJ-MM-TT': { km, notiz } }
@@ -78,59 +77,6 @@ function _awaitWorkoutSheet(timeoutMs = 10000) {
   });
 }
 
-// ── Training Calendar helper ───────────────────────────
-function _buildCalHTML(year, month) {
-  // month: 0-indexed (JS Date convention)
-  // Trainingstage werden ausschließlich aus dem Workout-Sheet abgeleitet.
-  // Health-CSV-Felder (runSpeed/distanceWalkingRunning/…) werden hier nicht mehr genutzt.
-  const trainDays = new Set(Object.keys(workoutData));
-  const minDate = allData.length ? allData[0].date : null;
-  const maxDate = allData.length ? allData[allData.length-1].date : null;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayStr = toLocalDateStr(new Date());
-  const firstOfMonth = new Date(year, month, 1);
-  const lastOfMonth = new Date(year, month+1, 0);
-  const monthStr = firstOfMonth.toLocaleDateString('de-CH',{month:'long',year:'numeric'});
-  const prevMonth = new Date(year, month-1, 1);
-  const nextMonth = new Date(year, month+1, 1);
-  // toLocalDateStr statt toISOString: toISOString rechnet nach UTC um, wodurch in
-  // Zeitzonen östlich von Greenwich (CH = UTC+1/+2) der Vortag herauskommt.
-  const prevDisabled = minDate && toLocalDateStr(prevMonth).slice(0,7) < minDate.slice(0,7) ? 'disabled' : '';
-  const nextDisabled = maxDate && toLocalDateStr(nextMonth).slice(0,7) > maxDate.slice(0,7) ? 'disabled' : '';
-  let startDow = firstOfMonth.getDay();
-  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
-  const mo1=toLocalDateStr(firstOfMonth), mo2=toLocalDateStr(lastOfMonth);
-  const trainCount = allData.filter(r=>r.date>=mo1&&r.date<=mo2&&trainDays.has(r.date)).length;
-
-  // Build cells — each cell is a flex container so circle is centered within the 1fr column.
-  // Trainingstage tragen .cal-train + data-day; Inhalt und Position des Tooltips
-  // übernimmt der zentrale Handler (Maus UND Touch, siehe initTooltips).
-  let cells='';
-  for(let i=0;i<startDow;i++) cells+=`<div></div>`;
-  for(let d=1;d<=lastOfMonth.getDate();d++){
-    const ds=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isTrain=trainDays.has(ds);
-    const isToday=ds===todayStr;
-    const bg=isTrain?'#F97316':'transparent';
-    const col=isTrain?'#fff':isToday?'#F97316':'var(--txt2)';
-    const ring=isToday?'box-shadow:0 0 0 2px #F97316;':'';
-    const fw=isTrain||isToday?'700':'400';
-    cells+=`<div class="cal-cell${isTrain?' cal-train':''}"${isTrain?` data-day="${ds}" tabindex="0" role="button" aria-label="Training am ${ds}"`:''}>
-      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${bg};color:${col};font-size:.81rem;font-weight:${fw};${ring}">${d}</div>
-    </div>`;
-  }
-
-  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-    <button class="nav-arrow" style="width:32px;height:32px;font-size:.99rem" onclick="window._calPrev()" ${prevDisabled}>◀</button>
-    <span style="font-size:.79rem;font-weight:700;color:var(--txt)">${monthStr}</span>
-    <button class="nav-arrow" style="width:32px;height:32px;font-size:.99rem" onclick="window._calNext()" ${nextDisabled}>▶</button>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:.3rem">
-    ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:var(--txt3);height:22px">${d}</div>`).join('')}
-    ${cells}
-  </div>
-  <div style="font-size:.7rem;color:var(--txt2);text-align:center;border-top:1px solid var(--border);padding-top:.25rem">${trainCount} Training${trainCount!==1?'s':''} diesen Monat</div>`;
-}
 
 // ── Laufplan-Zeilen parsen ─────────────────────────────
 // Spalten: Date | Distance (km) | Note. Das Datum kann als Text oder als echtes
@@ -943,9 +889,8 @@ function zeichneDiagramm(id, cfg) {
 //
 // Betroffen sind drei Bauarten, die absichtlich verschieden bleiben:
 //   .debt-tt-wrap      → Tooltip-Element im DOM, wird frei positioniert
-//   .cal-train         → gemeinsames #cal-tip-Element, Inhalt aus workoutData
 //   .info-i            → Erklärungskasten als .info-tt-Element im Anker
-const TT_TAP_SELECTOR = '.debt-tt-wrap, .cal-train, .info-i';
+const TT_TAP_SELECTOR = '.debt-tt-wrap, .info-i';
 
 // Positioniert ein frei schwebendes Tooltip-Element über (oder unter) seinem Anker.
 function _placeTooltip(tt, rect, fallbackW, fallbackH) {
@@ -963,34 +908,11 @@ function _placeTooltip(tt, rect, fallbackW, fallbackH) {
   tt.style.setProperty('--arrow-left', Math.max(10, Math.min(arrowLeft, ttW - 10)) + 'px');
 }
 
-// ── Trainingskalender: gemeinsames Tooltip-Element ──
-function _calTipEl() {
-  let tip = document.getElementById('cal-tip');
-  if (!tip) { tip = document.createElement('div'); tip.id = 'cal-tip'; document.body.appendChild(tip); }
-  return tip;
-}
-function _calTipHTML(ds) {
-  const wo = workoutData[ds];
-  if (!wo) return '';
-  const dateStr = new Date(ds+'T00:00:00').toLocaleDateString('de-CH',{weekday:'short',day:'2-digit',month:'long'});
-  // Die Trainingsart stand hier nur als Symbol – ohne Emojis muss sie ausgeschrieben
-  // werden, sonst ginge sie ersatzlos verloren. Ebenso die Zeilen darunter: statt
-  // Symbolen tragen sie jetzt ihre Bezeichnung.
-  let html = `<div class="cal-tip-title">${wo.typeLabel||'Training'} · ${dateStr}</div>`;
-  if (wo.avgHR)       html += `<div class="cal-tip-row">Puls Ø ${Math.round(wo.avgHR)} bpm${wo.maxHR?` · Max ${wo.maxHR} bpm`:''}</div>`;
-  if (wo.distanceKm)  html += `<div class="cal-tip-row">Strecke ${wo.distanceKm.toFixed(2)} km${wo.avgSpeedKph?` · ${fmtPace(paceFromSpeed(wo.avgSpeedKph))}/km`:''}</div>`;
-  if (wo.elevationM)  html += `<div class="cal-tip-row">Höhe ${Math.round(wo.elevationM)} m ↑</div>`;
-  if (wo.durationMin) html += `<div class="cal-tip-row">Dauer ${Math.floor(wo.durationMin)} min</div>`;
-  return html;
-}
-
 // ── Öffnen / Schliessen ──
 let _ttOpenEl = null;
 function closeTooltips() {
   document.querySelectorAll('.debt-tt.visible').forEach(t => t.classList.remove('visible'));
   document.querySelectorAll('.tt-open').forEach(el => el.classList.remove('tt-open'));
-  const tip = document.getElementById('cal-tip');
-  if (tip) tip.classList.remove('visible');
   _ttOpenEl = null;
 }
 function openTooltip(el) {
@@ -1003,11 +925,6 @@ function openTooltip(el) {
     if (!tt) { _ttOpenEl = null; return; }
     _placeTooltip(tt, rect, 270, 220);
     tt.classList.add('visible');
-  } else if (el.classList.contains('cal-train')) {
-    const tip = _calTipEl();
-    tip.innerHTML = _calTipHTML(el.dataset.day);
-    tip.classList.add('visible');                       // erst sichtbar, dann messen
-    _placeTooltip(tip, rect, 190, 110);
   } else if (el.classList.contains('info-i')) {
     // Am Bildschirmrand einklemmen: die ⓘ auf den Minikacheln sitzen ganz links und
     // ganz rechts, ein mittig zentrierter Kasten ragte dort aus dem Bild.
@@ -1516,21 +1433,23 @@ function scopeBadge(text) {
 
 // ── Daten-Stand ────────────────────────────────────────
 // Zeigt, bis wann Daten vorliegen und wann zuletzt geladen wurde. Ohne diese
-// Angabe war nach einem 🔄 nicht erkennbar, ob der Abruf etwas bewirkt hat.
-function dataStandHTML() {
+// Angabe war nach einem Abruf nicht erkennbar, ob er etwas bewirkt hat.
+// Steht als Zeilen in der App-Karte der Übersicht (früher im Tab-Titel — dort
+// wiederholte sich dieselbe Angabe auf allen fünf Tabs).
+function datenStandZeilen() {
   if (!allData.length) return '';
   const newest = allData[allData.length-1].date;
   const ageDays = Math.round(
     (new Date(toLocalDateStr(new Date())+'T00:00:00') - new Date(newest+'T00:00:00')) / 86400000
   );
-  // Kurz halten – die Zeile muss auf einem iPhone in eine Zeile passen. Das Alter
-  // wird nur genannt, wenn es auffällig ist; sonst genügt Datum + Ladezeit.
+  // Das Alter wird nur genannt, wenn es auffällig ist; sonst genügt das Datum.
   const stale  = ageDays >= 2;
   const ageTxt = stale ? ` · ${ageDays} Tage alt` : '';
   const loaded = _lastLoadTs
-    ? new Date(_lastLoadTs).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})
-    : null;
-  return `<div class="pg-banner-stand${stale?' stale':''}">Daten bis ${fmtDayShort(newest)}${ageTxt}${loaded?` · geladen ${loaded}`:''}</div>`;
+    ? new Date(_lastLoadTs).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'}) + ' Uhr'
+    : '—';
+  return statZeile('Daten bis', fmtDayShort(newest)+ageTxt, stale ? '#F59E0B' : null)
+       + statZeile('Zuletzt geladen', loaded);
 }
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
@@ -1590,7 +1509,7 @@ function pgOverview() {
 
 
   document.getElementById("screen-overview").innerHTML = `
-    ${pgBanner('📊','Übersicht','Dein Gesundheitsüberblick auf einen Blick','#0C4A6E','#0891B2')}
+    ${pgBanner('📊','Übersicht')}
     ${zielUebersichtHTML()}
     <!-- Warning signals (only shown when triggered) -->
     ${warnSig ? `<div class="warn-card">
@@ -1674,6 +1593,7 @@ function pgOverview() {
     <div class="chart-card app-karte">
       <h3>App</h3>
       <div class="stats-list">
+        ${datenStandZeilen()}
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
       </div>
       <button class="update-btn refresh-btn">Daten aktualisieren</button>
@@ -1819,7 +1739,7 @@ function pgHerz() {
   const hrMaL=tdL.align('restHR'); const hvMaL=tdL.align('hrv');
 
   document.getElementById("screen-herz").innerHTML=`
-    ${pgBanner('❤️','Herz','Ist mein Herz-Kreislauf-System stabil oder zeigt es Belastung?','#7F1D1D','#EF4444')}
+    ${pgBanner('❤️','Herz')}
     <div class="chart-card">
       <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
@@ -2034,7 +1954,7 @@ function pgSchlaf() {
   })();
 
   document.getElementById("screen-schlaf").innerHTML=`
-    ${pgBanner('🌙','Schlaf','War mein Schlaf ausreichend und erholsam?','#1E3A8A','#7C3AED')}
+    ${pgBanner('🌙','Schlaf')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
       <div class="chart-card">
@@ -2057,6 +1977,22 @@ function pgSchlaf() {
       </div>
 
       ${weitereAuf('schlaf')}
+      <div class="chart-card split2">
+        <h3>Schlafqualität-Verteilung</h3>
+        <div class="goal-list">
+          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">(${(n6to7/nTot*100).toFixed(0)}%)</span></span></div>
+          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">(${(nBelow6/nTot*100).toFixed(0)}%)</span></span></div>
+        </div>
+        <div class="stats-list">
+          ${statZeile(`Beste Nacht`, `${alsStdMin(slMax)}`, `#10B981`)}
+          ${statZeile(`Kürzeste Nacht`, `${alsStdMin(slMin)}`, `#EF4444`)}
+          ${statZeile(`Konsistenz`, `${consLabel}`, `${consColor}`)}
+          ${statZeile(`Messpunkte`, `${slRows.length}d <span style="color:var(--txt3)">(${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+        </div>
+      </div>
+
       <div class="chart-card">
         <div class="chart-head"><h3>Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
@@ -2098,21 +2034,6 @@ function pgSchlaf() {
       </div>`:''}
     </div>`:''}
 
-      <div class="chart-card split2">
-        <h3>Schlafqualität-Verteilung</h3>
-        <div class="goal-list">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">(${(n6to7/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">(${(nBelow6/nTot*100).toFixed(0)}%)</span></span></div>
-        </div>
-        <div class="stats-list">
-          ${statZeile(`Beste Nacht`, `${alsStdMin(slMax)}`, `#10B981`)}
-          ${statZeile(`Kürzeste Nacht`, `${alsStdMin(slMin)}`, `#EF4444`)}
-          ${statZeile(`Konsistenz`, `${consLabel}`, `${consColor}`)}
-          ${statZeile(`Messpunkte`, `${slRows.length}d <span style="color:var(--txt3)">(${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
-        </div>
-      </div>
 
     ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}
     </div>`;
@@ -2209,7 +2130,7 @@ async function pgTraining() {
     : workoutLoadError;
   if(woProblem){
     document.getElementById("screen-training").innerHTML=`
-      ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?')}
+      ${pgBanner('🏃','Training')}
       <div class="no-data">
         <strong>Workout-Daten nicht verfügbar</strong>
         ${esc(woProblem)}
@@ -2289,17 +2210,6 @@ async function pgTraining() {
   const minWeek=mittel(_woDur(woMinSplit.wkd));
   const minWknd=mittel(_woDur(woMinSplit.wknd));
 
-  // Init calendar to latest data month if not yet set
-  if(!_calDate && allData.length){
-    const ld=allData[allData.length-1].date;
-    _calDate={y:parseInt(ld.slice(0,4)),m:parseInt(ld.slice(5,7))-1};
-  }
-  // Sync calendar to 1M filter month
-  if(timeRange==='1m'){
-    const refD=new Date(referenceDate+'T00:00:00');
-    _calDate={y:refD.getFullYear(),m:refD.getMonth()};
-  }
-
   const {labels:tL,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
@@ -2357,12 +2267,7 @@ async function pgTraining() {
   const vo2 = vo2Abschnitt(D, P);
 
   document.getElementById("screen-training").innerHTML=`
-    ${pgBanner('🏃','Training','Wie war meine gezielte sportliche Belastung?','#7C2D12','#F97316')}
-      <div class="chart-card">
-        <h3 style="margin:0 0 .5rem">Trainingskalender</h3>
-        <div id="cal-training">${_calDate?_buildCalHTML(_calDate.y,_calDate.m):''}</div>
-      </div>
-
+    ${pgBanner('🏃','Training')}
       <div class="chart-card">
         <h3>Trainingszeit</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
@@ -2418,22 +2323,6 @@ async function pgTraining() {
     ${!hasAny?noDataCard:''}
     ${vo2.html}`;
 
-
-  // Calendar navigation callbacks
-  window._calPrev=()=>{
-    if(!_calDate||timeRange==='1m')return;
-    const d=new Date(_calDate.y,_calDate.m-1,1);
-    _calDate={y:d.getFullYear(),m:d.getMonth()};
-    const el=document.getElementById('cal-training');
-    if(el) el.innerHTML=_buildCalHTML(_calDate.y,_calDate.m);
-  };
-  window._calNext=()=>{
-    if(!_calDate||timeRange==='1m')return;
-    const d=new Date(_calDate.y,_calDate.m+1,1);
-    _calDate={y:d.getFullYear(),m:d.getMonth()};
-    const el=document.getElementById('cal-training');
-    if(el) el.innerHTML=_buildCalHTML(_calDate.y,_calDate.m);
-  };
 
   // ── Vergleichsdiagramm ──────────────────────────────────────────────────────
   {
@@ -3007,7 +2896,7 @@ function pgLaufplan() {
     </div>`;
 
   document.getElementById("screen-laufplan").innerHTML =
-    pgBanner('🏃','Laufplan','Meine Laufeinheiten im Überblick')
+    pgBanner('🏃','Laufplan')
     + umschalter
     + (_lpSeite === 'plan' ? lpSeiteAktuell() : lpSeiteVerwaltung());
 
@@ -3214,11 +3103,13 @@ function lpPlanDetail(p) {
 const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,laufplan:pgLaufplan,training:pgTraining};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
-function pgBanner(icon,title,sub){
-  // Refresh + Dark-Toggle sitzen jetzt rechtsbündig direkt auf der Titelzeile
-  // (keine eigene Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
+function pgBanner(icon,title){
+  // Dark-Toggle sitzt rechtsbündig direkt auf der Titelzeile (keine eigene
+  // Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
+  // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
+  // Tabnamen, der Daten-Stand steht jetzt einmal in der App-Karte der Übersicht.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
