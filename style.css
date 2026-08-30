@@ -356,7 +356,7 @@ body.dark #bottom-nav {
 }
 .update-btn:active{transform:scale(.985)}
 .update-btn:disabled{opacity:.55;cursor:default}
-.app-hinweis{font-size:.69rem;color:var(--txt3);line-height:1.5;margin-top:.45rem}
+.app-hinweis{font-size:.6rem;color:var(--txt3);line-height:1.45;margin-top:.4rem}
 
 /* Bezugszeitraum-Etikett: markiert Kacheln, deren Zahlen NICHT dem Zeitfilter folgen.
    Bewusst zurückhaltend – es soll einordnen, nicht um Aufmerksamkeit konkurrieren. */
