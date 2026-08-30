@@ -276,13 +276,8 @@ body.dark #bottom-nav {
   border-radius: 50%; animation: sp 1s linear infinite;
 }
 @keyframes sp { to { transform: rotate(360deg); } }
-@keyframes spin-btn { to { transform: rotate(360deg); } }
 .ld-txt { color: var(--txt2); font-size: 15.4px; }
 .err-msg { color: #EF4444; font-size: 15.4px; max-width: 480px; line-height: 1.5; }
-.refresh-btn.spinning {
-  animation: spin-btn 0.8s linear infinite;
-  opacity: 0.6; pointer-events: none;
-}
 
 /* ═══════════════════════════════════════════════════════════
    PRESERVED COMPONENT STYLES from previous version
@@ -911,3 +906,11 @@ body.dark .lp-plan-form input{background:#0F172A}
 body.dark .lp-feld input,body.dark .lp-feld textarea,
 body.dark .lp-einheit input,body.dark .lp-einheit select,
 body.dark .lp-wochenkopf{background:#0F172A}
+
+/* Muster-Abschnitt der Übersicht: die Überschrift ist ein Knopf. Als <button> nimmt
+   ihn der Hintergrund-Tipp (Bottom-Nav) automatisch aus. */
+.pi-titel{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;width:100%;
+  background:none;border:0;padding:0;margin:.3rem 0 .4rem;cursor:pointer;
+  font:inherit;font-size:.79rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--txt3);text-align:left;-webkit-tap-highlight-color:transparent}
+.pi-pfeil{margin-left:auto;font-size:.9rem;letter-spacing:0}

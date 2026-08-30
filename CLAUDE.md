@@ -94,8 +94,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 ## UI-/Namens-Konventionen
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
-- **Bedienelemente:** 🔄 Refresh + 🌙 Dark-Toggle liegen rechtsbündig auf der
-  `pg-banner`-Titelzeile (`pgBanner()`). Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
+- **Bedienelemente:** 🌙 Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
+  (`pgBanner()`), im Laufplan-Tab davor der `＋`-Knopf für einen neuen Plan. Das
+  Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
+  in der App-Karte der Übersicht — zusammen mit „App-Version aktualisieren" darunter,
+  jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
+  deshalb die Beschriftung auf „Lädt…" statt den Knopf zu drehen. Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
   **in jeder Diagramm-Karte**, verteilt auf **zwei Zeilen**: `filterTitelTeil()` setzt
   „Heute" + Zeitraum rechts in die **Titelzeile**, `filterLegendenTeil()` das Dropdown
   + `‹ ›` rechts in die **Legendenzeile** (`legendeMitFilter`). Karten ohne Legende

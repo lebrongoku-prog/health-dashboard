@@ -1652,8 +1652,12 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div style="font-size:.79rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:.4rem;margin-top:.3rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">Muster &amp; Zusammenhänge ${scopeBadge('gesamter Datenbestand')}</div>
-    <div class="pi-grid">
+    <button type="button" class="pi-titel" data-musterklapp aria-expanded="${_musterOffen?'true':'false'}">
+      <span>Muster &amp; Zusammenhänge</span>
+      ${scopeBadge('gesamter Datenbestand')}
+      <span class="pi-pfeil">${_musterOffen?'▾':'▸'}</span>
+    </button>
+    <div class="pi-grid" style="${_musterOffen?'':'display:none'}">
       ${patternIns.map(p=>{
         let txt=p.text;
         if(p.hl)p.hl.forEach(h=>{txt=txt.replace(h.phrase,`<span style="color:${h.c};font-weight:700">${h.phrase}</span>`);});
@@ -1669,8 +1673,10 @@ function pgOverview() {
       <div class="stats-list">
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
       </div>
-      <button class="update-btn">Jetzt aktualisieren</button>
-      <div class="app-hinweis">Holt den neuesten Stand in einem Schritt. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
+      <button class="update-btn refresh-btn">Daten aktualisieren</button>
+      <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
+      <button class="update-btn">App-Version aktualisieren</button>
+      <div class="app-hinweis">Holt eine neue Fassung der App selbst. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
     </div>
     `;
 
@@ -1920,6 +1926,9 @@ function pgHerz() {
 // Welche Reihen des Vergleichsdiagramms sind eingeblendet? Ueberlebt Re-Render und
 // Tabwechsel – sonst waere die Auswahl nach jedem Klick auf die Zeitpfeile zurueck.
 let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
+// Muster-Abschnitt der Übersicht: auf- oder zugeklappt. Startet offen, damit sich
+// beim ersten Öffnen nichts versteckt.
+let _musterOffen = true;
 
 // ── Schlaf ─────────────────────────────────────────────
 function pgSchlaf() {
@@ -2842,7 +2851,7 @@ function laufKalenderHTML() {
         </div>
       </div>
     </div>
-    <div class="lp-detail" id="lp-detail">${laufDetailHTML(_lpAuswahl)}</div>`;
+    ${_lpAuswahl ? `<div class="lp-detail" id="lp-detail">${laufDetailHTML(_lpAuswahl)}</div>` : ''}`;
 }
 
 // Laufzeit eines Plans als Rahmen um seine Wochenspalten – ohne Fuellung, damit die
@@ -2865,7 +2874,7 @@ function planBaenderHTML(rasterStart, wochen) {
 
 // Beschreibung unter dem Kalender – zeigt den angetippten Tag.
 function laufDetailHTML(datum) {
-  if (!datum) return `<div class="lp-detail-leer">Tippe einen Tag an, um die Einheit zu sehen oder einen Termin zu setzen.</div>`;
+  if (!datum) return '';   // ohne gewaehlten Tag bleibt der Bereich leer
   const l = laufEinheit(datum);
   const plan = planData[datum];
   const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}</div>`;
@@ -3109,7 +3118,7 @@ function pgBanner(icon,title,sub){
   // Refresh + Dark-Toggle sitzen jetzt rechtsbündig direkt auf der Titelzeile
   // (keine eigene Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act refresh-btn" title="Daten neu laden" aria-label="Refresh">🔄</button><button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div><div class="pg-banner-sub">${sub}</div>${dataStandHTML()}</div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -3474,6 +3483,13 @@ function initScrollHideNav() {
   });
 }
 
+// Muster-Abschnitt auf-/zuklappen.
+document.body.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-musterklapp]')) return;
+  _musterOffen = !_musterOffen;
+  _renderTab('overview');
+});
+
 // ── Laufplanverwaltung: Bedienung ──────────────────────
 document.body.addEventListener('click', async (e) => {
   // Seitenumschalter
@@ -3752,8 +3768,10 @@ function blickAnkerWiederherstellen() {
 
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
+  // Der Knopf traegt jetzt Text statt eines Symbols – deshalb Beschriftung wechseln
+  // statt drehen. Der alte Text wird am Element gemerkt und danach zurueckgesetzt.
   const btns = document.querySelectorAll('.refresh-btn');
-  btns.forEach(b => { b.disabled = true; b.classList.add('spinning'); });
+  btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
   // 1. Apps Script: Drive → Sheet aktualisieren
   try { await fetch(REFRESH_URL, { mode: 'no-cors' }); } catch(_) {}
   // 2. Kurz warten bis Sheet bereit ist
@@ -3761,7 +3779,10 @@ async function refreshData() {
   // 3. Daten neu aus Sheet laden
   workoutData = {}; workoutSheetReady = false; workoutLoadError = null;
   await loadFromAPI();
-  document.querySelectorAll('.refresh-btn').forEach(b => { b.disabled = false; b.classList.remove('spinning'); });
+  document.querySelectorAll('.refresh-btn').forEach(b => {
+    b.disabled = false;
+    if (b.dataset.altText) { b.textContent = b.dataset.altText; delete b.dataset.altText; }
+  });
   updateNavUI();
   _refreshAfterStateChange();
 }
