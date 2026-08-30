@@ -803,7 +803,10 @@ h5,
 /* Wettkampftag: auffaellig, aber ohne die Geplant/Gelaufen-Kodierung zu stoeren –
    Ring aussen, damit die Flaeche und der Kern darunter lesbar bleiben. Der Ring darf
    hier nach aussen ragen; er steht nie in der ersten Spalte unter der Abdeckung. */
-.lp-tag.wettkampf{box-shadow:0 0 0 2px #D97706;z-index:3}
+.lp-tag.wettkampf{background:#D97706;box-shadow:0 0 0 2px #D97706;z-index:3}
+/* Wurde am Wettkampftag gelaufen, bleibt der dunkle Kern sichtbar – er steht fuer
+   die absolvierte Einheit und wuerde sonst in der orangen Flaeche verschwinden. */
+.lp-tag.wettkampf.gelaufen::before{background:#0F766E}
 .lp-wk-marke{margin-left:.4rem;font-size:.66rem;font-weight:700;color:#D97706;
   border:1px solid #D97706;border-radius:999px;padding:.05rem .4rem;white-space:nowrap}
 .lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.5px var(--txt)}
@@ -927,7 +930,10 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
 /* Schmaler und mittig: die Felder tragen hoechstens vier Zeichen ("12.5", "1h 15").
    Ohne flex-grow bleiben sie schmal, statt die freie Breite unter sich aufzuteilen. */
-.lp-einheit input{flex:0 1 3.4rem;width:auto;text-align:center}
+.lp-einheit input{flex:0 0 70px;width:70px;text-align:center}
+/* Masseinheit rechts neben dem Feld – ohne sie ist nicht erkennbar, ob im Zeitfeld
+   Minuten oder Stunden stehen. */
+.lp-einheit-mass{font-size:.66rem;color:var(--txt3);flex:0 0 auto;margin-left:-.1rem}
 .lp-einheit select{flex:0 0 4.2rem}
 .lp-einheit button{flex:0 0 auto;font:inherit;font-size:.83rem;padding:.3rem .5rem;border:0;
   border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer}
@@ -943,3 +949,13 @@ body.dark .lp-wochenkopf{background:#0F172A}
   font:inherit;font-size:.79rem;font-weight:700;text-transform:uppercase;
   letter-spacing:.07em;color:var(--txt3);text-align:left;-webkit-tap-highlight-color:transparent}
 .pi-pfeil{margin-left:auto;font-size:.9rem;letter-spacing:0}
+
+/* "Weitere Auswertungen" in Herz und Schlaf: volle Kartenbreite, aber transparent –
+   der Knopf soll die Karten darueber nicht ueberstrahlen. */
+.weitere-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;
+  background:none;border:1px solid var(--border);border-radius:var(--r);
+  padding:.6rem .75rem;margin-bottom:.7rem;cursor:pointer;
+  font:inherit;font-size:.79rem;font-weight:600;color:var(--txt2);
+  -webkit-tap-highlight-color:transparent}
+.weitere-pfeil{font-size:.9rem;line-height:1}
+.weitere-inhalt[hidden]{display:none}

@@ -1839,6 +1839,7 @@ function pgHerz() {
       </div>
     </div>
 
+    ${weitereAuf('herz')}
     <div class="two-col-eq">
       <div class="chart-card split2" style="margin-bottom:0">
         <h3>Ruhepuls-Einordnung ${infoI('restHR')}</h3>
@@ -1885,6 +1886,7 @@ function pgHerz() {
       <div class="rec-title">Herz-Kreislauf Einordnung ${infoI('baseline')} ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
       <div class="rec-text">${herzInterpret.text}</div>
     </div>`:''}
+    </div>
 `;
 
   if(tHD){
@@ -1932,6 +1934,19 @@ let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
 // Muster-Abschnitt der Übersicht: auf- oder zugeklappt. Startet offen, damit sich
 // beim ersten Öffnen nichts versteckt.
 let _musterOffen = true;
+// Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
+// hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
+const _weitereOffen = { herz:false, schlaf:false };
+// Knopf + oeffnendes <div>. Der schliessende Tag steht im Markup, damit die Karten
+// dazwischen unveraendert bleiben – ein String-Parameter haette die Template-Literale
+// der Karten verschachtelt und war nicht sauber zu escapen.
+function weitereAuf(tab) {
+  const offen = _weitereOffen[tab];
+  return `<button type="button" class="weitere-btn" data-weitere="${tab}" aria-expanded="${offen}">
+      Weitere Auswertungen<span class="weitere-pfeil">${offen ? '▾' : '▸'}</span>
+    </button>
+    <div class="weitere-inhalt"${offen ? '' : ' hidden'}>`;
+}
 
 // ── Schlaf ─────────────────────────────────────────────
 function pgSchlaf() {
@@ -2041,6 +2056,7 @@ function pgSchlaf() {
         </div>`:''}
       </div>
 
+      ${weitereAuf('schlaf')}
       <div class="chart-card">
         <div class="chart-head"><h3>Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
@@ -2098,7 +2114,8 @@ function pgSchlaf() {
         </div>
       </div>
 
-    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}`;
+    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}
+    </div>`;
 
 
   if(tHD){
@@ -3141,11 +3158,11 @@ function lpPlanDetail(p) {
       // Woche aufklappte – der Re-Render baute das Formular neu auf.
       return `<div class="lp-einheit" data-lpeinheit="${p.id}|${w}|${tag}">
         <span class="lp-einheit-tag">${tag}<span class="lp-einheit-datum">${datum?fmtDayShort(datum):''}</span></span>
-        <input type="number" step="0.1" min="0" name="strecke" placeholder="km" inputmode="decimal"
-               value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern">
-        <input type="text" name="zeit" placeholder="min" inputmode="text"
+        <input type="number" step="0.1" min="0" name="strecke" placeholder="—" inputmode="decimal"
+               value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern"><span class="lp-einheit-mass">km</span>
+        <input type="text" name="zeit" placeholder="—" inputmode="text"
                value="${e.zeit != null && e.zeit !== '' ? fmtMin(e.zeit) : ''}"
-               aria-label="Zeit – Minuten oder Stunden und Minuten">
+               aria-label="Zeit – Minuten oder Stunden und Minuten"><span class="lp-einheit-mass">h, min</span>
         <select name="zone" aria-label="Herzzone">
           <option value="">Zone</option>
           ${[1,2,3,4,5].map(z=>`<option value="Z${z}"${e.zone==='Z'+z?' selected':''}>Z${z}</option>`).join('')}
@@ -3565,6 +3582,24 @@ function initScrollHideNav() {
     nav.classList.toggle('nav-hidden');
   });
 }
+
+// "Weitere Auswertungen" auf-/zuklappen. Ohne Neuaufbau: die Diagramme dahinter sind
+// bereits gezeichnet, ein Re-Render wuerde sie unnoetig neu aufbauen.
+document.body.addEventListener('click', (e) => {
+  const knopf = e.target.closest('[data-weitere]');
+  if (!knopf) return;
+  const tab = knopf.dataset.weitere;
+  _weitereOffen[tab] = !_weitereOffen[tab];
+  knopf.setAttribute('aria-expanded', _weitereOffen[tab]);
+  const pfeil = knopf.querySelector('.weitere-pfeil');
+  if (pfeil) pfeil.textContent = _weitereOffen[tab] ? '▾' : '▸';
+  // Neu aufbauen statt nur ein-/ausblenden: Diagramme im verborgenen Bereich werden
+  // ohne sichtbare Flaeche gezeichnet und behalten Breite 0. Aus diesem Zustand holt
+  // sie weder resize() noch update() zurueck – nur ein Neuaufbau bei sichtbarem
+  // Container. Der Nutzer oeffnet hier einen ganzen Abschnitt, ein Neuaufbau faellt
+  // dabei nicht ins Gewicht.
+  _renderTab(tab);
+});
 
 // Muster-Abschnitt auf-/zuklappen.
 document.body.addEventListener('click', (e) => {

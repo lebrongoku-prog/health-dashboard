@@ -269,6 +269,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
+  Diagramm; der Rest liegt hinter einem transparenten Knopf über die volle
+  Kartenbreite (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das
+  schliessende Tag steht im Markup). Zustand in `_weitereOffen`, Start **zu**.
+  Das Umschalten ruft `_renderTab` — **nicht** nur ein-/ausblenden: Diagramme, die im
+  verborgenen Bereich gezeichnet wurden, behalten Breite 0, und weder `resize()` noch
+  `update()` holen sie da heraus. Nur ein Neuaufbau bei sichtbarem Container hilft.
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
   **Herz** Ruhepuls & HRV → Ruhepuls-Einordnung → HRV-Einordnung → Herz-Kreislauf-
   Einordnung. **Schlaf** Schlaf-Score-Kachel → Schlafdauer → Schlafschuld →
