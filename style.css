@@ -811,7 +811,9 @@ h5,
    Raster, damit die Kaestchen lesbar bleiben. */
 .lp-baender{position:absolute;inset:0;pointer-events:none;z-index:0}
 .lp-band{position:absolute;top:calc(-1 * var(--lp-band-over));bottom:calc(-1 * var(--lp-band-over));
-  border:1.5px solid #0F766E;border-radius:5px;box-sizing:border-box}
+  border:1.5px solid #0F766E;border-radius:5px;box-sizing:border-box;
+  /* Der Rahmen sitzt in der Luecke zwischen den Spalten, nicht auf den Kaestchen. */
+  margin-left:-1.5px}
 .lp-band.archiviert{opacity:.5}
 /* Anzahl der Laeufe rechtsbuendig in der Titelzeile – das h3 ist bereits ein
    Flex-Container, deshalb genuegt margin-left:auto. */
@@ -879,9 +881,11 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-feld input,.lp-feld textarea,.lp-einheit input,.lp-einheit select{
   font:inherit;font-size:.83rem;padding:.35rem .5rem;border:1px solid var(--border);
   border-radius:8px;background:var(--bg);color:var(--txt);min-width:0}
-/* Ein date-Feld ist von Haus aus hoeher als ein number-Feld. Ohne feste Hoehe stuenden
-   Start, Ende und Wochen unterschiedlich hoch nebeneinander. */
-.lp-feld input{height:31px;box-sizing:border-box}
+/* Ein date-Feld ist von Haus aus hoeher als ein number-Feld. Statt einer festen Zahl
+   werden die Felder der Reihe gleich hoch gezogen und das Wochenfeld fuellt seinen
+   Container – so passt es sich an, was der Browser fuer date-Felder vorgibt. */
+.lp-feld-reihe{align-items:stretch}
+.lp-feld-schmal input{flex:1 1 auto;box-sizing:border-box}
 .lp-feld textarea{resize:vertical}
 .lp-feld-reihe{display:flex;gap:.5rem}
 .lp-feld-reihe>.lp-feld{flex:1 1 0;min-width:0}
@@ -921,7 +925,9 @@ body.dark .lp-plan-form input{background:#0F172A}
 .lp-einheit{display:flex;align-items:center;gap:.3rem}
 .lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
 .lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
-.lp-einheit input{flex:1 1 3rem;width:100%}
+/* Schmaler und mittig: die Felder tragen hoechstens vier Zeichen ("12.5", "1h 15").
+   Ohne flex-grow bleiben sie schmal, statt die freie Breite unter sich aufzuteilen. */
+.lp-einheit input{flex:0 1 3.4rem;width:auto;text-align:center}
 .lp-einheit select{flex:0 0 4.2rem}
 .lp-einheit button{flex:0 0 auto;font:inherit;font-size:.83rem;padding:.3rem .5rem;border:0;
   border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer}

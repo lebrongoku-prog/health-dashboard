@@ -2744,6 +2744,21 @@ function _planEinheitAm(datum) {
   return null;
 }
 
+// Zeiteingabe einer Planeinheit deuten. Erlaubt sind reine Minuten ("75"), Stunden
+// mit Minuten ("1:15", "1h15", "1h 15min") und Dezimalstunden ("1,5h"). Rueckgabe in
+// Minuten; leer bleibt leer.
+function _lpZeitAusText(text) {
+  const t = String(text ?? '').trim().toLowerCase().replace(',', '.');
+  if (!t) return '';
+  // Nur eine Zahl: Minuten – ausser es haengt ein "h" dran.
+  const nur = t.match(/^(\d+(?:\.\d+)?)\s*(h|std)?$/);
+  if (nur) return Math.round(parseFloat(nur[1]) * (nur[2] ? 60 : 1));
+  // Stunden und Minuten in einem: "1:15", "1h15", "1h 15min"
+  const beides = t.match(/^(\d+)\s*(?::|h|std)\s*(\d+)?\s*(?:m|min)?$/);
+  if (beides) return parseInt(beides[1]) * 60 + parseInt(beides[2] || 0);
+  return '';
+}
+
 // Dauer eines Plans in Wochen – ergibt sich aus Start und Ende, wie in FitTrack.
 // Gerechnet wird ab dem MONTAG der Startwoche, damit eine Woche immer eine ganze
 // Kalenderwoche ist; sonst zaehlt ein Plan, der am Mittwoch beginnt, eine Woche zu
@@ -2908,7 +2923,7 @@ function planBaenderHTML(rasterStart, wochen) {
     const a = Math.max(0, spalte(p.start)), b = Math.min(wochen - 1, spalte(p.ende));
     if (b < a) return '';
     return `<div class="lp-band${p.archiviert ? ' archiviert' : ''}"
-      style="left:calc(${a} * (var(--lp-zelle) + 3px)); width:calc(${b - a + 1} * (var(--lp-zelle) + 3px) - 3px)"
+      style="left:calc(${a} * (var(--lp-zelle) + 3px)); width:calc(${b - a + 1} * (var(--lp-zelle) + 3px))"
       title="${esc(p.name)}"></div>`;
   }).join('');
 }
@@ -3128,8 +3143,9 @@ function lpPlanDetail(p) {
         <span class="lp-einheit-tag">${tag}<span class="lp-einheit-datum">${datum?fmtDayShort(datum):''}</span></span>
         <input type="number" step="0.1" min="0" name="strecke" placeholder="km" inputmode="decimal"
                value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern">
-        <input type="number" step="1" min="0" name="zeit" placeholder="min" inputmode="numeric"
-               value="${e.zeit ?? ''}" aria-label="Zeit in Minuten">
+        <input type="text" name="zeit" placeholder="min" inputmode="text"
+               value="${e.zeit != null && e.zeit !== '' ? fmtMin(e.zeit) : ''}"
+               aria-label="Zeit – Minuten oder Stunden und Minuten">
         <select name="zone" aria-label="Herzzone">
           <option value="">Zone</option>
           ${[1,2,3,4,5].map(z=>`<option value="Z${z}"${e.zone==='Z'+z?' selected':''}>Z${z}</option>`).join('')}
@@ -3667,9 +3683,16 @@ document.body.addEventListener('change', async (e) => {
   const ok = await lpEinheitSpeichern({ planId, woche: +woche, wochentag,
     datum: p ? _lpDatumAus(p, +woche, wochentag) : '',
     strecke: zeile.querySelector('[name=strecke]').value.trim(),
-    zeit: zeile.querySelector('[name=zeit]').value.trim(),
+    zeit: _lpZeitAusText(zeile.querySelector('[name=zeit]').value),
     zone: zeile.querySelector('[name=zone]').value });
   zeile.classList.remove('speichert');
+  // Zeit normalisiert zurueckschreiben ("1h15" → "1h 15min"), damit sichtbar ist, wie
+  // die Eingabe gedeutet wurde. Nur wenn das Feld nicht gerade wieder den Fokus hat.
+  const zf = zeile.querySelector('[name=zeit]');
+  if (ok && zf && document.activeElement !== zf) {
+    const min = _lpZeitAusText(zf.value);
+    zf.value = min === '' ? '' : fmtMin(min);
+  }
   zeile.classList.add(ok ? 'gesichert' : 'fehlgeschlagen');
   setTimeout(() => zeile.classList.remove('gesichert', 'fehlgeschlagen'), 1600);
 });
