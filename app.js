@@ -2724,6 +2724,18 @@ function geplanteTage() {
   });
   return tage;
 }
+// Planeinheit an einem Datum – samt Plannamen, damit die Tagesansicht zeigen kann,
+// aus welchem Plan der Tag stammt.
+function _planEinheitAm(datum) {
+  for (const p of planListe) {
+    if (p.archiviert || !p.start) continue;
+    const e = planEinheiten.find(x => x.planId === p.id &&
+      (x.datum || _lpDatumAus(p, x.woche, x.wochentag)) === datum);
+    if (e) return { ...e, planName: p.name };
+  }
+  return null;
+}
+
 // Datum einer Planeinheit: Woche 1 beginnt am Montag der Startwoche.
 function _lpDatumAus(plan, woche, wochentag) {
   const i = WOCHENTAGE.indexOf(wochentag);
@@ -2876,8 +2888,20 @@ function planBaenderHTML(rasterStart, wochen) {
 function laufDetailHTML(datum) {
   if (!datum) return '';   // ohne gewaehlten Tag bleibt der Bereich leer
   const l = laufEinheit(datum);
-  const plan = planData[datum];
+  const plan = planData[datum];                 // freier Einzeltermin
+  const ausPlan = _planEinheitAm(datum);        // Einheit aus einem Laufplan
   const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}</div>`;
+  // Beide Arten koennen am selben Tag liegen und werden getrennt gezeigt: die
+  // Planeinheit gehoert zum Plan und wird dort bearbeitet, der freie Termin hier.
+  const ausPlanZeile = ausPlan
+    ? `<div class="lp-plan-zeile">
+         <span class="lp-plan-marke">Plan</span>
+         <span>${[ausPlan.strecke!=null?zahl(ausPlan.strecke,1)+' km':null,
+                   ausPlan.zeit!=null?fmtMin(ausPlan.zeit):null,
+                   ausPlan.zone||null].filter(Boolean).join(' · ') || 'Lauf'}</span>
+         <button type="button" class="lp-plan-zuplan" data-lpzuplan="${ausPlan.planId}">${esc(ausPlan.planName)}</button>
+       </div>`
+    : '';
   const geplant = plan
     ? `<div class="lp-plan-zeile">
          <span class="lp-plan-marke">geplant</span>
@@ -2895,7 +2919,7 @@ function laufDetailHTML(datum) {
     </form>`;
   const ist = l ? laufWerteHTML(l)
                 : `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
-  return kopf + geplant + ist + formular;
+  return kopf + ausPlanZeile + geplant + ist + formular;
 }
 
 // Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
@@ -3507,6 +3531,15 @@ document.body.addEventListener('click', async (e) => {
   if (woche) { const k = woche.dataset.lpwoche;
     _lpOffeneWoche = _lpOffeneWoche === k ? null : k; _renderTab('laufplan'); return; }
 
+  // Aus der Tagesansicht in den zugehoerigen Plan springen
+  const zuPlan = e.target.closest('[data-lpzuplan]');
+  if (zuPlan) {
+    e.preventDefault(); e.stopPropagation();
+    _lpSeite = 'verwaltung'; _lpOffenerPlan = zuPlan.dataset.lpzuplan;
+    _renderTab('laufplan');
+    return;
+  }
+
   // Neuen Plan anlegen
   const neuKnopf = e.target.closest('.lp-neu');
   if (neuKnopf) {
@@ -3601,7 +3634,7 @@ document.body.addEventListener('click', async (e) => {
 // Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
 // ueberlebt damit den Re-Render.
 document.body.addEventListener('click', (e) => {
-  if (e.target.closest('.lp-plan-form, [data-planweg], [data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
+  if (e.target.closest('.lp-plan-form, [data-planweg], [data-lpzuplan], [data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
   const ziel = e.target.closest('[data-lauftag]');
   if (!ziel) return;
   const tag = ziel.dataset.lauftag;

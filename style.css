@@ -838,6 +838,8 @@ h5,
   font-size:.75rem;color:var(--txt2);margin-bottom:.4rem}
 .lp-plan-marke{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
   color:var(--tab-color);border:1px solid var(--tab-color);border-radius:999px;padding:.05rem .4rem}
+.lp-plan-zuplan{background:none;border:0;padding:0;margin-left:auto;font:inherit;
+  font-size:.72rem;font-weight:600;color:var(--tab-color);cursor:pointer;text-decoration:underline}
 .lp-plan-weg{background:none;border:0;padding:0;margin-left:auto;font:inherit;
   font-size:.72rem;color:#EF4444;cursor:pointer;text-decoration:underline}
 .lp-plan-form{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
