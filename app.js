@@ -2736,6 +2736,19 @@ function _planEinheitAm(datum) {
   return null;
 }
 
+// Dauer eines Plans in Wochen – ergibt sich aus Start und Ende, wie in FitTrack.
+// Gerechnet wird ab dem MONTAG der Startwoche, damit eine Woche immer eine ganze
+// Kalenderwoche ist; sonst zaehlt ein Plan, der am Mittwoch beginnt, eine Woche zu
+// wenig. Ganze Tage statt Millisekunden: zwischen Winter- und Sommerzeit fehlt sonst
+// eine Stunde und das Ergebnis kippt um eine Woche.
+function _lpWochenAus(start, ende) {
+  if (!start || !ende) return '';
+  const a = new Date(getWeekMonday(start) + 'T00:00:00');
+  const b = new Date(ende + 'T00:00:00');
+  const tage = Math.round((b - a) / 86400000) + 1;
+  return tage > 0 ? Math.max(1, Math.ceil(tage / 7)) : '';
+}
+
 // Datum einer Planeinheit: Woche 1 beginnt am Montag der Startwoche.
 function _lpDatumAus(plan, woche, wochentag) {
   const i = WOCHENTAGE.indexOf(wochentag);
@@ -2799,7 +2812,9 @@ function alleLaeufe() {
 let _lpAuswahl = null;   // angetippter Tag (Datum) – ueberlebt Re-Render
 let _lpSeite = 'plan';   // 'plan' = Aktueller Laufplan, 'verwaltung' = Planverwaltung
 let _lpOffenerPlan = null;   // ID des aufgeklappten Plans in der Verwaltung
-let _lpOffeneWoche = null;   // aufgeklappte Woche innerhalb eines Plans
+// Aufgeklappte Wochen – ein Set, damit mehrere gleichzeitig offen bleiben koennen.
+// Vorher schloss das Oeffnen einer Woche die vorige, was beim Eintragen stoerte.
+let _lpOffeneWochen = new Set();
 let _lpFehler = null;        // Hinweis, wenn das Speichern nicht angekommen ist
 
 function laufKalenderHTML() {
@@ -3082,12 +3097,16 @@ function lpPlanDetail(p) {
       ${p.lauftage.includes(t)?'checked':''}>${t}</label>`).join('');
 
   const wochen = [];
-  for (let w = 1; w <= (p.wochen || 0); w++) {
-    const offen = _lpOffeneWoche === p.id + '#' + w;
+  const dauer = _lpWochenAus(p.start, p.ende) || 0;
+  for (let w = 1; w <= dauer; w++) {
+    const offen = _lpOffeneWochen.has(p.id + '#' + w);
     const einheiten = p.lauftage.map(tag => {
       const e = planEinheiten.find(x => x.planId===p.id && x.woche===w && x.wochentag===tag) || {};
       const datum = _lpDatumAus(p, w, tag);
-      return `<form class="lp-einheit" data-lpeinheit="${p.id}|${w}|${tag}">
+      // Kein Speichern-Knopf mehr: die Zeile sichert sich selbst, sobald ein Feld
+      // verlassen wird. Vorher gingen Eingaben verloren, sobald man eine andere
+      // Woche aufklappte – der Re-Render baute das Formular neu auf.
+      return `<div class="lp-einheit" data-lpeinheit="${p.id}|${w}|${tag}">
         <span class="lp-einheit-tag">${tag}<span class="lp-einheit-datum">${datum?fmtDayShort(datum):''}</span></span>
         <input type="number" step="0.1" min="0" name="strecke" placeholder="km" inputmode="decimal"
                value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern">
@@ -3097,8 +3116,7 @@ function lpPlanDetail(p) {
           <option value="">Zone</option>
           ${[1,2,3,4,5].map(z=>`<option value="Z${z}"${e.zone==='Z'+z?' selected':''}>Z${z}</option>`).join('')}
         </select>
-        <button type="submit" aria-label="Einheit speichern">✓</button>
-      </form>`;
+      </div>`;
     }).join('');
     wochen.push(`<div class="lp-wochenblock">
       <button type="button" class="lp-wochenkopf" data-lpwoche="${p.id}#${w}">
@@ -3119,9 +3137,10 @@ function lpPlanDetail(p) {
           <input type="date" name="start" value="${p.start}"></label>
         <label class="lp-feld"><span>Ende</span>
           <input type="date" name="ende" value="${p.ende}"></label>
+        <label class="lp-feld lp-feld-schmal"><span>Wochen</span>
+          <input type="number" name="wochen" value="${_lpWochenAus(p.start,p.ende)||''}" readonly
+                 tabindex="-1" aria-label="Dauer in Wochen, ergibt sich aus Start und Ende"></label>
       </div>
-      <label class="lp-feld"><span>Dauer (Wochen)</span>
-        <input type="number" name="wochen" min="1" max="52" value="${p.wochen||''}" inputmode="numeric"></label>
       <div class="lp-feld"><span>Lauftage</span><div class="lp-tagwahl-reihe">${tageWahl}</div></div>
       <div class="lp-planaktionen">
         <button type="submit" class="lp-knopf-haupt">Speichern</button>
@@ -3129,8 +3148,8 @@ function lpPlanDetail(p) {
         <button type="button" class="lp-knopf-weg" data-lploeschen="${p.id}">Löschen</button>
       </div>
     </form>
-    ${p.wochen ? `<div class="lp-wochen">${wochen.join('')}</div>`
-               : `<div class="lp-hinweis">Trage eine Dauer in Wochen ein, dann erscheinen hier die einzelnen Wochen.</div>`}
+    ${dauer ? `<div class="lp-wochen">${wochen.join('')}</div>`
+            : `<div class="lp-hinweis">Trage Start und Ende ein, dann erscheinen hier die einzelnen Wochen.</div>`}
   </div>`;
 }
 
@@ -3523,13 +3542,14 @@ document.body.addEventListener('click', async (e) => {
   // Plan auf-/zuklappen
   const kopf = e.target.closest('[data-lpplan]');
   if (kopf) { const id = kopf.dataset.lpplan;
-    _lpOffenerPlan = _lpOffenerPlan === id ? null : id; _lpOffeneWoche = null;
+    _lpOffenerPlan = _lpOffenerPlan === id ? null : id; _lpOffeneWochen.clear();
     _renderTab('laufplan'); return; }
 
   // Woche auf-/zuklappen
   const woche = e.target.closest('[data-lpwoche]');
   if (woche) { const k = woche.dataset.lpwoche;
-    _lpOffeneWoche = _lpOffeneWoche === k ? null : k; _renderTab('laufplan'); return; }
+    if (_lpOffeneWochen.has(k)) _lpOffeneWochen.delete(k); else _lpOffeneWochen.add(k);
+    _renderTab('laufplan'); return; }
 
   // Aus der Tagesansicht in den zugehoerigen Plan springen
   const zuPlan = e.target.closest('[data-lpzuplan]');
@@ -3585,24 +3605,39 @@ document.body.addEventListener('submit', async (e) => {
   knopf.disabled = true; knopf.textContent = 'Speichert…';
   await lpPlanSpeichern({ id: alt.id, archiviert: alt.archiviert,
     name: form.name.value.trim(), notizen: form.notizen.value.trim(),
-    start: form.start.value, ende: form.ende.value, wochen: form.wochen.value,
+    start: form.start.value, ende: form.ende.value,
+    wochen: _lpWochenAus(form.start.value, form.ende.value),
     lauftage: [...form.querySelectorAll('input[name=lauftage]:checked')].map(c=>c.value) });
   _renderTab('laufplan');
 });
 
-// Einzelne Planeinheit speichern
-document.body.addEventListener('submit', async (e) => {
-  const form = e.target.closest('[data-lpeinheit]');
-  if (!form) return;
-  e.preventDefault();
-  const [planId, woche, wochentag] = form.dataset.lpeinheit.split('|');
+// Start/Ende geaendert → Wochenzahl sofort nachfuehren, damit man die Dauer sieht,
+// bevor man speichert.
+document.body.addEventListener('input', (e) => {
+  const form = e.target.closest('[data-lpplanform]');
+  if (!form || (e.target.name !== 'start' && e.target.name !== 'ende')) return;
+  const feld = form.querySelector('[name=wochen]');
+  if (feld) feld.value = _lpWochenAus(form.start.value, form.ende.value) || '';
+});
+
+// Einzelne Planeinheit speichern – ausgeloest vom Verlassen eines Feldes.
+// Bewusst OHNE _renderTab: der Nutzer tippt womoeglich schon in der naechsten Zeile,
+// ein Neuaufbau wuerde ihm den Fokus und halb getippte Werte nehmen. Die Anzeige ist
+// ohnehin aktuell – die Werte stehen ja im Feld.
+document.body.addEventListener('change', async (e) => {
+  const zeile = e.target.closest('[data-lpeinheit]');
+  if (!zeile) return;
+  const [planId, woche, wochentag] = zeile.dataset.lpeinheit.split('|');
   const p = planListe.find(x => x.id === planId);
-  const knopf = form.querySelector('button[type=submit]');
-  knopf.disabled = true; knopf.textContent = '…';
-  await lpEinheitSpeichern({ planId, woche: +woche, wochentag,
+  zeile.classList.add('speichert');
+  const ok = await lpEinheitSpeichern({ planId, woche: +woche, wochentag,
     datum: p ? _lpDatumAus(p, +woche, wochentag) : '',
-    strecke: form.strecke.value.trim(), zeit: form.zeit.value.trim(), zone: form.zone.value });
-  _renderTab('laufplan');
+    strecke: zeile.querySelector('[name=strecke]').value.trim(),
+    zeit: zeile.querySelector('[name=zeit]').value.trim(),
+    zone: zeile.querySelector('[name=zone]').value });
+  zeile.classList.remove('speichert');
+  zeile.classList.add(ok ? 'gesichert' : 'fehlgeschlagen');
+  setTimeout(() => zeile.classList.remove('gesichert', 'fehlgeschlagen'), 1600);
 });
 
 // Plan-Termin setzen oder aendern.
