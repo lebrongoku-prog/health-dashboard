@@ -34,13 +34,26 @@ function onOpen() {
 // ueber die Sheets-API. Uebrig bleibt der Import Drive → Sheet, denn NUR das Skript
 // kommt an die Health-Auto-Export-Dateien in Drive.
 function zugangGueltig(zugang) {
-  if (!zugang || String(zugang).length < 20) return false;
+  if (!zugang || String(zugang).length < 20) {
+    Logger.log('zugangGueltig: kein Zugang mitgeschickt');
+    return false;
+  }
   try {
     var res = UrlFetchApp.fetch(
       'https://sheets.googleapis.com/v4/spreadsheets/' + WORKOUT_SHEET_ID + '?fields=spreadsheetId',
       { headers: { Authorization: 'Bearer ' + zugang }, muteHttpExceptions: true });
-    return res.getResponseCode() === 200;
+    if (res.getResponseCode() !== 200) {
+      Logger.log('zugangGueltig: Google lehnt den Zugang ab (' + res.getResponseCode() + ')');
+      return false;
+    }
+    return true;
   } catch (err) {
+    // WICHTIG: Hier landet man auch, wenn das Skript nach dem Einfuegen des neuen
+    // Codes nie neu berechtigt wurde – UrlFetchApp braucht eine Erlaubnis, die es
+    // vorher nicht hatte. Ohne diese Zeile im Protokoll sieht das genauso aus wie
+    // ein falscher Zugang, und man sucht an der falschen Stelle.
+    Logger.log('zugangGueltig: UrlFetchApp scheitert – Skript vermutlich nicht neu '
+      + 'berechtigt. Einmal selbsttest() im Editor ausfuehren. Fehler: ' + err);
     return false;
   }
 }
@@ -75,6 +88,81 @@ function doPost(e) {
 // Die App legt die Blaetter 'Laufplan', 'Laufplaene' und 'Laufplan-Einheiten' jetzt
 // selbst an und schreibt direkt ueber die Sheets-API – abgesichert durch die
 // Google-Anmeldung statt durch ein Passwort im oeffentlichen Quelltext.
+
+// ── Automatischer Import (ersetzt den frueheren Aufruf per Adresse) ──────────
+// Bis zur Umstellung liess sich der Import ueber die Web-Adresse ausloesen, abgesichert
+// mit dem Passwort im Quelltext. Alles, was auf dem Handy eingerichtet war und diese
+// Adresse aufrief, konnte den Import damit anstossen – und ist seit dem Wegfall des
+// Passworts stumm, denn ein Google-Zugang laesst sich dort nicht mitgeben.
+//
+// Die Loesung fuehrt NICHT ueber ein neues Geheimnis, sondern ueber einen Zeitplan im
+// Skript selbst: Es holt sich die Dateien von sich aus. Damit braucht es von aussen
+// gar keinen Ausloeser mehr – das ist zugleich zuverlaessiger als der fruehere Ping,
+// der bei jedem Netzfehler auf dem Handy einfach ausfiel.
+//
+// EINMAL im Apps-Script-Editor ausfuehren. Danach laeuft der Import stuendlich.
+function installiereStuendlichenImport() {
+  loescheImportTrigger();
+  ScriptApp.newTrigger('writeToSheet').timeBased().everyHours(1).create();
+  var msg = 'Stuendlicher Import eingerichtet. Naechster Lauf innerhalb der naechsten Stunde.';
+  Logger.log(msg);
+  return msg;
+}
+
+function loescheImportTrigger() {
+  var weg = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'writeToSheet') { ScriptApp.deleteTrigger(t); weg++; }
+  });
+  Logger.log('Entfernte Import-Trigger: ' + weg);
+  return weg;
+}
+
+// ── Selbsttest ───────────────────────────────────────────────────────────────
+// Prueft der Reihe nach die drei Stellen, an denen es klemmen kann, und schreibt das
+// Ergebnis ins Protokoll (Editor: Ausfuehrungsprotokoll). Ein Aufruf von Hand loest
+// ausserdem die faellige Neu-Berechtigung aus, falls sie noch aussteht.
+function selbsttest() {
+  var zeilen = [];
+
+  zeilen.push('1. Nach aussen telefonieren (fuer die Zugangspruefung der App):');
+  try {
+    var res = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/'
+      + WORKOUT_SHEET_ID + '?fields=spreadsheetId', { muteHttpExceptions: true });
+    zeilen.push('   OK – UrlFetchApp ist berechtigt (Antwort ' + res.getResponseCode()
+      + ', 401 ist hier richtig: ohne Zugang darf niemand lesen).');
+  } catch (err) {
+    zeilen.push('   FEHLER – ' + err + '\n   → Das Skript ist nicht neu berechtigt. '
+      + 'Solange das so ist, lehnt es JEDEN Aufruf der App ab.');
+  }
+
+  zeilen.push('2. Drive-Ordner mit den Health-Dateien:');
+  try {
+    var dateien = getAllHealthFiles();
+    zeilen.push('   OK – ' + dateien.length + ' Datei(en) gefunden.');
+    if (dateien.length) {
+      var neueste = dateien.map(function (d) { return d.date; }).sort().pop();
+      zeilen.push('   Neuester Tag in den Dateien: ' + neueste);
+    } else {
+      zeilen.push('   ACHTUNG – keine Dateien. Dann liegt es NICHT am Skript, sondern '
+        + 'daran, dass vom Handy nichts in Drive ankommt.');
+    }
+  } catch (err) {
+    zeilen.push('   FEHLER – ' + err);
+  }
+
+  zeilen.push('3. Zeitplan fuer den automatischen Import:');
+  var trigger = ScriptApp.getProjectTriggers().filter(function (t) {
+    return t.getHandlerFunction() === 'writeToSheet';
+  });
+  zeilen.push(trigger.length
+    ? '   OK – ' + trigger.length + ' Zeitplan aktiv.'
+    : '   FEHLT – einmal installiereStuendlichenImport() ausfuehren.');
+
+  var text = zeilen.join('\n');
+  Logger.log(text);
+  return text;
+}
 
 function getAllHealthFiles() {
   var folder = getHealthFolder();
