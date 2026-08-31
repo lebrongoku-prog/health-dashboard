@@ -668,6 +668,25 @@ h5,
   line-height: 1.4;
 }
 
+/* Tagesdetail im Laufkalender: EINE Groesse fuer alles, was beim Antippen eines
+   Tages erscheint (Wunsch). Vorher standen dort fuenf Abstufungen von .66 bis
+   .79rem nebeneinander. Bezugsgroesse ist die Label-Stufe darueber – die tragen
+   die Wertzeilen (Trainingszeit, Strecke, …), an denen sich das Auge orientiert. */
+.lp-detail-tag,
+.lp-detail-plan,
+.lp-detail-leer,
+.lp-art,
+.lp-plan-zeile,
+.lp-plan-marke,
+.lp-wk-marke,
+.lp-plan-zuplan,
+.lp-plan-weg,
+.lp-plan-form input,
+.lp-plan-form button{
+  font-size: .83rem !important;
+  line-height: 1.4;
+}
+
 /* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
 .kpi-lbl,
 .ti-metric-lbl,
@@ -778,7 +797,7 @@ h5,
 /* Wurde am Wettkampftag gelaufen, bleibt der dunkle Kern sichtbar – er steht fuer
    die absolvierte Einheit und wuerde sonst in der orangen Flaeche verschwinden. */
 .lp-tag.wettkampf.gelaufen::before{background:#0F766E}
-.lp-wk-marke{margin-left:.4rem;font-size:.66rem;font-weight:700;color:#D97706;
+.lp-wk-marke{margin-left:.4rem;font-weight:700;color:#D97706;
   border:1px solid #D97706;border-radius:999px;padding:.05rem .4rem;white-space:nowrap}
 .lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.5px var(--txt)}
 /* Zukunftstage sind als Gruppe gedimmt (.zukunft). Der angetippte darf das nicht
@@ -798,21 +817,21 @@ h5,
    Flex-Container, deshalb genuegt margin-left:auto. */
 .lp-kal-zahl{font-size:.72rem;font-weight:500;color:var(--txt2);margin-left:auto}
 .lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
-.lp-detail-leer{font-size:.75rem;color:var(--txt3)}
-.lp-detail-tag{font-size:.79rem;font-weight:700;margin-bottom:.3rem}
+.lp-detail-leer{color:var(--txt3)}
+.lp-detail-tag{font-weight:700;margin-bottom:.3rem}
 /* Plan und Planstand unter dem Datum – zwei gleich gesetzte Zeilen, wie in FitTrack.
    Zurueckhaltender als die Werte darunter: sie ordnen den Tag ein, sind aber nicht
    das, wofuer man den Tag angetippt hat. */
-.lp-detail-plan{font-size:.72rem;color:var(--txt3);margin-top:.15rem}
-.lp-art{font-size:.72rem;font-weight:600;margin-bottom:.2rem}
+.lp-detail-plan{color:var(--txt3);margin-top:.15rem}
+.lp-art{font-weight:600;margin-bottom:.2rem}
 
 /* Wochenumfang */
 .lp-woche-zahl{font-size:1.65rem;font-weight:800;line-height:1.1}
 .lp-woche-einheit{font-size:.83rem;font-weight:600;color:var(--txt2)}
 
 .lp-plan-zeile{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
-  font-size:.75rem;color:var(--txt2);margin-bottom:.4rem}
-.lp-plan-marke{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--txt2);margin-bottom:.4rem}
+.lp-plan-marke{font-weight:700;text-transform:uppercase;letter-spacing:.04em;
   color:var(--tab-color);border:1px solid var(--tab-color);border-radius:999px;padding:.05rem .4rem}
 .lp-plan-zuplan{background:none;border:0;padding:0;margin-left:auto;font:inherit;
   font-size:.72rem;font-weight:600;color:var(--tab-color);cursor:pointer;text-decoration:underline}
@@ -820,9 +839,9 @@ h5,
   font-size:.72rem;color:#EF4444;cursor:pointer;text-decoration:underline}
 .lp-plan-form{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
 .lp-plan-form input{flex:1 1 4rem;min-width:0;height:32px;padding:0 .5rem;font:inherit;
-  font-size:.79rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--txt)}
+  border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--txt)}
 .lp-plan-form input[name=notiz]{flex:2 1 7rem}
-.lp-plan-form button{height:32px;padding:0 .7rem;font:inherit;font-size:.75rem;font-weight:600;
+.lp-plan-form button{height:32px;padding:0 .7rem;font:inherit;font-weight:600;
   border:0;border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer;flex:0 0 auto}
 .lp-plan-form button:disabled{opacity:.6}
 body.dark .lp-plan-form input{background:#0F172A}

@@ -3030,18 +3030,9 @@ function _lpDatumAus(plan, woche, wochentag) {
 // Welche Trainingsarten zaehlen als Lauf? Stichwortsuche wie bei workoutIcon –
 // Apple liefert je nach Sprache "Outdoor Ausfuehren", "Innenraeume Ausfuehren",
 // "Trail-Laufen" oder englische Namen.
-const LAUF_ARTEN = [
-  { id:'outdoor',   label:'Outdoor',   farbe:'#10B981', muster:/outdoor|draussen/i },
-  { id:'indoor',    label:'Indoor',    farbe:'#38BDF8', muster:/indoor|innenr/i },
-  { id:'trail',     label:'Trail',     farbe:'#A16207', muster:/trail/i },
-  { id:'intervall', label:'Intervall', farbe:'#F97316', muster:/intervall|hiit|hochintensiv/i }
-];
-function laufArt(typeRaw) {
-  const t = String(typeRaw || '');
-  // Intervall und Trail zuerst: sie stehen oft zusammen mit "Outdoor" im Namen.
-  for (const a of LAUF_ARTEN) if (a.id !== 'outdoor' && a.muster.test(t)) return a;
-  return LAUF_ARTEN[0];
-}
+// Hinweis: LAUF_ARTEN und laufArt() sind entfallen. Ihr einziger Zweck war die
+// Farbe der Laufart in der Tagesansicht – die ist auf Wunsch weg, damit dort alles
+// gleich gesetzt ist. `istLauf` bleibt: es entscheidet, was ueberhaupt ein Lauf ist.
 function istLauf(typeRaw) {
   return /lauf|ausf(ü|ue)hren|run|jog/i.test(String(typeRaw || ''));
 }
@@ -3057,7 +3048,7 @@ function laufEinheit(datum) {
   const streckeKm = w.distanceKm;
   const kmh = tag.runSpeed > 0 ? tag.runSpeed : (w.avgSpeedKph > 0 ? w.avgSpeedKph : null);
   return {
-    datum, art: laufArt(w.typeRaw), typLabel: w.typeLabel,
+    datum, typLabel: w.typeLabel,
     dauerMin: w.durationMin,
     streckeKm,
     // Kalorien werden auf Wunsch nicht mehr gezeigt; das Feld ist damit entfallen.
@@ -3226,7 +3217,7 @@ function laufDetailHTML(datum) {
 // Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
 function laufWerteHTML(l) {
   const zeile = (label, wert) => wert == null ? '' : statZeile(label, wert);
-  return `<div class="lp-art" style="color:${l.art.farbe}">${esc(l.typLabel)}</div>
+  return `<div class="lp-art">${esc(l.typLabel)}</div>
     <div class="stats-list">
       ${zeile('Trainingszeit', l.dauerMin!=null?fmtMin(l.dauerMin):null)}
       ${zeile('Strecke',       l.streckeKm!=null?zahl(l.streckeKm,2)+' km':null)}

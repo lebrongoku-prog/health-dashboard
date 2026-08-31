@@ -370,6 +370,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **Tagesdetail des Laufkalenders: eine Schriftgrösse.** Alles, was beim Antippen
+  eines Tages erscheint (Datum, Planzeilen, Laufart, Plan-Zeile, Werte, das
+  Termin-Formular), steht auf der **Label-Stufe** `.83rem`. Vorher lagen dort fünf
+  Abstufungen von `.66` bis `.79rem` nebeneinander. Die Grösse steht — wie alle —
+  **nur im Type Scale**; die `.lp-*`-Regeln tragen keine `font-size` mehr.
+  Die Laufart (`.lp-art`) ist zudem **nicht mehr eingefärbt**.
 - **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
   (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
   Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
@@ -463,8 +469,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nimmt weiterhin `runSpeed` und greift nur ersatzweise auf die Workout-Geschwindigkeit
   zurück (GPS schlägt die Schätzung der Uhr). Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
   Workout-Sheet.
-  `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
-  Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
+  `istLauf()` filtert die Workout-Zeilen per Stichwort, weil Apple je nach Sprache
+  andere Namen liefert. `LAUF_ARTEN`/`laufArt()` sind **entfallen**: ihr einziger
+  Zweck war die Farbe der Laufart in der Tagesansicht, und dort ist alles gleich
+  gesetzt (siehe „Tagesdetail: eine Schriftgrösse").
   **Waagrechte Startposition (`lpKalenderScrollen`):** der heutige Tag steht in der
   Mitte. Früher stand die laufende Woche am rechten Rand
   (`(w+1)*proSpalte − clientWidth`); auf breiteren Ausschnitten begann die Ansicht
