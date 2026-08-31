@@ -1756,9 +1756,16 @@ function pgOverview() {
       </div>`;}).join('')}
     </div>`:''}
     <!-- App-Version + Update: eine installierte PWA übernimmt einen neuen Stand sonst
-         erst beim zweiten Start. Der Knopf holt ihn in einem Schritt. -->
+         erst beim zweiten Start. Der Knopf holt ihn in einem Schritt.
+         Hinter demselben Ausklapp-Knopf wie "Weitere Auswertungen" und
+         "Muster & Zusammenhänge" – der Abschnitt wird selten gebraucht und muss
+         nicht dauerhaft unter der Übersicht stehen. Der Knopf traegt den Namen,
+         die Karte darunter deshalb keine eigene Überschrift mehr. -->
+    <button type="button" class="weitere-btn" data-appklapp aria-expanded="${_appOffen?'true':'false'}">
+      App<span class="weitere-pfeil">${_appOffen?'▾':'▸'}</span>
+    </button>
+    <div class="weitere-inhalt"${_appOffen?'':' hidden'}>
     <div class="chart-card app-karte">
-      <h3>App</h3>
       <div class="stats-list">
         ${datenStandZeilen()}
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
@@ -1767,6 +1774,7 @@ function pgOverview() {
       <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
       <button class="update-btn">App-Version aktualisieren</button>
       <div class="app-hinweis">Holt eine neue Fassung der App selbst. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
+    </div>
     </div>
     `;
 
@@ -2021,6 +2029,8 @@ let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
 // Muster-Abschnitt der Übersicht: auf- oder zugeklappt. Startet offen, damit sich
 // beim ersten Öffnen nichts versteckt.
 let _musterOffen = true;
+// App-Karte: startet zu, wie die uebrigen Ausklapp-Abschnitte.
+let _appOffen = false;
 // Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
 // hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
 const _weitereOffen = { herz:false, schlaf:false };
@@ -3050,8 +3060,9 @@ function laufEinheit(datum) {
     datum, art: laufArt(w.typeRaw), typLabel: w.typeLabel,
     dauerMin: w.durationMin,
     streckeKm,
-    // Energy steht im Sheet in Kilojoule – 1 kcal = 4.184 kJ.
-    kcal: w.activeEnergyKJ != null ? w.activeEnergyKJ / 4.184 : null,
+    // Kalorien werden auf Wunsch nicht mehr gezeigt; das Feld ist damit entfallen.
+    // Falls es zurueckkommt: Energy steht im Sheet in Kilojoule (1 kcal = 4.184 kJ),
+    // und activeCal aus dem Health-Sheet ist der TAGESverbrauch, nicht der des Laufs.
     pace: kmh != null ? paceFromSpeed(kmh) : null,
     puls: w.avgHR, maxPuls: w.maxHR,
     hoehe: w.elevationM
@@ -3207,7 +3218,6 @@ function laufWerteHTML(l) {
     <div class="stats-list">
       ${zeile('Trainingszeit', l.dauerMin!=null?fmtMin(l.dauerMin):null)}
       ${zeile('Strecke',       l.streckeKm!=null?zahl(l.streckeKm,2)+' km':null)}
-      ${zeile('Kalorien',      l.kcal!=null?Math.round(l.kcal).toLocaleString('de-CH')+' kcal':null)}
       ${zeile('Ø Pace',        l.pace!=null?fmtPace(l.pace)+' min/km':null)}
       ${zeile('Ø Herzfrequenz',l.puls!=null?Math.round(l.puls)+' bpm':null)}
       ${zeile('Höhenmeter',    l.hoehe!=null?Math.round(l.hoehe)+' m':null)}
@@ -3298,15 +3308,6 @@ function lpSeiteAktuell() {
       ${laufKalenderHTML()}
     </div>
 
-    ${aktiverPlan ? `<div class="chart-card">
-      <div class="chart-head"><h3>${esc(aktiverPlan.name)}</h3>${scopeBadge('laufender Plan')}</div>
-      <div class="stats-list">
-        ${statZeile('Zeitraum', `${fmtDayShort(aktiverPlan.start)} – ${fmtDayShort(aktiverPlan.ende)}`)}
-        ${statZeile('Woche', `${lpWocheNr(aktiverPlan, referenceDate)} von ${aktiverPlan.wochen||'—'}`)}
-        ${statZeile('Lauftage', aktiverPlan.lauftage.join(', ') || '—')}
-      </div>
-    </div>` : ''}
-
     <div class="chart-card">
       <h3>Diese Woche</h3>
       <div class="lp-woche-zahl" style="color:${dieseWoche.km>=zielKm?'#10B981':'var(--txt)'}">
@@ -3322,6 +3323,8 @@ function lpSeiteAktuell() {
           ? `<span style="color:#10B981">erreicht</span>` : `${zahl(zielKm-dieseWoche.km,1)} km`)}
       </div>
     </div>
+
+    ${planFortschrittHTML(aktiverPlan)}
 
     ${laeufe.length ? `<div class="chart-card">
       <h3>Bestleistungen ${scopeBadge('gesamter Datenbestand')}</h3>
@@ -3344,6 +3347,55 @@ function lpSeiteAktuell() {
       </div>` : `<div class="no-data">Im gewählten Zeitraum ist keine Laufeinheit erfasst.</div>`}
     </div>
 `;
+}
+
+// Wie weit ist der laufende Plan? Vorbild ist FitTracks „X von Y Einheiten
+// absolviert" samt Fortschrittsbalken. Als absolviert zaehlt eine geplante Einheit,
+// wenn an ihrem Tag tatsaechlich ein Lauf im Workout-Sheet steht.
+//
+// Zwei Zahlen, weil eine allein irrefuehrt: Der Gesamtfortschritt faellt zu Beginn
+// eines Plans zwangslaeufig niedrig aus – die meisten Einheiten liegen noch in der
+// Zukunft. Ob man IM PLAN liegt, zeigt erst der Vergleich mit dem, was bis heute
+// faellig war. Nur diese zweite Zahl traegt deshalb eine Signalfarbe.
+function planFortschritt(plan) {
+  if (!plan) return null;
+  const heute = toLocalDateStr(new Date());
+  const einheiten = planEinheiten
+    .filter(e => e.planId === plan.id)
+    .map(e => e.datum || _lpDatumAus(plan, e.woche, e.wochentag))
+    .filter(Boolean);
+  if (!einheiten.length) return null;
+  const gelaufen = d => !!workoutData[d] && !!laufEinheit(d);
+  const erledigt = einheiten.filter(gelaufen).length;
+  const faellig  = einheiten.filter(d => d <= heute);
+  return {
+    gesamt: einheiten.length, erledigt,
+    anteil: Math.round(erledigt / einheiten.length * 100),
+    faellig: faellig.length, faelligErledigt: faellig.filter(gelaufen).length
+  };
+}
+
+function planFortschrittHTML(plan) {
+  const f = planFortschritt(plan);
+  if (!f) return '';
+  const imPlan = f.faelligErledigt >= f.faellig;
+  const offen  = f.faellig - f.faelligErledigt;
+  return `<div class="chart-card">
+      <div class="chart-head"><h3>${esc(plan.name)}</h3>${scopeBadge('laufender Plan')}</div>
+      <div class="lp-woche-zahl">
+        ${f.anteil}<span class="lp-woche-einheit">% · ${f.erledigt} von ${f.gesamt} Einheiten</span>
+      </div>
+      <div class="goal-bar-bg" style="margin:.5rem 0 .2rem">
+        <div class="goal-bar-fill" style="width:${f.anteil}%;background:${f.anteil>=100?'#10B981':'#84CC16'}"></div>
+      </div>
+      <div class="stats-list diagramm-fuss">
+        ${statZeile('Bis heute fällig', `${f.faelligErledigt} von ${f.faellig}`,
+          f.faellig === 0 ? null : (imPlan ? '#10B981' : '#F59E0B'))}
+        ${f.faellig > 0 && !imPlan ? statZeile('Ausgelassen', `${offen} ${offen===1?'Einheit':'Einheiten'}`) : ''}
+        ${statZeile('Woche', `${lpWocheNr(plan, referenceDate)} von ${plan.wochen||'—'}`)}
+        ${statZeile('Lauftage', plan.lauftage.join(', ') || '—')}
+      </div>
+    </div>`;
 }
 
 // In welcher Woche des Plans liegt ein Datum?
@@ -3849,6 +3901,19 @@ document.body.addEventListener('click', (e) => {
   if (!e.target.closest('[data-musterklapp]')) return;
   _musterOffen = !_musterOffen;
   _renderTab('overview');
+});
+
+// App-Karte auf-/zuklappen. Hier genuegt Ein-/Ausblenden: in der Karte steckt kein
+// Diagramm, das im verborgenen Zustand mit Breite 0 gezeichnet wuerde.
+document.body.addEventListener('click', (e) => {
+  const knopf = e.target.closest('[data-appklapp]');
+  if (!knopf) return;
+  _appOffen = !_appOffen;
+  knopf.setAttribute('aria-expanded', _appOffen);
+  const pfeil = knopf.querySelector('.weitere-pfeil');
+  if (pfeil) pfeil.textContent = _appOffen ? '▾' : '▸';
+  const inhalt = knopf.nextElementSibling;
+  if (inhalt) inhalt.hidden = !_appOffen;
 });
 
 // ── Laufplanverwaltung: Bedienung ──────────────────────

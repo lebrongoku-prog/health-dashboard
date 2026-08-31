@@ -370,12 +370,22 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
+  (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
+  Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
+  **ohne** die frühere Haarlinie — die wirkte neben dem Knopf wie eine Umrandung.
+  Im Dunkelmodus dieselbe Form mit `.45` statt `.18`: ein 18%-Schwarz verschwindet
+  auf dunklem Grund und die Karten hätten keine Kante mehr.
 - **Aufklapp-Knöpfe teilen eine Klasse:** „Weitere Auswertungen" (Herz, Schlaf) und
   „Muster & Zusammenhänge" (Übersicht) tragen beide `.weitere-btn` und sehen damit
   identisch aus. Der Muster-Knopf hatte vorher als `.pi-titel` das Aussehen einer
   Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
   zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
-  nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt.
+  nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
+  ihn: „Weitere Auswertungen" (Herz, Schlaf), „Muster & Zusammenhänge" und die
+  **App-Karte** der Übersicht (`_appOffen`, Start **zu**). Die App-Karte klappt ohne
+  `_renderTab` auf — in ihr steckt kein Diagramm, das im verborgenen Zustand mit
+  Breite 0 gezeichnet würde.
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
   Diagramm; der Rest liegt hinter einem Knopf über die volle Kartenbreite
   (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das schliessende
@@ -416,8 +426,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
   Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, schiebt beim
   Rendern den heutigen Tag in die **Mitte** des Ausschnitts — `lpKalenderScrollen()`)
-  → Wochenumfang gegen `ZIELE.laufKm` → Bestleistungen →
-  Liste der Einheiten. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
+  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`) → **Planfortschritt** →
+  Bestleistungen → Liste der Einheiten. Die frühere reine Infokarte zum laufenden
+  Plan (Zeitraum / Woche / Lauftage) ist entfallen; ihre Angaben stehen jetzt in der
+  Fusszeile der Fortschrittskarte.
+- **Planfortschritt (`planFortschritt` / `planFortschrittHTML`, Vorbild FitTrack):**
+  „X von Y Einheiten" samt Prozentbalken. Als absolviert zählt eine geplante Einheit,
+  wenn an ihrem Tag ein Lauf im Workout-Sheet steht. **Zwei Zahlen, weil eine allein
+  irreführt:** Der Gesamtanteil ist zu Beginn eines Plans zwangsläufig niedrig — die
+  meisten Einheiten liegen noch in der Zukunft. Ob man IM PLAN liegt, zeigt erst
+  „Bis heute fällig"; nur diese Zeile trägt deshalb eine Signalfarbe.
+- **Kalorien in der Tagesansicht entfallen** (auf Wunsch). `laufEinheit` führt das Feld
+  `kcal` nicht mehr; die Herleitung steht als Kommentar dort, falls es zurückkommt:
+  `Energy (kJ)` ÷ 4.184 aus dem **Workout**-Sheet — `activeCal` im Health-Sheet ist
+  der Tagesverbrauch, nicht der des Laufs. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
   klappt zu; die Auswahl liegt in `_lpAuswahl` **ausserhalb** der Seitenfunktion.
   **Datenquellen:** `laufEinheit(datum)` setzt eine Einheit aus beiden Sheets zusammen.
   Die **Strecke kommt immer aus dem Workout-Sheet** (`distanceKm`) — genau wie im
@@ -425,8 +447,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   beide Tabs zeigten dadurch unterschiedliche Kilometer für denselben Lauf. Die Pace
   nimmt weiterhin `runSpeed` und greift nur ersatzweise auf die Workout-Geschwindigkeit
   zurück (GPS schlägt die Schätzung der Uhr). Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
-  Workout-Sheet. Kalorien ebenfalls von dort (`Energy (kJ)` ÷ 4.184) — `activeCal` im
-  Health-Sheet ist der Tagesverbrauch, nicht der des Laufs (Leonard-Entscheidung).
+  Workout-Sheet.
   `LAUF_ARTEN` ist die einzige Quelle für Laufart-Farben; `istLauf()` filtert die
   Workout-Zeilen per Stichwort, weil Apple je nach Sprache andere Namen liefert.
   **Waagrechte Startposition (`lpKalenderScrollen`):** der heutige Tag steht in der
