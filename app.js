@@ -3293,8 +3293,6 @@ function lpKalenderScrollen() {
 // ── Seite 1: Aktueller Laufplan ────────────────────────
 function lpSeiteAktuell() {
   const laeufe = alleLaeufe();
-  const D = filtered();
-  const imFenster = laeufe.filter(l => D.some(r => r.date === l.datum));
 
   const woMap = {};
   laeufe.forEach(l => { const w = getWeekMonday(l.datum);
@@ -3305,14 +3303,6 @@ function lpSeiteAktuell() {
   const dieseWoche = woMap[getWeekMonday(referenceDate)] || { km:0, min:0, n:0 };
   const zielKm = ZIELE.laufKm.ziel;
   const zielAnteil = Math.min(100, Math.round(dieseWoche.km / zielKm * 100));
-
-  const mit = f => laeufe.filter(l => l[f] != null);
-  const best = (f, kleinerBesser) => { const v = mit(f); if (!v.length) return null;
-    return v.reduce((a,b) => (kleinerBesser ? (b[f] < a[f]) : (b[f] > a[f])) ? b : a); };
-  const schnellster = best('pace', true), laengster = best('streckeKm', false), hoechster = best('hoehe', false);
-  const bestZeile = (label, l, wert) => l ? statZeile(label,
-    `${wert} <span style="color:var(--txt3)">${fmtDayShort(l.datum)}</span>`) : '';
-
 
   return `
     <div class="chart-card">
@@ -3335,26 +3325,6 @@ function lpSeiteAktuell() {
       </div>
     </div>
 
-    ${laeufe.length ? `<div class="chart-card">
-      <h3>Bestleistungen ${scopeBadge('gesamter Datenbestand')}</h3>
-      <div class="stats-list">
-        ${bestZeile('Schnellste Pace', schnellster, schnellster?fmtPace(schnellster.pace)+' min/km':'')}
-        ${bestZeile('Längster Lauf',   laengster,   laengster?zahl(laengster.streckeKm,2)+' km':'')}
-        ${bestZeile('Meiste Höhenmeter', hoechster, hoechster?Math.round(hoechster.hoehe)+' m':'')}
-      </div>
-    </div>` : ''}
-
-    <div class="chart-card">
-      <div class="chart-head"><h3>Einheiten</h3>${scopeBadge('gewählter Zeitraum')}</div>
-      ${imFenster.length ? `<div class="lp-liste">
-        ${imFenster.map(l => `<button type="button" class="lp-eintrag${_lpAuswahl===l.datum?' offen':''}" data-lauftag="${l.datum}">
-          <span class="lp-eintrag-punkt" style="background:${l.art.farbe}"></span>
-          <span class="lp-eintrag-tag">${fmtDayShort(l.datum)}</span>
-          <span class="lp-eintrag-werte">${l.streckeKm!=null?zahl(l.streckeKm,2)+' km':'—'}${l.pace!=null?' · '+fmtPace(l.pace)+'/km':''}</span>
-        </button>
-        ${_lpAuswahl===l.datum?`<div class="lp-eintrag-detail">${laufWerteHTML(l)}</div>`:''}`).join('')}
-      </div>` : `<div class="no-data">Im gewählten Zeitraum ist keine Laufeinheit erfasst.</div>`}
-    </div>
 `;
 }
 

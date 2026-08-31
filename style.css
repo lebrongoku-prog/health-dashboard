@@ -810,18 +810,6 @@ h5,
 .lp-woche-zahl{font-size:1.65rem;font-weight:800;line-height:1.1}
 .lp-woche-einheit{font-size:.83rem;font-weight:600;color:var(--txt2)}
 
-/* Liste der Einheiten – jeder Eintrag ist ein Knopf, damit der Hintergrund-Tipp
-   (Bottom-Nav) ihn ausnimmt. */
-.lp-liste{display:flex;flex-direction:column}
-.lp-eintrag{display:flex;align-items:center;gap:.5rem;width:100%;padding:.45rem 0;
-  background:none;border:0;border-bottom:1px solid var(--border);cursor:pointer;
-  font:inherit;color:inherit;text-align:left;-webkit-tap-highlight-color:transparent}
-.lp-eintrag-punkt{width:9px;height:9px;border-radius:2px;flex-shrink:0}
-.lp-eintrag-tag{font-size:.79rem;font-weight:600;flex:0 0 auto}
-.lp-eintrag-werte{font-size:.79rem;color:var(--txt2);margin-left:auto;white-space:nowrap}
-.lp-eintrag.offen{border-bottom-color:transparent}
-.lp-eintrag-detail{padding:.1rem 0 .6rem;border-bottom:1px solid var(--border)}
-
 .lp-plan-zeile{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
   font-size:.75rem;color:var(--txt2);margin-bottom:.4rem}
 .lp-plan-marke{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;

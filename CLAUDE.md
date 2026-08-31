@@ -426,10 +426,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
   Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, schiebt beim
   Rendern den heutigen Tag in die **Mitte** des Ausschnitts — `lpKalenderScrollen()`)
-  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`) → Bestleistungen →
-  Liste der Einheiten. Eine eigene Karte zum laufenden Plan gibt es **nicht** mehr
-  (weder die reine Infokarte noch die kurzzeitige Fortschrittskarte) — beides steht
-  jetzt im Tagesdetail des Kalenders.
+  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`). Mehr nicht — die Karten
+  **„Bestleistungen"** und **„Einheiten"** (Liste der Läufe im Zeitfenster) sind auf
+  Wunsch ersatzlos entfallen, mit ihnen die Klassen `.lp-liste` / `.lp-eintrag*`.
+  Eine eigene Karte zum laufenden Plan gibt es ebenfalls **nicht** mehr (weder die
+  reine Infokarte noch die kurzzeitige Fortschrittskarte) — das steht im Tagesdetail
+  des Kalenders. `laufWerteHTML()` lebt weiter: es füllt dieses Tagesdetail.
 - **Planstand im Tagesdetail (`planErfuellung`, `planAmTag`) — 1:1 aus FitTrack:**
   Tippt man einen Tag an, der in der Laufzeit eines Plans liegt, folgen unter dem
   Datum zwei zurückhaltende Zeilen (`.lp-detail-plan`): *„Name (N Wochen)"* und
