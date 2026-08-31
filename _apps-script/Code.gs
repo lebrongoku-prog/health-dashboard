@@ -130,7 +130,8 @@ function selbsttest() {
     var res = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/'
       + WORKOUT_SHEET_ID + '?fields=spreadsheetId', { muteHttpExceptions: true });
     zeilen.push('   OK – UrlFetchApp ist berechtigt (Antwort ' + res.getResponseCode()
-      + ', 401 ist hier richtig: ohne Zugang darf niemand lesen).');
+      + '; 401 oder 403 sind hier RICHTIG: die Anfrage geht ohne Zugang raus, und '
+      + 'Google lehnt sie ab. Entscheidend ist nur, dass ueberhaupt eine Antwort kam).');
   } catch (err) {
     zeilen.push('   FEHLER – ' + err + '\n   → Das Skript ist nicht neu berechtigt. '
       + 'Solange das so ist, lehnt es JEDEN Aufruf der App ab.');
@@ -151,7 +152,23 @@ function selbsttest() {
     zeilen.push('   FEHLER – ' + err);
   }
 
-  zeilen.push('3. Zeitplan fuer den automatischen Import:');
+  zeilen.push('3. Sind alle Bausteine des Imports da?');
+  // Namentlich abgefragt statt ueber eine Liste: `typeof unbekannterName` ist der eine
+  // Ausdruck, der bei einem nicht existierenden Namen NICHT abbricht – und er kommt
+  // ohne globalThis aus, das die aeltere Apps-Script-Laufzeit nicht kennt.
+  var fehlt = [];
+  if (typeof parseDay          !== 'function') fehlt.push('parseDay');
+  if (typeof extractTime       !== 'function') fehlt.push('extractTime');
+  if (typeof getHealthFolder   !== 'function') fehlt.push('getHealthFolder');
+  if (typeof getAllHealthFiles !== 'function') fehlt.push('getAllHealthFiles');
+  if (typeof getOrCreateSheet  !== 'function') fehlt.push('getOrCreateSheet');
+  if (typeof upsertDay         !== 'function') fehlt.push('upsertDay');
+  if (typeof buildDateIndex    !== 'function') fehlt.push('buildDateIndex');
+  if (typeof writeToSheet      !== 'function') fehlt.push('writeToSheet');
+  if (typeof importWorkoutData !== 'function') fehlt.push('importWorkoutData');
+  zeilen.push(fehlt.length ? '   FEHLT – ' + fehlt.join(', ') : '   OK – alle vorhanden.');
+
+  zeilen.push('4. Zeitplan fuer den automatischen Import:');
   var trigger = ScriptApp.getProjectTriggers().filter(function (t) {
     return t.getHandlerFunction() === 'writeToSheet';
   });
@@ -163,6 +180,106 @@ function selbsttest() {
   Logger.log(text);
   return text;
 }
+
+// ── Einen Tag verarbeiten ──────────────────────────────────────
+function parseDay(date, metrics) {
+  var d = { date: date };
+  metrics.forEach(function(m) {
+    var pts = m.data || [];
+    switch (m.name) {
+      case 'step_count':                       d.steps         = Math.round(S(pts));         break;
+      case 'walking_running_distance':         d.distKm        = R1(S(pts));                 break;
+      case 'active_energy':                    d.activeCal     = Math.round(S(pts) / 4.184); break;
+      case 'basal_energy_burned':              d.basalCal      = Math.round(S(pts) / 4.184); break;
+      case 'heart_rate':
+        if (pts.length) {
+          var hrAvg = pts[0].Avg, hrMin = pts[0].Min, hrMax = pts[0].Max;
+          if (!hrAvg) {
+            var vals = pts.map(function(p){ return p.qty||0; }).filter(function(v){ return v>0; });
+            if (vals.length) {
+              hrAvg = vals.reduce(function(a,b){ return a+b; },0) / vals.length;
+              hrMin = Math.min.apply(null, vals);
+              hrMax = Math.max.apply(null, vals);
+            }
+          }
+          d.hrAvg = Math.round(hrAvg||0);
+          d.hrMin = Math.round(hrMin||0);
+          d.hrMax = Math.round(hrMax||0);
+        }
+        break;
+      case 'resting_heart_rate':               d.restHR        = Math.round(A(pts));         break;
+      case 'heart_rate_variability':           d.hrv           = Math.round(A(pts));         break;
+      case 'blood_oxygen_saturation':          d.spo2          = R1(A(pts));                 break;
+      case 'respiratory_rate':                 d.respRate      = R1(A(pts));                 break;
+      case 'sleep_analysis':
+        if (pts[0]) {
+          var s        = pts[0];
+          d.sleepTotal = R1(s.totalSleep || 0);
+          d.sleepCore  = R1(s.core       || 0);
+          d.sleepRem   = R1(s.rem        || 0);
+          d.sleepDeep  = R1(s.deep       || 0);
+          d.sleepAwake = R1(s.awake      || 0);
+          d.sleepStart = extractTime(s.sleepStart || s.inBedStart);
+          d.sleepEnd   = extractTime(s.sleepEnd   || s.inBedEnd);
+        }
+        break;
+      case 'vo2_max':                          d.vo2max        = R1(A(pts));                 break;
+      case 'apple_exercise_time':              d.exerciseMin   = Math.round(S(pts));         break;
+      case 'apple_stand_time':                 d.standMin      = Math.round(S(pts));         break;
+      case 'apple_stand_hour':                 d.standHours    = Math.round(S(pts));         break;
+      case 'flights_climbed':                  d.flights       = Math.round(S(pts));         break;
+      case 'time_in_daylight':                 d.daylight      = Math.round(S(pts));         break;
+      case 'apple_sleeping_wrist_temperature': d.wristTemp     = R1(A(pts));                 break;
+      case 'breathing_disturbances':           d.breathDisturb = R1(A(pts));                 break;
+      case 'running_speed':      if (pts.length) d.runSpeed    = R1(A(pts));                 break;
+      case 'running_power':      if (pts.length) d.runPower    = Math.round(A(pts));         break;
+      case 'walking_speed':                    d.walkSpeed     = R1(A(pts));                 break;
+      case 'physical_effort':                  d.physEffort    = R1(A(pts));                 break;
+      case 'walking_heart_rate_average':       d.walkHR        = Math.round(A(pts));         break;
+    }
+  });
+  return d;
+}
+
+// ── Hilfsfunktion: Zeit aus Datetime-String extrahieren ────────
+function extractTime(dtStr) {
+  if (!dtStr) return null;
+  var m = String(dtStr).match(/\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2})/);
+  return m ? m[1] : null;
+}
+
+// ── Mathe-Hilfsfunktionen ──────────────────────────────────────
+function S(d)  { return d.reduce(function(a,x){ return a+(x.qty||0); }, 0); }
+function A(d)  { return d.length ? S(d) / d.length : 0; }
+function R1(v) { return Math.round(v * 10) / 10; }
+
+// ================================================================
+// GOOGLE SHEETS EXPORT
+// ================================================================
+
+var SHEET_NAME = 'Health Dashboard Data';
+var COLUMNS = [
+  'date','steps','distKm','activeCal','basalCal',
+  'hrAvg','hrMin','hrMax','restHR','hrv','spo2','respRate',
+  'sleepTotal','sleepCore','sleepRem','sleepDeep','sleepAwake',
+  'vo2max','exerciseMin','standMin','standHours','flights',
+  'daylight','wristTemp','breathDisturb','runSpeed','runPower',
+  'walkSpeed','physEffort','walkHR',
+  'sleepStart','sleepEnd'
+];
+
+function getHealthFolder() {
+  var parent = DriveApp.getFolderById('1akYBt8MyyvS03yxxWgxAV-lYOeqKdrL_');
+  var subs = parent.getFoldersByName('Health Data');
+  if (subs.hasNext()) return subs.next();
+  throw new Error('Ordner nicht gefunden: Health Data');
+}
+
+// Pro Datum genau eine Datei zurückgeben.
+// Google Drive ERSETZT eine gleichnamige Datei nicht, sondern legt eine zweite daneben.
+// Exportiert Health Auto Export für denselben Tag mehrmals, lagen bisher mehrere
+// Dateien mit identischem Namen im Ordner – und jede erzeugte eine eigene Sheet-Zeile.
+// Bei Mehrfachtreffern gewinnt die zuletzt geänderte Datei.
 
 function getAllHealthFiles() {
   var folder = getHealthFolder();
