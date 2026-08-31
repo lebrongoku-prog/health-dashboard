@@ -800,6 +800,10 @@ h5,
 .lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
 .lp-detail-leer{font-size:.75rem;color:var(--txt3)}
 .lp-detail-tag{font-size:.79rem;font-weight:700;margin-bottom:.3rem}
+/* Plan und Planstand unter dem Datum – zwei gleich gesetzte Zeilen, wie in FitTrack.
+   Zurueckhaltender als die Werte darunter: sie ordnen den Tag ein, sind aber nicht
+   das, wofuer man den Tag angetippt hat. */
+.lp-detail-plan{font-size:.72rem;color:var(--txt3);margin-top:.15rem}
 .lp-art{font-size:.72rem;font-weight:600;margin-bottom:.2rem}
 
 /* Wochenumfang */

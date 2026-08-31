@@ -426,16 +426,29 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
   Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, schiebt beim
   Rendern den heutigen Tag in die **Mitte** des Ausschnitts — `lpKalenderScrollen()`)
-  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`) → **Planfortschritt** →
-  Bestleistungen → Liste der Einheiten. Die frühere reine Infokarte zum laufenden
-  Plan (Zeitraum / Woche / Lauftage) ist entfallen; ihre Angaben stehen jetzt in der
-  Fusszeile der Fortschrittskarte.
-- **Planfortschritt (`planFortschritt` / `planFortschrittHTML`, Vorbild FitTrack):**
-  „X von Y Einheiten" samt Prozentbalken. Als absolviert zählt eine geplante Einheit,
-  wenn an ihrem Tag ein Lauf im Workout-Sheet steht. **Zwei Zahlen, weil eine allein
-  irreführt:** Der Gesamtanteil ist zu Beginn eines Plans zwangsläufig niedrig — die
-  meisten Einheiten liegen noch in der Zukunft. Ob man IM PLAN liegt, zeigt erst
-  „Bis heute fällig"; nur diese Zeile trägt deshalb eine Signalfarbe.
+  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`) → Bestleistungen →
+  Liste der Einheiten. Eine eigene Karte zum laufenden Plan gibt es **nicht** mehr
+  (weder die reine Infokarte noch die kurzzeitige Fortschrittskarte) — beides steht
+  jetzt im Tagesdetail des Kalenders.
+- **Planstand im Tagesdetail (`planErfuellung`, `planAmTag`) — 1:1 aus FitTrack:**
+  Tippt man einen Tag an, der in der Laufzeit eines Plans liegt, folgen unter dem
+  Datum zwei zurückhaltende Zeilen (`.lp-detail-plan`): *„Name (N Wochen)"* und
+  *„X von Y geplanten Einheiten (Z%)"*. Genau dort und genau so zeigt FitTrack es
+  (`.cal-detail-plan` in seiner Kalender-Fusszeile). Die Angaben gehören an den Tag,
+  den man gerade ansieht, nicht in einen dauerhaften Block weiter unten.
+  Mitübernommen sind FitTracks Entscheidungen:
+  - Bezug ist **immer nur die Vergangenheit** (bis heute, bei beendeten Plänen bis
+    zum Planende) — sonst läge die Quote zwangsläufig niedrig, solange der Plan läuft.
+    Sie ändert sich deshalb **nicht**, wenn man einen künftigen Tag antippt.
+  - **Läufe an nicht geplanten Tagen zählen mit**, damit ein nachgeholtes Training
+    die Quote nicht drückt.
+  - Der Nenner kommt aus den **Lauftagen** des Plans (`plan.lauftage`, Tag für Tag
+    durch den Zeitraum gezählt), **nicht** aus den einzeln erfassten Planeinheiten.
+    Die sind meist nur für die nächsten Wochen ausgefüllt; gegen zwei erfasste
+    Einheiten ergaben fünf gelaufene Tage 250 %. FitTrack geht aus demselben Grund
+    seinen Wochenplan ab.
+  - `planAmTag` berücksichtigt **auch archivierte** Pläne: im Kalender tragen sie
+    ebenfalls ein Band, und ein Tag darin soll denselben Plan benennen.
 - **Kalorien in der Tagesansicht entfallen** (auf Wunsch). `laufEinheit` führt das Feld
   `kcal` nicht mehr; die Herleitung steht als Kommentar dort, falls es zurückkommt:
   `Energy (kJ)` ÷ 4.184 aus dem **Workout**-Sheet — `activeCal` im Health-Sheet ist

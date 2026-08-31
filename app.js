@@ -3180,6 +3180,18 @@ function laufDetailHTML(datum) {
   const wk = planListe.find(x => !x.archiviert && x.wettkampf === datum);
   const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}${
     wk ? `<span class="lp-wk-marke">Wettkampf · ${esc(wk.name)}</span>` : ''}</div>`;
+  // Liegt der Tag in der Laufzeit eines Plans, folgen zwei Zeilen wie in FitTrack:
+  // erst der Plan mit seiner Dauer, darunter sein Stand bis hierher. Sie ersetzen die
+  // fruehere eigene Fortschrittskarte – die Angaben gehoeren an den Tag, den man
+  // gerade ansieht, nicht in einen dauerhaften Block weiter unten.
+  const planDesTages = planAmTag(datum);
+  let planZeilen = '';
+  if (planDesTages) {
+    const wochen = _lpWochenAus(planDesTages.start, planDesTages.ende);
+    planZeilen = `<div class="lp-detail-plan">${esc(planDesTages.name)}${wochen ? ` (${wochen} Wochen)` : ''}</div>`;
+    const q = planErfuellung(planDesTages);
+    if (q) planZeilen += `<div class="lp-detail-plan">${q.absolviert} von ${q.geplant} geplanten Einheiten (${q.prozent}%)</div>`;
+  }
   // Beide Arten koennen am selben Tag liegen und werden getrennt gezeigt: die
   // Planeinheit gehoert zum Plan und wird dort bearbeitet, der freie Termin hier.
   const ausPlanZeile = ausPlan
@@ -3208,7 +3220,7 @@ function laufDetailHTML(datum) {
     </form>`;
   const ist = l ? laufWerteHTML(l)
                 : `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
-  return kopf + ausPlanZeile + geplant + ist + formular;
+  return kopf + planZeilen + ausPlanZeile + geplant + ist + formular;
 }
 
 // Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
@@ -3301,7 +3313,6 @@ function lpSeiteAktuell() {
   const bestZeile = (label, l, wert) => l ? statZeile(label,
     `${wert} <span style="color:var(--txt3)">${fmtDayShort(l.datum)}</span>`) : '';
 
-  const aktiverPlan = planListe.find(p => !p.archiviert && p.start <= referenceDate && p.ende >= referenceDate);
 
   return `
     <div class="chart-card">
@@ -3323,8 +3334,6 @@ function lpSeiteAktuell() {
           ? `<span style="color:#10B981">erreicht</span>` : `${zahl(zielKm-dieseWoche.km,1)} km`)}
       </div>
     </div>
-
-    ${planFortschrittHTML(aktiverPlan)}
 
     ${laeufe.length ? `<div class="chart-card">
       <h3>Bestleistungen ${scopeBadge('gesamter Datenbestand')}</h3>
@@ -3349,53 +3358,40 @@ function lpSeiteAktuell() {
 `;
 }
 
-// Wie weit ist der laufende Plan? Vorbild ist FitTracks „X von Y Einheiten
-// absolviert" samt Fortschrittsbalken. Als absolviert zaehlt eine geplante Einheit,
-// wenn an ihrem Tag tatsaechlich ein Lauf im Workout-Sheet steht.
-//
-// Zwei Zahlen, weil eine allein irrefuehrt: Der Gesamtfortschritt faellt zu Beginn
-// eines Plans zwangslaeufig niedrig aus – die meisten Einheiten liegen noch in der
-// Zukunft. Ob man IM PLAN liegt, zeigt erst der Vergleich mit dem, was bis heute
-// faellig war. Nur diese zweite Zahl traegt deshalb eine Signalfarbe.
-function planFortschritt(plan) {
-  if (!plan) return null;
+// Wie viel vom Plan ist bislang erfuellt? Uebernommen aus FitTrack, samt der dort
+// getroffenen Entscheidungen:
+//   • Bezug ist immer nur die VERGANGENHEIT (bei laufenden Plaenen bis heute) – sonst
+//     laege die Quote zwangslaeufig niedrig, solange der Plan noch laeuft.
+//   • Laeufe an NICHT geplanten Tagen zaehlen mit, damit ein nachgeholtes Training
+//     die Quote nicht drueckt.
+function planErfuellung(plan) {
+  if (!plan || !plan.start) return null;
   const heute = toLocalDateStr(new Date());
-  const einheiten = planEinheiten
-    .filter(e => e.planId === plan.id)
-    .map(e => e.datum || _lpDatumAus(plan, e.woche, e.wochentag))
-    .filter(Boolean);
-  if (!einheiten.length) return null;
-  const gelaufen = d => !!workoutData[d] && !!laufEinheit(d);
-  const erledigt = einheiten.filter(gelaufen).length;
-  const faellig  = einheiten.filter(d => d <= heute);
-  return {
-    gesamt: einheiten.length, erledigt,
-    anteil: Math.round(erledigt / einheiten.length * 100),
-    faellig: faellig.length, faelligErledigt: faellig.filter(gelaufen).length
-  };
+  const bis = (plan.ende && plan.ende < heute) ? plan.ende : heute;
+  if (bis < plan.start) return null;
+  const imZeitraum = d => d >= plan.start && d <= bis;
+
+  // Gezaehlt werden die LAUFTAGE des Plans, Tag fuer Tag durch den Zeitraum – genau
+  // wie FitTrack seinen Wochenplan abgeht. Die einzeln eingetragenen Einheiten taugen
+  // dafuer NICHT als Nenner: sie sind meist nur fuer die naechsten Wochen ausgefuellt,
+  // und gegen zwei erfasste Einheiten ergaben fuenf gelaufene Tage 250 %.
+  const lauftage = new Set(plan.lauftage || []);
+  if (!lauftage.size) return null;
+  let geplant = 0;
+  for (let d = plan.start; d <= bis; d = addDays(d, 1)) {
+    if (lauftage.has(WOCHENTAGE[(new Date(d + 'T00:00:00').getDay() + 6) % 7])) geplant++;
+  }
+  if (!geplant) return null;
+
+  const absolviert = Object.keys(workoutData).filter(d => imZeitraum(d) && laufEinheit(d)).length;
+  return { geplant, absolviert, prozent: Math.round(absolviert / geplant * 100) };
 }
 
-function planFortschrittHTML(plan) {
-  const f = planFortschritt(plan);
-  if (!f) return '';
-  const imPlan = f.faelligErledigt >= f.faellig;
-  const offen  = f.faellig - f.faelligErledigt;
-  return `<div class="chart-card">
-      <div class="chart-head"><h3>${esc(plan.name)}</h3>${scopeBadge('laufender Plan')}</div>
-      <div class="lp-woche-zahl">
-        ${f.anteil}<span class="lp-woche-einheit">% · ${f.erledigt} von ${f.gesamt} Einheiten</span>
-      </div>
-      <div class="goal-bar-bg" style="margin:.5rem 0 .2rem">
-        <div class="goal-bar-fill" style="width:${f.anteil}%;background:${f.anteil>=100?'#10B981':'#84CC16'}"></div>
-      </div>
-      <div class="stats-list diagramm-fuss">
-        ${statZeile('Bis heute fällig', `${f.faelligErledigt} von ${f.faellig}`,
-          f.faellig === 0 ? null : (imPlan ? '#10B981' : '#F59E0B'))}
-        ${f.faellig > 0 && !imPlan ? statZeile('Ausgelassen', `${offen} ${offen===1?'Einheit':'Einheiten'}`) : ''}
-        ${statZeile('Woche', `${lpWocheNr(plan, referenceDate)} von ${plan.wochen||'—'}`)}
-        ${statZeile('Lauftage', plan.lauftage.join(', ') || '—')}
-      </div>
-    </div>`;
+// Der Plan, in dessen Laufzeit ein Tag faellt. Archivierte zaehlen mit – im Kalender
+// tragen sie ebenfalls ein Band (planBaenderHTML), und ein angetippter Tag darin soll
+// denselben Plan benennen, den das Band zeigt.
+function planAmTag(datum) {
+  return planListe.find(p => p.start && p.ende && datum >= p.start && datum <= p.ende) || null;
 }
 
 // In welcher Woche des Plans liegt ein Datum?
