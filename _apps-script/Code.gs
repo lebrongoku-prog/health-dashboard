@@ -169,12 +169,18 @@ function selbsttest() {
   zeilen.push(fehlt.length ? '   FEHLT – ' + fehlt.join(', ') : '   OK – alle vorhanden.');
 
   zeilen.push('4. Zeitplan fuer den automatischen Import:');
-  var trigger = ScriptApp.getProjectTriggers().filter(function (t) {
-    return t.getHandlerFunction() === 'writeToSheet';
-  });
-  zeilen.push(trigger.length
-    ? '   OK – ' + trigger.length + ' Zeitplan aktiv.'
+  var alle = ScriptApp.getProjectTriggers();
+  var eigene = alle.filter(function (t) { return t.getHandlerFunction() === 'writeToSheet'; });
+  zeilen.push(eigene.length
+    ? '   OK – ' + eigene.length + ' Zeitplan fuer writeToSheet aktiv.'
     : '   FEHLT – einmal installiereStuendlichenImport() ausfuehren.');
+  // Alle Zeitplaene auflisten: hier faellt auf, wenn noch ein alter aus frueheren
+  // Zeiten mitlaeuft oder etwas anderes den Import schon anstoesst.
+  zeilen.push('   Alle Zeitplaene im Projekt: ' + (alle.length
+    ? alle.map(function (t) { return t.getHandlerFunction(); }).join(', ')
+    : 'keine'));
+  zeilen.push('   (writeToSheet ruft am Ende selbst importWorkoutData auf – ein '
+    + 'Zeitplan deckt damit BEIDE Sheets ab.)');
 
   var text = zeilen.join('\n');
   Logger.log(text);
