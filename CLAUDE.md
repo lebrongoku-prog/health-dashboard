@@ -296,7 +296,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   alle** Ziele — auch die erreichten und die ohne Wert (dann `—`). Vorher standen dort
   nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war, liess sich
   nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
-  „Ziele" + `scopeBadge`), darunter `chart-note` („3 von 5 erreicht") und eine
+  „Ziele" + `scopeBadge`) und darunter eine
   `stats-list` mit einer Zeile je Ziel: `Wert · Ziel X`, wobei der Zielteil in
   `--txt3` zurücktritt. Trägt ein Ziel eine Einheit, die im Messwert schon steht,
   kürzt `ZIELE[key].fmtZiel` sie im Zielteil weg (`4 / Woche · Ziel 3`). **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein

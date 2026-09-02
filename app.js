@@ -1204,12 +1204,8 @@ function zielUebersichtHTML() {
     return statZeile(z.label, `${z.fmt(v)}${zielTxt}`, ok ? '#10B981' : '#F59E0B');
   }).join('');
 
-  const mitWert = pruef.filter(([,v]) => v != null);
-  const erreicht = mitWert.filter(([k,v]) => zielErfuellt(k,v)).length;
-
   return `<div class="chart-card">
     <div class="chart-head"><h3>Ziele</h3>${scopeBadge('letzter Tag')}</div>
-    ${mitWert.length ? `<div class="chart-note">${erreicht} von ${mitWert.length} erreicht</div>` : ''}
     <div class="stats-list">${zeilen}</div>
   </div>`;
 }
