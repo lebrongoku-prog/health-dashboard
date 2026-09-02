@@ -1613,9 +1613,12 @@ function datenStandZeilen() {
   }
   return statZeile('Daten bis', fmtDayShort(newest)+ageTxt, stale ? '#F59E0B' : null)
        + statZeile('Zuletzt geladen', loaded)
-       // Ohne gueltige Anmeldung laeuft die App aus dem Zwischenspeicher weiter.
-       // Das gehoert sichtbar hierher, nicht nur in die Leiste oben, die man wegtippt.
-       + (accessToken ? '' : statZeile('Google-Anmeldung', 'abgelaufen', '#F59E0B'));
+       // Stand der Anmeldung: eine Zeile, drei moegliche Werte. Der Text kommt aus
+       // anmeldeStand() – frueher stand hier eine zweite, eigene Pruefung auf
+       // `accessToken`, die den Fall „nur Lesen" gar nicht kannte und nach dem Umbau
+       // dieselbe Zeile ein zweites Mal erzeugte.
+       + (()=>{ const a = anmeldeStand();
+           return statZeile('Google-Anmeldung', a.text, a.farbe); })();
 }
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
@@ -1772,8 +1775,6 @@ function pgOverview() {
     <div class="chart-card app-karte">
       <div class="stats-list">
         ${datenStandZeilen()}
-        ${(()=>{ const a = anmeldeStand();
-          return statZeile('Google-Anmeldung', a.text, a.farbe); })()}
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
       </div>
       ${(()=>{ const a = anmeldeStand();
@@ -1783,7 +1784,7 @@ function pgOverview() {
         <div class="app-hinweis">${a.hinweis}</div>` : ''; })()}
       <button class="update-btn refresh-btn">Daten aktualisieren</button>
       <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
-      <button class="update-btn">App-Version aktualisieren</button>
+      <button class="update-btn appver-btn">App-Version aktualisieren</button>
       <div class="app-hinweis">Holt eine neue Fassung der App selbst. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
     </div>
     </div>
@@ -4089,8 +4090,12 @@ document.body.addEventListener('click', (e) => {
     }
     return;
   }
+  // Jeder Knopf hat eine EIGENE Auslöser-Klasse. `.update-btn` ist reine Optik und
+  // sitzt auf allen dreien – wurde sie hier abgefragt, loeste „Mit Google anmelden"
+  // zusaetzlich das App-Update samt Rueckfrage aus.
+  if (t.closest('.anmelde-btn')) { signIn(); return; }
   if (t.closest('.refresh-btn')) { refreshData(); return; }
-  if (t.closest('.update-btn')) { jetztAktualisieren(); return; }
+  if (t.closest('.appver-btn'))  { jetztAktualisieren(); return; }
   if (t.closest('.dark-toggle')) {
     setDarkMode(!document.body.classList.contains('dark'));
     return;
@@ -4165,7 +4170,9 @@ async function versionAnzeigen() {
 // Service Worker abmelden, Caches leeren, neu laden. Der Google-Token liegt im
 // localStorage und bleibt unberührt – man muss sich also nicht neu anmelden.
 async function jetztAktualisieren() {
-  const knoepfe = document.querySelectorAll('.update-btn');
+  // Nur der eigene Knopf – `.update-btn` sitzt auch auf „Daten aktualisieren" und
+  // „Mit Google anmelden", die hier nichts zu suchen haben.
+  const knoepfe = document.querySelectorAll('.appver-btn');
   if (!confirm('Jetzt aktualisieren?\n\nDie App lädt den neuesten Stand vom Server und startet neu. Deine Anmeldung und deine Daten bleiben erhalten.')) return;
   knoepfe.forEach(b => { b.disabled = true; b.textContent = 'Wird geladen…'; });
   try {
@@ -4263,7 +4270,6 @@ function appKarteAuffrischen() {
   if (_renderedTabs.has('overview')) _renderTab('overview');
 }
 document.body.addEventListener('click', (e) => {
-  if (e.target.closest('.anmelde-btn')) { signIn(); return; }
   if (!e.target.closest('.hinweis-akt')) return;
   if (_hinweisZustand === 'neu') { hinweisAus(); _refreshAfterStateChange(); }
 });
@@ -4304,7 +4310,18 @@ async function refreshData() {
   // statt drehen. Der alte Text wird am Element gemerkt und danach zurueckgesetzt.
   // Ohne gültige Anmeldung gibt es nichts zu holen. Frueher lief der Abruf trotzdem
   // los und endete stumm – jetzt sagt es die Leiste oben und der Knopf fuehrt hin.
-  if (!accessToken) { hinweisAuthZeigen(); return; }
+  if (!accessToken) {
+    // Erst die Karte auffrischen (ersetzt die Knoepfe), dann am NEUEN Knopf antworten.
+    // Ohne diese Rueckmeldung passierte auf den Tipp sichtbar gar nichts – die Zeile
+    // darueber sagte den Grund zwar, aber nicht als Antwort auf den Druck.
+    hinweisAuthZeigen();
+    document.querySelectorAll('.refresh-btn').forEach(b => {
+      const alt = b.textContent;
+      b.textContent = 'Anmeldung nötig';
+      setTimeout(() => { if (b.isConnected) b.textContent = alt; }, 2500);
+    });
+    return;
+  }
   const btns = document.querySelectorAll('.refresh-btn');
   btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
   // 1. Apps Script: Drive → Sheet aktualisieren. `no-cors` liefert keine auswertbare

@@ -155,7 +155,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   App-Karte** der Übersicht, nicht mehr als Leiste über allen Tabs: Zeile
   „Google-Anmeldung" (`aktiv` / `nur Lesen` / `abgelaufen`, die letzten beiden
   orange), darunter Knopf + Erklärung — beide nur, wenn wirklich etwas zu tun ist.
-  `anmeldeStand()` ist die **einzige** Quelle dafür. `#hinweis-oben` bleibt allein
+  `anmeldeStand()` ist die **einzige** Quelle dafür — die Zeile entsteht in
+  `datenStandZeilen()`, sonst stand sie zweimal da.
+  **Jeder Knopf der App-Karte hat eine eigene Auslöser-Klasse** (`.anmelde-btn`,
+  `.refresh-btn`, `.appver-btn`); `.update-btn` ist reine Optik und sitzt auf allen
+  dreien. Wird sie als Auslöser abgefragt, löst „Mit Google anmelden" zusätzlich das
+  App-Update samt Rückfrage aus — genau das war passiert. `#hinweis-oben` bleibt allein
   dem Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
   **Folge:** Eine abgelaufene Anmeldung fällt erst auf, wenn man die App-Karte
   aufklappt oder etwas speichern will — das ist die gewollte Zurückhaltung.
