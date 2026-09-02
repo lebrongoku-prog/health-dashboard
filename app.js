@@ -1180,27 +1180,34 @@ function zielUebersichtHTML() {
   const trainProWoche = letzte7.filter(r => workoutData[r.date]?.durationMin > 0).length;
   const letzterVo2 = [...allData].reverse().find(r => r.vo2max != null)?.vo2max ?? null;
 
+  // ALLE Ziele, immer – auch die erreichten und die ohne Wert. Vorher zeigte die
+  // Karte nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war,
+  // liess sich nicht ablesen. Aufbau wie die uebrigen Karten: Titel + Wertzeilen.
   const pruef = [
     ['sleepTotal', last.sleepTotal],
     ['restHR',     last.restHR],
     ['hrv',        last.hrv],
     ['trainDays',  letzte7.length >= 7 ? trainProWoche : null],
     ['vo2max',     letzterVo2]
-  ].filter(([,v]) => v != null);
+  ];
+  if (!allData.length) return '';
 
-  if (!pruef.length) return '';
-  const verfehlt = pruef.filter(([k,v]) => zielErfuellt(k,v) === false);
-  const alleOk = verfehlt.length === 0;
+  const zeilen = pruef.map(([k, v]) => {
+    const z = ZIELE[k];
+    const zielTxt = `<span style="color:var(--txt3);font-weight:400"> · Ziel ${z.fmt(z.ziel)}</span>`;
+    if (v == null) return statZeile(z.label, `—${zielTxt}`, null);
+    const ok = zielErfuellt(k, v);
+    // Farbe ist hier die Bewertung selbst: gruen erreicht, orange verfehlt.
+    return statZeile(z.label, `${z.fmt(v)}${zielTxt}`, ok ? '#10B981' : '#F59E0B');
+  }).join('');
 
-  const details = verfehlt.map(([k,v]) =>
-    `<span class="zs-item">${ZIELE[k].label} <strong>${ZIELE[k].fmt(v)}</strong> statt ${ZIELE[k].fmt(ZIELE[k].ziel)}</span>`
-  ).join('');
+  const mitWert = pruef.filter(([,v]) => v != null);
+  const erreicht = mitWert.filter(([k,v]) => zielErfuellt(k,v)).length;
 
-  return `<div class="ziel-status ${alleOk?'ok':'ab'}">
-    <div class="zs-kopf"><strong>${alleOk
-      ? `Alle ${pruef.length} Ziele erreicht`
-      : `${verfehlt.length} von ${pruef.length} Zielen verfehlt`}</strong>${scopeBadge('letzter Tag')}</div>
-    ${alleOk ? '' : `<div class="zs-liste">${details}</div>`}
+  return `<div class="chart-card">
+    <div class="chart-head"><h3>Ziele</h3>${scopeBadge('letzter Tag')}</div>
+    ${mitWert.length ? `<div class="chart-note">${erreicht} von ${mitWert.length} erreicht</div>` : ''}
+    <div class="stats-list">${zeilen}</div>
   </div>`;
 }
 

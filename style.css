@@ -366,22 +366,6 @@ body.dark .scope-badge{background:#0F172A}
 .stat-hint{font-size:.69rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
 
 /* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
-.ziel-status{
-  background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
-  padding:.6rem .7rem;margin-bottom:.7rem;border-left:4px solid #10B981;
-}
-.ziel-status.ab{border-left-color:#F97316}
-.zs-kopf{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;font-size:.86rem;color:var(--txt)}
-.zs-kopf .scope-badge{margin-left:auto}
-.zs-liste{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
-.zs-item{
-  font-size:.7rem;color:var(--txt2);background:var(--bg);
-  border:1px solid var(--border);border-radius:8px;padding:.2rem .45rem;
-}
-.zs-item strong{color:#B45309}
-body.dark .zs-item{background:#0F172A}
-body.dark .zs-item strong{color:#FDBA74}
-
 /* ── ⓘ-Erklärungen ───────────────────────────────────────
    Beantworten pro Kennzahl: Was ist das, und welche Richtung ist gut? Ohne die
    zweite Angabe lässt sich weder Farbe noch Pfeil deuten. */

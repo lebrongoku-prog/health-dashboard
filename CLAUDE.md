@@ -192,7 +192,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','laufplan','training']` (5 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
-- **Übersicht (`pgOverview`):** Zielstatus-Zeile → Tageswert-Kacheln → Verlaufs-Chart →
+- **Übersicht (`pgOverview`):** Ziel-Karte → Tageswert-Kacheln → Verlaufs-Chart →
   Muster-Insights → App-Karte (installierte Version + Update-Knopf). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/`.nav-today`/
@@ -287,14 +287,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   die Angabe machte den Wert nur unnötig fett. Gleiches gilt für den Fall „kein
   Signal" — dann `null` übergeben, nicht eine graue Farbe.
 - **Schritte sind KEINE Zielmetrik mehr** (auf Wunsch entfernt): weder in `ZIELE`
-  noch in der Statuszeile `zielUebersichtHTML()` noch als Minikachel. Die vierte
+  noch in der Ziel-Karte `zielUebersichtHTML()` noch als Minikachel. Die vierte
   Minikachel zeigt an Trainingstagen die Dauer der Einheit und sonst die **Zahl der
   Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
   **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
   dort sind sie Messwert, nicht Ziel.
+- **Ziel-Karte (`zielUebersichtHTML()`, erste Karte der Übersicht):** zeigt **immer
+  alle** Ziele — auch die erreichten und die ohne Wert (dann `—`). Vorher standen dort
+  nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war, liess sich
+  nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
+  „Ziele" + `scopeBadge`), darunter `chart-note` („3 von 5 erreicht") und eine
+  `stats-list` mit einer Zeile je Ziel: `Wert · Ziel X`, wobei der Zielteil in
+  `--txt3` zurücktritt. **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein
+  Wert** — die Farbe IST hier die Bewertung. Die frühere eigene Optik
+  (`.ziel-status` mit farbiger Kante, `.zs-*`-Pillen) ist entfallen.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
-  Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
+  Ziel-Karte `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Die
