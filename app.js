@@ -1141,7 +1141,10 @@ const ZIELE = {
   sleepTotal: { label:'Schlaf',       ziel:7.5,   richtung:'hoch', fmt:v=>alsStdMin(v) },
   restHR:     { label:'Ruhepuls',     ziel:60,    richtung:'tief', fmt:v=>Math.round(v)+' bpm' },
   hrv:        { label:'HRV',          ziel:50,    richtung:'hoch', fmt:v=>Math.round(v)+' ms' },
-  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche' },
+  // fmtZiel: kuerzere Fassung fuer die Zielangabe. In der Ziel-Karte steht der
+  // Zielwert direkt hinter dem Messwert – die Einheit ist dort schon gesagt und
+  // haette sich sonst wiederholt („4 / Woche · Ziel 3 / Woche").
+  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche', fmtZiel:v=>String(v) },
   vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) },
   laufKm:     { label:'Laufkilometer', ziel:25,  richtung:'hoch', fmt:v=>zahl(v,1)+' km/Woche' }
 };
@@ -1194,7 +1197,7 @@ function zielUebersichtHTML() {
 
   const zeilen = pruef.map(([k, v]) => {
     const z = ZIELE[k];
-    const zielTxt = `<span style="color:var(--txt3);font-weight:400"> · Ziel ${z.fmt(z.ziel)}</span>`;
+    const zielTxt = `<span style="color:var(--txt3);font-weight:400"> · Ziel ${(z.fmtZiel || z.fmt)(z.ziel)}</span>`;
     if (v == null) return statZeile(z.label, `—${zielTxt}`, null);
     const ok = zielErfuellt(k, v);
     // Farbe ist hier die Bewertung selbst: gruen erreicht, orange verfehlt.
@@ -1758,7 +1761,7 @@ function pgOverview() {
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
     <button type="button" class="weitere-btn" data-musterklapp aria-expanded="${_musterOffen?'true':'false'}">
-      Muster &amp; Zusammenhänge${scopeBadge('gesamter Datenbestand')}<span class="weitere-pfeil">${_musterOffen?'▾':'▸'}</span>
+      Muster &amp; Zusammenhänge<span class="weitere-pfeil">${_musterOffen?'▾':'▸'}</span>
     </button>
     <div class="pi-grid" style="${_musterOffen?'':'display:none'}">
       ${patternIns.map(p=>{
@@ -1940,7 +1943,6 @@ function pgHerz() {
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
       </div>
-      <div class="chart-note">Beide Kurven teilen sich eine Skala: gleiche Höhe = gleicher Zahlenwert.</div>
       <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
       <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe

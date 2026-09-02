@@ -298,7 +298,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
   „Ziele" + `scopeBadge`), darunter `chart-note` („3 von 5 erreicht") und eine
   `stats-list` mit einer Zeile je Ziel: `Wert · Ziel X`, wobei der Zielteil in
-  `--txt3` zurücktritt. **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein
+  `--txt3` zurücktritt. Trägt ein Ziel eine Einheit, die im Messwert schon steht,
+  kürzt `ZIELE[key].fmtZiel` sie im Zielteil weg (`4 / Woche · Ziel 3`). **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein
   Wert** — die Farbe IST hier die Bewertung. Die frühere eigene Optik
   (`.ziel-status` mit farbiger Kante, `.zs-*`-Pillen) ist entfallen.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
