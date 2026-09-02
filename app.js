@@ -1141,7 +1141,6 @@ const ZIELE = {
   sleepTotal: { label:'Schlaf',       ziel:7.5,   richtung:'hoch', fmt:v=>alsStdMin(v) },
   restHR:     { label:'Ruhepuls',     ziel:60,    richtung:'tief', fmt:v=>Math.round(v)+' bpm' },
   hrv:        { label:'HRV',          ziel:50,    richtung:'hoch', fmt:v=>Math.round(v)+' ms' },
-  steps:      { label:'Schritte',     ziel:10000, richtung:'hoch', fmt:v=>Math.round(v).toLocaleString('de-CH') },
   trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche' },
   vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) },
   laufKm:     { label:'Laufkilometer', ziel:25,  richtung:'hoch', fmt:v=>zahl(v,1)+' km/Woche' }
@@ -1185,7 +1184,6 @@ function zielUebersichtHTML() {
     ['sleepTotal', last.sleepTotal],
     ['restHR',     last.restHR],
     ['hrv',        last.hrv],
-    ['steps',      last.steps],
     ['trainDays',  letzte7.length >= 7 ? trainProWoche : null],
     ['vo2max',     letzterVo2]
   ].filter(([,v]) => v != null);
@@ -1213,7 +1211,6 @@ const ERKLAERUNG = {
   sleepTotal: 'Tatsächlich geschlafene Zeit pro Nacht (ohne Wachliegen). Mehr ist besser, bis etwa 9 Stunden.',
   restHR:     'Ruhepuls: Herzschläge pro Minute in völliger Ruhe. Weniger ist besser – ein sinkender Ruhepuls zeigt wachsende Ausdauer.',
   hrv:        'Herzratenvariabilität: Schwankung der Abstände zwischen zwei Herzschlägen. Mehr ist besser – hohe Werte stehen für gute Erholung.',
-  steps:      'Zurückgelegte Schritte pro Tag. Mehr ist besser.',
   trainDays:  'Tage mit einem Eintrag im Workout-Sheet, gezählt über die letzten sieben Tage.',
   vo2max:     'VO₂max: geschätzte maximale Sauerstoffaufnahme – das gängigste Mass für Ausdauerleistung. Mehr ist besser.',
   pace:       'Pace: benötigte Zeit pro Kilometer. Weniger ist besser (schneller).',
@@ -1228,8 +1225,8 @@ const ERKLAERUNG_MINI = {
   sleepTotal: 'Oben die Schlafdauer der letzten Nacht, darunter der Abstand zum Durchschnitt der sieben Nächte davor. „+18m vs. Ø" heisst: 18 Minuten mehr als üblich. Mehr ist besser.',
   restHR:     'Oben der Ruhepuls des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „−2 vs. Ø" heisst: 2 Schläge weniger als üblich. Weniger ist besser.',
   hrv:        'Oben die HRV des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „+3 vs. Ø" heisst: 3 ms mehr als üblich. Mehr ist besser.',
-  steps:      'Oben die Schritte des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „+1 063 vs. Ø" heisst: gut tausend Schritte mehr als üblich. Mehr ist besser.',
-  training:   'Oben die Trainingsminuten des letzten Tages, darunter der Abstand zum Durchschnitt der Trainingstage aus den sieben Tagen davor. Tage ohne Training zählen nicht in den Durchschnitt.'
+  training:   'Oben die Trainingsminuten des letzten Tages, darunter der Abstand zum Durchschnitt der Trainingstage aus den sieben Tagen davor. Tage ohne Training zählen nicht in den Durchschnitt.',
+  trainWoche: 'Anzahl Tage mit Training in den letzten sieben Tagen, darunter der Vergleich mit den sieben Tagen davor. Diese Kachel erscheint an Tagen ohne Training – an Trainingstagen steht hier die Dauer der Einheit. Mehr ist besser.'
 };
 
 // Antippbares Fragezeichen. Der Text steckt als eigenes Element im Anker, damit ihn
@@ -1646,7 +1643,6 @@ function pgOverview() {
     sleep: mittel(priorDays,'sleepTotal'),
     hr:    mittel(priorDays,'restHR'),
     hrv:   mittel(priorDays,'hrv'),
-    steps: mittel(priorDays,'steps'),
     vo2:   mittel(priorDays.filter(r=>r.vo2max),'vo2max')
   };
 
@@ -1658,7 +1654,6 @@ function pgOverview() {
   const slLast = lastDay.sleepTotal;
   const hrLast = lastDay.restHR;
   const hvLast = lastDay.hrv;
-  const stLast = lastDay.steps;
 
 
   // Verlaufs-Chart + Trend folgen jetzt dem globalen Zeitfilter (D = gewähltes Fenster).
@@ -1720,10 +1715,19 @@ function pgOverview() {
               <div class="ti-metric-val">${Math.round(trMin)} min</div>
               ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
             </div>`;}
-            return`<div class="ti-metric" style="border-top:3px solid #10B981;background:rgba(16,185,129,.05)">
-              <div class="ti-metric-lbl">🚶 Schritte ${infoMini('steps')}</div>
-              <div class="ti-metric-val">${stLast!=null?Math.round(stLast).toLocaleString('de-CH'):'—'}</div>
-              ${stLast!=null&&avg7d.steps!=null?`<div class="ti-metric-delta ${stLast-avg7d.steps>10?'pos':stLast-avg7d.steps<-10?'neg':'neu'}">${(()=>{const d=Math.round(stLast-avg7d.steps);return(d>=0?'+':'')+d.toLocaleString('de-CH')+' vs. Ø';})()}</div>`:''}
+            // Kein Training an diesem Tag: statt der Tagesdauer die Anzahl der
+            // Trainingstage im Siebentagefenster – die Kachel bleibt damit beim
+            // Thema Training. Die frueher hier stehenden Schritte sind auf Wunsch
+            // ganz entfallen (auch als Zielmetrik).
+            const tage7   = allData.slice(-7);
+            const tage7v  = allData.slice(-14, -7);
+            const zaehl   = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
+            const nWoche  = zaehl(tage7);
+            const nVor    = tage7v.length >= 7 ? zaehl(tage7v) : null;
+            return`<div class="ti-metric" style="border-top:3px solid #F97316;background:rgba(249,115,22,.07)">
+              <div class="ti-metric-lbl">🏃 Trainings ${infoMini('trainWoche')}</div>
+              <div class="ti-metric-val">${nWoche}<span class="ti-metric-einheit"> / 7 Tage</span></div>
+              ${nVor!=null?`<div class="ti-metric-delta ${nWoche-nVor>0?'pos':nWoche-nVor<0?'neg':'neu'}">${(()=>{const d=nWoche-nVor;return(d>=0?'+':'')+d+' vs. Vorwoche';})()}</div>`:''}
             </div>`;
           })()}
         </div>
@@ -1768,8 +1772,15 @@ function pgOverview() {
     <div class="chart-card app-karte">
       <div class="stats-list">
         ${datenStandZeilen()}
+        ${(()=>{ const a = anmeldeStand();
+          return statZeile('Google-Anmeldung', a.text, a.farbe); })()}
         ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
       </div>
+      ${(()=>{ const a = anmeldeStand();
+        // Knopf und Erklaerung nur, wenn wirklich etwas zu tun ist – sonst staende hier
+        // dauerhaft eine Handlungsaufforderung ohne Anlass.
+        return a.hinweis ? `<button class="update-btn anmelde-btn">Mit Google anmelden</button>
+        <div class="app-hinweis">${a.hinweis}</div>` : ''; })()}
       <button class="update-btn refresh-btn">Daten aktualisieren</button>
       <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
       <button class="update-btn">App-Version aktualisieren</button>
@@ -2838,13 +2849,13 @@ async function _blattUmschreiben(sheetId, blatt, spalten, umbauen) {
 // war der schlimmste der frueheren Fehler.
 function _schreibenErlaubt() {
   if (!accessToken) {
-    _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. Oben anmelden und erneut versuchen.';
+    _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. In der Übersicht unter „App“ neu anmelden und erneut versuchen.';
     hinweisAuthZeigen();
     if (currentScreen === 'laufplan') _renderTab('laufplan');
     return false;
   }
   if (!darfSchreiben) {
-    _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. Oben anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
+    _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. In der Übersicht unter „App“ neu anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
     hinweisSchreibrechtZeigen();
     if (currentScreen === 'laufplan') _renderTab('laufplan');
     return false;
@@ -2862,7 +2873,7 @@ async function _schreibVorgang(tun) {
     return true;
   } catch (e) {
     if (e.message === 'AUTH') {
-      _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. Oben anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
+      _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. In der Übersicht unter „App“ neu anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
       hinweisSchreibrechtZeigen();
     } else {
       _lpFehler = 'Nicht gespeichert: ' + e.message;
@@ -4204,11 +4215,10 @@ function blickAnkerWiederherstellen() {
 }
 
 // ── Hinweisleiste oben ─────────────────────────────────
-// Zwei Zustaende, ein Element:
-//   'auth' – die Anmeldung ist abgelaufen, gezeigt wird der Stand aus dem
-//            Zwischenspeicher. Der Knopf fuehrt zur Google-Anmeldung.
-//   'neu'  – im Hintergrund wurde frisch geladen, waehrend der Nutzer schon
-//            arbeitete. Der Knopf zeichnet neu.
+// Nur noch EIN Zustand: 'neu' – im Hintergrund wurde frisch geladen, waehrend der
+// Nutzer schon arbeitete; der Knopf zeichnet neu. Der frueher hier gezeigte Stand
+// der Google-Anmeldung ist auf Wunsch in die App-Karte gewandert (anmeldeStand()):
+// er verlangt keine sofortige Antwort und muss deshalb nicht ueber allen Tabs stehen.
 // Ohne Zustand verschwindet die Leiste und gibt den Platz wieder frei.
 let _hinweisZustand = null;
 function hinweisZeigen(zustand, text, knopf) {
@@ -4231,20 +4241,31 @@ function hinweisAus() {
   document.body.classList.remove('hinweis-an');
   document.body.style.removeProperty('--hinweis-h');
 }
-function hinweisAuthZeigen() {
-  const stand = allData.length ? fmtDayShort(allData[allData.length-1].date) : '—';
-  hinweisZeigen('auth', `Daten bis ${stand} · Anmeldung nötig zum Aktualisieren`, 'Anmelden');
+// Der Stand der Google-Anmeldung steht NICHT mehr als Leiste ueber allen Tabs,
+// sondern als Zeile „Google-Anmeldung" in der App-Karte der Uebersicht – dort, wo
+// auch die uebrigen App-Angelegenheiten liegen. Die Leiste oben bleibt allein dem
+// Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
+// `anmeldeStand()` ist die einzige Quelle fuer diesen Zustand.
+function anmeldeStand() {
+  if (!accessToken)   return { schluessel:'abgelaufen', text:'abgelaufen', farbe:'#F59E0B',
+    hinweis:'Ohne Anmeldung zeigt die App den zuletzt geladenen Stand. Neue Daten holen und Laufpläne speichern gehen erst nach dem Anmelden wieder.' };
+  if (!darfSchreiben) return { schluessel:'nurLesen', text:'nur Lesen', farbe:'#F59E0B',
+    hinweis:'Diese Anmeldung stammt von vor der Umstellung und darf nur lesen. Zum Speichern von Laufplänen einmal neu anmelden – Google fragt dabei nach der erweiterten Erlaubnis.' };
+  return { schluessel:'aktiv', text:'aktiv', farbe:null, hinweis:null };
 }
-// Eigener Zustand fuer den Fall „angemeldet, aber nur mit Leserecht": nach der
-// Umstellung auf das Schreiben ueber die Google-Anmeldung tragen alte Anmeldungen
-// die neue Erlaubnis noch nicht. Lesen laeuft weiter, nur das Speichern fragt nach.
-function hinweisSchreibrechtZeigen() {
-  hinweisZeigen('recht', 'Zum Speichern einmal neu anmelden', 'Anmelden');
+// Frueher zeigten diese beiden die Leiste oben. Sie frischen jetzt die App-Karte auf,
+// damit die Zeile dort den neuen Stand traegt – der Name bleibt, die Aufrufer stehen
+// an den Stellen, an denen der Zustand tatsaechlich kippt (Abruf, Schreibversuch).
+function hinweisAuthZeigen()        { appKarteAuffrischen(); }
+function hinweisSchreibrechtZeigen(){ appKarteAuffrischen(); }
+// Nur die Uebersicht neu aufbauen, und auch das nur, wenn sie gerade gerendert ist.
+function appKarteAuffrischen() {
+  if (_renderedTabs.has('overview')) _renderTab('overview');
 }
 document.body.addEventListener('click', (e) => {
+  if (e.target.closest('.anmelde-btn')) { signIn(); return; }
   if (!e.target.closest('.hinweis-akt')) return;
-  if (_hinweisZustand === 'auth' || _hinweisZustand === 'recht') { signIn(); return; }
-  if (_hinweisZustand === 'neu')  { hinweisAus(); _refreshAfterStateChange(); }
+  if (_hinweisZustand === 'neu') { hinweisAus(); _refreshAfterStateChange(); }
 });
 
 // ── Erste Berührung merken ─────────────────────────────
@@ -4265,7 +4286,7 @@ async function hintergrundLaden() {
   const ergebnis = await loadFromAPI({ still: true });
   if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
   if (ergebnis !== true) return;               // Netzfehler: der alte Stand bleibt stehen
-  if (_hinweisZustand === 'auth') hinweisAus();   // 'recht' bleibt stehen – es gilt weiter
+  appKarteAuffrischen();   // Anmeldung wieder gueltig → Zeile in der App-Karte nachziehen
   // Identischer Stand – der Normalfall, wenn die App kurz nacheinander geoeffnet wird.
   // Dann nichts anfassen: ein Neuaufbau saehe nach Ruckeln aus, ohne etwas zu zeigen.
   if (datenStand() === vorher) return;
@@ -4305,6 +4326,7 @@ async function refreshData() {
   if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
+  appKarteAuffrischen();
   updateNavUI();
   _refreshAfterStateChange();
 }

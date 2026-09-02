@@ -517,6 +517,10 @@ body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{ba
 .ti-metric .info-i{width:13px;height:13px}
 .ti-metric-lbl{font-size:.73rem;font-weight:600;color:var(--txt3);margin-bottom:.35rem;display:flex;align-items:center;justify-content:center;gap:.25rem;flex-wrap:wrap}
 .ti-metric-val{font-size:1.18rem;font-weight:800;color:var(--txt);line-height:1.2}
+/* Bezugsangabe direkt am Wert („3 / 7 Tage"): kleiner und leichter, damit die Zahl
+   die Kachel traegt. Die uebrigen Kacheln zeigen den letzten Tag und brauchen das
+   nicht – diese hier fasst ein Fenster zusammen und muss es sagen. */
+.ti-metric-einheit{font-size:.62em;font-weight:600;color:var(--txt3)}
 .ti-metric-delta{font-size:.74rem;font-weight:500;margin-top:.25rem}
 .ti-metric-delta.pos{color:#10B981}
 .ti-metric-delta.neg{color:#EF4444}

@@ -151,9 +151,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Abgelaufene Anmeldung sperrt nicht mehr:** `_fetchSheet` leitet **nicht** mehr von
   selbst zu Google weiter (das riss den Nutzer mitten aus der Ansicht), sondern liefert
   `{authError:true}`; der Aufrufer entscheidet. Ohne Token laufen Anzeige und
-  Zeitfilter aus dem Zwischenspeicher weiter, die Hinweisleiste oben
-  (`#hinweis-oben`, ein Element für beide Zustände) bietet die Anmeldung an, und die
-  App-Karte zeigt „Google-Anmeldung — abgelaufen". **Schreiben ist dann gesperrt**
+  Zeitfilter aus dem Zwischenspeicher weiter. Der **Stand der Anmeldung steht in der
+  App-Karte** der Übersicht, nicht mehr als Leiste über allen Tabs: Zeile
+  „Google-Anmeldung" (`aktiv` / `nur Lesen` / `abgelaufen`, die letzten beiden
+  orange), darunter Knopf + Erklärung — beide nur, wenn wirklich etwas zu tun ist.
+  `anmeldeStand()` ist die **einzige** Quelle dafür. `#hinweis-oben` bleibt allein
+  dem Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
+  **Folge:** Eine abgelaufene Anmeldung fällt erst auf, wenn man die App-Karte
+  aufklappt oder etwas speichern will — das ist die gewollte Zurückhaltung.
+  Fehlertexte dürfen deshalb **nicht** mehr auf „oben" verweisen, sondern auf
+  „Übersicht → App". **Schreiben ist dann gesperrt**
   (`_schreibenErlaubt()`) — seit der Umstellung schon deshalb, weil die App ohne
   Anmeldung gar nicht mehr ins Sheet schreiben kann.
 - **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
@@ -274,6 +281,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Deshalb dort **nie** `var(--txt2)` als Farbe übergeben: Grau ist bereits der Standard,
   die Angabe machte den Wert nur unnötig fett. Gleiches gilt für den Fall „kein
   Signal" — dann `null` übergeben, nicht eine graue Farbe.
+- **Schritte sind KEINE Zielmetrik mehr** (auf Wunsch entfernt): weder in `ZIELE`
+  noch in der Statuszeile `zielUebersichtHTML()` noch als Minikachel. Die vierte
+  Minikachel zeigt an Trainingstagen die Dauer der Einheit und sonst die **Zahl der
+  Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
+  **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
+  dort sind sie Messwert, nicht Ziel.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Statuszeile `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
