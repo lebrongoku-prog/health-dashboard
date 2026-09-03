@@ -748,36 +748,76 @@ h5,
    sagt, ob laut Plan ein Lauf vorgesehen war, der Kern, ob er stattgefunden hat.
    Bewusst KEINE Abstufung nach Strecke – der Kalender beantwortet nur "gelaufen
    oder nicht". */
-:root { --lp-zelle: 14px; --lp-label-w: 20px; --lp-label-gap: 3px; --lp-pad-x: 1px;
-        --lp-band-over: 3px; --lp-mask-over: 6px; --lp-monate-gap: 8px; }
+/* Masse des Kalenders – 1:1 aus FitTrack uebernommen (Leonard-Wunsch 03.09.2026).
+   Das Kaestchen ist dort halb so gross wieder: 21 statt 14 px. Folge: Es passen rund
+   14 statt 20 Wochen ins Bild, dafuer sind die Tage sicher zu treffen.
+   --lp-gap steht hier UND wird vom JS gelesen (planBaenderHTML, lpKalenderScrollen).
+   Frueher stand die Luecke an vier Stellen fest im CSS und einmal gerechnet im JS;
+   liefen die auseinander, verschoben sich die Planrahmen gegenueber den Spalten –
+   je weiter rechts, desto staerker. */
+:root { --lp-zelle: 21px; --lp-gap: 3px; --lp-label-w: 24px; --lp-label-gap: 4px;
+        --lp-pad-x: 1px; --lp-pad-y: 5px; --lp-band-over: 4px;
+        --lp-monate-h: 16px; --lp-monate-gap: 10px; }
+
+/* WICHTIG – hier steckt Erfahrung aus FitTrack drin, bitte nicht "aufraeumen":
+   `.lp-body` ist ein GEWOEHNLICHER BLOCK, und `.lp-scroll` darin ebenfalls. Kein Flex,
+   kein Grid. Als Flex-Kind stockte das Wischen auf dem iPhone mitten in der Geste –
+   ein Flex-Kind bekommt seine Breite vom Layout-Algorithmus des Elternteils, ein Block
+   schlicht vom umgebenden Kasten. Platz fuer die Wochentagsspalte macht deshalb ein
+   `margin-left`, und die Spalte selbst liegt absolut darueber: Sie steht damit
+   AUSSERHALB des Scrollers – die Kaestchen verschwinden an dessen Kante, statt von
+   einer deckenden Flaeche ueberdeckt zu werden. Die fruehere Loesung (sticky Spalte +
+   Maske in Kartenfarbe) brauchte eine deckende Farbe; diese kommt ohne aus. */
+.lp-body{position:relative}
 /* NUR waagrecht scrollen: sobald eine Achse nicht mehr "visible" ist, macht der
    Browser aus der anderen ebenfalls "auto" – das Raster liesse sich sonst senkrecht
    verschieben. Das Polster oben und unten nimmt den Ueberstand der Plan-Rahmen auf. */
-.lp-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:4px var(--lp-pad-x)}
+.lp-scroll{
+  margin-left:calc(var(--lp-pad-x) + var(--lp-label-w) + var(--lp-label-gap));
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  padding:var(--lp-pad-y) var(--lp-pad-x) var(--lp-pad-y) 0;
+  /* Haelt die waagrechte Geste im Kalender, statt sie an #tab-container (Snap-Scroller)
+     weiterzureichen. Preis: Aus dem Kalender heraus laesst sich der Tab nicht per Wisch
+     wechseln – ueber die Leiste unten geht es weiter. */
+  overscroll-behavior-x:contain;
+}
+/* Unsichtbarer Halt im Scroller: Ein klebendes Kind zwingt WebKit, den Scrollbereich auf
+   der Compositor-Ebene zu fuehren. Ohne so ein Kind kann er auf den Hauptthread
+   zurueckfallen, und dann bleibt die Bewegung stehen, sobald dort etwas anderes laeuft.
+   Kostet nichts: null Breite, null Hoehe, unsichtbar. */
+.lp-sticky-anker{position:sticky;left:0;display:block;width:0;height:0}
 .lp-scroll::-webkit-scrollbar{display:none}
+/* vertical-align:top vermeidet den Unterlaengen-Spalt, den ein inline-block sonst
+   unter sich laesst. */
 .lp-inner{display:inline-block;vertical-align:top;min-width:100%}
-.lp-monate{display:flex;gap:3px;margin-left:calc(var(--lp-label-w) + var(--lp-label-gap));margin-bottom:var(--lp-monate-gap)}
-.lp-monat{width:var(--lp-zelle);flex:0 0 var(--lp-zelle);font-size:.66rem;color:var(--txt3);white-space:nowrap}
-.lp-body{display:flex;gap:var(--lp-label-gap)}
-/* Bleibt beim Scrollen stehen. Die Abdeckung wird als Pseudo-Element gemalt, damit sie
-   auch das Polster links und den Spalt zum Raster deckt, ohne die Spaltenbreite zu
-   veraendern. */
-.lp-wtage{display:flex;flex-direction:column;gap:3px;flex:0 0 var(--lp-label-w);position:sticky;left:0;z-index:2}
-.lp-wtage::before{content:'';position:absolute;top:calc(-1 * var(--lp-mask-over));bottom:calc(-1 * var(--lp-mask-over));
-  left:calc(-1 * var(--lp-pad-x));right:calc(-1 * var(--lp-label-gap));background:var(--card);z-index:-1}
-.lp-wtage span{height:var(--lp-zelle);font-size:.66rem;line-height:var(--lp-zelle);color:var(--txt3)}
+.lp-monate{display:flex;gap:var(--lp-gap);margin-bottom:var(--lp-monate-gap);height:var(--lp-monate-h)}
+.lp-monat{width:var(--lp-zelle);flex:0 0 var(--lp-zelle);font-size:13px;
+  line-height:var(--lp-monate-h);color:var(--txt3);white-space:nowrap}
+/* Liegt absolut ueber dem linken Rand von `.lp-body` – bewusst NICHT als Flex-Spalte,
+   damit `.lp-scroll` ein gewoehnlicher Block bleiben kann (siehe oben). Der obere
+   Abstand bildet die Monatszeile im Scroller nach, damit "Mo" auf einer Linie mit der
+   ersten Rasterzeile liegt; dafuer hat die Monatszeile eine FESTE Hoehe. */
+.lp-wtage{
+  position:absolute;left:var(--lp-pad-x);
+  top:calc(var(--lp-pad-y) + var(--lp-monate-h) + var(--lp-monate-gap));
+  width:var(--lp-label-w);
+  display:flex;flex-direction:column;gap:var(--lp-gap);
+}
+.lp-wtage span{height:var(--lp-zelle);font-size:13px;line-height:var(--lp-zelle);color:var(--txt3)}
 .lp-gridwrap{position:relative}
-.lp-raster{display:flex;gap:3px;position:relative;z-index:1}
-.lp-woche{display:flex;flex-direction:column;gap:3px}
-.lp-tag{position:relative;width:var(--lp-zelle);height:var(--lp-zelle);border-radius:4px;display:block;
+.lp-raster{display:flex;gap:var(--lp-gap);position:relative;z-index:1}
+.lp-woche{display:flex;flex-direction:column;gap:var(--lp-gap)}
+.lp-tag{position:relative;width:var(--lp-zelle);height:var(--lp-zelle);border-radius:5px;display:block;
   background:var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .lp-tag.geplant{background:#CDE7E1}
-.lp-tag.gelaufen::before{content:'';position:absolute;inset:3px;border-radius:2px;background:#0F766E}
+/* Der Kern behaelt sein Groessenverhaeltnis zum Kaestchen – daher 3,5 px und keine
+   runde Zahl. */
+.lp-tag.gelaufen::before{content:'';position:absolute;inset:3.5px;border-radius:2.5px;background:#0F766E}
 .lp-tag.zukunft{opacity:.45}
 .lp-tag.ausserhalb{opacity:.25;pointer-events:none}
 /* Ringe INNEN zeichnen – aussen ragten sie ueber das Kaestchen und wurden in der
    ersten Spalte von der Abdeckung der Wochentagsspalte verschluckt. */
-.lp-tag.heute{box-shadow:inset 0 0 0 1.5px var(--tab-color)}
+.lp-tag.heute{box-shadow:inset 0 0 0 1.6px var(--tab-color)}
 /* Wettkampftag: auffaellig, aber ohne die Geplant/Gelaufen-Kodierung zu stoeren –
    Ring aussen, damit die Flaeche und der Kern darunter lesbar bleiben. Der Ring darf
    hier nach aussen ragen; er steht nie in der ersten Spalte unter der Abdeckung. */
@@ -787,7 +827,7 @@ h5,
 .lp-tag.wettkampf.gelaufen::before{background:#0F766E}
 .lp-wk-marke{margin-left:.4rem;font-weight:700;color:#D97706;
   border:1px solid #D97706;border-radius:999px;padding:.05rem .4rem;white-space:nowrap}
-.lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.5px var(--txt)}
+.lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.6px var(--txt)}
 /* Zukunftstage sind als Gruppe gedimmt (.zukunft). Der angetippte darf das nicht
    sein: im Dunkelmodus lag dann ein fast weisser Ring bei 45 % ueber einer ebenfalls
    abgeblendeten Flaeche – auf dem Bildschirm nicht mehr zu erkennen. Volle Deckkraft
@@ -797,7 +837,7 @@ h5,
    Raster, damit die Kaestchen lesbar bleiben. */
 .lp-baender{position:absolute;inset:0;pointer-events:none;z-index:0}
 .lp-band{position:absolute;top:calc(-1 * var(--lp-band-over));bottom:calc(-1 * var(--lp-band-over));
-  border:1.5px solid #0F766E;border-radius:5px;box-sizing:border-box;
+  border:1.2px solid #0F766E;border-radius:6px;box-sizing:border-box;
   /* Der Rahmen sitzt in der Luecke zwischen den Spalten, nicht auf den Kaestchen. */
   margin-left:-1.5px}
 .lp-band.archiviert{opacity:.5}
@@ -805,6 +845,10 @@ h5,
    Flex-Container, deshalb genuegt margin-left:auto. */
 .lp-kal-zahl{font-size:.72rem;font-weight:500;color:var(--txt2);margin-left:auto}
 .lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
+/* Ohne ausgewaehlten Tag ist die Zeile leer – dann darf sie auch keinen Platz belegen
+   (Trennlinie und Polster blieben sonst als Streifen unter dem Raster stehen).
+   Aus FitTrack uebernommen; dort steht das Element ebenfalls immer im Markup. */
+.lp-detail:empty{display:none}
 .lp-detail-leer{color:var(--txt3)}
 .lp-detail-tag{font-weight:700;margin-bottom:.3rem}
 /* Plan und Planstand unter dem Datum – zwei gleich gesetzte Zeilen, wie in FitTrack.

@@ -3144,13 +3144,19 @@ function laufKalenderHTML() {
   const wochentage = ['Mo','','Mi','','Fr','','So'].map(t=>`<span>${t}</span>`).join('');
   const anzahl = Object.keys(proTag).filter(d => d.startsWith(jahr)).length;
 
+  // Aufbau 1:1 aus FitTrack: Die Wochentagsspalte liegt AUSSERHALB des Scrollers und
+  // absolut ueber dessen linkem Rand; der unsichtbare Anker darin haelt das Scrollen
+  // auf der Compositor-Ebene. Beides steht ausfuehrlich in style.css begruendet.
+  // Die Fusszeile steht IMMER im Markup und blendet sich per :empty selbst aus –
+  // frueher wurde sie nur bei Auswahl erzeugt.
   return `
-    <h3>Laufkalender ${jahr}<span class="lp-kal-zahl">${anzahl} Läufe</span></h3>
-    <div class="lp-scroll">
-      <div class="lp-inner">
-        <div class="lp-monate">${monate}</div>
-        <div class="lp-body">
-          <div class="lp-wtage">${wochentage}</div>
+    <h3>Laufkalender<span class="lp-kal-zahl">${jahr} · ${anzahl} ${anzahl===1?'Lauf':'Läufe'}</span></h3>
+    <div class="lp-body">
+      <div class="lp-wtage">${wochentage}</div>
+      <div class="lp-scroll">
+        <span class="lp-sticky-anker" aria-hidden="true"></span>
+        <div class="lp-inner">
+          <div class="lp-monate">${monate}</div>
           <div class="lp-gridwrap">
             <div class="lp-baender">${planBaenderHTML(start, wochen)}</div>
             <div class="lp-raster">${zellen}</div>
@@ -3158,7 +3164,7 @@ function laufKalenderHTML() {
         </div>
       </div>
     </div>
-    ${_lpAuswahl ? `<div class="lp-detail" id="lp-detail">${laufDetailHTML(_lpAuswahl)}</div>` : ''}`;
+    <div class="lp-detail">${_lpAuswahl ? laufDetailHTML(_lpAuswahl) : ''}</div>`;
 }
 
 // Laufzeit eines Plans als Rahmen um seine Wochenspalten – ohne Fuellung, damit die
@@ -3174,7 +3180,7 @@ function planBaenderHTML(rasterStart, wochen) {
     const a = Math.max(0, spalte(p.start)), b = Math.min(wochen - 1, spalte(p.ende));
     if (b < a) return '';
     return `<div class="lp-band${p.archiviert ? ' archiviert' : ''}"
-      style="left:calc(${a} * (var(--lp-zelle) + 3px)); width:calc(${b - a + 1} * (var(--lp-zelle) + 3px))"
+      style="left:calc(${a} * (var(--lp-zelle) + var(--lp-gap))); width:calc(${b - a + 1} * (var(--lp-zelle) + var(--lp-gap)))"
       title="${esc(p.name)}"></div>`;
   }).join('');
 }
@@ -3265,37 +3271,67 @@ function pgLaufplan() {
 // (`(w+1)*proSpalte - clientWidth`); auf breiten Ausschnitten begann die Ansicht
 // dadurch im Maerz und heute klebte an der Kante.
 // Synchron, weil im verdeckten Tab kein requestAnimationFrame feuert.
+// Scrollverhalten 1:1 aus FitTrack (Leonard-Entscheidung 03.09.2026):
+//   • Beim ERSTEN Aufbau steht der heutige Tag bei 70 % der Breite – rechts der Mitte,
+//     damit die zurueckliegenden Wochen mehr Platz bekommen als die leere Zukunft.
+//   • Danach wird die Position des Nutzers GEHALTEN. `lpKalenderScrollen` laeuft bei
+//     jedem Neuaufbau des Tabs; ein erneutes Positionieren zoege das Raster jedes Mal
+//     zur laufenden Woche zurueck.
+// Bewusst SYNCHRON statt in requestAnimationFrame (anders als FitTrack): In einer
+// nicht gezeichneten Seite feuert rAF nie, und der Laufplan-Tab wird im Hintergrund
+// vorgerendert. getBoundingClientRect erzwingt ohnehin ein Layout.
+let _lpPositioniert = false;
+let _lpScrollPos = 0;
+
 function lpKalenderScrollen() {
   const scroll = document.querySelector('#screen-laufplan .lp-scroll');
   if (!scroll) return;
   const spaltenEls = scroll.querySelectorAll('.lp-woche');
   if (!spaltenEls.length) return;
 
+  // Position des Nutzers mitfuehren. Der Listener haengt am Element, das der Neuaufbau
+  // ersetzt – deshalb bei jedem Aufbau neu setzen, gegen Doppelung per Merker geschuetzt.
+  if (!scroll.dataset.posMerker) {
+    scroll.dataset.posMerker = '1';
+    scroll.addEventListener('scroll', () => {
+      if (_lpPositioniert) _lpScrollPos = scroll.scrollLeft;
+    }, { passive: true });
+  }
+
+  // Ohne vermessenen Ausschnitt laesst sich nichts rechnen – dann nichts tun und es
+  // dem naechsten Aufbau ueberlassen, sonst kaeme der rechte Rand heraus.
+  if (!scroll.clientWidth) return;
+
+  if (_lpPositioniert) { scroll.scrollLeft = _lpScrollPos; return; }
+
   // Rasterbeginn exakt wie in laufKalenderHTML: Montag der Woche, die den 1. Januar
-  // enthaelt. Wird hier anders gerechnet, zeigt die Mitte auf die falsche Spalte.
+  // enthaelt. Wird hier anders gerechnet, zeigt das Ziel auf die falsche Spalte.
   const jahr  = new Date(referenceDate+'T00:00:00').getFullYear();
   const jan1  = new Date(jahr, 0, 1);
   const start = new Date(jan1);
   start.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
 
-  // Auf heute zentrieren, solange heute im gezeigten Jahr liegt – blaettert man den
+  // Anker ist heute, solange heute im gezeigten Jahr liegt – blaettert man den
   // Zeitfilter in ein anderes Jahr, ist das Bezugsdatum der sinnvolle Anker.
   const heute = new Date(toLocalDateStr(new Date())+'T00:00:00');
   const ziel  = heute.getFullYear() === jahr ? heute : new Date(referenceDate+'T00:00:00');
   // In ganzen Tagen runden: eine reine ms-Division kippt an der Zeitumstellung um
   // einen halben Tag und damit gelegentlich um eine ganze Spalte.
-  const tage    = Math.round((ziel - start) / 86400000);
-  const spalte  = Math.max(0, Math.min(spaltenEls.length - 1, Math.floor(tage / 7)));
+  const spalte = Math.max(0, Math.min(spaltenEls.length - 1,
+    Math.floor(Math.round((ziel - start) / 86400000) / 7)));
 
-  // Position ueber getBoundingClientRect statt offsetLeft: Letzteres bezieht sich auf
-  // den naechsten positionierten Vorfahren, der hier nicht der Scroller sein muss.
-  const rC = scroll.getBoundingClientRect();
-  const rS = spaltenEls[spalte].getBoundingClientRect();
-  // Ohne vermessenen Ausschnitt kaeme statt der Mitte der rechte Rand heraus – dann
-  // lieber nichts tun und es dem naechsten Aufbau ueberlassen.
-  if (!scroll.clientWidth || !rS.width) return;
-  const mitte = scroll.scrollLeft + (rS.left - rC.left) + rS.width / 2 - scroll.clientWidth / 2;
-  scroll.scrollLeft = Math.max(0, Math.min(mitte, scroll.scrollWidth - scroll.clientWidth));
+  // Spaltenbreite aus denselben Variablen wie das CSS – laufen die auseinander,
+  // verschiebt sich das Ziel mit jeder Spalte weiter.
+  const stil    = getComputedStyle(document.documentElement);
+  const zelle   = parseFloat(stil.getPropertyValue('--lp-zelle')) || 21;
+  const luecke  = parseFloat(stil.getPropertyValue('--lp-gap'))   || 3;
+  const SPALTE  = zelle + luecke;
+
+  const pos = Math.max(0, Math.min(spalte * SPALTE - scroll.clientWidth * 0.7,
+                                   scroll.scrollWidth - scroll.clientWidth));
+  scroll.scrollLeft = pos;
+  _lpScrollPos = pos;
+  _lpPositioniert = true;
 }
 
 // ── Seite 1: Aktueller Laufplan ────────────────────────
@@ -4049,17 +4085,15 @@ document.body.addEventListener('click', (e) => {
   const tag = ziel.dataset.lauftag;
   _lpAuswahl = (_lpAuswahl === tag) ? null : tag;
   if (currentScreen !== 'laufplan') return;
-  // Waagrechte Position des Jahresrasters und senkrechte des Tabs merken: der
-  // Neuaufbau setzt beide zurueck, und der Kalender spraenge zum Jahresanfang.
+  // Senkrechte Position der Seite merken – der Neuaufbau setzt sie sonst zurueck.
+  // Die WAAGRECHTE Position des Rasters wird hier nicht mehr gerettet: seit der
+  // Uebernahme aus FitTrack fuehrt der Kalender sie selbst mit (_lpScrollPos) und
+  // stellt sie in lpKalenderScrollen wieder her. Zwei Stellen, die dasselbe setzen,
+  // kaemen sich in die Quere.
   const screenEl = document.getElementById('screen-laufplan');
-  const vorher = {
-    kalender: screenEl?.querySelector('.lp-scroll')?.scrollLeft ?? null,
-    seite: screenEl?.scrollTop ?? 0
-  };
+  const seite = screenEl?.scrollTop ?? 0;
   _renderTab('laufplan');
-  const sc = document.querySelector('#screen-laufplan .lp-scroll');
-  if (sc && vorher.kalender != null) sc.scrollLeft = vorher.kalender;
-  if (screenEl) screenEl.scrollTop = vorher.seite;
+  if (screenEl) screenEl.scrollTop = seite;
 });
 
 // Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die

@@ -501,18 +501,39 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   andere Namen liefert. `LAUF_ARTEN`/`laufArt()` sind **entfallen**: ihr einziger
   Zweck war die Farbe der Laufart in der Tagesansicht, und dort ist alles gleich
   gesetzt (siehe „Tagesdetail: eine Schriftgrösse").
-  **Waagrechte Startposition (`lpKalenderScrollen`):** der heutige Tag steht in der
-  Mitte. Früher stand die laufende Woche am rechten Rand
-  (`(w+1)*proSpalte − clientWidth`); auf breiteren Ausschnitten begann die Ansicht
-  dadurch im März und heute klebte an der Kante. Der Rasterbeginn muss **exakt wie in
+  **Layout 1:1 aus FitTrack übernommen (03.09.2026).** Masse in `:root`:
+  `--lp-zelle: 21px` (vorher 14), `--lp-gap: 3px`, Label-Spalte 24 px, Radius 5 px,
+  Kern `inset 3.5px`, Ringe 1.6 px, Planrahmen 1.2 px/Radius 6, Monatszeile mit
+  **fester** Höhe 16 px + 10 px Abstand. Folge: rund 14 statt 20 Wochen im Bild,
+  dafür sicher treffbare Tage.
+  - **`--lp-gap` ist die einzige Quelle für die Lücke** — CSS *und* JS lesen sie
+    (`planBaenderHTML`, `lpKalenderScrollen`). Vorher stand sie an vier Stellen fest
+    im CSS und einmal gerechnet im JS; liefen die auseinander, verschoben sich die
+    Planrahmen gegenüber den Spalten, je weiter rechts desto stärker.
+  - **Die Wochentagsspalte steht AUSSERHALB des Scrollers** (`position:absolute` über
+    dem linken Rand von `.lp-body`), der Scroller bekommt Platz per `margin-left`.
+    Die Kästchen verschwinden dadurch an dessen Kante, statt von einer deckenden
+    Fläche überdeckt zu werden — die frühere Lösung (sticky Spalte + Maske in
+    Kartenfarbe) brauchte eine deckende Farbe.
+  - **`.lp-scroll` MUSS ein gewöhnlicher Block bleiben**, kein Flex-/Grid-Kind: In
+    FitTrack stockte das Wischen auf dem iPhone, als es eines war. Dazu gehört
+    `.lp-sticky-anker` (0×0, unsichtbar) — ein klebendes Kind zwingt WebKit, den
+    Scrollbereich auf der Compositor-Ebene zu führen.
+  - `overscroll-behavior-x: contain` hält die Wischgeste im Kalender. Preis: aus dem
+    Kalender heraus lässt sich der Tab nicht per Wisch wechseln.
+  - Die Fusszeile steht **immer** im Markup und blendet sich per `:empty` aus.
+  **Waagrechte Startposition (`lpKalenderScrollen`):** beim **ersten** Aufbau steht
+  heute bei **70 %** der Breite (rechts der Mitte — die zurückliegenden Wochen brauchen
+  mehr Platz als die leere Zukunft). Danach wird die Position des Nutzers gehalten
+  (`_lpPositioniert` / `_lpScrollPos` + Scroll-Listener); ein erneutes Positionieren
+  zöge das Raster bei jedem Neuaufbau zur laufenden Woche zurück. Der Tipp auf einen
+  Tag rettet deshalb **nur noch** die senkrechte Position der Seite — zwei Stellen, die
+  die waagrechte setzen, kämen sich in die Quere. Der Rasterbeginn muss **exakt wie in
   `laufKalenderHTML`** gerechnet werden (Montag der Woche, die den 1. Januar enthält),
-  sonst zeigt die Mitte auf die falsche Spalte, und die Tagesdifferenz wird gerundet —
-  eine reine ms-Division kippt an der Zeitumstellung um eine ganze Spalte. Die Position
-  kommt aus `getBoundingClientRect`, nicht aus `offsetLeft`: Letzteres bezieht sich auf
-  den nächsten positionierten Vorfahren, der hier nicht der Scroller sein muss. Bei
-  `clientWidth === 0` bricht die Funktion ab — sonst käme statt der Mitte der rechte
-  Rand heraus und bliebe dort stehen. Der Tipp auf einen Tag sichert die Position vorher
-  und setzt sie nach dem Re-Render zurück, springt also **nicht** zur Mitte.
+  und die Tagesdifferenz wird gerundet — eine reine ms-Division kippt an der
+  Zeitumstellung um eine ganze Spalte. Bei `clientWidth === 0` bricht die Funktion ab.
+  Bewusst **synchron** statt in `requestAnimationFrame` (anders als FitTrack): in einer
+  nicht gezeichneten Seite feuert rAF nie, und der Tab wird im Hintergrund vorgerendert.
 - **Laufplan-Tab: zwei Seiten** über einen Segment-Umschalter (`.seg-toggle`, Layout aus
   FitTrack übernommen). `_lpSeite` merkt die Wahl über Re-Render hinweg.
   **Aktueller Laufplan** = Kalender, laufender Plan, Wochenumfang, Bestleistungen,
