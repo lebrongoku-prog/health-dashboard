@@ -611,6 +611,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „—" statt eines geschätzten Ersatzwerts. Gilt überall.
 - **Testen nur nach SW-Abmeldung.** Ein früher registrierter Service Worker liefert sonst
   die alte `app.js` aus — auch auf `localhost`.
+- **`text-size-adjust: 100%` auf `<html>` — nicht entfernen.** Ohne die Angabe gilt auf
+  iOS `auto`, und WebKit vergrössert Text dann eigenmächtig, **blockweise** nach Breite
+  und Textmenge des Kastens. Zwei Zeilen mit identischer CSS-Grösse erscheinen dadurch
+  auf dem iPhone unterschiedlich gross, während jeder Desktop-Browser (und der
+  Prüfstand) sie gleich zeigt — im Tagesdetail des Laufkalenders wurden die
+  Block-Kästen aufgeblasen, die Flex-Zeile daneben nicht. Wirkt sich auf die **ganze**
+  App aus: Erscheint danach etwas zu klein, gehört der Wert im CSS erhöht, nicht die
+  Heuristik zurückgeholt.
 - **iOS-PWA:** `viewport-fit=cover`, Status-Bar `black-translucent`, `env(safe-area-inset-*)`.
   **Kein** Body-Gradient mit `background-attachment:fixed` (friert auf iOS ein) — soliden Body
   + `.screen`-Safe-Areas nutzen.

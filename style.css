@@ -47,7 +47,20 @@
 html, body { height: 100%; overflow: hidden; }
 /* Solider Fallback-Hintergrund liegt auf <html>, damit der Body transparent sein
    kann und die fixierten .bg-fade-layer (z-index:-1) durchscheinen. */
-html { background: var(--bg); }
+html {
+  background: var(--bg);
+  /* WICHTIG fuer iOS. Ohne diese Angabe gilt `auto`, und WebKit vergroessert Text
+     dann EIGENMAECHTIG – blockweise, je nach Breite und Textmenge des Kastens.
+     Zwei Zeilen mit identischer CSS-Groesse werden dadurch auf dem iPhone
+     unterschiedlich gross gesetzt, waehrend jeder Desktop-Browser sie gleich zeigt.
+     Genau das war im Tagesdetail des Laufkalenders zu sehen: Die Zeilen in
+     Block-Kaesten (Datum, Planzeilen, „Kein Lauf an diesem Tag") wurden aufgeblasen,
+     die Plan-Zeile daneben – ein Flex-Kasten – nicht.
+     Mit 100 % gilt ueberall die Groesse, die im CSS steht. Die Textgroessen-Einstellung
+     des Nutzers bleibt davon unberuehrt, ebenso das Zoomen mit zwei Fingern. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   /* min-height: 100vh erzwingt volle Viewport-Höhe auf iOS PWA, falls height: 100%
      auf bestimmten iOS-Versionen unzuverlässig wird. Body ist transparent – der
