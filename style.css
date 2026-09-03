@@ -676,14 +676,8 @@ h5,
 .lp-detail-tag,
 .lp-detail-plan,
 .lp-detail-leer,
-.lp-art,
-.lp-plan-zeile,
-.lp-plan-marke,
 .lp-wk-marke,
-.lp-plan-zuplan,
-.lp-plan-weg,
-.lp-plan-form input,
-.lp-plan-form button{
+.lp-werte>span{
   font-size: .83rem !important;
   line-height: 1.4;
 }
@@ -863,33 +857,35 @@ h5,
    Aus FitTrack uebernommen; dort steht das Element ebenfalls immer im Markup. */
 .lp-detail:empty{display:none}
 .lp-detail-leer{color:var(--txt3)}
-.lp-detail-tag{font-weight:700;margin-bottom:.3rem}
+.lp-detail-tag{font-weight:700}
 /* Plan und Planstand unter dem Datum – zwei gleich gesetzte Zeilen, wie in FitTrack.
    Zurueckhaltender als die Werte darunter: sie ordnen den Tag ein, sind aber nicht
    das, wofuer man den Tag angetippt hat. */
-.lp-detail-plan{color:var(--txt3);margin-top:.15rem}
-.lp-art{font-weight:600;margin-bottom:.2rem}
+.lp-detail-plan{color:var(--txt3)}
+/* Zeilenabstand wie ueberall sonst in der App: der Kopfblock uebernimmt Luecke und
+   Polster der .stats-list (gap .2rem, padding .22rem 0). Vorher trug jede Zeile ihren
+   eigenen Rand (.3 / .15 / .4 / .2rem) – dadurch sassen sie sichtbar ungleich. */
+.lp-detail-kopf{display:flex;flex-direction:column;gap:.2rem}
+.lp-detail-kopf>div{padding:.22rem 0}
+.lp-detail-leer{color:var(--txt3);padding:.22rem 0}
+
+/* Geleistet neben Geplant. Ein FLACHES Raster: jede Zelle ist ein direktes Kind,
+   dadurch stehen die drei Spalten garantiert auf einer Linie – bei Zeilen-Wrappern
+   bestimmt jede Zeile ihre Hoehe selbst und die Spalten laufen auseinander.
+   Luecke und Polster wie in .stats-list, damit der Rhythmus zum Rest der App passt. */
+.lp-werte{display:grid;grid-template-columns:1fr auto auto;column-gap:.7rem;row-gap:.2rem;margin-top:.2rem}
+.lp-werte>span{padding:.22rem 0;border-bottom:1px solid #F8FAFC;min-width:0}
+.lp-werte>span:nth-last-child(-n+3){border-bottom:0}
+.lp-werte-kopf{color:var(--txt3);text-align:right;border-bottom-color:var(--border) !important}
+.lp-werte-lbl{color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-werte-ist{font-weight:700;text-align:right;white-space:nowrap}
+.lp-werte-soll{color:var(--txt3);text-align:right;white-space:nowrap}
+body.dark .lp-werte>span{border-bottom-color:#1E293B}
+body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
 
 /* Wochenumfang */
 .lp-woche-zahl{font-size:1.65rem;font-weight:800;line-height:1.1}
 .lp-woche-einheit{font-size:.83rem;font-weight:600;color:var(--txt2)}
-
-.lp-plan-zeile{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
-  color:var(--txt2);margin-bottom:.4rem}
-.lp-plan-marke{font-weight:700;text-transform:uppercase;letter-spacing:.04em;
-  color:var(--tab-color);border:1px solid var(--tab-color);border-radius:999px;padding:.05rem .4rem}
-.lp-plan-zuplan{background:none;border:0;padding:0;margin-left:auto;font:inherit;
-  font-size:.72rem;font-weight:600;color:var(--tab-color);cursor:pointer;text-decoration:underline}
-.lp-plan-weg{background:none;border:0;padding:0;margin-left:auto;font:inherit;
-  font-size:.72rem;color:#EF4444;cursor:pointer;text-decoration:underline}
-.lp-plan-form{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
-.lp-plan-form input{flex:1 1 4rem;min-width:0;height:32px;padding:0 .5rem;font:inherit;
-  border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--txt)}
-.lp-plan-form input[name=notiz]{flex:2 1 7rem}
-.lp-plan-form button{height:32px;padding:0 .7rem;font:inherit;font-weight:600;
-  border:0;border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer;flex:0 0 auto}
-.lp-plan-form button:disabled{opacity:.6}
-body.dark .lp-plan-form input{background:#0F172A}
 
 /* ── Laufplan: Seitenumschalter (Layout aus FitTrack) ── */
 .seg-toggle{display:flex;gap:4px;margin:0 0 .7rem;background:rgba(255,255,255,.22);

@@ -398,12 +398,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
-- **Tagesdetail des Laufkalenders: eine Schriftgrösse.** Alles, was beim Antippen
-  eines Tages erscheint (Datum, Planzeilen, Laufart, Plan-Zeile, Werte, das
-  Termin-Formular), steht auf der **Label-Stufe** `.83rem`. Vorher lagen dort fünf
+- **Tagesdetail des Laufkalenders: eine Schriftgrösse, ein Zeilenabstand.** Alles,
+  was beim Antippen eines Tages erscheint, steht auf der **Label-Stufe** `.83rem`. Vorher lagen dort fünf
   Abstufungen von `.66` bis `.79rem` nebeneinander. Die Grösse steht — wie alle —
   **nur im Type Scale**; die `.lp-*`-Regeln tragen keine `font-size` mehr.
-  Die Laufart (`.lp-art`) ist zudem **nicht mehr eingefärbt**.
+  Ebenso trägt **keine Zeile einen eigenen Rand**: `.lp-detail-kopf` und `.lp-werte`
+  übernehmen Lücke und Polster der `.stats-list` (`gap:.2rem`, `padding:.22rem 0`),
+  damit der Rhythmus dem Rest der App entspricht — vorher hatte jede Zeile ihren
+  eigenen Wert (.3 / .15 / .4 / .2rem) und sie sassen sichtbar ungleich.
 - **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
   (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
   Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
@@ -485,6 +487,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     seinen Wochenplan ab.
   - `planAmTag` berücksichtigt **auch archivierte** Pläne: im Kalender tragen sie
     ebenfalls ein Band, und ein Tag darin soll denselben Plan benennen.
+- **Tagesansicht: „Geleistet" neben „Geplant" (`laufWerteHTML`).** Aufbau von oben:
+  ausgeschriebenes Datum (`Donnerstag, 03. September`) → Planname mit Dauer →
+  Planstand → ein **flaches Raster** aus drei Spalten (Label | geleistet | geplant)
+  mit den vier Zeilen Trainingszeit, Strecke, Ø Pace, Ø Herzfrequenz.
+  Flach heisst: jede Zelle ist ein direktes Kind von `.lp-werte`. Mit Zeilen-Wrappern
+  bestimmt jede Zeile ihre Höhe selbst und die Spalten laufen auseinander.
+  Die Soll-Werte kommen aus der **Planeinheit desselben Tages** (Seite
+  „Laufplanverwaltung"). Die **Ziel-Pace steht dort nicht als Feld** — sie ergibt sich
+  aus Zielzeit ÷ Zielstrecke. Bei der Herzfrequenz wird die **Zone unverändert
+  übernommen** und NICHT in Schläge umgerechnet: eine Zone ist ein Bereich, jede
+  Umrechnung wäre eine Erfindung. Höhenmeter und die Laufart-Zeile sind mit dem
+  Umbau entfallen.
+- **Einzelne Termine lassen sich nicht mehr setzen** (auf Wunsch): das Formular in
+  der Tagesansicht, der „entfernen"-Knopf und der grüne Verweis in den Plan sind weg,
+  mit ihnen `planSpeichern`/`planLoeschen`, `PLAN_SPALTEN` und die Klassen
+  `.lp-plan-*`. Das Blatt **`Laufplan` wird weiterhin gelesen** — bereits eingetragene
+  Termine erscheinen im Kalender als „geplant", sie sind nur nicht mehr änderbar.
 - **Kalorien in der Tagesansicht entfallen** (auf Wunsch). `laufEinheit` führt das Feld
   `kcal` nicht mehr; die Herleitung steht als Kommentar dort, falls es zurückkommt:
   `Energy (kJ)` ÷ 4.184 aus dem **Workout**-Sheet — `activeCal` im Health-Sheet ist

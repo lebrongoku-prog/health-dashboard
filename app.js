@@ -2764,7 +2764,6 @@ function vo2Abschnitt(D, P) {
 // auswertbare Antwort, deshalb wurde blind gesendet, 1.2 s gewartet und im Sheet
 // nachgelesen, ob etwas angekommen ist – daher die zeitweise verschwundenen km-Werte.
 // Jetzt antwortet Google sofort und eindeutig.
-const PLAN_SPALTEN       = ['Date','Distance (km)','Note'];
 const LP_KOPF_SPALTEN    = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf'];
 const LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
 
@@ -2898,28 +2897,10 @@ function _inKette(tun) {
   return _lpKette;
 }
 
-// ── Einzelne Termine (Blatt „Laufplan") ──
-async function planSpeichern(datum, km, notiz) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(datum || ''))) return false;
-  const wert  = km != null && km !== '' ? Number(String(km).replace(',', '.')) : '';
-  const text  = String(notiz ?? '').slice(0, 200);
-  return _inKette(async () => {
-    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, PLAN_BLATT, PLAN_SPALTEN, zeilen => {
-      const ohne = zeilen.filter(r => String(r[0] ?? '').trim().slice(0, 10) !== datum);
-      ohne.push([datum, isNaN(wert) ? '' : wert, text]);
-      // Sortiert halten, damit das Blatt auch von Hand lesbar bleibt.
-      return ohne.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-    });
-    _parsePlanRows(werte);
-  });
-}
-async function planLoeschen(datum) {
-  return _inKette(async () => {
-    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, PLAN_BLATT, PLAN_SPALTEN,
-      zeilen => zeilen.filter(r => String(r[0] ?? '').trim().slice(0, 10) !== String(datum)));
-    _parsePlanRows(werte);
-  });
-}
+// Hinweis: planSpeichern()/planLoeschen() sind entfallen - der Kalender bietet das
+// Setzen einzelner Termine nicht mehr an (Wunsch 03.09.2026). Das Blatt 'Laufplan'
+// wird weiterhin GELESEN: bereits eingetragene Termine erscheinen im Kalender als
+// geplant (geplanteTage), sie lassen sich nur nicht mehr aus der App aendern.
 
 // ── Laufplaene und ihre Einheiten ──
 // Nach jedem Schreiben wird der lokale Stand aus GENAU dem nachgezogen, was im Sheet
@@ -3188,65 +3169,57 @@ function planBaenderHTML(rasterStart, wochen) {
 // Beschreibung unter dem Kalender – zeigt den angetippten Tag.
 function laufDetailHTML(datum) {
   if (!datum) return '';   // ohne gewaehlten Tag bleibt der Bereich leer
-  const l = laufEinheit(datum);
-  const plan = planData[datum];                 // freier Einzeltermin
-  const ausPlan = _planEinheitAm(datum);        // Einheit aus einem Laufplan
+  const l = laufEinheit(datum);                 // tatsaechlich gelaufen
+  const ausPlan = _planEinheitAm(datum);        // Einheit aus einem Laufplan (Soll)
   const wk = planListe.find(x => !x.archiviert && x.wettkampf === datum);
-  const kopf = `<div class="lp-detail-tag">${fmtDayShort(datum)}${
-    wk ? `<span class="lp-wk-marke">Wettkampf · ${esc(wk.name)}</span>` : ''}</div>`;
-  // Liegt der Tag in der Laufzeit eines Plans, folgen zwei Zeilen wie in FitTrack:
-  // erst der Plan mit seiner Dauer, darunter sein Stand bis hierher. Sie ersetzen die
-  // fruehere eigene Fortschrittskarte – die Angaben gehoeren an den Tag, den man
-  // gerade ansieht, nicht in einen dauerhaften Block weiter unten.
+
+  // Zeile 1: ausgeschriebener Wochentag und Monat – die Tagesansicht ist der einzige
+  // Ort, an dem genau EIN Tag gemeint ist; die Kurzform (25.08.26) spart hier nichts.
+  const langesDatum = new Date(datum + 'T00:00:00')
+    .toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long' });
+
+  const zeilen = [
+    `<div class="lp-detail-tag">${langesDatum}${
+      wk ? `<span class="lp-wk-marke">Wettkampf · ${esc(wk.name)}</span>` : ''}</div>`
+  ];
+  // Zeile 2 und 3: der Plan, in dessen Laufzeit der Tag faellt, und sein Stand.
   const planDesTages = planAmTag(datum);
-  let planZeilen = '';
   if (planDesTages) {
     const wochen = _lpWochenAus(planDesTages.start, planDesTages.ende);
-    planZeilen = `<div class="lp-detail-plan">${esc(planDesTages.name)}${wochen ? ` (${wochen} Wochen)` : ''}</div>`;
+    zeilen.push(`<div class="lp-detail-plan">${esc(planDesTages.name)}${wochen ? ` (${wochen} Wochen)` : ''}</div>`);
     const q = planErfuellung(planDesTages);
-    if (q) planZeilen += `<div class="lp-detail-plan">${q.absolviert} von ${q.geplant} geplanten Einheiten (${q.prozent}%)</div>`;
+    if (q) zeilen.push(`<div class="lp-detail-plan">${q.absolviert} von ${q.geplant} geplanten Einheiten (${q.prozent}%)</div>`);
   }
-  // Beide Arten koennen am selben Tag liegen und werden getrennt gezeigt: die
-  // Planeinheit gehoert zum Plan und wird dort bearbeitet, der freie Termin hier.
-  const ausPlanZeile = ausPlan
-    ? `<div class="lp-plan-zeile">
-         <span class="lp-plan-marke">Plan</span>
-         <span>${[ausPlan.strecke!=null?zahl(ausPlan.strecke,1)+' km':null,
-                   ausPlan.zeit!=null?fmtMin(ausPlan.zeit):null,
-                   ausPlan.zone||null].filter(Boolean).join(' · ') || 'Lauf'}</span>
-         <button type="button" class="lp-plan-zuplan" data-lpzuplan="${ausPlan.planId}">${esc(ausPlan.planName)}</button>
-       </div>`
-    : '';
-  const geplant = plan
-    ? `<div class="lp-plan-zeile">
-         <span class="lp-plan-marke">geplant</span>
-         <span>${plan.km != null ? zahl(plan.km,1)+' km' : 'Lauf'}${plan.notiz ? ' · '+esc(plan.notiz) : ''}</span>
-         <button type="button" class="lp-plan-weg" data-planweg="${datum}">entfernen</button>
-       </div>`
-    : '';
-  const formular = `
-    <form class="lp-plan-form" data-planform="${datum}">
-      <input type="number" step="0.1" min="0" name="km" inputmode="decimal"
-             placeholder="km" value="${plan && plan.km != null ? plan.km : ''}" aria-label="Geplante Kilometer">
-      <input type="text" name="notiz" maxlength="60" placeholder="Notiz (optional)"
-             value="${plan ? esc(plan.notiz) : ''}" aria-label="Notiz">
-      <button type="submit">${plan ? 'Ändern' : 'Termin setzen'}</button>
-    </form>`;
-  const ist = l ? laufWerteHTML(l)
-                : `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
-  return kopf + planZeilen + ausPlanZeile + geplant + ist + formular;
+  const kopf = `<div class="lp-detail-kopf">${zeilen.join('')}</div>`;
+
+  if (!l && !ausPlan) return kopf + `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
+  return kopf + laufWerteHTML(l, ausPlan);
 }
 
-// Die sechs Kennzahlen einer Einheit – auch in der Liste verwendet.
-function laufWerteHTML(l) {
-  const zeile = (label, wert) => wert == null ? '' : statZeile(label, wert);
-  return `<div class="lp-art">${esc(l.typLabel)}</div>
-    <div class="stats-list">
-      ${zeile('Trainingszeit', l.dauerMin!=null?fmtMin(l.dauerMin):null)}
-      ${zeile('Strecke',       l.streckeKm!=null?zahl(l.streckeKm,2)+' km':null)}
-      ${zeile('Ø Pace',        l.pace!=null?fmtPace(l.pace)+' min/km':null)}
-      ${zeile('Ø Herzfrequenz',l.puls!=null?Math.round(l.puls)+' bpm':null)}
-      ${zeile('Höhenmeter',    l.hoehe!=null?Math.round(l.hoehe)+' m':null)}
+// Geleistet neben Geplant: links der Wert des Laufs, rechts das Ziel der Planeinheit
+// desselben Tages (Seite „Laufplanverwaltung"). Die Ziel-Pace steht dort nicht als
+// eigenes Feld – sie ergibt sich aus Zielzeit ÷ Zielstrecke. Bei der Herzfrequenz wird
+// die Zone unveraendert uebernommen und NICHT in Schlaege umgerechnet: eine Zone ist
+// ein Bereich, jede Umrechnung waere eine Erfindung.
+function laufWerteHTML(l, plan) {
+  const sollPace = (plan && plan.zeit > 0 && plan.strecke > 0) ? plan.zeit / plan.strecke : null;
+  const reihen = [
+    ['Trainingszeit',   l && l.dauerMin  != null ? fmtMin(l.dauerMin)              : null,
+                        plan && plan.zeit != null ? fmtMin(plan.zeit)              : null],
+    ['Strecke',         l && l.streckeKm != null ? zahl(l.streckeKm,2)+' km'       : null,
+                        plan && plan.strecke != null ? zahl(plan.strecke,1)+' km'  : null],
+    ['Ø Pace',          l && l.pace      != null ? fmtPace(l.pace)+' min/km'       : null,
+                        sollPace != null ? fmtPace(sollPace)+' min/km'             : null],
+    ['Ø Herzfrequenz',  l && l.puls      != null ? Math.round(l.puls)+' bpm'       : null,
+                        plan && plan.zone ? esc(plan.zone)                         : null]
+  ];
+  return `<div class="lp-werte">
+      <span class="lp-werte-kopf"></span>
+      <span class="lp-werte-kopf">Geleistet</span>
+      <span class="lp-werte-kopf">Geplant</span>
+      ${reihen.map(([lbl, ist, soll]) => `<span class="lp-werte-lbl">${lbl}</span>`
+        + `<span class="lp-werte-ist">${ist ?? '—'}</span>`
+        + `<span class="lp-werte-soll">${soll ?? '—'}</span>`).join('')}
     </div>`;
 }
 
@@ -3953,15 +3926,6 @@ document.body.addEventListener('click', async (e) => {
     if (pfeil) pfeil.textContent = auf ? '▾' : '▸';
     return; }
 
-  // Aus der Tagesansicht in den zugehoerigen Plan springen
-  const zuPlan = e.target.closest('[data-lpzuplan]');
-  if (zuPlan) {
-    e.preventDefault(); e.stopPropagation();
-    _lpSeite = 'verwaltung'; _lpOffenerPlan = zuPlan.dataset.lpzuplan;
-    _renderTab('laufplan');
-    return;
-  }
-
   // Neuen Plan anlegen
   const neuKnopf = e.target.closest('.lp-neu');
   if (neuKnopf) {
@@ -4050,36 +4014,11 @@ document.body.addEventListener('change', async (e) => {
   setTimeout(() => zeile.classList.remove('gesichert', 'fehlgeschlagen'), 1600);
 });
 
-// Plan-Termin setzen oder aendern.
-document.body.addEventListener('submit', async (e) => {
-  const form = e.target.closest('[data-planform]');
-  if (!form) return;
-  e.preventDefault();
-  const datum = form.dataset.planform;
-  const knopf = form.querySelector('button[type=submit]');
-  const vorher = knopf.textContent;
-  knopf.disabled = true; knopf.textContent = 'Speichert…';
-  const ok = await planSpeichern(datum, form.km.value.trim(), form.notiz.value.trim());
-  knopf.disabled = false; knopf.textContent = vorher;
-  if (!ok) { knopf.textContent = 'Fehlgeschlagen'; return; }
-  if (currentScreen === 'laufplan') _renderTab('laufplan');
-});
-
-// Plan-Termin entfernen.
-document.body.addEventListener('click', async (e) => {
-  const weg = e.target.closest('[data-planweg]');
-  if (!weg) return;
-  e.preventDefault(); e.stopPropagation();
-  weg.disabled = true; weg.textContent = 'Entfernt…';
-  await planLoeschen(weg.dataset.planweg);
-  if (currentScreen === 'laufplan') _renderTab('laufplan');
-});
-
 // Laufkalender und Einheitenliste: Tipp auf einen Tag zeigt die Einheit, erneuter
 // Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
 // ueberlebt damit den Re-Render.
 document.body.addEventListener('click', (e) => {
-  if (e.target.closest('.lp-plan-form, [data-planweg], [data-lpzuplan], [data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
+  if (e.target.closest('[data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
   const ziel = e.target.closest('[data-lauftag]');
   if (!ziel) return;
   const tag = ziel.dataset.lauftag;
