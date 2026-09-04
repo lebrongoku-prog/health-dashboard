@@ -307,9 +307,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ziel-Karte `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
-  kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Die
-  gestapelte Struktur bleibt nur wegen der runden Ecke bestehen, beide Segmente
-  tragen dieselbe Farbe. Den Zielwert markiert die grüne Linie, nicht mehr eine
+  kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
   Farbnaht. Die Legende heisst deshalb „Ziel erreicht / verfehlt".
   Bei Monatsauflösung bezieht sich die Farbe auf den **Monatsdurchschnitt** — die
   Fusszeile zählt daneben die echten Nächte (24M: 4 kräftige Balken, 69 von 120).
@@ -354,31 +352,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
-- **Erste Karte füllt den freien Raum (Herz, Schlaf, eingeklappt).** Steht nur eine
-  Karte auf dem Bildschirm, blieb darunter viel leerer Verlauf (Hochformat, 375×812:
-  bei Herz ~296 px). Statt zusätzlichen Inhalt einzublenden wächst das Diagramm, das
-  ohnehin da steht: `weitereAuf()` setzt `.fuellt` auf den Screen, solange der
-  Abschnitt zu ist, die erste Karte trägt `.fuell-karte`.
-  **Nur Hochformat UND < 768 px** — im Querformat ist der Platz ohnehin gefüllt, und
-  über die Höhe eines Tablets wäre das Diagramm ein Streifen. `min-height` hält die
-  bisherige Hochformat-Höhe als Untergrenze: schrumpfen soll es nie, nur wachsen.
-  **Obergrenze `aspect-ratio:10/7`** — Höhe = Breite × 0.7, also 30 % flacher als
-  quadratisch. Ein Quadrat (`1/1`) wirkte im Hochformat weiterhin zu hoch. Über reines Flex-Wachstum
-  füllte das Diagramm den Raum zwar restlos, wurde dabei aber 434 × 327 — genau das
-  Seitenverhältnis, das im Hochformat schon einmal als zu hoch empfunden wurde.
-  `aspect-ratio` braucht dafür keine gemessenen Werte, die Höhe folgt der Breite.
-  Der Screen ist trotzdem eine Flex-Spalte, aber nur zum **Schrumpfen**
-  (`flex:0 1 auto`): Im Schlaf-Tab steht über der Karte noch die Score-Kachel, und ein
-  volles Quadrat ragte dort 32 px unter den Bildschirmrand — jetzt gibt das Diagramm
-  so viel nach wie nötig, höchstens bis zur alten Höhe (`min-height`). `min-height:0`
-  an den Zwischenebenen ist Bedingung, sonst gibt keine davon Platz ab.
-  **Wirkung nach dem Deckel auf 10/7 gering:** Das Diagramm ist damit 229 px hoch
-  gegenüber 221 px ohne die ganze Regel — die Karte wächst also nur um 8 px, und der
-  Leerraum bleibt fast vollständig bestehen (Herz ~216 px sichtbar statt 224). Die
-  Mechanik wirkt praktisch nur noch im Schlaf-Tab als **Schrumpf**-Schutz. Wer sie
-  aufräumen will: `.fuellt`/`.fuell-karte` samt der Media-Query entfernen und
-  `weitereAuf()` auf die eine Zeile zurückbauen — die Anzeige ändert sich dadurch
-  um wenige Pixel.
+- **Balkenrundung: `BALKEN_RADIUS` (3) ist die einzige Quelle.** Vorher standen 5, 4,
+  3 und (im 1M-Fenster) 2 nebeneinander — dieselbe obere Kante sah je nach Diagramm
+  anders aus. Klein gehalten: kräftige Kappen lassen kurze Balken abgeschnitten wirken.
+- **Schlafdauer ist EIN Balken je Nacht**, kein Stapel mehr. Die zwei Segmente
+  („bis Ziel" / „über Ziel") stammten aus der Zeit, als sie verschiedene Farben trugen.
+  Seit beide `_slFarbe` nutzen, war der Stapel nur noch schädlich: Chart.js kappt die
+  Rundung an der Höhe des **oberen** Segments, und die hängt vom Überschuss ab — je
+  nach Nacht 3 oder 15 px, wodurch die Kante von Balken zu Balken anders aussah.
+  Die Hilfslinien brauchen weiterhin **eigene Stapelnamen** (`ziel`, `ziel-avg`),
+  sonst addiert Chart.js sie auf den Balken.
 - **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
   Das CSS staffelt sie nach Orientierung: im Querformat die volle Höhe, im Hochformat
   **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist

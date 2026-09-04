@@ -206,6 +206,11 @@ function _parseWorkoutRows(rows) {
 // Hintergrund und tritt deutlich zurück, die Achse bleibt die kräftigere Kante.
 const GRID_COLOR   = 'rgba(148,163,184,0.10)';
 const ACHSEN_COLOR = 'rgba(148,163,184,0.38)';
+// Rundung der oberen Balkenkante – EINE Quelle fuer alle Diagramme. Vorher standen
+// dort 5, 4, 3 und (im 1M-Fenster) 2 nebeneinander, wodurch dieselbe Kante je nach
+// Diagramm unterschiedlich stark gerundet aussah. Bewusst klein: kraeftig gerundete
+// Kappen lassen kurze Balken abgeschnitten wirken.
+const BALKEN_RADIUS = 3;
 
 Chart.defaults.color = '#94A3B8';
 Chart.defaults.borderColor = ACHSEN_COLOR;
@@ -1820,7 +1825,7 @@ function pgOverview() {
   if(wHas){
     zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
       data:{labels:wLabels,datasets:[
-        {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:4,yAxisID:'yL'},
+        {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:BALKEN_RADIUS,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
         {type:'line',label:'HRV',data:wHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR',spanGaps:true},
         {type:'line',label:_wocheTrLabel,data:wTr,borderColor:'#F97316',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#F97316',yAxisID:'yL',spanGaps:true}
@@ -1937,7 +1942,7 @@ function pgHerz() {
 
   document.getElementById("screen-herz").innerHTML=`
     ${pgBanner('❤️','Herz')}
-    <div class="chart-card fuell-karte">
+    <div class="chart-card">
       <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
@@ -2061,13 +2066,6 @@ const _weitereOffen = { herz:false, schlaf:false };
 // Nur noch das oeffnende <div>; der Schalter sitzt seit 03.09.2026 als Knopf in der
 // Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
 function weitereAuf(tab) {
-  // Ist der Abschnitt zu, bleibt unter der einen sichtbaren Karte viel leerer Raum
-  // (im Hochformat bei Herz rund 220 px). Die Klasse `fuellt` laesst das Diagramm der
-  // ersten Karte diesen Raum einnehmen – kein zusaetzlicher Inhalt, nur mehr Hoehe
-  // fuer das, was ohnehin da steht. Ausgeklappt laeuft der Inhalt ueber den Bildschirm
-  // hinaus, dann gibt es nichts zu fuellen und die Klasse faellt weg.
-  const el = document.getElementById('screen-' + tab);
-  if (el) el.classList.toggle('fuellt', !_weitereOffen[tab]);
   return `<div class="weitere-inhalt"${_weitereOffen[tab] ? '' : ' hidden'}>`;
 }
 
@@ -2172,7 +2170,7 @@ function pgSchlaf() {
     ${pgBanner('🌙','Schlaf')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
-      <div class="chart-card fuell-karte">
+      <div class="chart-card">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
@@ -2272,15 +2270,16 @@ function pgSchlaf() {
     // kräftig und darüber hell – man sah den Überschuss, aber nicht auf einen Blick,
     // welche Nächte das Ziel verfehlten. Den Zielwert markiert jetzt die grüne Linie.
     const _slZiel = ZIELE.sleepTotal.ziel;
-    const _slBis  = slMa.map(v=>v==null?null:Math.min(v,_slZiel));
-    const _slUeber= slMa.map(v=>v==null?null:Math.max(0,v-_slZiel));
     const _slErreicht = i => slMa[i]!=null && slMa[i] >= _slZiel;
     const _slFarbe = ctx => _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:[
-      // Runde Ecke nur am oberen Ende des Balkens, sonst entsteht an der Naht eine Kerbe.
-      {label:'bis Ziel',data:_slBis,backgroundColor:_slFarbe,stack:'s',
-       borderRadius:ctx=>_slUeber[ctx.dataIndex]>0?0:5},
-      {label:'über Ziel',data:_slUeber,backgroundColor:_slFarbe,stack:'s',borderRadius:5},
+      // EIN Balken je Nacht. Frueher waren es zwei gestapelte Segmente ("bis Ziel" /
+      // "ueber Ziel") – ein Rest aus der Zeit, als sie verschiedene Farben trugen.
+      // Seit beide dieselbe Farbe haben, war der Stapel nur noch schaedlich: Chart.js
+      // kappt die Rundung an der Hoehe des OBEREN Segments, und das ist je nach
+      // Ueberschuss mal 3, mal 15 Pixel hoch – dieselbe Kante sah dadurch von Balken
+      // zu Balken anders aus.
+      {label:'Schlafdauer',data:slMa,backgroundColor:_slFarbe,stack:'s',borderRadius:BALKEN_RADIUS},
       // Beide Hilfslinien brauchen einen EIGENEN Stapel: sonst addiert Chart.js sie auf
       // die Balken darunter und sie lägen bei 15h statt bei 7h30.
       // Ziel: durchgezogen und im Grün, das die App für erreichte Ziele nutzt.
@@ -2308,11 +2307,11 @@ function pgSchlaf() {
       }}}},scales:{x:{...gx,stacked:true},y:{..._slY,stacked:true}}}});
     if(hasPhases){
       const _phDs=[
-        {label:'Tiefschlaf',data:dpMa,backgroundColor:'#1E1B6E',borderRadius:3,stack:'s'},
-        {label:'Leichtschlaf',data:lMa,backgroundColor:'#2186E8',borderRadius:3,stack:'s'},
-        {label:'REM',data:remMa,backgroundColor:'#5BC8FA',borderRadius:3,stack:'s'}
+        {label:'Tiefschlaf',data:dpMa,backgroundColor:'#1E1B6E',borderRadius:BALKEN_RADIUS,stack:'s'},
+        {label:'Leichtschlaf',data:lMa,backgroundColor:'#2186E8',borderRadius:BALKEN_RADIUS,stack:'s'},
+        {label:'REM',data:remMa,backgroundColor:'#5BC8FA',borderRadius:BALKEN_RADIUS,stack:'s'}
       ];
-      if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:3,stack:'s'});
+      if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:BALKEN_RADIUS,stack:'s'});
       zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
@@ -2583,7 +2582,7 @@ async function pgTraining() {
         data:{labels:kLbls,datasets:aktiv.map(r=>({
           label:r.label, data:kDaten[r.id], type:r.typ, yAxisID:r.achse,
           ...(r.typ==='bar'
-            ? {backgroundColor:r.farbe+'CC', borderRadius:4}
+            ? {backgroundColor:r.farbe+'CC', borderRadius:BALKEN_RADIUS}
             : {borderColor:r.farbe, backgroundColor:'transparent', borderWidth:2,
                tension:.3, pointRadius:3, pointBackgroundColor:r.farbe, spanGaps:true, fill:false})
         }))},
@@ -2616,7 +2615,7 @@ async function pgTraining() {
     const _lKeyTyp=_is1m?'tag':tKeyTyp;
 
     zeichneDiagramm('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lZeitLbls,datasets:[
-      {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:_is1m?2:4}
+      {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
       // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
@@ -2626,7 +2625,7 @@ async function pgTraining() {
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
     zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lStrLbls,datasets:[
-      {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:_is1m?2:4}
+      {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${ctx.raw.toFixed(2)} km`:null}}},
       scales:{x:_xTot,y:{...gy,
@@ -2661,7 +2660,7 @@ async function pgTraining() {
     const woDsets=[];
     woDsets.push({
       label:'Distanz (km)',data:woDist,
-      backgroundColor:'rgba(249,115,22,.75)',borderRadius:4,yAxisID:'yL',type:'bar'
+      backgroundColor:'rgba(249,115,22,.75)',borderRadius:BALKEN_RADIUS,yAxisID:'yL',type:'bar'
     });
     if(woHR.some(v=>v!=null)) woDsets.push({
       label:'Ø HR (bpm)',data:woHR,

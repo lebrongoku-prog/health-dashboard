@@ -364,43 +364,6 @@ body.dark #bottom-nav {
   .chart-wrap{height:calc(var(--h,200px) * .7)}
 }
 
-/* ── Erste Karte fuellt den freien Raum (Herz, Schlaf, eingeklappt) ──────────
-   Steht nur eine Karte auf dem Bildschirm, blieb darunter viel leerer Verlauf
-   (im Hochformat bei Herz rund 220 px). Statt zusaetzlichen Inhalt einzublenden
-   waechst das Diagramm, das ohnehin da steht, in diesen Raum hinein.
-   Nur auf Telefonen (< 768 px) und nur im Hochformat: im Querformat und auf
-   breiten Schirmen ist der Platz ohnehin ausgefuellt, und ein Diagramm ueber die
-   ganze Hoehe eines Tablets waere ein Streifen.
-   `min-height` haelt die bisherige Hochformat-Hoehe als Untergrenze – schrumpfen
-   soll das Diagramm nie, nur wachsen. `min-height:0` an den Flex-Kindern erlaubt
-   ihnen, unter ihre Inhaltshoehe zu gehen; ohne das waechst der Kasten, aber das
-   Diagramm darin nicht mit. */
-@media (orientation: portrait) and (max-width: 767px) {
-  /* Der Screen ist eine Flex-Spalte, damit das Diagramm bei Bedarf SCHRUMPFEN kann:
-     Im Schlaf-Tab steht ueber der Karte noch die Score-Kachel, und ein volles Quadrat
-     ragte dort 32 px unter den Bildschirmrand. `flex:0 1 auto` heisst wachsen nein,
-     schrumpfen ja – bis hoechstens auf die alte Hochformat-Hoehe (min-height).
-     Ohne `min-height:0` an den Zwischenebenen gaebe keine davon Platz ab. */
-  .screen.fuellt{display:flex;flex-direction:column}
-  .screen.fuellt>.fuell-karte{flex:0 1 auto;display:flex;flex-direction:column;min-height:0}
-  .screen.fuellt>.fuell-karte>.chart-wrap{
-    flex:0 1 auto;
-    /* Obergrenze „nie hoeher als breit": ein quadratisches Feld. Ueber Flex-Wachstum
-       fuellte das Diagramm den Raum zwar restlos, wurde dabei aber deutlich hoeher
-       als breit (434x327) – genau das Seitenverhaeltnis, das im Hochformat schon
-       einmal als zu hoch empfunden wurde. `aspect-ratio` braucht kein Flex und keine
-       gemessenen Werte: die Hoehe folgt schlicht der Breite.
-       `height:auto` hebt die feste Hoehe der Grundregel auf, `min-height` haelt die
-       bisherige Hochformat-Hoehe als Untergrenze – kleiner als heute wird es nie. */
-    height:auto;
-    /* 30 % flacher als quadratisch (Wunsch 04.09.2026): Hoehe = Breite x 0.7.
-       Das Quadrat wirkte im Hochformat weiterhin zu hoch. `min-height` bleibt die
-       Untergrenze – kleiner als die bisherige Hochformat-Hoehe wird es nie. */
-    aspect-ratio:10 / 7;
-    min-height:calc(var(--h,200px) * .7);
-  }
-}
-
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
 .chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
