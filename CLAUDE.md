@@ -362,7 +362,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Nur Hochformat UND < 768 px** — im Querformat ist der Platz ohnehin gefüllt, und
   über die Höhe eines Tablets wäre das Diagramm ein Streifen. `min-height` hält die
   bisherige Hochformat-Höhe als Untergrenze: schrumpfen soll es nie, nur wachsen.
-  **Obergrenze „nie höher als breit"** (`aspect-ratio:1/1`): Über reines Flex-Wachstum
+  **Obergrenze `aspect-ratio:10/7`** — Höhe = Breite × 0.7, also 30 % flacher als
+  quadratisch. Ein Quadrat (`1/1`) wirkte im Hochformat weiterhin zu hoch. Über reines Flex-Wachstum
   füllte das Diagramm den Raum zwar restlos, wurde dabei aber 434 × 327 — genau das
   Seitenverhältnis, das im Hochformat schon einmal als zu hoch empfunden wurde.
   `aspect-ratio` braucht dafür keine gemessenen Werte, die Höhe folgt der Breite.
@@ -371,9 +372,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   volles Quadrat ragte dort 32 px unter den Bildschirmrand — jetzt gibt das Diagramm
   so viel nach wie nötig, höchstens bis zur alten Höhe (`min-height`). `min-height:0`
   an den Zwischenebenen ist Bedingung, sonst gibt keine davon Platz ab.
-  **Folge, bewusst in Kauf genommen:** Die Hochformat-Regel „70 % der Querformat-Höhe"
-  gilt für dieses eine Diagramm nicht mehr, und seine Höhe ändert sich beim Auf- und
-  Zuklappen (Herz 221 ↔ 327 px). Ein Rest Leerraum bleibt (Herz ~118 px sichtbar).
+  **Wirkung nach dem Deckel auf 10/7 gering:** Das Diagramm ist damit 229 px hoch
+  gegenüber 221 px ohne die ganze Regel — die Karte wächst also nur um 8 px, und der
+  Leerraum bleibt fast vollständig bestehen (Herz ~216 px sichtbar statt 224). Die
+  Mechanik wirkt praktisch nur noch im Schlaf-Tab als **Schrumpf**-Schutz. Wer sie
+  aufräumen will: `.fuellt`/`.fuell-karte` samt der Media-Query entfernen und
+  `weitereAuf()` auf die eine Zeile zurückbauen — die Anzeige ändert sich dadurch
+  um wenige Pixel.
 - **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
   Das CSS staffelt sie nach Orientierung: im Querformat die volle Höhe, im Hochformat
   **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist

@@ -393,7 +393,10 @@ body.dark #bottom-nav {
        `height:auto` hebt die feste Hoehe der Grundregel auf, `min-height` haelt die
        bisherige Hochformat-Hoehe als Untergrenze – kleiner als heute wird es nie. */
     height:auto;
-    aspect-ratio:1 / 1;
+    /* 30 % flacher als quadratisch (Wunsch 04.09.2026): Hoehe = Breite x 0.7.
+       Das Quadrat wirkte im Hochformat weiterhin zu hoch. `min-height` bleibt die
+       Untergrenze – kleiner als die bisherige Hochformat-Hoehe wird es nie. */
+    aspect-ratio:10 / 7;
     min-height:calc(var(--h,200px) * .7);
   }
 }
