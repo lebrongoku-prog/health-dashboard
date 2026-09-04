@@ -207,7 +207,29 @@ body.dark .dark-toggle { color: #FBBF24; }
   border-radius: 11px; cursor: pointer;
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
 }
+/* Icon-Knoepfe druecken sich staerker als Flaechenknoepfe – so haelt es FitTrack
+   bei seinem runden `.ph-gear` ebenfalls. */
 .pg-act:active { transform: scale(0.94); }
+
+/* ── Tipp-Animation (aus FitTrack uebernommen) ──────────────
+   Jeder Knopf gibt beim Beruehren kurz nach – Werte 1:1 aus FitTracks `.btn`:
+   `opacity .15s, transform .1s` und `opacity:.75; scale(.97)` im gedrueckten
+   Zustand. Beides bewusst als ELEMENT-Regel (Spezifitaet 0,0,1): jede Klasse mit
+   eigenem Druckpunkt (`.pg-act`, s. o.) gewinnt weiterhin, ohne !important.
+   Das antippbare ⓘ ist zwar ein <span>, verhaelt sich aber wie ein Knopf und
+   bekommt dasselbe.
+   NICHT enthalten sind die Kalender-Kaestchen (`.lp-tag`, ebenfalls role=button):
+   Ein transform waehrend `:active` bricht auf iOS die laufende Wischgeste ab – in
+   FitTrack liess sich das Jahresraster dadurch gar nicht mehr scrollen. */
+button,
+.info-i{
+  transition: opacity .15s, transform .1s;
+}
+button:active,
+.info-i:active{
+  opacity: .75;
+  transform: scale(.97);
+}
 
 /* ── Bottom-Nav (FitTrack pattern) ──────────────────────── */
 #bottom-nav {
@@ -357,7 +379,6 @@ body.dark #bottom-nav {
   color:#fff;background:var(--tab-color,#0891B2);
   border:none;border-radius:10px;cursor:pointer;
 }
-.update-btn:active{transform:scale(.985)}
 .update-btn:disabled{opacity:.55;cursor:default}
 .app-hinweis{font-size:.6rem;color:var(--txt3);line-height:1.45;margin-top:.4rem}
 
@@ -892,9 +913,13 @@ body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
   border-radius:12px;padding:4px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .seg-btn{flex:1;border:none;background:transparent;color:#fff;font-size:.86rem;font-weight:600;
   padding:9px 6px;border-radius:9px;cursor:pointer;-webkit-tap-highlight-color:transparent;
-  font-family:inherit;transition:background .15s,color .15s}
+  font-family:inherit;transition:background .15s,color .15s,opacity .15s,transform .1s}
 .seg-btn.active{background:#fff;color:#065F46;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .pg-act.lp-neu{color:#fff;font-weight:700;line-height:1}
+/* Der Aufklapp-Pfeil erbt sonst die dunkle Textfarbe des Body – auf dem farbigen
+   Banner unlesbar. Die Dreiecks-Glyphe fuellt ihr Feld zudem schlechter als ein Emoji,
+   deshalb etwas groesser gesetzt als die uebrigen Banner-Knoepfe. */
+.pg-act.ausklapp-act{color:#fff;font-size:22px;line-height:1}
 
 /* ── Planverwaltung ── */
 .lp-plankarte.offen{box-shadow:0 0 0 1.5px var(--tab-color), var(--shadow)}

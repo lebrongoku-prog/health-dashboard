@@ -412,6 +412,24 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **ohne** die frühere Haarlinie — die wirkte neben dem Knopf wie eine Umrandung.
   Im Dunkelmodus dieselbe Form mit `.45` statt `.18`: ein 18%-Schwarz verschwindet
   auf dunklem Grund und die Karten hätten keine Kante mehr.
+- **Aufklapp-Schalter sitzt in der Kopfzeile.** „Weitere Auswertungen" (Herz, Schlaf)
+  und „Muster & Zusammenhänge" (Übersicht) haben keinen breiten Balken im Inhalt mehr,
+  sondern einen `.pg-act.ausklapp-act` links vom Dark-Toggle (`▾` zu / `▴` offen).
+  **`AUSKLAPP` ist die einzige Quelle** dafür, welcher Tab etwas zum Aufklappen hat,
+  wie es heisst und wie umgeschaltet wird — Knopf, Zustand und Handler lesen dieselbe
+  Tabelle. Tabs ohne Eintrag zeigen den Knopf gar nicht. Der Knopf braucht
+  `color:#fff`; ohne erbt er die dunkle Textfarbe und ist auf dem Banner unlesbar.
+  Der Ausklapp-Knopf der **App-Karte** bleibt davon unberührt — er steht weiter als
+  `.weitere-btn` im Inhalt der Übersicht.
+- **Tipp-Animation (aus FitTrack):** `button` und `.info-i` tragen
+  `transition: opacity .15s, transform .1s` und im gedrückten Zustand
+  `opacity:.75; scale(.97)`. Bewusst als **Element-Regel** (Spezifität 0,0,1), damit
+  Klassen mit eigenem Druckpunkt (`.pg-act`: `scale(.94)`) ohne `!important` gewinnen.
+  Klassen mit eigenem `transition` müssen `opacity`/`transform` mitführen, sonst
+  springt der Druckpunkt (`.seg-btn`). **Die Kalender-Kästchen `.lp-tag` sind
+  ausgenommen** (obwohl `role="button"`): ein `transform` während `:active` bricht auf
+  iOS die laufende Wischgeste ab — in FitTrack liess sich das Jahresraster dadurch
+  gar nicht mehr scrollen.
 - **Aufklapp-Knöpfe teilen eine Klasse:** „Weitere Auswertungen" (Herz, Schlaf) und
   „Muster & Zusammenhänge" (Übersicht) tragen beide `.weitere-btn` und sehen damit
   identisch aus. Der Muster-Knopf hatte vorher als `.pi-titel` das Aussehen einer

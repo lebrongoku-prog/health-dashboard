@@ -1756,9 +1756,6 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <button type="button" class="weitere-btn" data-musterklapp aria-expanded="${_musterOffen?'true':'false'}">
-      Muster &amp; Zusammenhänge<span class="weitere-pfeil">${_musterOffen?'▾':'▸'}</span>
-    </button>
     <div class="pi-grid" style="${_musterOffen?'':'display:none'}">
       ${patternIns.map(p=>{
         let txt=p.text;
@@ -2054,13 +2051,23 @@ const _weitereOffen = { herz:false, schlaf:false };
 // Knopf + oeffnendes <div>. Der schliessende Tag steht im Markup, damit die Karten
 // dazwischen unveraendert bleiben – ein String-Parameter haette die Template-Literale
 // der Karten verschachtelt und war nicht sauber zu escapen.
+// Nur noch das oeffnende <div>; der Schalter sitzt seit 03.09.2026 als Knopf in der
+// Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
 function weitereAuf(tab) {
-  const offen = _weitereOffen[tab];
-  return `<button type="button" class="weitere-btn" data-weitere="${tab}" aria-expanded="${offen}">
-      Weitere Auswertungen<span class="weitere-pfeil">${offen ? '▾' : '▸'}</span>
-    </button>
-    <div class="weitere-inhalt"${offen ? '' : ' hidden'}>`;
+  return `<div class="weitere-inhalt"${_weitereOffen[tab] ? '' : ' hidden'}>`;
 }
+
+// Welche Tabs haben ueberhaupt etwas zum Aufklappen – und wie heisst es?
+// EINE Quelle fuer Knopf, Zustand und Umschalten; sonst muesste jede der drei
+// Stellen ihre eigene Fallunterscheidung fuehren.
+const AUSKLAPP = {
+  overview: { titel: 'Muster & Zusammenhänge', offen: () => _musterOffen,
+              um: () => { _musterOffen = !_musterOffen; } },
+  herz:     { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.herz,
+              um: () => { _weitereOffen.herz = !_weitereOffen.herz; } },
+  schlaf:   { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.schlaf,
+              um: () => { _weitereOffen.schlaf = !_weitereOffen.schlaf; } }
+};
 
 // ── Schlaf ─────────────────────────────────────────────
 function pgSchlaf() {
@@ -3496,7 +3503,16 @@ function pgBanner(icon,title){
   // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
   // Tabnamen, der Daten-Stand steht jetzt einmal in der App-Karte der Übersicht.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  // Aufklapp-Schalter links vom Dark-Toggle – nur in den Tabs, die etwas zu zeigen
+  // haben. Er ersetzt die frueheren breiten Balken im Inhalt ("Weitere Auswertungen",
+  // "Muster & Zusammenhänge"); der Ausklapp-Knopf der App-Karte bleibt, wo er ist.
+  const k = AUSKLAPP[_currentRenderingTab];
+  const ausklapp = k
+    ? `<button class="pg-act ausklapp-act" data-ausklapp="${_currentRenderingTab}"
+         aria-expanded="${k.offen() ? 'true' : 'false'}"
+         title="${k.titel}" aria-label="${k.titel}">${k.offen() ? '▴' : '▾'}</button>`
+    : '';
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -3861,29 +3877,22 @@ function initScrollHideNav() {
   });
 }
 
-// "Weitere Auswertungen" auf-/zuklappen. Ohne Neuaufbau: die Diagramme dahinter sind
-// bereits gezeichnet, ein Re-Render wuerde sie unnoetig neu aufbauen.
+// Aufklapp-Schalter in der Kopfzeile: „Weitere Auswertungen" (Herz, Schlaf) und
+// „Muster & Zusammenhänge" (Übersicht) laufen ueber denselben Knopf und dieselbe
+// Tabelle (AUSKLAPP).
 document.body.addEventListener('click', (e) => {
-  const knopf = e.target.closest('[data-weitere]');
+  const knopf = e.target.closest('[data-ausklapp]');
   if (!knopf) return;
-  const tab = knopf.dataset.weitere;
-  _weitereOffen[tab] = !_weitereOffen[tab];
-  knopf.setAttribute('aria-expanded', _weitereOffen[tab]);
-  const pfeil = knopf.querySelector('.weitere-pfeil');
-  if (pfeil) pfeil.textContent = _weitereOffen[tab] ? '▾' : '▸';
+  const tab = knopf.dataset.ausklapp;
+  const k = AUSKLAPP[tab];
+  if (!k) return;
+  k.um();
   // Neu aufbauen statt nur ein-/ausblenden: Diagramme im verborgenen Bereich werden
   // ohne sichtbare Flaeche gezeichnet und behalten Breite 0. Aus diesem Zustand holt
   // sie weder resize() noch update() zurueck – nur ein Neuaufbau bei sichtbarem
   // Container. Der Nutzer oeffnet hier einen ganzen Abschnitt, ein Neuaufbau faellt
   // dabei nicht ins Gewicht.
   _renderTab(tab);
-});
-
-// Muster-Abschnitt auf-/zuklappen.
-document.body.addEventListener('click', (e) => {
-  if (!e.target.closest('[data-musterklapp]')) return;
-  _musterOffen = !_musterOffen;
-  _renderTab('overview');
 });
 
 // App-Karte auf-/zuklappen. Hier genuegt Ein-/Ausblenden: in der Karte steckt kein
