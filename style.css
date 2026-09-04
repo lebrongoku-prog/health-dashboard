@@ -376,10 +376,25 @@ body.dark #bottom-nav {
    ihnen, unter ihre Inhaltshoehe zu gehen; ohne das waechst der Kasten, aber das
    Diagramm darin nicht mit. */
 @media (orientation: portrait) and (max-width: 767px) {
+  /* Der Screen ist eine Flex-Spalte, damit das Diagramm bei Bedarf SCHRUMPFEN kann:
+     Im Schlaf-Tab steht ueber der Karte noch die Score-Kachel, und ein volles Quadrat
+     ragte dort 32 px unter den Bildschirmrand. `flex:0 1 auto` heisst wachsen nein,
+     schrumpfen ja – bis hoechstens auf die alte Hochformat-Hoehe (min-height).
+     Ohne `min-height:0` an den Zwischenebenen gaebe keine davon Platz ab. */
   .screen.fuellt{display:flex;flex-direction:column}
-  .screen.fuellt>.fuell-karte{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+  .screen.fuellt>.fuell-karte{flex:0 1 auto;display:flex;flex-direction:column;min-height:0}
   .screen.fuellt>.fuell-karte>.chart-wrap{
-    flex:1 1 auto;height:auto;min-height:calc(var(--h,200px) * .7);
+    flex:0 1 auto;
+    /* Obergrenze „nie hoeher als breit": ein quadratisches Feld. Ueber Flex-Wachstum
+       fuellte das Diagramm den Raum zwar restlos, wurde dabei aber deutlich hoeher
+       als breit (434x327) – genau das Seitenverhaeltnis, das im Hochformat schon
+       einmal als zu hoch empfunden wurde. `aspect-ratio` braucht kein Flex und keine
+       gemessenen Werte: die Hoehe folgt schlicht der Breite.
+       `height:auto` hebt die feste Hoehe der Grundregel auf, `min-height` haelt die
+       bisherige Hochformat-Hoehe als Untergrenze – kleiner als heute wird es nie. */
+    height:auto;
+    aspect-ratio:1 / 1;
+    min-height:calc(var(--h,200px) * .7);
   }
 }
 
