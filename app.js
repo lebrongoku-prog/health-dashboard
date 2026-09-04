@@ -1937,7 +1937,7 @@ function pgHerz() {
 
   document.getElementById("screen-herz").innerHTML=`
     ${pgBanner('❤️','Herz')}
-    <div class="chart-card">
+    <div class="chart-card fuell-karte">
       <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
@@ -2061,6 +2061,13 @@ const _weitereOffen = { herz:false, schlaf:false };
 // Nur noch das oeffnende <div>; der Schalter sitzt seit 03.09.2026 als Knopf in der
 // Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
 function weitereAuf(tab) {
+  // Ist der Abschnitt zu, bleibt unter der einen sichtbaren Karte viel leerer Raum
+  // (im Hochformat bei Herz rund 220 px). Die Klasse `fuellt` laesst das Diagramm der
+  // ersten Karte diesen Raum einnehmen – kein zusaetzlicher Inhalt, nur mehr Hoehe
+  // fuer das, was ohnehin da steht. Ausgeklappt laeuft der Inhalt ueber den Bildschirm
+  // hinaus, dann gibt es nichts zu fuellen und die Klasse faellt weg.
+  const el = document.getElementById('screen-' + tab);
+  if (el) el.classList.toggle('fuellt', !_weitereOffen[tab]);
   return `<div class="weitere-inhalt"${_weitereOffen[tab] ? '' : ' hidden'}>`;
 }
 
@@ -2165,7 +2172,7 @@ function pgSchlaf() {
     ${pgBanner('🌙','Schlaf')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
-      <div class="chart-card">
+      <div class="chart-card fuell-karte">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>

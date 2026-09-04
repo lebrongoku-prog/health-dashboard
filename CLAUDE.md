@@ -354,6 +354,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
+- **Erste Karte füllt den freien Raum (Herz, Schlaf, eingeklappt).** Steht nur eine
+  Karte auf dem Bildschirm, blieb darunter viel leerer Verlauf (Hochformat, 375×812:
+  bei Herz ~296 px). Statt zusätzlichen Inhalt einzublenden wächst das Diagramm, das
+  ohnehin da steht: `weitereAuf()` setzt `.fuellt` auf den Screen, solange der
+  Abschnitt zu ist, die erste Karte trägt `.fuell-karte`.
+  **Nur Hochformat UND < 768 px** — im Querformat ist der Platz ohnehin gefüllt, und
+  über die Höhe eines Tablets wäre das Diagramm ein Streifen. `min-height` hält die
+  bisherige Hochformat-Höhe als Untergrenze: schrumpfen soll es nie, nur wachsen.
+  `min-height:0` an den Flex-Kindern ist Bedingung — sonst wächst der Kasten, das
+  Diagramm darin aber nicht mit. **Folge, bewusst in Kauf genommen:** Die
+  Hochformat-Regel „70 % der Querformat-Höhe" gilt für dieses eine Diagramm nicht
+  mehr, und seine Höhe ändert sich beim Auf- und Zuklappen (Herz 220 ↔ 434 px).
 - **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
   Das CSS staffelt sie nach Orientierung: im Querformat die volle Höhe, im Hochformat
   **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist

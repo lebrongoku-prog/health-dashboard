@@ -364,6 +364,25 @@ body.dark #bottom-nav {
   .chart-wrap{height:calc(var(--h,200px) * .7)}
 }
 
+/* ── Erste Karte fuellt den freien Raum (Herz, Schlaf, eingeklappt) ──────────
+   Steht nur eine Karte auf dem Bildschirm, blieb darunter viel leerer Verlauf
+   (im Hochformat bei Herz rund 220 px). Statt zusaetzlichen Inhalt einzublenden
+   waechst das Diagramm, das ohnehin da steht, in diesen Raum hinein.
+   Nur auf Telefonen (< 768 px) und nur im Hochformat: im Querformat und auf
+   breiten Schirmen ist der Platz ohnehin ausgefuellt, und ein Diagramm ueber die
+   ganze Hoehe eines Tablets waere ein Streifen.
+   `min-height` haelt die bisherige Hochformat-Hoehe als Untergrenze – schrumpfen
+   soll das Diagramm nie, nur wachsen. `min-height:0` an den Flex-Kindern erlaubt
+   ihnen, unter ihre Inhaltshoehe zu gehen; ohne das waechst der Kasten, aber das
+   Diagramm darin nicht mit. */
+@media (orientation: portrait) and (max-width: 767px) {
+  .screen.fuellt{display:flex;flex-direction:column}
+  .screen.fuellt>.fuell-karte{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+  .screen.fuellt>.fuell-karte>.chart-wrap{
+    flex:1 1 auto;height:auto;min-height:calc(var(--h,200px) * .7);
+  }
+}
+
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
 .chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
