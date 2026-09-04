@@ -1683,8 +1683,9 @@ function pgOverview() {
 
   document.getElementById("screen-overview").innerHTML = `
     ${pgBanner('📊','Übersicht')}
-    ${zielUebersichtHTML()}
-    <!-- Warning signals (only shown when triggered) -->
+    <!-- Warning signals (only shown when triggered). Steht ueber dem Kartenpaar:
+         eine Warnung gehoert nach oben, und im Querformat stehen Ziele und Kacheln
+         nebeneinander – dazwischen waere kein Platz fuer sie. -->
     ${warnSig ? `<div class="warn-card">
       <div>
         <div class="warn-title">Belastungssignal erkannt ${scopeBadge('letzter Tag')}</div>
@@ -1692,6 +1693,9 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
+    <!-- Ziele und Tageswerte: im Hochformat untereinander, im Querformat nebeneinander. -->
+    <div class="ov-oben">
+    ${zielUebersichtHTML()}
 
     <!-- Aktuelle Tageswerte. Der Gesundheits-Score stand hier daneben und wurde
          auf Wunsch komplett entfernt; die Belastungswarnung oben bleibt. -->
@@ -1701,11 +1705,6 @@ function pgOverview() {
         <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
-          ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
-            <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
-            <div class="ti-metric-val">${alsStdMin(slLast)}</div>
-            ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
-          </div>`:'<div class="ti-metric"></div>'}
           ${hrLast!=null?`<div class="ti-metric" style="border-top:3px solid #EF4444;background:rgba(239,68,68,.05)">
             <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
             <div class="ti-metric-val">${Math.round(hrLast)} bpm</div>
@@ -1715,6 +1714,11 @@ function pgOverview() {
             <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
             <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
+          </div>`:'<div class="ti-metric"></div>'}
+          ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
+            <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
+            <div class="ti-metric-val">${alsStdMin(slLast)}</div>
+            ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${(()=>{
             const trMin=workoutData[lastDay.date]?.durationMin??null;
@@ -1741,6 +1745,7 @@ function pgOverview() {
           })()}
         </div>
       </div>
+    </div>
     </div>
     <!-- Zeile 2: Verlauf (oberhalb des Trends) -->
     <div class="chart-card" style="margin-bottom:.7rem">
@@ -3507,10 +3512,16 @@ function pgBanner(icon,title){
   // haben. Er ersetzt die frueheren breiten Balken im Inhalt ("Weitere Auswertungen",
   // "Muster & Zusammenhänge"); der Ausklapp-Knopf der App-Karte bleibt, wo er ist.
   const k = AUSKLAPP[_currentRenderingTab];
+  // Doppel-Chevron wie in FitTracks Uebungen-Tab (`.ex-sort-btn`): nach unten zum
+  // Aufklappen, nach oben zum Einklappen. Die Punkte der Polylinien sind von dort
+  // uebernommen, damit der Knopf in beiden Apps derselbe ist.
+  const chevron = k && k.offen()
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 11 12 6 17 11"/><polyline points="7 18 12 13 17 18"/></svg>`
+    : `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>`;
   const ausklapp = k
     ? `<button class="pg-act ausklapp-act" data-ausklapp="${_currentRenderingTab}"
          aria-expanded="${k.offen() ? 'true' : 'false'}"
-         title="${k.titel}" aria-label="${k.titel}">${k.offen() ? '▴' : '▾'}</button>`
+         title="${k.titel}" aria-label="${k.titel}">${chevron}</button>`
     : '';
   return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }

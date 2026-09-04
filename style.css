@@ -734,6 +734,14 @@ h5,
    Platz nicht doppelt für zwei Topbar-Zeilen draufgeht.
    ═══════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
+  /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
+     Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
+     Hoehe der laengeren gezogen wird. */
+  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:start}
+  .ov-oben>*{margin-bottom:0}
+  /* Die vier Kacheln stehen dann zu zweit: oben Ruhepuls und HRV, darunter Schlaf
+     und Training. Die Reihenfolge kommt aus dem Markup und gilt in beiden Lagen. */
+  .ov-oben .ti-metrics{grid-template-columns:1fr 1fr}
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -916,10 +924,22 @@ body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
   font-family:inherit;transition:background .15s,color .15s,opacity .15s,transform .1s}
 .seg-btn.active{background:#fff;color:#065F46;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .pg-act.lp-neu{color:#fff;font-weight:700;line-height:1}
-/* Der Aufklapp-Pfeil erbt sonst die dunkle Textfarbe des Body – auf dem farbigen
-   Banner unlesbar. Die Dreiecks-Glyphe fuellt ihr Feld zudem schlechter als ein Emoji,
-   deshalb etwas groesser gesetzt als die uebrigen Banner-Knoepfe. */
-.pg-act.ausklapp-act{color:#fff;font-size:22px;line-height:1}
+/* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf
+   mit Doppel-Chevron in der Tabfarbe – dort ist es die Akzentfarbe, hier folgt sie
+   dem Tab. Masse, Radius, Schatten und Strichstaerke sind von dort uebernommen; er
+   hebt sich damit bewusst von den beiden durchscheinenden Nachbarn (＋, 🌙) ab. */
+.pg-act.ausklapp-act{
+  background:rgba(255,255,255,.95);
+  border:1px solid transparent;
+  border-radius:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+.pg-act.ausklapp-act svg{
+  width:18px;height:18px;fill:none;
+  stroke:var(--tab-color,#0891B2);stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;
+}
 
 /* ── Planverwaltung ── */
 .lp-plankarte.offen{box-shadow:0 0 0 1.5px var(--tab-color), var(--shadow)}

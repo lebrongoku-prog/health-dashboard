@@ -378,6 +378,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **Übersicht im Querformat:** „Ziele" und die Kachel-Karte stehen **nebeneinander**
+  (`.ov-oben`, Grid `1fr 1fr`), die vier Minikacheln darin **zweizeilig**. Reihenfolge
+  überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
+  im Querformat also oben Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
+  **über** dem Paar; zwischen zwei nebeneinanderliegenden Karten wäre kein Platz.
 - **Minikacheln der Übersicht (`.ti-metric`):** Inhalte waagrecht **und** senkrecht
   zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
   Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
@@ -417,8 +422,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   sondern einen `.pg-act.ausklapp-act` links vom Dark-Toggle (`▾` zu / `▴` offen).
   **`AUSKLAPP` ist die einzige Quelle** dafür, welcher Tab etwas zum Aufklappen hat,
   wie es heisst und wie umgeschaltet wird — Knopf, Zustand und Handler lesen dieselbe
-  Tabelle. Tabs ohne Eintrag zeigen den Knopf gar nicht. Der Knopf braucht
-  `color:#fff`; ohne erbt er die dunkle Textfarbe und ist auf dem Banner unlesbar.
+  Tabelle. Tabs ohne Eintrag zeigen den Knopf gar nicht.
+  **Optik 1:1 aus FitTracks Übungen-Tab** (`.ex-sort-btn`): heller Knopf
+  (`rgba(255,255,255,.95)`, Radius 10, Schatten `0 2px 8px`) mit **Doppel-Chevron**
+  als SVG (18 px, `stroke-width:1.8`, runde Enden) — nach unten zum Aufklappen, nach
+  oben zum Einklappen. Die Strichfarbe folgt hier `--tab-color` statt FitTracks fester
+  Akzentfarbe. Er hebt sich damit bewusst von den durchscheinenden Nachbarn (＋, 🌙) ab.
   Der Ausklapp-Knopf der **App-Karte** bleibt davon unberührt — er steht weiter als
   `.weitere-btn` im Inhalt der Übersicht.
 - **Tipp-Animation (aus FitTrack):** `button` und `.info-i` tragen
