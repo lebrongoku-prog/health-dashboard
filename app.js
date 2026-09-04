@@ -1701,6 +1701,7 @@ function pgOverview() {
          auf Wunsch komplett entfernt; die Belastungswarnung oben bleibt. -->
       <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
            wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
+    <div class="ov-oben-kacheln">
     <div class="ov-combo-card">
         <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
@@ -1745,6 +1746,7 @@ function pgOverview() {
           })()}
         </div>
       </div>
+    </div>
     </div>
     </div>
     <!-- Zeile 2: Verlauf (oberhalb des Trends) -->

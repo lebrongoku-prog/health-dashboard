@@ -737,11 +737,25 @@ h5,
   /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
      Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
      Hoehe der laengeren gezogen wird. */
-  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:start}
+  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:stretch}
   .ov-oben>*{margin-bottom:0}
+  /* Beide Karten gleich hoch – und zwar so hoch wie „Ziele". Dafuer darf die
+     Kachel-Spalte die Zeilenhoehe NICHT mitbestimmen: Der Kasten bleibt leer, die
+     Karte darin liegt absolut darueber. Bei `align-items:stretch` allein gaebe die
+     HOEHERE der beiden das Mass vor – hier ist das die Kachel-Karte, und „Ziele"
+     wuerde mitwachsen statt umgekehrt. */
+  /* Untergrenze, damit die Kopplung nicht ins Gegenteil kippt: Liegen ausnahmsweise
+     nur ein, zwei Ziele vor, ist die Ziele-Karte kuerzer als die vier Kacheln je
+     brauchen – ohne diesen Wert schnitte `overflow:hidden` sie ab. Ueber 12rem
+     bestimmt weiterhin allein die Ziele-Karte die Hoehe (bei fuenf Zielen ~197 px). */
+  .ov-oben-kacheln{position:relative;min-height:12rem}
+  .ov-oben-kacheln>.ov-combo-card{position:absolute;inset:0;margin:0;overflow:hidden}
   /* Die vier Kacheln stehen dann zu zweit: oben Ruhepuls und HRV, darunter Schlaf
-     und Training. Die Reihenfolge kommt aus dem Markup und gilt in beiden Lagen. */
-  .ov-oben .ti-metrics{grid-template-columns:1fr 1fr}
+     und Training. Die Reihenfolge kommt aus dem Markup und gilt in beiden Lagen.
+     Zwei gleich hohe Zeilen, die den vorgegebenen Platz ausfuellen; `min-height:0`
+     erlaubt den Zellen, unter ihre Inhaltshoehe zu gehen. */
+  .ov-oben .ti-metrics{height:100%;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  .ov-oben .ti-metric{min-height:0}
 }
 
 /* ═══════════════════════════════════════════════════════════

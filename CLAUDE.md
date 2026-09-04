@@ -379,7 +379,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
 - **Übersicht im Querformat:** „Ziele" und die Kachel-Karte stehen **nebeneinander**
-  (`.ov-oben`, Grid `1fr 1fr`), die vier Minikacheln darin **zweizeilig**. Reihenfolge
+  (`.ov-oben`, Grid `1fr 1fr`) und sind **gleich hoch — nach dem Mass der Ziele-Karte**.
+  Dafür bestimmt die Kachel-Spalte die Zeilenhöhe NICHT mit: `.ov-oben-kacheln` bleibt
+  leer, die Karte darin liegt `position:absolute; inset:0`. Mit blossem
+  `align-items:stretch` gäbe die **höhere** der beiden das Mass vor — das ist die
+  Kachel-Karte, und „Ziele" würde mitwachsen statt umgekehrt. `min-height:12rem` am
+  Kasten verhindert den umgekehrten Fehler: liegen ausnahmsweise nur ein, zwei Ziele
+  vor, schnitte `overflow:hidden` die Kacheln sonst ab.
+  Die vier Minikacheln stehen darin **zweizeilig**. Reihenfolge
   überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
   im Querformat also oben Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
   **über** dem Paar; zwischen zwei nebeneinanderliegenden Karten wäre kein Platz.
