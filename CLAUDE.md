@@ -417,10 +417,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   was beim Antippen eines Tages erscheint, steht auf der **Label-Stufe** `.83rem`. Vorher lagen dort fünf
   Abstufungen von `.66` bis `.79rem` nebeneinander. Die Grösse steht — wie alle —
   **nur im Type Scale**; die `.lp-*`-Regeln tragen keine `font-size` mehr.
-  Ebenso trägt **keine Zeile einen eigenen Rand**: `.lp-detail-kopf` und `.lp-werte`
-  übernehmen Lücke und Polster der `.stats-list` (`gap:.2rem`, `padding:.22rem 0`),
-  damit der Rhythmus dem Rest der App entspricht — vorher hatte jede Zeile ihren
-  eigenen Wert (.3 / .15 / .4 / .2rem) und sie sassen sichtbar ungleich.
+  Ebenso trägt **keine Zeile einen eigenen Rand** — vorher hatte jede ihren eigenen
+  Wert (.3 / .15 / .4 / .2rem) und sie sassen sichtbar ungleich. Es gibt **zwei
+  Rhythmen**: die Wertzeilen (`.lp-werte`) folgen der `.stats-list` (Lücke `.2rem`,
+  Polster `.22rem 0` → 29–30 px), die Zeilen **darüber** (Datum, Plan, Planstand,
+  Spaltenköpfe) laufen enger (`.lp-detail-kopf` mit Lücke `.15rem`, kein Polster,
+  `.lp-werte-kopf` ohne oberes Polster → 21 px). Sie ordnen den Tag nur ein; im
+  Polster der Wertzeilen wurde die Karte unnötig hoch.
 - **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
   (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
   Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
@@ -601,6 +604,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Montag der Startwoche und in ganzen Tagen — sonst wird ein mitten in der Woche
   begonnener Plan zu kurz und die Zeitumstellung kippt das Ergebnis). Das Feld ist
   reine Anzeige und bestimmt zugleich die Zahl der Wochenblöcke.
+  Die Zeilen der Lauftage stehen **mittig** (`.lp-einheit{justify-content:center}`) —
+  linksbündig blieb rechts ein breiter leerer Streifen.
   Mehrere Wochen bleiben **gleichzeitig** offen (`_lpOffeneWochen` ist ein Set).
   Der Inhalt jedes Wochenblocks steht **immer** im DOM und wird nur ein-/ausgeblendet;
   das Auf- und Zuklappen läuft ohne `_renderTab`. Beides zusammen ist Bedingung:

@@ -910,21 +910,25 @@ h5,
    Zurueckhaltender als die Werte darunter: sie ordnen den Tag ein, sind aber nicht
    das, wofuer man den Tag angetippt hat. */
 .lp-detail-plan{color:var(--txt3)}
-/* Zeilenabstand wie ueberall sonst in der App: der Kopfblock uebernimmt Luecke und
-   Polster der .stats-list (gap .2rem, padding .22rem 0). Vorher trug jede Zeile ihren
-   eigenen Rand (.3 / .15 / .4 / .2rem) – dadurch sassen sie sichtbar ungleich. */
-.lp-detail-kopf{display:flex;flex-direction:column;gap:.2rem}
-.lp-detail-kopf>div{padding:.22rem 0}
+/* Die Zeilen UEBER den Werten (Datum, Plan, Planstand, Spaltenkoepfe) laufen in einem
+   eigenen, engeren Rhythmus: Sie sind Einordnung, nicht das, wofuer man den Tag
+   angetippt hat, und im Polster der Wertzeilen wuerde die Karte unnoetig hoch.
+   Alle vier haben denselben Abstand – nur eben einen kleineren. */
+.lp-detail-kopf{display:flex;flex-direction:column;gap:.15rem}
+.lp-detail-kopf>div{padding:0}
 .lp-detail-leer{color:var(--txt3);padding:.22rem 0}
 
 /* Geleistet neben Geplant. Ein FLACHES Raster: jede Zelle ist ein direktes Kind,
    dadurch stehen die drei Spalten garantiert auf einer Linie – bei Zeilen-Wrappern
    bestimmt jede Zeile ihre Hoehe selbst und die Spalten laufen auseinander.
    Luecke und Polster wie in .stats-list, damit der Rhythmus zum Rest der App passt. */
-.lp-werte{display:grid;grid-template-columns:1fr auto auto;column-gap:.7rem;row-gap:.2rem;margin-top:.2rem}
+.lp-werte{display:grid;grid-template-columns:1fr auto auto;column-gap:.7rem;row-gap:.2rem;margin-top:.15rem}
 .lp-werte>span{padding:.22rem 0;border-bottom:1px solid #F8FAFC;min-width:0}
 .lp-werte>span:nth-last-child(-n+3){border-bottom:0}
-.lp-werte-kopf{color:var(--txt3);text-align:right;border-bottom-color:var(--border) !important}
+/* Die Spaltenkoepfe gehoeren noch zum engen Block darueber: oben kein Polster, unten
+   das der Wertzeilen – so schliesst der Kopfteil buendig an die erste Wertzeile an. */
+.lp-werte-kopf{color:var(--txt3);text-align:right;padding-top:0 !important;
+  border-bottom-color:var(--border) !important}
 .lp-werte-lbl{color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lp-werte-ist{font-weight:700;text-align:right;white-space:nowrap}
 .lp-werte-soll{color:var(--txt3);text-align:right;white-space:nowrap}
@@ -1020,7 +1024,9 @@ body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
 /* Bei 100 px je Feld passt die Zeile nicht mehr in eine Kartenbreite – sie darf
    deshalb umbrechen. Der Wochentag bleibt oben links, die Herzzone rutscht bei
    Bedarf in die zweite Zeile, statt abgeschnitten zu werden. */
-.lp-einheit{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+/* Mittig statt linksbuendig (Wunsch): die Zeile ist schmaler als die Karte, und
+   linksbuendig blieb rechts ein breiter leerer Streifen. */
+.lp-einheit{display:flex;align-items:center;justify-content:center;gap:.3rem;flex-wrap:wrap}
 .lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
 .lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
 /* Schmaler und mittig: die Felder tragen hoechstens vier Zeichen ("12.5", "1h 15").
