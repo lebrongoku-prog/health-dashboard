@@ -737,7 +737,12 @@ h5,
   /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
      Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
      Hoehe der laengeren gezogen wird. */
-  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:stretch}
+  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:stretch;
+    /* Der Rand wandert von den Karten auf den Container: Im Raster wuerde er die
+       Zeilenhoehe verfaelschen, ohne ihn stiesse die Verlauf-Karte direkt an –
+       Schatten an Schatten, was wie eine Ueberlappung aussieht. Derselbe Wert wie
+       das margin-bottom jeder anderen Karte. */
+    margin-bottom:.7rem}
   .ov-oben>*{margin-bottom:0}
   /* Beide Karten gleich hoch – und zwar so hoch wie „Ziele". Dafuer darf die
      Kachel-Spalte die Zeilenhoehe NICHT mitbestimmen: Der Kasten bleibt leer, die

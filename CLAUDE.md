@@ -386,6 +386,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kachel-Karte, und „Ziele" würde mitwachsen statt umgekehrt. `min-height:12rem` am
   Kasten verhindert den umgekehrten Fehler: liegen ausnahmsweise nur ein, zwei Ziele
   vor, schnitte `overflow:hidden` die Kacheln sonst ab.
+  Der Kartenabstand sitzt am **Container** (`.ov-oben{margin-bottom:.7rem}`), nicht an
+  den Karten: im Raster verfälschte er die Zeilenhöhe, und ohne ihn stiess die
+  Verlauf-Karte direkt an — Schatten an Schatten, was wie eine Überlappung aussah.
   Die vier Minikacheln stehen darin **zweizeilig**. Reihenfolge
   überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
   im Querformat also oben Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
