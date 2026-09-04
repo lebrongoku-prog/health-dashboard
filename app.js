@@ -13,27 +13,20 @@ const WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
 const REFRESH_URL      = 'https://script.google.com/macros/s/AKfycbyN4HSh5ai3ZBpCkGjuxHVlE0IagpLtUT-gyLgzRfAXZT4wPahzRJUbZTMvUiaT0djA/exec';
 
 let accessToken = null, tokenExpiry = 0;
-// Seit die App selbst ins Sheet schreibt, braucht sie Schreibrechte. Frueher lief das
-// Schreiben ueber das Apps Script, das mit einem Passwort im Quelltext abgesichert war –
-// und der ist oeffentlich, also konnte jeder Laufplan-Eintraege aendern. Jetzt gilt:
-// schreiben darf nur, wer als Leonard bei Google angemeldet ist.
-const SCOPE_SCHREIBEN = 'https://www.googleapis.com/auth/spreadsheets';
-// Ein aelterer Token traegt nur das Leserecht. Lesen soll damit weiterlaufen; erst der
-// erste Schreibversuch bittet um eine neue Anmeldung. Deshalb wird die tatsaechlich
-// erteilte Berechtigung mitgefuehrt – `includes` genuegt nicht, weil
-// '…/spreadsheets.readonly' den kurzen Namen als Teilstring enthaelt.
-let darfSchreiben = false;
-function _scopeAuswerten(scopeText) {
-  darfSchreiben = String(scopeText || '').split(/[\s+]+/).includes(SCOPE_SCHREIBEN);
-  try { localStorage.setItem('g_scope', scopeText || ''); } catch(_) {}
-}
+// **Nur Lesen.** Die App schreibt nirgends mehr ins Sheet – mit dem Laufplan ist der
+// einzige Schreibweg entfallen. Der weitergehende Scope `…/spreadsheets` waere jetzt
+// ein Recht ohne Zweck, und ein Zugang, der nicht schreiben KANN, kann auch durch
+// einen Fehler nichts zerstoeren. Ein bereits erteilter Schreib-Token liest weiterhin
+// anstandslos, es braucht also keine neue Anmeldung; erst die naechste fordert
+// wieder das kleinere Recht an.
+const SCOPE_LESEN = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 
 function signIn() {
   location.href = 'https://accounts.google.com/o/oauth2/v2/auth'
     + '?client_id='    + encodeURIComponent(CLIENT_ID)
     + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
     + '&response_type=token'
-    + '&scope='        + encodeURIComponent(SCOPE_SCHREIBEN)
+    + '&scope='        + encodeURIComponent(SCOPE_LESEN)
     + '&prompt=select_account';
 }
 function _checkHashToken() {
@@ -44,7 +37,6 @@ function _checkHashToken() {
   if (!t) return false;
   const exp = parseInt(p.get('expires_in') || '3600');
   accessToken = t; tokenExpiry = Date.now() + (exp - 60) * 1000;
-  _scopeAuswerten(p.get('scope'));
   // localStorage statt sessionStorage: Token überlebt PWA-Schließen/Restart.
   // Nach ~1h Ablauf wird er bei der nächsten Anfrage wegen 401 automatisch verworfen.
   try { localStorage.setItem('g_token', accessToken); localStorage.setItem('g_expiry', String(tokenExpiry)); } catch(_) {}
@@ -58,7 +50,6 @@ function _initAuth() {
     const exp = parseInt(localStorage.getItem('g_expiry') || '0');
     if (t && Date.now() < exp) {
       accessToken = t; tokenExpiry = exp;
-      darfSchreiben = String(localStorage.getItem('g_scope') || '').split(/[\s+]+/).includes(SCOPE_SCHREIBEN);
       return true;
     }
   } catch(_) {}
@@ -86,13 +77,6 @@ function _memo(key, berechnen) {
   return _analyticsCache[key];
 }
 let workoutData  = {};      // date → parsed workout row (cached after load)
-const PLAN_BLATT = 'Laufplan';      // Blattname im Workout-Spreadsheet
-let planData = {};                  // { 'JJJJ-MM-TT': { km, notiz } }
-let planListe = [];                 // Laufpläne (Kopfdaten)
-let planEinheiten = [];             // geplante Einheiten aller Pläne
-const LP_PLAENE_BLATT = 'Laufplaene';
-const LP_EINHEITEN_BLATT = 'Laufplan-Einheiten';
-const WOCHENTAGE = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
 let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
 
@@ -109,69 +93,6 @@ function _awaitWorkoutSheet(timeoutMs = 10000) {
       else if (Date.now() - started >= timeoutMs) { clearInterval(iv); resolve(false); }
     }, 200);
   });
-}
-
-
-// ── Laufplan-Zeilen parsen ─────────────────────────────
-// Spalten: Date | Distance (km) | Note. Das Datum kann als Text oder als echtes
-// Datum im Sheet stehen – beides wird auf JJJJ-MM-TT gebracht.
-function _parsePlanRows(values) {
-  planData = {};
-  if (!values.length) return;
-  const kopf = values[0].map(h => String(h).trim());
-  const iDat = kopf.findIndex(h => /^date$/i.test(h));
-  const iKm  = kopf.findIndex(h => /dist/i.test(h));
-  const iNot = kopf.findIndex(h => /note|notiz/i.test(h));
-  if (iDat < 0) return;
-  values.slice(1).forEach(row => {
-    const d = String(row[iDat] ?? '').trim().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-    const km = iKm >= 0 ? parseFloat(String(row[iKm] ?? '').replace(',', '.')) : NaN;
-    planData[d] = { km: isNaN(km) ? null : km, notiz: iNot >= 0 ? String(row[iNot] ?? '').trim() : '' };
-  });
-}
-
-// ── Laufpläne parsen ───────────────────────────────────
-function _parsePlaene(kopfWerte, einheitWerte) {
-  planListe = []; planEinheiten = [];
-  if (kopfWerte.length > 1) {
-    const k = kopfWerte[0].map(h => String(h).trim().toLowerCase());
-    const sp = name => k.findIndex(h => h.startsWith(name));
-    const iId=sp('id'), iName=sp('name'), iNot=sp('notiz'), iStart=sp('start'),
-          iEnde=sp('ende'), iWo=sp('wochen'), iTage=sp('lauftage'), iArch=sp('archiv'),
-          iWk=sp('wettkampf');
-    kopfWerte.slice(1).forEach(r => {
-      const id = String(r[iId] ?? '').trim();
-      if (!id) return;
-      planListe.push({
-        id, name: String(r[iName] ?? '').trim() || 'Ohne Namen',
-        notizen: iNot>=0 ? String(r[iNot] ?? '').trim() : '',
-        start: String(r[iStart] ?? '').trim().slice(0,10),
-        ende:  String(r[iEnde]  ?? '').trim().slice(0,10),
-        wochen: parseInt(r[iWo]) || 0,
-        // Lauftage stehen als "Mo,Mi,Fr" im Sheet.
-        lauftage: String(r[iTage] ?? '').split(',').map(x=>x.trim()).filter(Boolean),
-        archiviert: /ja|1|true/i.test(String(r[iArch] ?? '')),
-        // Wettkampftag, auf den der Plan hinarbeitet – darf leer bleiben.
-        wettkampf: iWk>=0 ? String(r[iWk] ?? '').trim().slice(0,10) : ''
-      });
-    });
-  }
-  if (einheitWerte.length > 1) {
-    const k = einheitWerte[0].map(h => String(h).trim().toLowerCase());
-    const sp = name => k.findIndex(h => h.startsWith(name));
-    const iId=sp('plan'), iWo=sp('woche'), iTag=sp('wochentag'), iDat=sp('datum'),
-          iStr=sp('strecke'), iZeit=sp('zeit'), iZone=sp('herzzone');
-    einheitWerte.slice(1).forEach(r => {
-      const id = String(r[iId] ?? '').trim();
-      if (!id) return;
-      const zahlOderNull = v => { const n = parseFloat(String(v ?? '').replace(',','.')); return isNaN(n) ? null : n; };
-      planEinheiten.push({ planId:id, woche: parseInt(r[iWo]) || 0,
-        wochentag: String(r[iTag] ?? '').trim(), datum: String(r[iDat] ?? '').trim().slice(0,10),
-        strecke: zahlOderNull(r[iStr]), zeit: zahlOderNull(r[iZeit]),
-        zone: iZone>=0 ? String(r[iZone] ?? '').trim() : '' });
-    });
-  }
 }
 
 // ── Workout-Daten aus API-Response parsen ──────────────
@@ -272,10 +193,9 @@ const showErr = m => {
 
 // ── Blattnamen-Zwischenspeicher ───────────────────────
 // Vor jedem Wertabruf fragte die App das Spreadsheet, wie seine Blätter heissen –
-// bei fünf Abrufen also fünf zusätzliche Anfragen pro Start, für eine Angabe, die
-// sich praktisch nie ändert. Die Namensliste liegt jetzt lokal; nur wenn ein
-// gesuchtes Blatt fehlt (das Apps Script legt Laufplan-Blätter erst beim ersten
-// Speichern an), wird sie neu geholt.
+// zusätzliche Anfragen pro Start für eine Angabe, die sich praktisch nie ändert.
+// Die Namensliste liegt jetzt lokal; nur wenn ein gesuchtes Blatt fehlt, wird sie
+// neu geholt.
 const TABS_KEY = 'hcc_blattnamen_v1';
 let _tabsCache = (() => { try { return JSON.parse(localStorage.getItem(TABS_KEY)) || {}; } catch(_) { return {}; } })();
 function _tabsMerken(sheetId, titel) {
@@ -346,15 +266,12 @@ async function loadFromAPI(opt = {}) {
   try {
     // Alle Blaetter GLEICHZEITIG anfragen. Vorher liefen sie nacheinander: vier
     // Wartestufen hintereinander, bevor der erste Wert auf dem Bildschirm stand.
-    // Die Nebenblaetter fangen ihre Fehler selbst ab, damit ein fehlendes Laufplan-
-    // Blatt nicht den Gesundheitsteil mitreisst.
+    // Das Workout-Blatt faengt seinen Fehler selbst ab, damit es den
+    // Gesundheitsteil nicht mitreisst.
     const alsFehler = e => ({ fehler: e });
-    const [health, workout, plan, lpKopf, lpEinh] = await Promise.all([
+    const [health, workout] = await Promise.all([
       _fetchSheet(HEALTH_SHEET_ID),
-      _fetchSheet(WORKOUT_SHEET_ID).catch(alsFehler),
-      _fetchSheet(WORKOUT_SHEET_ID, PLAN_BLATT).catch(alsFehler),
-      _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT).catch(alsFehler),
-      _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT).catch(alsFehler)
+      _fetchSheet(WORKOUT_SHEET_ID).catch(alsFehler)
     ]);
     if (health.authError) {
       accessToken = null; tokenExpiry = 0;
@@ -437,19 +354,6 @@ async function loadFromAPI(opt = {}) {
       workoutSheetReady = true;
     }
 
-    // Laufplan (eigenes Blatt im Workout-Spreadsheet). Fehlt es noch, bleibt der
-    // Plan leer – die App legt es nicht an, das macht das Apps Script beim ersten
-    // Speichern. Ein Fehler hier darf den Rest der App nicht aufhalten.
-    // Auch hier: im Hintergrund nichts leeren, was schon dasteht.
-    if (plan.fehler || plan.authError) { if (!still) planData = {}; }
-    else _parsePlanRows(plan.values || []);
-
-    // Laufpläne und ihre Einheiten – beide Blätter sind optional, das Apps Script
-    // legt sie erst beim ersten Speichern an.
-    if (lpKopf.fehler || lpEinh.fehler || lpKopf.authError || lpEinh.authError) {
-      if (!still) { planListe = []; planEinheiten = []; }
-    } else _parsePlaene(lpKopf.values || [], lpEinh.values || []);
-
   } catch(e) {
     // Im Hintergrund-Abruf bleibt der Stand aus dem Zwischenspeicher stehen – eine
     // Fehlerkarte wuerde funktionierende Daten hinter einer Meldung verstecken.
@@ -476,7 +380,7 @@ const DATEN_KEY = 'hcc_daten_v1';
 // etwas geaendert hat. Sonst blitzte bei jedem Start ein Neuaufbau aller Diagramme
 // auf, obwohl exakt dieselben Zahlen herauskamen.
 function datenStand() {
-  return JSON.stringify({ allData, workoutData, planData, planListe, planEinheiten, workoutLoadError });
+  return JSON.stringify({ allData, workoutData, workoutLoadError });
 }
 
 function datenCacheSchreiben() {
@@ -505,9 +409,6 @@ function datenCacheLesen() {
   allData = zeilen;
   allData.sort((a, b) => a.date.localeCompare(b.date));
   workoutData    = (d.workoutData && typeof d.workoutData === 'object') ? d.workoutData : {};
-  planData       = (d.planData    && typeof d.planData    === 'object') ? d.planData    : {};
-  planListe      = Array.isArray(d.planListe)     ? d.planListe     : [];
-  planEinheiten  = Array.isArray(d.planEinheiten) ? d.planEinheiten : [];
   workoutLoadError = d.workoutLoadError || null;
   workoutSheetReady = true;
   referenceDate  = allData[allData.length - 1].date;
@@ -1150,8 +1051,7 @@ const ZIELE = {
   // Zielwert direkt hinter dem Messwert – die Einheit ist dort schon gesagt und
   // haette sich sonst wiederholt („4 / Woche · Ziel 3 / Woche").
   trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche', fmtZiel:v=>String(v) },
-  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) },
-  laufKm:     { label:'Laufkilometer', ziel:25,  richtung:'hoch', fmt:v=>zahl(v,1)+' km/Woche' }
+  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) }
 };
 // Erfüllt der Wert das Ziel? null, wenn kein Wert vorliegt.
 function zielErfuellt(key, wert) {
@@ -2772,742 +2672,8 @@ function vo2Abschnitt(D, P) {
   return { html, zeichnen };
 }
 
-// ── Schreiben ins Sheet ────────────────────────────────────────────────────
-// Frueher lief jede Aenderung ueber das Apps Script, abgesichert mit einem Passwort,
-// das in app.js steht – und app.js ist oeffentlich. Damit konnte JEDER Laufplan-
-// Eintraege anlegen, aendern und loeschen. Ein Passwort im Quelltext einer Webseite
-// laesst sich grundsaetzlich nicht geheim halten, also faellt es ersatzlos weg:
-// Die App schreibt jetzt selbst ueber die Sheets-API, mit derselben Google-Anmeldung,
-// mit der sie liest. Schreiben kann damit nur noch, wer als Leonard angemeldet ist.
-//
-// Zweiter Gewinn: der frueher noetige Umweg entfaellt. `mode:'no-cors'` lieferte keine
-// auswertbare Antwort, deshalb wurde blind gesendet, 1.2 s gewartet und im Sheet
-// nachgelesen, ob etwas angekommen ist – daher die zeitweise verschwundenen km-Werte.
-// Jetzt antwortet Google sofort und eindeutig.
-const LP_KOPF_SPALTEN    = ['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf'];
-const LP_EINHEIT_SPALTEN = ['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone'];
-
-// Blattname in A1-Schreibweise. Ohne Anfuehrungszeichen bricht jeder Name mit
-// Sonderzeichen – 'Laufplan-Einheiten!A2' liest Google als Rechnung.
-function _a1(blatt, bereich) { return `'${String(blatt).replace(/'/g, "''")}'!${bereich}`; }
-// Spaltenbuchstabe zu einer 1-basierten Nummer (1→A). Mehr als 26 Spalten hat hier
-// kein Blatt, der Zweig darueber ist trotzdem billiger als ein spaeterer Fehler.
-function _spalteBuchstabe(n) {
-  let s = '';
-  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - r - 1) / 26; }
-  return s;
-}
-
-async function _sheetsRuf(pfad, opt = {}) {
-  const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + pfad, {
-    ...opt,
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json', ...(opt.headers || {}) }
-  });
-  if (res.status === 401 || res.status === 403) {
-    // 403 heisst hier fast immer: der Token traegt nur das Leserecht (alte Anmeldung).
-    darfSchreiben = false;
-    throw new Error('AUTH');
-  }
-  if (!res.ok) throw new Error('Google meldet ' + res.status + ': ' + (await res.text()).slice(0, 200));
-  return res.json();
-}
-
-// Blatt anlegen, falls es fehlt – bisher tat das Apps Script beim ersten Speichern.
-async function _blattSicherstellen(sheetId, blatt) {
-  let titel = _tabsCache[sheetId];
-  if (!Array.isArray(titel) || !titel.includes(blatt)) {
-    const frisch = await _tabsHolen(sheetId);
-    if (frisch.authError) throw new Error('AUTH');
-    titel = frisch.titel;
-  }
-  if (titel.includes(blatt)) return;
-  await _sheetsRuf(sheetId + ':batchUpdate', { method: 'POST',
-    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: blatt, gridProperties: { frozenRowCount: 1 } } } }] }) });
-  _tabsMerken(sheetId, titel.concat(blatt));
-}
-
-async function _werteSetzen(sheetId, bereich, werte) {
-  return _sheetsRuf(sheetId + '/values/' + encodeURIComponent(bereich) + '?valueInputOption=RAW',
-    { method: 'PUT', body: JSON.stringify({ values: werte }) });
-}
-
-// Blatt lesen, die Zeilen umbauen lassen, alles zurueckschreiben.
-// Ein Rundumschlag statt einzelner Zeilenbefehle: Anlegen, Aendern und Loeschen laufen
-// ueber denselben Weg, das Blatt bleibt sortiert, und es braucht keine Zeilennummern,
-// die zwischen Lesen und Schreiben veralten koennten. Die Blaetter sind klein
-// (Termine und Planeinheiten, keine Messdaten) – der Aufwand faellt nicht ins Gewicht.
-// Rueckgabe: die neuen Werte inklusive Kopfzeile, also genau das, was jetzt im Sheet
-// steht. Damit laesst sich der lokale Stand ohne zweiten Abruf nachziehen.
-async function _blattUmschreiben(sheetId, blatt, spalten, umbauen) {
-  await _blattSicherstellen(sheetId, blatt);
-  const alt = await _fetchSheet(sheetId, blatt);
-  if (alt.authError) throw new Error('AUTH');
-  // Kopfzeile nur berichtigen, wenn sie fehlt oder nicht mehr stimmt – etwa weil das
-  // Blatt neu ist oder eine spaeter hinzugekommene Spalte fehlt (so wie damals
-  // „Wettkampf", die in bestehenden Blaettern sonst fuer immer leer bliebe).
-  const kopfIst = (alt.values || [])[0] || [];
-  if (spalten.some((sp, i) => String(kopfIst[i] ?? '') !== sp)) {
-    await _werteSetzen(sheetId, _a1(blatt, 'A1'), [spalten]);
-  }
-  const altZeilen = (alt.values || []).slice(1);
-  const breite = spalten.length;
-  const neu = umbauen(altZeilen.map(r => r.slice())).map(r => {
-    const z = r.slice(0, breite).map(v => v == null ? '' : v);
-    while (z.length < breite) z.push('');
-    return z;
-  });
-  if (neu.length) await _werteSetzen(sheetId, _a1(blatt, 'A2'), neu);
-  // Ueberhang leeren: hat das Blatt vorher mehr Zeilen gehabt (Loeschen), blieben die
-  // alten sonst unter den neuen stehen.
-  if (altZeilen.length > neu.length) {
-    const von = neu.length + 2, bis = altZeilen.length + 1;
-    await _sheetsRuf(sheetId + '/values/' + encodeURIComponent(
-      _a1(blatt, `A${von}:${_spalteBuchstabe(breite)}${bis}`)) + ':clear', { method: 'POST', body: '{}' });
-  }
-  return [spalten, ...neu];
-}
-
-// Darf ueberhaupt geschrieben werden? Zwei Gruende koennen dagegen sprechen:
-// keine gueltige Anmeldung, oder eine Anmeldung von vor der Umstellung, die nur das
-// Leserecht traegt. Beides wird sichtbar gemeldet statt still zu scheitern – ein
-// Wert, der scheinbar gespeichert ist und beim naechsten Aufbau wieder verschwindet,
-// war der schlimmste der frueheren Fehler.
-function _schreibenErlaubt() {
-  if (!accessToken) {
-    _lpFehler = 'Nicht gespeichert: Die Google-Anmeldung ist abgelaufen. In der Übersicht unter „App“ neu anmelden und erneut versuchen.';
-    hinweisAuthZeigen();
-    if (currentScreen === 'laufplan') _renderTab('laufplan');
-    return false;
-  }
-  if (!darfSchreiben) {
-    _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. In der Übersicht unter „App“ neu anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
-    hinweisSchreibrechtZeigen();
-    if (currentScreen === 'laufplan') _renderTab('laufplan');
-    return false;
-  }
-  return true;
-}
-
-// Gemeinsame Huelle aller Schreibvorgaenge: Berechtigung pruefen, Fehler in eine
-// verstaendliche Meldung uebersetzen, Ergebnis als true/false zurueckgeben.
-async function _schreibVorgang(tun) {
-  if (!_schreibenErlaubt()) return false;
-  try {
-    await tun();
-    _lpFehler = null;
-    return true;
-  } catch (e) {
-    if (e.message === 'AUTH') {
-      _lpFehler = 'Nicht gespeichert: Die App darf noch nicht ins Sheet schreiben. In der Übersicht unter „App“ neu anmelden – Google fragt einmalig nach der erweiterten Erlaubnis.';
-      hinweisSchreibrechtZeigen();
-    } else {
-      _lpFehler = 'Nicht gespeichert: ' + e.message;
-    }
-    return false;
-  }
-}
-
-// Alle Schreibvorgaenge laufen nacheinander durch EINE Kette. Vorher stand hier ein
-// Riegel (`if (_planLaeuft) return false`), der jeden Aufruf verwarf, welcher waehrend
-// eines laufenden startete – tippte man mehrere Felder zuegig hintereinander, kam nur
-// das erste an und die uebrigen Werte verschwanden beim naechsten Neuaufbau.
-let _lpKette = Promise.resolve();
-function _inKette(tun) {
-  _lpKette = _lpKette.then(() => _schreibVorgang(tun), () => _schreibVorgang(tun));
-  return _lpKette;
-}
-
-// Hinweis: planSpeichern()/planLoeschen() sind entfallen - der Kalender bietet das
-// Setzen einzelner Termine nicht mehr an (Wunsch 03.09.2026). Das Blatt 'Laufplan'
-// wird weiterhin GELESEN: bereits eingetragene Termine erscheinen im Kalender als
-// geplant (geplanteTage), sie lassen sich nur nicht mehr aus der App aendern.
-
-// ── Laufplaene und ihre Einheiten ──
-// Nach jedem Schreiben wird der lokale Stand aus GENAU dem nachgezogen, was im Sheet
-// steht – nicht aus der Eingabe. Damit bleibt das Sheet die massgebliche Quelle, ohne
-// dass es dafuer einen zweiten Abruf braucht.
-async function _lpNachziehen(kopfWerte, einheitWerte) {
-  const kopf = kopfWerte || (await _fetchSheet(WORKOUT_SHEET_ID, LP_PLAENE_BLATT)).values || [];
-  const einh = einheitWerte || (await _fetchSheet(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT)).values || [];
-  _parsePlaene(kopf, einh);
-}
-
-async function lpPlanSpeichern(plan) {
-  const id = String(plan.id || '').trim() || ('lp' + Date.now());
-  const zeile = [id, String(plan.name || '').slice(0, 120), String(plan.notizen || '').slice(0, 500),
-    String(plan.start || ''), String(plan.ende || ''), Number(plan.wochen || 0) || '',
-    (plan.lauftage || []).join(','), plan.archiviert ? 'ja' : '', String(plan.wettkampf || '')];
-  return _inKette(async () => {
-    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_PLAENE_BLATT, LP_KOPF_SPALTEN, zeilen => {
-      const i = zeilen.findIndex(r => String(r[0] ?? '').trim() === id);
-      if (i >= 0) zeilen[i] = zeile; else zeilen.push(zeile);
-      return zeilen;
-    });
-    await _lpNachziehen(werte, null);
-  });
-}
-
-async function lpPlanLoeschen(id) {
-  return _inKette(async () => {
-    // Erst die Einheiten, dann der Plan: bricht der zweite Schritt ab, bleiben keine
-    // Einheiten ohne zugehoerigen Plan zurueck – die waeren unsichtbar und unloeschbar.
-    const einh = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT, LP_EINHEIT_SPALTEN,
-      zeilen => zeilen.filter(r => String(r[0] ?? '').trim() !== String(id)));
-    const kopf = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_PLAENE_BLATT, LP_KOPF_SPALTEN,
-      zeilen => zeilen.filter(r => String(r[0] ?? '').trim() !== String(id)));
-    await _lpNachziehen(kopf, einh);
-  });
-}
-
-async function lpEinheitSpeichern(e) {
-  const zeile = [String(e.planId || ''), Number(e.woche || 0), String(e.wochentag || ''),
-    String(e.datum || ''), e.strecke != null && e.strecke !== '' ? Number(String(e.strecke).replace(',', '.')) : '',
-    e.zeit != null && e.zeit !== '' ? Number(e.zeit) : '', String(e.zone || '')];
-  return _inKette(async () => {
-    const werte = await _blattUmschreiben(WORKOUT_SHEET_ID, LP_EINHEITEN_BLATT, LP_EINHEIT_SPALTEN, zeilen => {
-      const i = zeilen.findIndex(r => String(r[0] ?? '') === String(e.planId) &&
-        String(r[1] ?? '') === String(e.woche) && String(r[2] ?? '') === String(e.wochentag));
-      if (i >= 0) zeilen[i] = zeile; else zeilen.push(zeile);
-      return zeilen;
-    });
-    await _lpNachziehen(null, werte);
-  });
-}
-
-
-// Alle Tage, an denen laut einem Plan ein Lauf vorgesehen ist. Ergaenzt die freien
-// Einzeltermine aus planData – beide erscheinen im Kalender als "geplant".
-function geplanteTage() {
-  const tage = { ...planData };
-  planListe.filter(p => !p.archiviert && p.start && p.ende).forEach(p => {
-    planEinheiten.filter(e => e.planId === p.id).forEach(e => {
-      const d = e.datum || _lpDatumAus(p, e.woche, e.wochentag);
-      if (d) tage[d] = { km: e.strecke, notiz: e.zone || '', ausPlan: p.name };
-    });
-  });
-  return tage;
-}
-// Planeinheit an einem Datum – samt Plannamen, damit die Tagesansicht zeigen kann,
-// aus welchem Plan der Tag stammt.
-function _planEinheitAm(datum) {
-  for (const p of planListe) {
-    if (p.archiviert || !p.start) continue;
-    const e = planEinheiten.find(x => x.planId === p.id &&
-      (x.datum || _lpDatumAus(p, x.woche, x.wochentag)) === datum);
-    if (e) return { ...e, planName: p.name };
-  }
-  return null;
-}
-
-// Zeiteingabe einer Planeinheit deuten. Erlaubt sind reine Minuten ("75"), Stunden
-// mit Minuten ("1:15", "1h15", "1h 15min") und Dezimalstunden ("1,5h"). Rueckgabe in
-// Minuten; leer bleibt leer.
-function _lpZeitAusText(text) {
-  const t = String(text ?? '').trim().toLowerCase().replace(',', '.');
-  if (!t) return '';
-  // Nur eine Zahl: Minuten – ausser es haengt ein "h" dran. Die Minuten-Einheit muss
-  // mitgelesen werden, sonst frisst die App ihre eigene Ausgabe nicht mehr:
-  // fmtMin(30) schreibt "30 min" ins Feld zurueck, und das passte auf KEINE der
-  // beiden Formen – beim naechsten Speichern derselben Zeile (etwa weil nur die
-  // Kilometer geaendert wurden) verschwand die Zeit stillschweigend. Betroffen war
-  // jede Einheit unter einer Stunde; ab 60 min ("1h 15min") griff die zweite Form.
-  const nur = t.match(/^(\d+(?:\.\d+)?)\s*(h|std)?\s*(?:m|min)?$/);
-  if (nur) return Math.round(parseFloat(nur[1]) * (nur[2] ? 60 : 1));
-  // Stunden und Minuten in einem: "1:15", "1h15", "1h 15min"
-  const beides = t.match(/^(\d+)\s*(?::|h|std)\s*(\d+)?\s*(?:m|min)?$/);
-  if (beides) return parseInt(beides[1]) * 60 + parseInt(beides[2] || 0);
-  return '';
-}
-
-// Dauer eines Plans in Wochen – ergibt sich aus Start und Ende, wie in FitTrack.
-// Gerechnet wird ab dem MONTAG der Startwoche, damit eine Woche immer eine ganze
-// Kalenderwoche ist; sonst zaehlt ein Plan, der am Mittwoch beginnt, eine Woche zu
-// wenig. Ganze Tage statt Millisekunden: zwischen Winter- und Sommerzeit fehlt sonst
-// eine Stunde und das Ergebnis kippt um eine Woche.
-function _lpWochenAus(start, ende) {
-  if (!start || !ende) return '';
-  const a = new Date(getWeekMonday(start) + 'T00:00:00');
-  const b = new Date(ende + 'T00:00:00');
-  const tage = Math.round((b - a) / 86400000) + 1;
-  return tage > 0 ? Math.max(1, Math.ceil(tage / 7)) : '';
-}
-
-// Datum einer Planeinheit: Woche 1 beginnt am Montag der Startwoche.
-function _lpDatumAus(plan, woche, wochentag) {
-  const i = WOCHENTAGE.indexOf(wochentag);
-  if (i < 0 || !plan.start) return '';
-  const mo = getWeekMonday(plan.start);
-  return addDays(mo, (Math.max(1, woche) - 1) * 7 + i);
-}
-
-// ── Laufplan ───────────────────────────────────────────
-// Ersetzt den frueheren Schritte-Tab. Quelle sind die Laufeinheiten aus dem
-// Workout-Sheet; wo "Dashboard Data" denselben Wert fuehrt (Strecke, Pace), hat es
-// Vorrang. Trainingszeit, Puls und Hoehenmeter gibt es nur im Workout-Sheet.
-
-// Welche Trainingsarten zaehlen als Lauf? Stichwortsuche wie bei workoutIcon –
-// Apple liefert je nach Sprache "Outdoor Ausfuehren", "Innenraeume Ausfuehren",
-// "Trail-Laufen" oder englische Namen.
-// Hinweis: LAUF_ARTEN und laufArt() sind entfallen. Ihr einziger Zweck war die
-// Farbe der Laufart in der Tagesansicht – die ist auf Wunsch weg, damit dort alles
-// gleich gesetzt ist. `istLauf` bleibt: es entscheidet, was ueberhaupt ein Lauf ist.
-function istLauf(typeRaw) {
-  return /lauf|ausf(ü|ue)hren|run|jog/i.test(String(typeRaw || ''));
-}
-
-// Eine Laufeinheit aus beiden Quellen zusammensetzen.
-function laufEinheit(datum) {
-  const w = workoutData[datum];
-  if (!w || !istLauf(w.typeRaw)) return null;
-  const tag = allData.find(r => r.date === datum) || {};
-  // Strecke IMMER aus dem Workout-Sheet – so wie im Training-Tab. Das Health-Sheet
-  // fuehrt unter distKm einen abweichenden Tageswert; beide Tabs zeigten dadurch
-  // unterschiedliche Kilometer fuer denselben Lauf.
-  const streckeKm = w.distanceKm;
-  const kmh = tag.runSpeed > 0 ? tag.runSpeed : (w.avgSpeedKph > 0 ? w.avgSpeedKph : null);
-  return {
-    datum, typLabel: w.typeLabel,
-    dauerMin: w.durationMin,
-    streckeKm,
-    // Kalorien werden auf Wunsch nicht mehr gezeigt; das Feld ist damit entfallen.
-    // Falls es zurueckkommt: Energy steht im Sheet in Kilojoule (1 kcal = 4.184 kJ),
-    // und activeCal aus dem Health-Sheet ist der TAGESverbrauch, nicht der des Laufs.
-    pace: kmh != null ? paceFromSpeed(kmh) : null,
-    puls: w.avgHR, maxPuls: w.maxHR,
-    hoehe: w.elevationM
-  };
-}
-// Alle Laufeinheiten, neueste zuerst.
-function alleLaeufe() {
-  return Object.keys(workoutData).sort().reverse()
-    .map(laufEinheit).filter(Boolean);
-}
-
-// Jahreskalender wie in FitTrack: 52 Wochen à 7 Kästchen, waagrecht scrollbar.
-// Gefuellt = an dem Tag gelaufen, Farbe nach Laufart. Antippen beschreibt den Tag
-// darunter. Zeigt immer das laufende Kalenderjahr.
-let _lpAuswahl = null;   // angetippter Tag (Datum) – ueberlebt Re-Render
-let _lpSeite = 'plan';   // 'plan' = Aktueller Laufplan, 'verwaltung' = Planverwaltung
-let _lpOffenerPlan = null;   // ID des aufgeklappten Plans in der Verwaltung
-// Aufgeklappte Wochen – ein Set, damit mehrere gleichzeitig offen bleiben koennen.
-// Vorher schloss das Oeffnen einer Woche die vorige, was beim Eintragen stoerte.
-let _lpOffeneWochen = new Set();
-let _lpFehler = null;        // Hinweis, wenn das Speichern nicht angekommen ist
-
-function laufKalenderHTML() {
-  const jahr = new Date(referenceDate + 'T00:00:00').getFullYear();
-  const heute = toLocalDateStr(new Date());
-  const proTag = {};
-  alleLaeufe().forEach(l => { proTag[l.datum] = l; });
-  const geplant = geplanteTage();
-  // Wettkampftage aller nicht archivierten Pläne – im Kalender eigens markiert.
-  const wettkaempfe = {};
-  planListe.forEach(p => { if (!p.archiviert && p.wettkampf) wettkaempfe[p.wettkampf] = p.name; });
-
-  // Raster beginnt am Montag der Woche, die den 1. Januar enthaelt – so stehen die
-  // Wochentagszeilen ueber das ganze Jahr an derselben Stelle.
-  const jan1 = new Date(jahr, 0, 1), dez31 = new Date(jahr, 11, 31);
-  const start = new Date(jan1);
-  start.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
-  const wochen = Math.ceil((Math.round((dez31 - start) / 86400000) + 1) / 7);
-
-  let zellen = '', monate = '', letzterMonat = -1;
-  for (let w = 0; w < wochen; w++) {
-    const wStart = new Date(start); wStart.setDate(start.getDate() + w * 7);
-    // Monatsname, sobald eine Woche einen neuen Monat beginnt.
-    const m = wStart.getMonth();
-    const zeigen = m !== letzterMonat && wStart.getDate() <= 7;
-    monate += `<span class="lp-monat">${zeigen ? wStart.toLocaleDateString('de-DE',{month:'short'}) : ''}</span>`;
-    if (zeigen) letzterMonat = m;
-
-    zellen += '<div class="lp-woche">';
-    for (let t = 0; t < 7; t++) {
-      const d = new Date(wStart); d.setDate(wStart.getDate() + t);
-      const ds = toLocalDateStr(d);
-      const ausserhalb = d.getFullYear() !== jahr;
-      const kl = ['lp-tag'];
-      if (ausserhalb) kl.push('ausserhalb');
-      if (!ausserhalb && geplant[ds]) kl.push('geplant');
-      if (!ausserhalb && proTag[ds])   kl.push('gelaufen');
-      if (ds > heute) kl.push('zukunft');
-      if (ds === heute) kl.push('heute');
-      if (!ausserhalb && wettkaempfe[ds]) kl.push('wettkampf');
-      if (ds === _lpAuswahl) kl.push('gewaehlt');
-      const zustand = proTag[ds]
-        ? (geplant[ds] ? 'geplant und gelaufen' : 'zusätzlich gelaufen')
-        : (geplant[ds] ? (ds > heute ? 'geplant' : 'geplant, nicht gelaufen') : 'kein Lauf');
-      zellen += `<span class="${kl.join(' ')}" data-lauftag="${ds}" role="button" tabindex="0"
-        aria-label="${d.toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}, ${zustand}"></span>`;
-    }
-    zellen += '</div>';
-  }
-
-  const wochentage = ['Mo','','Mi','','Fr','','So'].map(t=>`<span>${t}</span>`).join('');
-  const anzahl = Object.keys(proTag).filter(d => d.startsWith(jahr)).length;
-
-  // Aufbau 1:1 aus FitTrack: Die Wochentagsspalte liegt AUSSERHALB des Scrollers und
-  // absolut ueber dessen linkem Rand; der unsichtbare Anker darin haelt das Scrollen
-  // auf der Compositor-Ebene. Beides steht ausfuehrlich in style.css begruendet.
-  // Die Fusszeile steht IMMER im Markup und blendet sich per :empty selbst aus –
-  // frueher wurde sie nur bei Auswahl erzeugt.
-  return `
-    <h3>Laufkalender<span class="lp-kal-zahl">${jahr} · ${anzahl} ${anzahl===1?'Lauf':'Läufe'}</span></h3>
-    <div class="lp-body">
-      <div class="lp-wtage">${wochentage}</div>
-      <div class="lp-scroll">
-        <span class="lp-sticky-anker" aria-hidden="true"></span>
-        <div class="lp-inner">
-          <div class="lp-monate">${monate}</div>
-          <div class="lp-gridwrap">
-            <div class="lp-baender">${planBaenderHTML(start, wochen)}</div>
-            <div class="lp-raster">${zellen}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="lp-detail">${_lpAuswahl ? laufDetailHTML(_lpAuswahl) : ''}</div>`;
-}
-
-// Laufzeit eines Plans als Rahmen um seine Wochenspalten – ohne Fuellung, damit die
-// Kaestchen darunter lesbar bleiben. Spaltenbreite kommt aus derselben CSS-Variable
-// wie die Kaestchen, damit Rahmen und Raster nicht auseinanderlaufen.
-function planBaenderHTML(rasterStart, wochen) {
-  if (!planListe.length) return '';
-  const spalte = ds => {
-    const d = new Date(ds + 'T00:00:00');
-    return Math.floor(Math.round((d - rasterStart) / 86400000) / 7);
-  };
-  return planListe.filter(p => p.start && p.ende).map(p => {
-    const a = Math.max(0, spalte(p.start)), b = Math.min(wochen - 1, spalte(p.ende));
-    if (b < a) return '';
-    return `<div class="lp-band${p.archiviert ? ' archiviert' : ''}"
-      style="left:calc(${a} * (var(--lp-zelle) + var(--lp-gap))); width:calc(${b - a + 1} * (var(--lp-zelle) + var(--lp-gap)))"
-      title="${esc(p.name)}"></div>`;
-  }).join('');
-}
-
-// Beschreibung unter dem Kalender – zeigt den angetippten Tag.
-function laufDetailHTML(datum) {
-  if (!datum) return '';   // ohne gewaehlten Tag bleibt der Bereich leer
-  const l = laufEinheit(datum);                 // tatsaechlich gelaufen
-  const ausPlan = _planEinheitAm(datum);        // Einheit aus einem Laufplan (Soll)
-  const wk = planListe.find(x => !x.archiviert && x.wettkampf === datum);
-
-  // Zeile 1: ausgeschriebener Wochentag und Monat – die Tagesansicht ist der einzige
-  // Ort, an dem genau EIN Tag gemeint ist; die Kurzform (25.08.26) spart hier nichts.
-  const langesDatum = new Date(datum + 'T00:00:00')
-    .toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long' });
-
-  const zeilen = [
-    `<div class="lp-detail-tag">${langesDatum}${
-      wk ? `<span class="lp-wk-marke">Wettkampf · ${esc(wk.name)}</span>` : ''}</div>`
-  ];
-  // Zeile 2 und 3: der Plan, in dessen Laufzeit der Tag faellt, und sein Stand.
-  const planDesTages = planAmTag(datum);
-  if (planDesTages) {
-    const wochen = _lpWochenAus(planDesTages.start, planDesTages.ende);
-    zeilen.push(`<div class="lp-detail-plan">${esc(planDesTages.name)}${wochen ? ` (${wochen} Wochen)` : ''}</div>`);
-    const q = planErfuellung(planDesTages);
-    if (q) zeilen.push(`<div class="lp-detail-plan">${q.absolviert} von ${q.geplant} geplanten Einheiten (${q.prozent}%)</div>`);
-  }
-  const kopf = `<div class="lp-detail-kopf">${zeilen.join('')}</div>`;
-
-  if (!l && !ausPlan) return kopf + `<div class="lp-detail-leer">Kein Lauf an diesem Tag.</div>`;
-  return kopf + laufWerteHTML(l, ausPlan);
-}
-
-// Geleistet neben Geplant: links der Wert des Laufs, rechts das Ziel der Planeinheit
-// desselben Tages (Seite „Laufplanverwaltung"). Die Ziel-Pace steht dort nicht als
-// eigenes Feld – sie ergibt sich aus Zielzeit ÷ Zielstrecke. Bei der Herzfrequenz wird
-// die Zone unveraendert uebernommen und NICHT in Schlaege umgerechnet: eine Zone ist
-// ein Bereich, jede Umrechnung waere eine Erfindung.
-function laufWerteHTML(l, plan) {
-  const sollPace = (plan && plan.zeit > 0 && plan.strecke > 0) ? plan.zeit / plan.strecke : null;
-  const reihen = [
-    ['Trainingszeit',   l && l.dauerMin  != null ? fmtMin(l.dauerMin)              : null,
-                        plan && plan.zeit != null ? fmtMin(plan.zeit)              : null],
-    ['Strecke',         l && l.streckeKm != null ? zahl(l.streckeKm,2)+' km'       : null,
-                        plan && plan.strecke != null ? zahl(plan.strecke,1)+' km'  : null],
-    ['Ø Pace',          l && l.pace      != null ? fmtPace(l.pace)+' min/km'       : null,
-                        sollPace != null ? fmtPace(sollPace)+' min/km'             : null],
-    ['Ø Herzfrequenz',  l && l.puls      != null ? Math.round(l.puls)+' bpm'       : null,
-                        plan && plan.zone ? esc(plan.zone)                         : null]
-  ];
-  return `<div class="lp-werte">
-      <span class="lp-werte-kopf"></span>
-      <span class="lp-werte-kopf">Geleistet</span>
-      <span class="lp-werte-kopf">Geplant</span>
-      ${reihen.map(([lbl, ist, soll]) => `<span class="lp-werte-lbl">${lbl}</span>`
-        + `<span class="lp-werte-ist">${ist ?? '—'}</span>`
-        + `<span class="lp-werte-soll">${soll ?? '—'}</span>`).join('')}
-    </div>`;
-}
-
-function pgLaufplan() {
-  const umschalter = `
-    <div class="seg-toggle">
-      <button class="seg-btn${_lpSeite==='plan'?' active':''}" data-lpseite="plan">Aktueller Laufplan</button>
-      <button class="seg-btn${_lpSeite==='verwaltung'?' active':''}" data-lpseite="verwaltung">Laufplanverwaltung</button>
-    </div>`;
-
-  document.getElementById("screen-laufplan").innerHTML =
-    pgBanner('🏃','Laufplan')
-    + umschalter
-    + (_lpSeite === 'plan' ? lpSeiteAktuell() : lpSeiteVerwaltung());
-
-  if (_lpSeite === 'plan') lpKalenderScrollen();
-}
-
-// Kalender beim Rendern so schieben, dass die laufende Woche in der MITTE des
-// Ausschnitts steht – sonst startet das Jahresraster im Januar und der heutige Tag
-// liegt weit rechts ausserhalb. Frueher sass die Woche am rechten Rand
-// (`(w+1)*proSpalte - clientWidth`); auf breiten Ausschnitten begann die Ansicht
-// dadurch im Maerz und heute klebte an der Kante.
-// Synchron, weil im verdeckten Tab kein requestAnimationFrame feuert.
-// Scrollverhalten 1:1 aus FitTrack (Leonard-Entscheidung 03.09.2026):
-//   • Beim ERSTEN Aufbau steht der heutige Tag bei 70 % der Breite – rechts der Mitte,
-//     damit die zurueckliegenden Wochen mehr Platz bekommen als die leere Zukunft.
-//   • Danach wird die Position des Nutzers GEHALTEN. `lpKalenderScrollen` laeuft bei
-//     jedem Neuaufbau des Tabs; ein erneutes Positionieren zoege das Raster jedes Mal
-//     zur laufenden Woche zurueck.
-// Bewusst SYNCHRON statt in requestAnimationFrame (anders als FitTrack): In einer
-// nicht gezeichneten Seite feuert rAF nie, und der Laufplan-Tab wird im Hintergrund
-// vorgerendert. getBoundingClientRect erzwingt ohnehin ein Layout.
-let _lpPositioniert = false;
-let _lpScrollPos = 0;
-
-function lpKalenderScrollen() {
-  const scroll = document.querySelector('#screen-laufplan .lp-scroll');
-  if (!scroll) return;
-  const spaltenEls = scroll.querySelectorAll('.lp-woche');
-  if (!spaltenEls.length) return;
-
-  // Position des Nutzers mitfuehren. Der Listener haengt am Element, das der Neuaufbau
-  // ersetzt – deshalb bei jedem Aufbau neu setzen, gegen Doppelung per Merker geschuetzt.
-  if (!scroll.dataset.posMerker) {
-    scroll.dataset.posMerker = '1';
-    scroll.addEventListener('scroll', () => {
-      if (_lpPositioniert) _lpScrollPos = scroll.scrollLeft;
-    }, { passive: true });
-  }
-
-  // Ohne vermessenen Ausschnitt laesst sich nichts rechnen – dann nichts tun und es
-  // dem naechsten Aufbau ueberlassen, sonst kaeme der rechte Rand heraus.
-  if (!scroll.clientWidth) return;
-
-  if (_lpPositioniert) { scroll.scrollLeft = _lpScrollPos; return; }
-
-  // Rasterbeginn exakt wie in laufKalenderHTML: Montag der Woche, die den 1. Januar
-  // enthaelt. Wird hier anders gerechnet, zeigt das Ziel auf die falsche Spalte.
-  const jahr  = new Date(referenceDate+'T00:00:00').getFullYear();
-  const jan1  = new Date(jahr, 0, 1);
-  const start = new Date(jan1);
-  start.setDate(jan1.getDate() - ((jan1.getDay() + 6) % 7));
-
-  // Anker ist heute, solange heute im gezeigten Jahr liegt – blaettert man den
-  // Zeitfilter in ein anderes Jahr, ist das Bezugsdatum der sinnvolle Anker.
-  const heute = new Date(toLocalDateStr(new Date())+'T00:00:00');
-  const ziel  = heute.getFullYear() === jahr ? heute : new Date(referenceDate+'T00:00:00');
-  // In ganzen Tagen runden: eine reine ms-Division kippt an der Zeitumstellung um
-  // einen halben Tag und damit gelegentlich um eine ganze Spalte.
-  const spalte = Math.max(0, Math.min(spaltenEls.length - 1,
-    Math.floor(Math.round((ziel - start) / 86400000) / 7)));
-
-  // Spaltenbreite aus denselben Variablen wie das CSS – laufen die auseinander,
-  // verschiebt sich das Ziel mit jeder Spalte weiter.
-  const stil    = getComputedStyle(document.documentElement);
-  const zelle   = parseFloat(stil.getPropertyValue('--lp-zelle')) || 21;
-  const luecke  = parseFloat(stil.getPropertyValue('--lp-gap'))   || 3;
-  const SPALTE  = zelle + luecke;
-
-  const pos = Math.max(0, Math.min(spalte * SPALTE - scroll.clientWidth * 0.7,
-                                   scroll.scrollWidth - scroll.clientWidth));
-  scroll.scrollLeft = pos;
-  _lpScrollPos = pos;
-  _lpPositioniert = true;
-}
-
-// ── Seite 1: Aktueller Laufplan ────────────────────────
-function lpSeiteAktuell() {
-  const laeufe = alleLaeufe();
-
-  const woMap = {};
-  laeufe.forEach(l => { const w = getWeekMonday(l.datum);
-    if (!woMap[w]) woMap[w] = { km:0, min:0, n:0 };
-    if (l.streckeKm != null) woMap[w].km += l.streckeKm;
-    if (l.dauerMin  != null) woMap[w].min += l.dauerMin;
-    woMap[w].n++; });
-  const dieseWoche = woMap[getWeekMonday(referenceDate)] || { km:0, min:0, n:0 };
-  const zielKm = ZIELE.laufKm.ziel;
-  const zielAnteil = Math.min(100, Math.round(dieseWoche.km / zielKm * 100));
-
-  return `
-    <div class="chart-card">
-      ${laufKalenderHTML()}
-    </div>
-
-    <div class="chart-card">
-      <h3>Diese Woche</h3>
-      <div class="lp-woche-zahl" style="color:${dieseWoche.km>=zielKm?'#10B981':'var(--txt)'}">
-        ${zahl(dieseWoche.km,1)} <span class="lp-woche-einheit">von ${zielKm} km</span>
-      </div>
-      <div class="goal-bar-bg" style="margin:.5rem 0 .2rem">
-        <div class="goal-bar-fill" style="width:${zielAnteil}%;background:${dieseWoche.km>=zielKm?'#10B981':'#84CC16'}"></div>
-      </div>
-      <div class="stats-list diagramm-fuss">
-        ${statZeile('Einheiten', `${dieseWoche.n}`)}
-        ${statZeile('Zeit', dieseWoche.min>0?fmtMin(dieseWoche.min):'—')}
-        ${statZeile('Noch bis zum Ziel', dieseWoche.km>=zielKm
-          ? `<span style="color:#10B981">erreicht</span>` : `${zahl(zielKm-dieseWoche.km,1)} km`)}
-      </div>
-    </div>
-
-`;
-}
-
-// Wie viel vom Plan ist bislang erfuellt? Uebernommen aus FitTrack, samt der dort
-// getroffenen Entscheidungen:
-//   • Bezug ist immer nur die VERGANGENHEIT (bei laufenden Plaenen bis heute) – sonst
-//     laege die Quote zwangslaeufig niedrig, solange der Plan noch laeuft.
-//   • Laeufe an NICHT geplanten Tagen zaehlen mit, damit ein nachgeholtes Training
-//     die Quote nicht drueckt.
-function planErfuellung(plan) {
-  if (!plan || !plan.start) return null;
-  const heute = toLocalDateStr(new Date());
-  const bis = (plan.ende && plan.ende < heute) ? plan.ende : heute;
-  if (bis < plan.start) return null;
-  const imZeitraum = d => d >= plan.start && d <= bis;
-
-  // Gezaehlt werden die LAUFTAGE des Plans, Tag fuer Tag durch den Zeitraum – genau
-  // wie FitTrack seinen Wochenplan abgeht. Die einzeln eingetragenen Einheiten taugen
-  // dafuer NICHT als Nenner: sie sind meist nur fuer die naechsten Wochen ausgefuellt,
-  // und gegen zwei erfasste Einheiten ergaben fuenf gelaufene Tage 250 %.
-  const lauftage = new Set(plan.lauftage || []);
-  if (!lauftage.size) return null;
-  let geplant = 0;
-  for (let d = plan.start; d <= bis; d = addDays(d, 1)) {
-    if (lauftage.has(WOCHENTAGE[(new Date(d + 'T00:00:00').getDay() + 6) % 7])) geplant++;
-  }
-  if (!geplant) return null;
-
-  const absolviert = Object.keys(workoutData).filter(d => imZeitraum(d) && laufEinheit(d)).length;
-  return { geplant, absolviert, prozent: Math.round(absolviert / geplant * 100) };
-}
-
-// Der Plan, in dessen Laufzeit ein Tag faellt. Archivierte zaehlen mit – im Kalender
-// tragen sie ebenfalls ein Band (planBaenderHTML), und ein angetippter Tag darin soll
-// denselben Plan benennen, den das Band zeigt.
-function planAmTag(datum) {
-  return planListe.find(p => p.start && p.ende && datum >= p.start && datum <= p.ende) || null;
-}
-
-// In welcher Woche des Plans liegt ein Datum?
-function lpWocheNr(plan, datum) {
-  if (!plan.start) return 1;
-  const mo = getWeekMonday(plan.start), moD = getWeekMonday(datum);
-  return Math.floor((new Date(moD+'T00:00:00') - new Date(mo+'T00:00:00')) / 604800000) + 1;
-}
-
-
-// ── Seite 2: Laufplanverwaltung ────────────────────────
-function lpSeiteVerwaltung() {
-  const aktive = planListe.filter(p => !p.archiviert);
-  const archiv = planListe.filter(p => p.archiviert);
-  const karte = p => {
-    const offen = _lpOffenerPlan === p.id;
-    return `<div class="chart-card lp-plankarte${offen?' offen':''}">
-      <button type="button" class="lp-plankopf" data-lpplan="${p.id}">
-        <span class="lp-plantitel">${esc(p.name)}</span>
-        <span class="lp-planzeit">${p.start?fmtDayShort(p.start):'ohne Datum'}${p.ende?' – '+fmtDayShort(p.ende):''}${
-          (()=>{ const w = _lpWochenAus(p.start, p.ende);
-                 return w ? ` (${w} ${w===1?'Woche':'Wochen'})` : ''; })()}</span>
-        <span class="lp-planpfeil">${offen?'▾':'▸'}</span>
-      </button>
-      ${offen ? lpPlanDetail(p) : ''}
-    </div>`;
-  };
-  return `
-    ${_lpFehler ? `<div class="warn-card"><div class="warn-icon">⚠️</div><div>
-      <div class="warn-title">Speichern fehlgeschlagen</div>
-      <div class="warn-text">${esc(_lpFehler)}</div></div></div>` : ''}
-    ${aktive.length ? aktive.map(karte).join('') : `<div class="chart-card"><div class="no-data">
-      Noch kein Laufplan. Tippe oben rechts auf „＋“, um einen anzulegen.</div></div>`}
-    ${archiv.length ? `<div class="lp-archiv-titel">Archiv</div>${archiv.map(karte).join('')}` : ''}
-  `;
-}
-
-// Detailseite eines Plans: Kopfdaten, dann Woche für Woche die Lauftage.
-function lpPlanDetail(p) {
-  const tageWahl = WOCHENTAGE.map(t =>
-    `<label class="lp-tagwahl"><input type="checkbox" name="lauftage" value="${t}"
-      ${p.lauftage.includes(t)?'checked':''}>${t}</label>`).join('');
-
-  const wochen = [];
-  const dauer = _lpWochenAus(p.start, p.ende) || 0;
-  for (let w = 1; w <= dauer; w++) {
-    const offen = _lpOffeneWochen.has(p.id + '#' + w);
-    const einheiten = p.lauftage.map(tag => {
-      const e = planEinheiten.find(x => x.planId===p.id && x.woche===w && x.wochentag===tag) || {};
-      const datum = _lpDatumAus(p, w, tag);
-      // Kein Speichern-Knopf mehr: die Zeile sichert sich selbst, sobald ein Feld
-      // verlassen wird. Vorher gingen Eingaben verloren, sobald man eine andere
-      // Woche aufklappte – der Re-Render baute das Formular neu auf.
-      return `<div class="lp-einheit" data-lpeinheit="${p.id}|${w}|${tag}">
-        <span class="lp-einheit-tag">${tag}<span class="lp-einheit-datum">${datum?fmtDayShort(datum):''}</span></span>
-        <input type="number" step="0.1" min="0" name="strecke" placeholder="—" inputmode="decimal"
-               value="${e.strecke ?? ''}" aria-label="Strecke in Kilometern"><span class="lp-einheit-mass">km</span>
-        <input type="text" name="zeit" placeholder="—" inputmode="text"
-               value="${e.zeit != null && e.zeit !== '' ? fmtMin(e.zeit) : ''}"
-               aria-label="Zeit – Minuten oder Stunden und Minuten"><span class="lp-einheit-mass">h, min</span>
-        <select name="zone" aria-label="Herzzone">
-          <option value="">Zone</option>
-          ${[1,2,3,4,5].map(z=>`<option value="Z${z}"${e.zone==='Z'+z?' selected':''}>Z${z}</option>`).join('')}
-        </select>
-      </div>`;
-    }).join('');
-    // Der Inhalt steht IMMER im DOM und wird nur ein- oder ausgeblendet. Wuerde er
-    // beim Aufklappen nachgebaut, muesste die ganze Seite neu rendern – und die
-    // Formularfelder darueber verloeren dabei ihre noch nicht gespeicherten Eingaben.
-    wochen.push(`<div class="lp-wochenblock">
-      <button type="button" class="lp-wochenkopf" data-lpwoche="${p.id}#${w}" aria-expanded="${offen?'true':'false'}">
-        <span>Woche ${w}</span><span class="lp-planpfeil">${offen?'▾':'▸'}</span>
-      </button>
-      <div class="lp-wocheninhalt"${offen?'':' hidden'}>${einheiten || '<div class="lp-hinweis">Erst Lauftage wählen.</div>'}</div>
-    </div>`);
-  }
-
-  return `<div class="lp-plandetail">
-    <form class="lp-planform" data-lpplanform="${p.id}">
-      <label class="lp-feld"><span>Name</span>
-        <input type="text" name="name" value="${esc(p.name)}" maxlength="120"></label>
-      <label class="lp-feld"><span>Notizen</span>
-        <textarea name="notizen" rows="2" maxlength="500">${esc(p.notizen)}</textarea></label>
-      <div class="lp-feld-reihe">
-        <label class="lp-feld"><span>Start</span>
-          <input type="date" name="start" value="${p.start}"></label>
-        <label class="lp-feld"><span>Ende</span>
-          <input type="date" name="ende" value="${p.ende}"></label>
-        <label class="lp-feld lp-feld-schmal"><span>Wochen</span>
-          <input type="number" name="wochen" value="${_lpWochenAus(p.start,p.ende)||''}" readonly
-                 tabindex="-1" aria-label="Dauer in Wochen, ergibt sich aus Start und Ende"></label>
-      </div>
-      <label class="lp-feld"><span>Wettkampf (optional)</span>
-        <input type="date" name="wettkampf" value="${p.wettkampf || ''}"
-               aria-label="Tag des Wettkampfs, auf den dieser Plan hinarbeitet"></label>
-      <div class="lp-feld"><span>Lauftage</span><div class="lp-tagwahl-reihe">${tageWahl}</div></div>
-      <div class="lp-planaktionen">
-        <button type="submit" class="lp-knopf-haupt">Speichern</button>
-        <button type="button" class="lp-knopf-neben" data-lparchiv="${p.id}">${p.archiviert?'Aus Archiv holen':'Archivieren'}</button>
-        <button type="button" class="lp-knopf-weg" data-lploeschen="${p.id}">Löschen</button>
-      </div>
-    </form>
-    ${dauer ? `<div class="lp-wochen">${wochen.join('')}</div>`
-            : `<div class="lp-hinweis">Trage Start und Ende ein, dann erscheinen hier die einzelnen Wochen.</div>`}
-  </div>`;
-}
-
 // ── Navigation ─────────────────────────────────────────
-const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,laufplan:pgLaufplan,training:pgTraining};
+const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTraining};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
 function pgBanner(icon,title){
@@ -3531,17 +2697,17 @@ function pgBanner(icon,title){
          aria-expanded="${k.offen() ? 'true' : 'false'}"
          title="${k.titel}" aria-label="${k.titel}">${chevron}</button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${_currentRenderingTab==='laufplan'?`<button class="pg-act lp-neu" title="Neuen Laufplan anlegen" aria-label="Neuen Laufplan anlegen">＋</button>`:''}${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
 // ═══════════════════════════════════════════════════════════
-const TAB_ORDER = ['overview','herz','schlaf','laufplan','training'];
+const TAB_ORDER = ['overview','herz','schlaf','training'];
 let currentScreen = 'overview';
 let _suppressScrollSync = false;
 let _currentRenderingTab = null;
 const _renderedTabs = new Set();
-const tabCharts = { overview:[], herz:[], schlaf:[], laufplan:[], training:[] };
+const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 
 // Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
 // jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
@@ -3703,7 +2869,6 @@ const TAB_THEME_COLORS = {
   overview:   '#0891B2',
   herz:       '#EF4444',
   schlaf:     '#7C3AED',
-  laufplan:   '#10B981',
   training:   '#F97316'
 };
 function _setStatusBarColor(name) {
@@ -3722,7 +2887,6 @@ const THEME_GRADIENTS = {
   overview:   'linear-gradient(135deg, #0C4A6E, #0891B2)',
   herz:       'linear-gradient(135deg, #7F1D1D, #EF4444)',
   schlaf:     'linear-gradient(135deg, #1E3A8A, #7C3AED)',
-  laufplan:   'linear-gradient(135deg, #064E3B, #10B981)',
   training:   'linear-gradient(135deg, #7C2D12, #F97316)'
 };
 // Pro Wisch-Frame aufrufen. progress = container.scrollLeft / clientWidth
@@ -3927,142 +3091,6 @@ document.body.addEventListener('click', (e) => {
   if (inhalt) inhalt.hidden = !_appOffen;
 });
 
-// ── Laufplanverwaltung: Bedienung ──────────────────────
-document.body.addEventListener('click', async (e) => {
-  // Seitenumschalter
-  const seg = e.target.closest('[data-lpseite]');
-  if (seg) { _lpSeite = seg.dataset.lpseite; _renderTab('laufplan'); return; }
-
-  // Plan auf-/zuklappen
-  const kopf = e.target.closest('[data-lpplan]');
-  if (kopf) { const id = kopf.dataset.lpplan;
-    _lpOffenerPlan = _lpOffenerPlan === id ? null : id; _lpOffeneWochen.clear();
-    _renderTab('laufplan'); return; }
-
-  // Woche auf-/zuklappen
-  const woche = e.target.closest('[data-lpwoche]');
-  if (woche) { const k = woche.dataset.lpwoche;
-    const auf = !_lpOffeneWochen.has(k);
-    if (auf) _lpOffeneWochen.add(k); else _lpOffeneWochen.delete(k);
-    // Nur diesen Block umschalten – kein _renderTab, sonst waeren die Eingaben in
-    // den Feldern oberhalb weg, solange sie noch nicht gespeichert sind.
-    const block = woche.closest('.lp-wochenblock');
-    const inhalt = block && block.querySelector('.lp-wocheninhalt');
-    if (inhalt) inhalt.hidden = !auf;
-    woche.setAttribute('aria-expanded', auf ? 'true' : 'false');
-    const pfeil = woche.querySelector('.lp-planpfeil');
-    if (pfeil) pfeil.textContent = auf ? '▾' : '▸';
-    return; }
-
-  // Neuen Plan anlegen
-  const neuKnopf = e.target.closest('.lp-neu');
-  if (neuKnopf) {
-    const id = 'lp' + Date.now();
-    const heute = toLocalDateStr(new Date());
-    neuKnopf.disabled = true;
-    await lpPlanSpeichern({ id, name:'Neuer Laufplan', notizen:'',
-      start: getWeekMonday(heute), ende: addDays(getWeekMonday(heute), 8*7-1),
-      wochen: 8, lauftage:['Di','Do','So'], wettkampf:'' });
-    neuKnopf.disabled = false;
-    _lpSeite = 'verwaltung';
-    // Gegenprobe am Sheet: mode:'no-cors' meldet keinen Fehler zurueck, auch wenn das
-    // Apps Script den Endpunkt gar nicht kennt. Nur das Gegenlesen zeigt, ob der Plan
-    // wirklich angelegt wurde – sonst waere der Knopf scheinbar wirkungslos.
-    if (planListe.some(p => p.id === id)) { _lpOffenerPlan = id; _lpFehler = null; }
-    else _lpFehler = 'Der Plan wurde nicht gespeichert. Vermutlich fehlt der Laufplan-Teil im Apps Script: Code aus _apps-script/Code.gs übernehmen und das Skript neu bereitstellen.';
-    _renderTab('laufplan');
-    return;
-  }
-
-  // Archivieren / zurückholen
-  const arch = e.target.closest('[data-lparchiv]');
-  if (arch) { const p = planListe.find(x => x.id === arch.dataset.lparchiv);
-    if (p) { arch.disabled = true; await lpPlanSpeichern({ ...p, archiviert: !p.archiviert }); }
-    _renderTab('laufplan'); return; }
-
-  // Löschen – mit Rückfrage, der Schritt ist nicht umkehrbar.
-  const weg = e.target.closest('[data-lploeschen]');
-  if (weg) { const p = planListe.find(x => x.id === weg.dataset.lploeschen);
-    if (p && confirm(`Laufplan „${p.name}" mit allen geplanten Einheiten löschen?`)) {
-      weg.disabled = true; await lpPlanLoeschen(p.id); _lpOffenerPlan = null;
-    }
-    _renderTab('laufplan'); return; }
-});
-
-// Plan-Kopfdaten speichern
-document.body.addEventListener('submit', async (e) => {
-  const form = e.target.closest('[data-lpplanform]');
-  if (!form) return;
-  e.preventDefault();
-  const alt = planListe.find(x => x.id === form.dataset.lpplanform) || {};
-  const knopf = form.querySelector('button[type=submit]');
-  knopf.disabled = true; knopf.textContent = 'Speichert…';
-  await lpPlanSpeichern({ id: alt.id, archiviert: alt.archiviert,
-    name: form.name.value.trim(), notizen: form.notizen.value.trim(),
-    start: form.start.value, ende: form.ende.value,
-    wochen: _lpWochenAus(form.start.value, form.ende.value),
-    wettkampf: form.wettkampf.value,
-    lauftage: [...form.querySelectorAll('input[name=lauftage]:checked')].map(c=>c.value) });
-  _renderTab('laufplan');
-});
-
-// Start/Ende geaendert → Wochenzahl sofort nachfuehren, damit man die Dauer sieht,
-// bevor man speichert.
-document.body.addEventListener('input', (e) => {
-  const form = e.target.closest('[data-lpplanform]');
-  if (!form || (e.target.name !== 'start' && e.target.name !== 'ende')) return;
-  const feld = form.querySelector('[name=wochen]');
-  if (feld) feld.value = _lpWochenAus(form.start.value, form.ende.value) || '';
-});
-
-// Einzelne Planeinheit speichern – ausgeloest vom Verlassen eines Feldes.
-// Bewusst OHNE _renderTab: der Nutzer tippt womoeglich schon in der naechsten Zeile,
-// ein Neuaufbau wuerde ihm den Fokus und halb getippte Werte nehmen. Die Anzeige ist
-// ohnehin aktuell – die Werte stehen ja im Feld.
-document.body.addEventListener('change', async (e) => {
-  const zeile = e.target.closest('[data-lpeinheit]');
-  if (!zeile) return;
-  const [planId, woche, wochentag] = zeile.dataset.lpeinheit.split('|');
-  const p = planListe.find(x => x.id === planId);
-  zeile.classList.add('speichert');
-  const ok = await lpEinheitSpeichern({ planId, woche: +woche, wochentag,
-    datum: p ? _lpDatumAus(p, +woche, wochentag) : '',
-    strecke: zeile.querySelector('[name=strecke]').value.trim(),
-    zeit: _lpZeitAusText(zeile.querySelector('[name=zeit]').value),
-    zone: zeile.querySelector('[name=zone]').value });
-  zeile.classList.remove('speichert');
-  // Zeit normalisiert zurueckschreiben ("1h15" → "1h 15min"), damit sichtbar ist, wie
-  // die Eingabe gedeutet wurde. Nur wenn das Feld nicht gerade wieder den Fokus hat.
-  const zf = zeile.querySelector('[name=zeit]');
-  if (ok && zf && document.activeElement !== zf) {
-    const min = _lpZeitAusText(zf.value);
-    zf.value = min === '' ? '' : fmtMin(min);
-  }
-  zeile.classList.add(ok ? 'gesichert' : 'fehlgeschlagen');
-  setTimeout(() => zeile.classList.remove('gesichert', 'fehlgeschlagen'), 1600);
-});
-
-// Laufkalender und Einheitenliste: Tipp auf einen Tag zeigt die Einheit, erneuter
-// Tipp auf denselben Tag klappt sie wieder zu. Die Auswahl liegt in _lpAuswahl und
-// ueberlebt damit den Re-Render.
-document.body.addEventListener('click', (e) => {
-  if (e.target.closest('[data-lpseite], [data-lpplan], [data-lpwoche], .lp-plandetail, .lp-neu')) return;
-  const ziel = e.target.closest('[data-lauftag]');
-  if (!ziel) return;
-  const tag = ziel.dataset.lauftag;
-  _lpAuswahl = (_lpAuswahl === tag) ? null : tag;
-  if (currentScreen !== 'laufplan') return;
-  // Senkrechte Position der Seite merken – der Neuaufbau setzt sie sonst zurueck.
-  // Die WAAGRECHTE Position des Rasters wird hier nicht mehr gerettet: seit der
-  // Uebernahme aus FitTrack fuehrt der Kalender sie selbst mit (_lpScrollPos) und
-  // stellt sie in lpKalenderScrollen wieder her. Zwei Stellen, die dasselbe setzen,
-  // kaemen sich in die Quere.
-  const screenEl = document.getElementById('screen-laufplan');
-  const seite = screenEl?.scrollTop ?? 0;
-  _renderTab('laufplan');
-  if (screenEl) screenEl.scrollTop = seite;
-});
-
 // Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die
 // Schalter sind <button>, damit der Hintergrund-Tipp (Bottom-Nav) sie ausnimmt.
 document.body.addEventListener('click', (e) => {
@@ -4260,17 +3288,13 @@ function hinweisAus() {
 // Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
 // `anmeldeStand()` ist die einzige Quelle fuer diesen Zustand.
 function anmeldeStand() {
-  if (!accessToken)   return { schluessel:'abgelaufen', text:'abgelaufen', farbe:'#F59E0B',
-    hinweis:'Ohne Anmeldung zeigt die App den zuletzt geladenen Stand. Neue Daten holen und Laufpläne speichern gehen erst nach dem Anmelden wieder.' };
-  if (!darfSchreiben) return { schluessel:'nurLesen', text:'nur Lesen', farbe:'#F59E0B',
-    hinweis:'Diese Anmeldung stammt von vor der Umstellung und darf nur lesen. Zum Speichern von Laufplänen einmal neu anmelden – Google fragt dabei nach der erweiterten Erlaubnis.' };
+  if (!accessToken) return { schluessel:'abgelaufen', text:'abgelaufen', farbe:'#F59E0B',
+    hinweis:'Ohne Anmeldung zeigt die App den zuletzt geladenen Stand. Neue Daten holen geht erst nach dem Anmelden wieder.' };
   return { schluessel:'aktiv', text:'aktiv', farbe:null, hinweis:null };
 }
-// Frueher zeigten diese beiden die Leiste oben. Sie frischen jetzt die App-Karte auf,
-// damit die Zeile dort den neuen Stand traegt – der Name bleibt, die Aufrufer stehen
-// an den Stellen, an denen der Zustand tatsaechlich kippt (Abruf, Schreibversuch).
-function hinweisAuthZeigen()        { appKarteAuffrischen(); }
-function hinweisSchreibrechtZeigen(){ appKarteAuffrischen(); }
+// Frueher zeigte das die Leiste oben. Es frischt jetzt die App-Karte auf, damit die
+// Zeile dort den neuen Stand traegt.
+function hinweisAuthZeigen() { appKarteAuffrischen(); }
 // Nur die Uebersicht neu aufbauen, und auch das nur, wenn sie gerade gerendert ist.
 function appKarteAuffrischen() {
   if (_renderedTabs.has('overview')) _renderTab('overview');

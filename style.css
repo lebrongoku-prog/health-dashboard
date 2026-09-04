@@ -88,7 +88,6 @@ body {
 body.theme-overview   { --tab-color: #0891B2; }
 body.theme-herz       { --tab-color: #EF4444; }
 body.theme-schlaf     { --tab-color: #7C3AED; }
-body.theme-laufplan { --tab-color: #10B981; }
 body.theme-training   { --tab-color: #F97316; }
 
 /* ── Topbar pro Tab (inline) ─────────────────────────────
@@ -217,10 +216,7 @@ body.dark .dark-toggle { color: #FBBF24; }
    Zustand. Beides bewusst als ELEMENT-Regel (Spezifitaet 0,0,1): jede Klasse mit
    eigenem Druckpunkt (`.pg-act`, s. o.) gewinnt weiterhin, ohne !important.
    Das antippbare ⓘ ist zwar ein <span>, verhaelt sich aber wie ein Knopf und
-   bekommt dasselbe.
-   NICHT enthalten sind die Kalender-Kaestchen (`.lp-tag`, ebenfalls role=button):
-   Ein transform waehrend `:active` bricht auf iOS die laufende Wischgeste ab – in
-   FitTrack liess sich das Jahresraster dadurch gar nicht mehr scrollen. */
+   bekommt dasselbe. */
 button,
 .info-i{
   transition: opacity .15s, transform .1s;
@@ -694,14 +690,6 @@ h5,
    Tages erscheint (Wunsch). Vorher standen dort fuenf Abstufungen von .66 bis
    .79rem nebeneinander. Bezugsgroesse ist die Label-Stufe darueber – die tragen
    die Wertzeilen (Trainingszeit, Strecke, …), an denen sich das Auge orientiert. */
-.lp-detail-tag,
-.lp-detail-plan,
-.lp-detail-leer,
-.lp-wk-marke,
-.lp-werte>span{
-  font-size: .83rem !important;
-  line-height: 1.4;
-}
 
 /* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
 .kpi-lbl,
@@ -798,155 +786,6 @@ h5,
   #bottom-nav.nav-hidden { transform: translateX(-50%) translateY(110%); }
 }
 
-/* ── Laufplan ───────────────────────────────────────────
-   Jahreskalender nach dem Vorbild von FitTrack. Zwei Schichten pro Tag: die Flaeche
-   sagt, ob laut Plan ein Lauf vorgesehen war, der Kern, ob er stattgefunden hat.
-   Bewusst KEINE Abstufung nach Strecke – der Kalender beantwortet nur "gelaufen
-   oder nicht". */
-/* Masse des Kalenders – 1:1 aus FitTrack uebernommen (Leonard-Wunsch 03.09.2026).
-   Das Kaestchen ist dort halb so gross wieder: 21 statt 14 px. Folge: Es passen rund
-   14 statt 20 Wochen ins Bild, dafuer sind die Tage sicher zu treffen.
-   --lp-gap steht hier UND wird vom JS gelesen (planBaenderHTML, lpKalenderScrollen).
-   Frueher stand die Luecke an vier Stellen fest im CSS und einmal gerechnet im JS;
-   liefen die auseinander, verschoben sich die Planrahmen gegenueber den Spalten –
-   je weiter rechts, desto staerker. */
-:root { --lp-zelle: 21px; --lp-gap: 3px; --lp-label-w: 24px; --lp-label-gap: 4px;
-        --lp-pad-x: 1px; --lp-pad-y: 5px; --lp-band-over: 4px;
-        --lp-monate-h: 16px; --lp-monate-gap: 10px; }
-
-/* WICHTIG – hier steckt Erfahrung aus FitTrack drin, bitte nicht "aufraeumen":
-   `.lp-body` ist ein GEWOEHNLICHER BLOCK, und `.lp-scroll` darin ebenfalls. Kein Flex,
-   kein Grid. Als Flex-Kind stockte das Wischen auf dem iPhone mitten in der Geste –
-   ein Flex-Kind bekommt seine Breite vom Layout-Algorithmus des Elternteils, ein Block
-   schlicht vom umgebenden Kasten. Platz fuer die Wochentagsspalte macht deshalb ein
-   `margin-left`, und die Spalte selbst liegt absolut darueber: Sie steht damit
-   AUSSERHALB des Scrollers – die Kaestchen verschwinden an dessen Kante, statt von
-   einer deckenden Flaeche ueberdeckt zu werden. Die fruehere Loesung (sticky Spalte +
-   Maske in Kartenfarbe) brauchte eine deckende Farbe; diese kommt ohne aus. */
-.lp-body{position:relative}
-/* NUR waagrecht scrollen: sobald eine Achse nicht mehr "visible" ist, macht der
-   Browser aus der anderen ebenfalls "auto" – das Raster liesse sich sonst senkrecht
-   verschieben. Das Polster oben und unten nimmt den Ueberstand der Plan-Rahmen auf. */
-.lp-scroll{
-  margin-left:calc(var(--lp-pad-x) + var(--lp-label-w) + var(--lp-label-gap));
-  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
-  padding:var(--lp-pad-y) var(--lp-pad-x) var(--lp-pad-y) 0;
-  /* Haelt die waagrechte Geste im Kalender, statt sie an #tab-container (Snap-Scroller)
-     weiterzureichen. Preis: Aus dem Kalender heraus laesst sich der Tab nicht per Wisch
-     wechseln – ueber die Leiste unten geht es weiter. */
-  overscroll-behavior-x:contain;
-}
-/* Unsichtbarer Halt im Scroller: Ein klebendes Kind zwingt WebKit, den Scrollbereich auf
-   der Compositor-Ebene zu fuehren. Ohne so ein Kind kann er auf den Hauptthread
-   zurueckfallen, und dann bleibt die Bewegung stehen, sobald dort etwas anderes laeuft.
-   Kostet nichts: null Breite, null Hoehe, unsichtbar. */
-.lp-sticky-anker{position:sticky;left:0;display:block;width:0;height:0}
-.lp-scroll::-webkit-scrollbar{display:none}
-/* vertical-align:top vermeidet den Unterlaengen-Spalt, den ein inline-block sonst
-   unter sich laesst. */
-.lp-inner{display:inline-block;vertical-align:top;min-width:100%}
-.lp-monate{display:flex;gap:var(--lp-gap);margin-bottom:var(--lp-monate-gap);height:var(--lp-monate-h)}
-.lp-monat{width:var(--lp-zelle);flex:0 0 var(--lp-zelle);font-size:13px;
-  line-height:var(--lp-monate-h);color:var(--txt3);white-space:nowrap}
-/* Liegt absolut ueber dem linken Rand von `.lp-body` – bewusst NICHT als Flex-Spalte,
-   damit `.lp-scroll` ein gewoehnlicher Block bleiben kann (siehe oben). Der obere
-   Abstand bildet die Monatszeile im Scroller nach, damit "Mo" auf einer Linie mit der
-   ersten Rasterzeile liegt; dafuer hat die Monatszeile eine FESTE Hoehe. */
-.lp-wtage{
-  position:absolute;left:var(--lp-pad-x);
-  top:calc(var(--lp-pad-y) + var(--lp-monate-h) + var(--lp-monate-gap));
-  width:var(--lp-label-w);
-  display:flex;flex-direction:column;gap:var(--lp-gap);
-}
-.lp-wtage span{height:var(--lp-zelle);font-size:13px;line-height:var(--lp-zelle);color:var(--txt3)}
-.lp-gridwrap{position:relative}
-.lp-raster{display:flex;gap:var(--lp-gap);position:relative;z-index:1}
-.lp-woche{display:flex;flex-direction:column;gap:var(--lp-gap)}
-.lp-tag{position:relative;width:var(--lp-zelle);height:var(--lp-zelle);border-radius:5px;display:block;
-  background:var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.lp-tag.geplant{background:#CDE7E1}
-/* Der Kern behaelt sein Groessenverhaeltnis zum Kaestchen – daher 3,5 px und keine
-   runde Zahl. */
-.lp-tag.gelaufen::before{content:'';position:absolute;inset:3.5px;border-radius:2.5px;background:#0F766E}
-.lp-tag.zukunft{opacity:.45}
-.lp-tag.ausserhalb{opacity:.25;pointer-events:none}
-/* Ringe INNEN zeichnen – aussen ragten sie ueber das Kaestchen und wurden in der
-   ersten Spalte von der Abdeckung der Wochentagsspalte verschluckt. */
-.lp-tag.heute{box-shadow:inset 0 0 0 1.6px var(--tab-color)}
-/* Wettkampftag: auffaellig, aber ohne die Geplant/Gelaufen-Kodierung zu stoeren –
-   Ring aussen, damit die Flaeche und der Kern darunter lesbar bleiben. Der Ring darf
-   hier nach aussen ragen; er steht nie in der ersten Spalte unter der Abdeckung. */
-.lp-tag.wettkampf{background:#D97706;box-shadow:0 0 0 2px #D97706;z-index:3}
-/* Wurde am Wettkampftag gelaufen, bleibt der dunkle Kern sichtbar – er steht fuer
-   die absolvierte Einheit und wuerde sonst in der orangen Flaeche verschwinden. */
-.lp-tag.wettkampf.gelaufen::before{background:#0F766E}
-.lp-wk-marke{margin-left:.4rem;font-weight:700;color:#D97706;
-  border:1px solid #D97706;border-radius:999px;padding:.05rem .4rem;white-space:nowrap}
-.lp-tag.gewaehlt{box-shadow:inset 0 0 0 1.6px var(--txt)}
-/* Zukunftstage sind als Gruppe gedimmt (.zukunft). Der angetippte darf das nicht
-   sein: im Dunkelmodus lag dann ein fast weisser Ring bei 45 % ueber einer ebenfalls
-   abgeblendeten Flaeche – auf dem Bildschirm nicht mehr zu erkennen. Volle Deckkraft
-   ist zugleich die klarere Aussage: DIESER Tag ist gerade ausgewaehlt. */
-.lp-tag.zukunft.gewaehlt{opacity:1}
-/* Laufzeit eines Plans: Rahmen um die Wochenspalten, ohne Fuellung. Liegt unter dem
-   Raster, damit die Kaestchen lesbar bleiben. */
-.lp-baender{position:absolute;inset:0;pointer-events:none;z-index:0}
-.lp-band{position:absolute;top:calc(-1 * var(--lp-band-over));bottom:calc(-1 * var(--lp-band-over));
-  border:1.2px solid #0F766E;border-radius:6px;box-sizing:border-box;
-  /* Der Rahmen sitzt in der Luecke zwischen den Spalten, nicht auf den Kaestchen. */
-  margin-left:-1.5px}
-.lp-band.archiviert{opacity:.5}
-/* Anzahl der Laeufe rechtsbuendig in der Titelzeile – das h3 ist bereits ein
-   Flex-Container, deshalb genuegt margin-left:auto. */
-.lp-kal-zahl{font-size:.72rem;font-weight:500;color:var(--txt2);margin-left:auto}
-.lp-detail{margin-top:.6rem;border-top:1px solid var(--border);padding-top:.5rem}
-/* Ohne ausgewaehlten Tag ist die Zeile leer – dann darf sie auch keinen Platz belegen
-   (Trennlinie und Polster blieben sonst als Streifen unter dem Raster stehen).
-   Aus FitTrack uebernommen; dort steht das Element ebenfalls immer im Markup. */
-.lp-detail:empty{display:none}
-.lp-detail-leer{color:var(--txt3)}
-.lp-detail-tag{font-weight:700}
-/* Plan und Planstand unter dem Datum – zwei gleich gesetzte Zeilen, wie in FitTrack.
-   Zurueckhaltender als die Werte darunter: sie ordnen den Tag ein, sind aber nicht
-   das, wofuer man den Tag angetippt hat. */
-.lp-detail-plan{color:var(--txt3)}
-/* Die Zeilen UEBER den Werten (Datum, Plan, Planstand, Spaltenkoepfe) laufen in einem
-   eigenen, engeren Rhythmus: Sie sind Einordnung, nicht das, wofuer man den Tag
-   angetippt hat, und im Polster der Wertzeilen wuerde die Karte unnoetig hoch.
-   Alle vier haben denselben Abstand – nur eben einen kleineren. */
-.lp-detail-kopf{display:flex;flex-direction:column;gap:.15rem}
-.lp-detail-kopf>div{padding:0}
-.lp-detail-leer{color:var(--txt3);padding:.22rem 0}
-
-/* Geleistet neben Geplant. Ein FLACHES Raster: jede Zelle ist ein direktes Kind,
-   dadurch stehen die drei Spalten garantiert auf einer Linie – bei Zeilen-Wrappern
-   bestimmt jede Zeile ihre Hoehe selbst und die Spalten laufen auseinander.
-   Luecke und Polster wie in .stats-list, damit der Rhythmus zum Rest der App passt. */
-.lp-werte{display:grid;grid-template-columns:1fr auto auto;column-gap:.7rem;row-gap:.2rem;margin-top:.15rem}
-.lp-werte>span{padding:.22rem 0;border-bottom:1px solid #F8FAFC;min-width:0}
-.lp-werte>span:nth-last-child(-n+3){border-bottom:0}
-/* Die Spaltenkoepfe gehoeren noch zum engen Block darueber: oben kein Polster, unten
-   das der Wertzeilen – so schliesst der Kopfteil buendig an die erste Wertzeile an. */
-.lp-werte-kopf{color:var(--txt3);text-align:right;padding-top:0 !important;
-  border-bottom-color:var(--border) !important}
-.lp-werte-lbl{color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lp-werte-ist{font-weight:700;text-align:right;white-space:nowrap}
-.lp-werte-soll{color:var(--txt3);text-align:right;white-space:nowrap}
-body.dark .lp-werte>span{border-bottom-color:#1E293B}
-body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
-
-/* Wochenumfang */
-.lp-woche-zahl{font-size:1.65rem;font-weight:800;line-height:1.1}
-.lp-woche-einheit{font-size:.83rem;font-weight:600;color:var(--txt2)}
-
-/* ── Laufplan: Seitenumschalter (Layout aus FitTrack) ── */
-.seg-toggle{display:flex;gap:4px;margin:0 0 .7rem;background:rgba(255,255,255,.22);
-  border-radius:12px;padding:4px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.seg-btn{flex:1;border:none;background:transparent;color:#fff;font-size:.86rem;font-weight:600;
-  padding:9px 6px;border-radius:9px;cursor:pointer;-webkit-tap-highlight-color:transparent;
-  font-family:inherit;transition:background .15s,color .15s,opacity .15s,transform .1s}
-.seg-btn.active{background:#fff;color:#065F46;box-shadow:0 1px 4px rgba(0,0,0,.15)}
-.pg-act.lp-neu{color:#fff;font-weight:700;line-height:1}
 /* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf
    mit Doppel-Chevron in der Tabfarbe – dort ist es die Akzentfarbe, hier folgt sie
    dem Tab. Masse, Radius, Schatten und Strichstaerke sind von dort uebernommen; er
@@ -963,85 +802,6 @@ body.dark .lp-werte-kopf{border-bottom-color:var(--border) !important}
   stroke:var(--tab-color,#0891B2);stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round;
 }
-
-/* ── Planverwaltung ── */
-.lp-plankarte.offen{box-shadow:0 0 0 1.5px var(--tab-color), var(--shadow)}
-.lp-plankopf{display:flex;align-items:center;gap:.5rem;width:100%;background:none;border:0;
-  padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.lp-plantitel{font-size:.94rem;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lp-planzeit{font-size:.72rem;color:var(--txt2);margin-left:auto;white-space:nowrap}
-.lp-planpfeil{font-size:.8rem;color:var(--txt3);flex:0 0 auto}
-.lp-archiv-titel{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
-  color:var(--txt3);margin:.2rem 0 .4rem}
-.lp-plandetail{margin-top:.7rem;border-top:1px solid var(--border);padding-top:.6rem}
-.lp-planform{display:flex;flex-direction:column;gap:.5rem}
-.lp-feld{display:flex;flex-direction:column;gap:.2rem;flex:1;min-width:0}
-.lp-feld>span{font-size:.72rem;font-weight:600;color:var(--txt2)}
-.lp-feld input,.lp-feld textarea,.lp-einheit input,.lp-einheit select{
-  font:inherit;font-size:.83rem;padding:.35rem .5rem;border:1px solid var(--border);
-  border-radius:8px;background:var(--bg);color:var(--txt);min-width:0}
-/* Ein date-Feld ist von Haus aus hoeher als ein number-Feld. Statt einer festen Zahl
-   werden die Felder der Reihe gleich hoch gezogen und das Wochenfeld fuellt seinen
-   Container – so passt es sich an, was der Browser fuer date-Felder vorgibt. */
-.lp-feld-reihe{align-items:stretch}
-.lp-feld-schmal input{flex:1 1 auto;box-sizing:border-box}
-.lp-feld textarea{resize:vertical}
-.lp-feld-reihe{display:flex;gap:.5rem}
-.lp-feld-reihe>.lp-feld{flex:1 1 0;min-width:0}
-.lp-feld-schmal{flex:0 0 4.2rem !important}
-/* Die Wochenzahl wird gerechnet, nicht getippt – deshalb sichtbar passiv. */
-.lp-feld-schmal input{background:var(--bg);color:var(--txt2);text-align:center;cursor:default}
-
-/* Rueckmeldung beim Selbstspeichern einer Planeinheit */
-.lp-einheit.speichert{opacity:.6}
-.lp-einheit.gesichert input,.lp-einheit.gesichert select{border-color:#10B981}
-.lp-einheit.fehlgeschlagen input,.lp-einheit.fehlgeschlagen select{border-color:#EF4444}
-/* Sieben gleich breite Spalten statt umbrechender Kaestchen – so fuellt die Reihe
-   die Kartenbreite wie die Felder darueber. */
-.lp-tagwahl-reihe{display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}
-.lp-tagwahl{display:flex;align-items:center;justify-content:center;gap:.15rem;font-size:.72rem;
-  min-width:0;
-  border:1px solid var(--border);border-radius:8px;padding:.5rem .4rem;cursor:pointer}
-.lp-tagwahl input{margin:0}
-.lp-planaktionen{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-top:.2rem}
-.lp-knopf-haupt,.lp-knopf-neben,.lp-knopf-weg{font:inherit;font-size:.79rem;font-weight:600;
-  padding:.4rem .7rem;border-radius:8px;cursor:pointer;border:1px solid transparent}
-.lp-knopf-haupt{background:var(--tab-color);color:#fff;border-color:var(--tab-color)}
-.lp-knopf-neben{background:transparent;color:var(--txt2);border-color:var(--border)}
-.lp-knopf-weg{background:transparent;color:#EF4444;border-color:#EF4444}
-.lp-knopf-haupt:disabled,.lp-knopf-neben:disabled,.lp-knopf-weg:disabled{opacity:.6}
-
-/* Wochen ein- und ausklappbar */
-.lp-wochen{margin-top:.7rem;display:flex;flex-direction:column;gap:.3rem}
-.lp-wochenkopf{display:flex;align-items:center;justify-content:space-between;width:100%;
-  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .55rem;
-  font:inherit;font-size:.72rem;font-weight:600;color:inherit;cursor:pointer;
-  -webkit-tap-highlight-color:transparent}
-.lp-wocheninhalt{display:flex;flex-direction:column;gap:.35rem;padding:.4rem 0 .2rem}
-/* Das hidden-Attribut allein genuegt nicht: eine display-Regel im Stylesheet schlaegt
-   es, und die Woche liesse sich nicht mehr zuklappen. */
-.lp-wocheninhalt[hidden]{display:none}
-/* Bei 100 px je Feld passt die Zeile nicht mehr in eine Kartenbreite – sie darf
-   deshalb umbrechen. Der Wochentag bleibt oben links, die Herzzone rutscht bei
-   Bedarf in die zweite Zeile, statt abgeschnitten zu werden. */
-/* Mittig statt linksbuendig (Wunsch): die Zeile ist schmaler als die Karte, und
-   linksbuendig blieb rechts ein breiter leerer Streifen. */
-.lp-einheit{display:flex;align-items:center;justify-content:center;gap:.3rem;flex-wrap:wrap}
-.lp-einheit-tag{flex:0 0 3.4rem;font-size:.79rem;font-weight:600;display:flex;flex-direction:column;line-height:1.15}
-.lp-einheit-datum{font-size:.66rem;font-weight:400;color:var(--txt3)}
-/* Schmaler und mittig: die Felder tragen hoechstens vier Zeichen ("12.5", "1h 15").
-   Ohne flex-grow bleiben sie schmal, statt die freie Breite unter sich aufzuteilen. */
-.lp-einheit input{flex:0 0 100px;width:100px;text-align:center}
-/* Masseinheit rechts neben dem Feld – ohne sie ist nicht erkennbar, ob im Zeitfeld
-   Minuten oder Stunden stehen. */
-.lp-einheit-mass{font-size:.66rem;color:var(--txt3);flex:0 0 auto;margin-left:-.1rem}
-.lp-einheit select{flex:0 0 4.2rem}
-.lp-einheit button{flex:0 0 auto;font:inherit;font-size:.83rem;padding:.3rem .5rem;border:0;
-  border-radius:8px;background:var(--tab-color);color:#fff;cursor:pointer}
-.lp-hinweis{font-size:.75rem;color:var(--txt3);padding:.3rem 0}
-body.dark .lp-feld input,body.dark .lp-feld textarea,
-body.dark .lp-einheit input,body.dark .lp-einheit select,
-body.dark .lp-wochenkopf{background:#0F172A}
 
 /* Aufklapp-Knopf: "Weitere Auswertungen" (Herz, Schlaf) und "Muster & Zusammenhänge"
    (Übersicht) teilen sich diese Klasse – volle Kartenbreite, aber transparent, damit

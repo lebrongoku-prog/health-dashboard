@@ -10,8 +10,9 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
 - **Chart.js 4.5.0** via CDN (in `index.html`, `defer`).
 - **PWA**: Service Worker (`sw.js`, Cache-First-Shell) + `manifest.json`.
 - **Daten**: Google Sheets. Auth: **Google OAuth**, Token in `localStorage`, Scope
-  `spreadsheets` (**Lesen UND Schreiben** — siehe „Schreiben ins Sheet"). Die App liest
-  und schreibt selbst über die Sheets-API. Das **Apps Script** (`_apps-script/`) macht
+  `spreadsheets.readonly` — die App **liest nur**. Mit dem Laufplan ist der einzige
+  Schreibweg entfallen; ein Zugang, der nicht schreiben kann, kann durch einen Fehler
+  auch nichts zerstören. Das **Apps Script** (`_apps-script/`) macht
   nur noch das eine, was die App nicht kann: den Import Drive→Sheet (`REFRESH_URL`).
   (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
   Der zuletzt geladene Stand liegt zusätzlich als Kopie im `localStorage` — die App
@@ -25,7 +26,7 @@ Ausgeliefert werden `index.html`, `style.css`, `app.js`, `manifest.json`, `sw.js
 Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 
 ## Dateistruktur
-- `index.html` — Shell: Bottom-Nav (5 Tabs), `.screen`-Sections, Icon-Links mit
+- `index.html` — Shell: Bottom-Nav (4 Tabs), `.screen`-Sections, Icon-Links mit
   `?v=N`-Cachebust, `theme-color`-Meta.
 - `app.js` (~2740 Z.) — gesamte App-Logik (siehe Architektur).
 - `style.css` (~780 Z.) — Styles.
@@ -43,16 +44,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Daten, damit sich die Oberfläche lokal ohne Anmeldung prüfen lässt. Szenarien per
   `?scenario=normal|nodata|woerror|stale|inject|dubletten|quellen`. Nur Entwicklung,
   nicht Teil der App. Für die Datenschicht zusätzlich: `?auth=aus` (kein gültiger Token
-  → die App muss aus dem Zwischenspeicher weiterlaufen), `?auth=lesen` (Anmeldung von
-  vor der Schreib-Umstellung: Lesen läuft, Speichern muss nach neuer Anmeldung fragen),
-  `?cache=behalten`
+  → die App muss aus dem Zwischenspeicher weiterlaufen), `?cache=behalten`
   (Zwischenspeicher NICHT leeren — erst normal laden, dann damit neu laden),
   `?netz=langsam` (jede Antwort 1.5 s später), `?tipp=sofort` (Nutzer tippt gleich nach
   dem Start → Hinweisleiste statt stillem Neuzeichnen). Messpunkte:
   `window.__ersterChartMs` / `__ersteAntwortMs` (belegen den Sofortstart), `__anfragen`
-  (meta/werte/**schreiben**/script), `__lpPlaene`/`__lpEinheiten`/`__planBlatt` (der
-  simulierte Sheet-Inhalt — der Prüfstand bildet das Schreiben über die Sheets-API
-  nach, nicht mehr den entfallenen Apps-Script-Weg), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
+  (meta/werte/script), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
   sie racet jede Prüfung von aussen gegen die Antwortzeit).
   Jeder vierte Lauf ist dort ein **Indoor-Lauf**: `runSpeed` leer, Workout-Speed
   vorhanden — der Fall, in dem die Pace früher fehlte.
@@ -85,6 +82,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
    2. Start aktiviert ihn).
 
 ## Kern-Architektur (app.js)
+- **Der Laufplan-Tab ist entfallen** (04.09.2026, auf Wunsch): Jahreskalender,
+  Planverwaltung, Tagesdetail und der gesamte Schreibweg ins Sheet sind aus App und
+  Code entfernt. Mit ihm gingen 56 Bezeichner — u. a. `pgLaufplan`, `laufKalenderHTML`,
+  `_blattUmschreiben`, `lpPlanSpeichern`, `planListe`/`planEinheiten`/`planData`,
+  `WOCHENTAGE`, `ZIELE.laufKm` — sowie die Blätter `Laufplan`, `Laufplaene` und
+  `Laufplan-Einheiten` als Datenquelle. Die Blätter selbst **bleiben im Sheet stehen**;
+  die App liest sie nur nicht mehr. Damit ist auch der Schreib-Scope entfallen
+  (siehe Kopf) — die App liest jetzt wieder ausschliesslich.
+
 - **Globaler State:** `timeRange` (`heute`/`7d`/`1m`/`3m`/`6m`/`12m`/`24m`) + `referenceDate`.
   `filtered()` liefert die Zeilen des Fensters. `timeDim(D,…)` liefert
   `{labels, align, alignSum, hasData}` und aggregiert je nach Range täglich/wöchentlich/monatlich.
@@ -92,44 +98,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Datumszeilen werden beim Einlesen zusammengeführt (das Apps-Script schreibt beim Refresh
   die letzten Tage neu und kann Dubletten erzeugen; ungefiltert zählte so ein Tag in jeden
   Durchschnitt doppelt). `workoutData` = nach Datum gekeyt, dadurch von Haus aus eindeutig.
-- **Schreiben ins Sheet — über die Google-Anmeldung, NICHT über ein Passwort.**
-  Bis 30.08.2026 lief jede Änderung über das Apps Script, abgesichert mit `var SECRET`.
-  Dasselbe Passwort musste in `app.js` stehen, damit die App es mitschicken kann — und
-  `app.js` liefert GitHub Pages an jeden aus. **Jeder, der das Projekt fand, konnte
-  Laufplan-Einträge anlegen, ändern und löschen** (nachgewiesen: der Endpunkt
-  antwortete auf den öffentlichen Schlüssel mit `{"ok":true}`). Ein Passwort im
-  Quelltext einer Webseite lässt sich grundsätzlich nicht geheim halten — Wechseln oder
-  das Repo privat machen hilft nicht, weil `app.js` öffentlich bleiben MUSS.
-  Deshalb: **`SECRET` ist ersatzlos entfallen.** Nie wieder ein Geheimnis in `app.js`.
-  - `_blattUmschreiben(sheetId, blatt, spalten, umbauen)` ist der **einzige** Schreibweg:
-    Blatt lesen → Zeilen umbauen lassen → alles zurückschreiben (`values PUT` ab A2,
-    Überhang per `values:clear`). Ein Rundumschlag statt einzelner Zeilenbefehle —
-    Anlegen, Ändern und Löschen laufen gleich, das Blatt bleibt sortiert, und es braucht
-    keine Zeilennummern, die zwischen Lesen und Schreiben veralten. Die Blätter sind
-    klein (Termine und Planeinheiten, keine Messdaten).
-  - Blattnamen in A1-Schreibweise **immer quoten** (`_a1`) — `Laufplan-Einheiten!A2`
-    liest Google sonst als Rechnung.
-  - Die Kopfzeile wird nur berichtigt, wenn sie fehlt oder nicht stimmt. Das ersetzt die
-    Spaltennachrüstung, die früher `lpBlatt` im Apps Script übernahm.
-  - Der lokale Stand wird aus **genau dem** nachgezogen, was geschrieben wurde — kein
-    zweiter Abruf, kein Warten. Der frühere Umweg (`mode:'no-cors'` → 1.2 s warten →
-    Sheet gegenlesen) war die Ursache der zeitweise verschwundenen km-Werte.
-  - `darfSchreiben` führt mit, ob die Anmeldung den Schreib-Scope trägt. Eine Anmeldung
-    von vor der Umstellung darf weiter **lesen**; erst der erste Schreibversuch bittet um
-    eine neue. Die Prüfung muss auf **exakte** Scope-Gleichheit gehen —
-    `includes('auth/spreadsheets')` trifft auch `…/spreadsheets.readonly`.
-  - `_schreibenErlaubt()` lehnt sichtbar ab (Warnkarte + Hinweisleiste), statt still zu
-    scheitern. Ein Wert, der scheinbar gespeichert ist und beim nächsten Aufbau wieder
-    verschwindet, war der schlimmste der früheren Fehler.
-  - **Der Refresh-Auslöser** trägt kein Passwort mehr: die App schickt ihren
-    Google-Zugang im **POST-Rumpf** (Adressen landen in Server-Protokollen, Rumpfdaten
-    nicht), und `zugangGueltig()` im Apps Script prüft ihn, indem es damit die private
-    Tabelle anfragt — wer sie lesen darf, darf auch den Import auslösen.
 - **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
   auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
   Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
-  1. `datenCacheLesen()` füllt `allData`/`workoutData`/`planData`/`planListe`/
-     `planEinheiten` aus `hcc_daten_v1` — die App ist nach ~30 ms bedienbar.
+  1. `datenCacheLesen()` füllt `allData` und `workoutData` aus `hcc_daten_v1` —
+     die App ist nach ~30 ms bedienbar.
   2. `hintergrundLaden()` holt danach den frischen Stand. Ist er **identisch**
      (Fingerabdruck `datenStand()` vorher/nachher), passiert **nichts** — sonst
      blitzte bei jedem Start ein Neuaufbau aller Diagramme auf.
@@ -169,27 +142,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (`_schreibenErlaubt()`) — seit der Umstellung schon deshalb, weil die App ohne
   Anmeldung gar nicht mehr ins Sheet schreiben kann.
 - **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
-  Workout- oder Laufplan-Blatt, bleibt der vorhandene Stand stehen (`still &&
+  Workout-Blatt, bleibt der vorhandene Stand stehen (`still &&
   vorhanden` → nur `console.warn`). Sonst hätte eine kurze Netzstörung den
   Training-Tab gegen eine Fehlerkarte getauscht, obwohl alle Trainings vorliegen.
 - **Blattnamen-Zwischenspeicher (`hcc_blattnamen_v1`):** `_fetchSheet` fragte vor jedem
   Wertabruf, wie die Blätter heissen — fünf Extraanfragen pro Start für eine Angabe,
   die sich nie ändert. Die Liste liegt jetzt lokal; neu geholt wird sie nur, wenn ein
-  gesuchtes Blatt fehlt (die Laufplan-Blätter entstehen erst beim ersten Speichern —
-  seit der Umstellung legt sie `_blattSicherstellen` an, vorher das Apps Script).
-  `_tabsHolen` bündelt parallele Aufrufe, sonst schickten die fünf
-  gleichzeitigen Abrufe wieder fünf identische Namensanfragen los.
-- **`loadFromAPI` lädt alle fünf Blätter gleichzeitig** (`Promise.all`), nicht mehr
-  nacheinander. Die Nebenblätter fangen ihre Fehler selbst ab (`.catch(alsFehler)`),
-  damit ein fehlendes Laufplan-Blatt nicht den Gesundheitsteil mitreisst.
+  gesuchtes Blatt fehlt. `_tabsHolen` bündelt parallele Aufrufe, sonst schickten die
+  gleichzeitigen Abrufe identische Namensanfragen los.
+- **`loadFromAPI` lädt beide Blätter gleichzeitig** (`Promise.all`), nicht mehr
+  nacheinander. Das Workout-Blatt fängt seinen Fehler selbst ab (`.catch(alsFehler)`),
+  damit es den Gesundheitsteil nicht mitreisst.
   Rückgabe: `true` | `'auth'` | `false` — `'auth'` ist **kein** Fehler, sondern der
   Auftrag, die Hinweisleiste zu zeigen.
 - **Rendering:** `_renderTab(name)` → Seiten-Funktion `pgOverview`/`pgHerz`/`pgSchlaf`/
-  `pgAktivitaet`/`pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
+  `pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
   `mkC(id,cfg)`; danach `_injectTopbar(name)` → `_injectChartFilters` + `updateNavUI`.
 - **Chart-Registry:** `charts` (Instanzen nach Canvas-ID), `tabCharts` (IDs pro Tab, für
   Destroy beim Re-Render).
-- **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','laufplan','training']` (5 Tabs).
+- **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','training']` (4 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
 - **Übersicht (`pgOverview`):** Ziel-Karte → Tageswert-Kacheln → Verlaufs-Chart →
@@ -208,7 +179,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
   der App-Karte der Übersicht (`datenStandZeilen()`, ab 2 Tagen Rückstand orange).
 - **Bedienelemente:** 🌙 Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
-  (`pgBanner()`), im Laufplan-Tab davor der `＋`-Knopf für einen neuen Plan. Das
+  (`pgBanner()`). Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
   in der App-Karte der Übersicht — zusammen mit „App-Version aktualisieren" darunter,
   jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
@@ -421,17 +392,6 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
-- **Tagesdetail des Laufkalenders: eine Schriftgrösse, ein Zeilenabstand.** Alles,
-  was beim Antippen eines Tages erscheint, steht auf der **Label-Stufe** `.83rem`. Vorher lagen dort fünf
-  Abstufungen von `.66` bis `.79rem` nebeneinander. Die Grösse steht — wie alle —
-  **nur im Type Scale**; die `.lp-*`-Regeln tragen keine `font-size` mehr.
-  Ebenso trägt **keine Zeile einen eigenen Rand** — vorher hatte jede ihren eigenen
-  Wert (.3 / .15 / .4 / .2rem) und sie sassen sichtbar ungleich. Es gibt **zwei
-  Rhythmen**: die Wertzeilen (`.lp-werte`) folgen der `.stats-list` (Lücke `.2rem`,
-  Polster `.22rem 0` → 29–30 px), die Zeilen **darüber** (Datum, Plan, Planstand,
-  Spaltenköpfe) laufen enger (`.lp-detail-kopf` mit Lücke `.15rem`, kein Polster,
-  `.lp-werte-kopf` ohne oberes Polster → 21 px). Sie ordnen den Tag nur ein; im
-  Polster der Wertzeilen wurde die Karte unnötig hoch.
 - **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
   (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
   Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
@@ -456,10 +416,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `opacity:.75; scale(.97)`. Bewusst als **Element-Regel** (Spezifität 0,0,1), damit
   Klassen mit eigenem Druckpunkt (`.pg-act`: `scale(.94)`) ohne `!important` gewinnen.
   Klassen mit eigenem `transition` müssen `opacity`/`transform` mitführen, sonst
-  springt der Druckpunkt (`.seg-btn`). **Die Kalender-Kästchen `.lp-tag` sind
-  ausgenommen** (obwohl `role="button"`): ein `transform` während `:active` bricht auf
-  iOS die laufende Wischgeste ab — in FitTrack liess sich das Jahresraster dadurch
-  gar nicht mehr scrollen.
+  springt der Druckpunkt. **Merke für künftige Scrollbereiche:** ein `transform`
+  während `:active` bricht auf iOS die laufende Wischgeste ab — in FitTrack liess sich
+  das Jahresraster dadurch gar nicht mehr scrollen.
 - **Aufklapp-Knöpfe teilen eine Klasse:** „Weitere Auswertungen" (Herz, Schlaf) und
   „Muster & Zusammenhänge" (Übersicht) tragen beide `.weitere-btn` und sehen damit
   identisch aus. Der Muster-Knopf hatte vorher als `.pi-titel` das Aussehen einer
@@ -489,7 +448,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   VO₂max. Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
   dann deren Deutung. Der frühere **Trainingskalender** zuoberst im Training-Tab ist
   auf Wunsch **ersatzlos entfernt** (samt `_buildCalHTML`, `_calDate`, `#cal-tip`
-  und den `.cal-*`-Regeln) — der Jahreskalender im Laufplan-Tab deckt das ab.
+  und den `.cal-*`-Regeln).
 - **Vergleichsdiagramm (`c-kombi`, im Training-Tab nach der Trainingszeit):** vier Reihen —
   Trainingszeit (Balken), Puls, Laufstrecke, Pace (Linien). `KOMBI_REIHEN` ist die
   **einzige** Quelle für Farbe, Einheit, Achse und Format; die Legende, die Datensätze
@@ -505,147 +464,6 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Fusszeilen:** `Total` überspringt Puls und Pace (`summierbar:false`) und entfällt
   ganz, wenn keine summierbare Reihe aktiv ist; die Ø-Zeilen zeigen alle aktiven
   Reihen, getrennt durch `|`.
-- **Laufplan-Tab (`pgLaufplan`):** ersetzt seit 29.08.2026 den früheren Schritte-Tab
-  (Farbe Grün beibehalten; `pgAktivitaet` samt `c-steps`/`c-cals` ist entfernt — die
-  Schritte-Kachel und der Wochenverlauf der **Übersicht** bleiben davon unberührt).
-  Aufbau: Jahreskalender (53 Wochen à 7 Kästchen, waagrecht scrollbar, schiebt beim
-  Rendern den heutigen Tag in die **Mitte** des Ausschnitts — `lpKalenderScrollen()`)
-  → **„Diese Woche"** (Wochenumfang gegen `ZIELE.laufKm`). Mehr nicht — die Karten
-  **„Bestleistungen"** und **„Einheiten"** (Liste der Läufe im Zeitfenster) sind auf
-  Wunsch ersatzlos entfallen, mit ihnen die Klassen `.lp-liste` / `.lp-eintrag*`.
-  Eine eigene Karte zum laufenden Plan gibt es ebenfalls **nicht** mehr (weder die
-  reine Infokarte noch die kurzzeitige Fortschrittskarte) — das steht im Tagesdetail
-  des Kalenders. `laufWerteHTML()` lebt weiter: es füllt dieses Tagesdetail.
-- **Planstand im Tagesdetail (`planErfuellung`, `planAmTag`) — 1:1 aus FitTrack:**
-  Tippt man einen Tag an, der in der Laufzeit eines Plans liegt, folgen unter dem
-  Datum zwei zurückhaltende Zeilen (`.lp-detail-plan`): *„Name (N Wochen)"* und
-  *„X von Y geplanten Einheiten (Z%)"*. Genau dort und genau so zeigt FitTrack es
-  (`.cal-detail-plan` in seiner Kalender-Fusszeile). Die Angaben gehören an den Tag,
-  den man gerade ansieht, nicht in einen dauerhaften Block weiter unten.
-  Mitübernommen sind FitTracks Entscheidungen:
-  - Bezug ist **immer nur die Vergangenheit** (bis heute, bei beendeten Plänen bis
-    zum Planende) — sonst läge die Quote zwangsläufig niedrig, solange der Plan läuft.
-    Sie ändert sich deshalb **nicht**, wenn man einen künftigen Tag antippt.
-  - **Läufe an nicht geplanten Tagen zählen mit**, damit ein nachgeholtes Training
-    die Quote nicht drückt.
-  - Der Nenner kommt aus den **Lauftagen** des Plans (`plan.lauftage`, Tag für Tag
-    durch den Zeitraum gezählt), **nicht** aus den einzeln erfassten Planeinheiten.
-    Die sind meist nur für die nächsten Wochen ausgefüllt; gegen zwei erfasste
-    Einheiten ergaben fünf gelaufene Tage 250 %. FitTrack geht aus demselben Grund
-    seinen Wochenplan ab.
-  - `planAmTag` berücksichtigt **auch archivierte** Pläne: im Kalender tragen sie
-    ebenfalls ein Band, und ein Tag darin soll denselben Plan benennen.
-- **Tagesansicht: „Geleistet" neben „Geplant" (`laufWerteHTML`).** Aufbau von oben:
-  ausgeschriebenes Datum (`Donnerstag, 03. September`) → Planname mit Dauer →
-  Planstand → ein **flaches Raster** aus drei Spalten (Label | geleistet | geplant)
-  mit den vier Zeilen Trainingszeit, Strecke, Ø Pace, Ø Herzfrequenz.
-  Flach heisst: jede Zelle ist ein direktes Kind von `.lp-werte`. Mit Zeilen-Wrappern
-  bestimmt jede Zeile ihre Höhe selbst und die Spalten laufen auseinander.
-  Die Soll-Werte kommen aus der **Planeinheit desselben Tages** (Seite
-  „Laufplanverwaltung"). Die **Ziel-Pace steht dort nicht als Feld** — sie ergibt sich
-  aus Zielzeit ÷ Zielstrecke. Bei der Herzfrequenz wird die **Zone unverändert
-  übernommen** und NICHT in Schläge umgerechnet: eine Zone ist ein Bereich, jede
-  Umrechnung wäre eine Erfindung. Höhenmeter und die Laufart-Zeile sind mit dem
-  Umbau entfallen.
-- **Einzelne Termine lassen sich nicht mehr setzen** (auf Wunsch): das Formular in
-  der Tagesansicht, der „entfernen"-Knopf und der grüne Verweis in den Plan sind weg,
-  mit ihnen `planSpeichern`/`planLoeschen`, `PLAN_SPALTEN` und die Klassen
-  `.lp-plan-*`. Das Blatt **`Laufplan` wird weiterhin gelesen** — bereits eingetragene
-  Termine erscheinen im Kalender als „geplant", sie sind nur nicht mehr änderbar.
-- **Kalorien in der Tagesansicht entfallen** (auf Wunsch). `laufEinheit` führt das Feld
-  `kcal` nicht mehr; die Herleitung steht als Kommentar dort, falls es zurückkommt:
-  `Energy (kJ)` ÷ 4.184 aus dem **Workout**-Sheet — `activeCal` im Health-Sheet ist
-  der Tagesverbrauch, nicht der des Laufs. Kalendertag und Listeneintrag sind antippbar, erneuter Tipp
-  klappt zu; die Auswahl liegt in `_lpAuswahl` **ausserhalb** der Seitenfunktion.
-  **Datenquellen:** `laufEinheit(datum)` setzt eine Einheit aus beiden Sheets zusammen.
-  Die **Strecke kommt immer aus dem Workout-Sheet** (`distanceKm`) — genau wie im
-  Training-Tab. Das Health-Sheet führt unter `distKm` einen abweichenden Tageswert;
-  beide Tabs zeigten dadurch unterschiedliche Kilometer für denselben Lauf. Die Pace
-  nimmt weiterhin `runSpeed` und greift nur ersatzweise auf die Workout-Geschwindigkeit
-  zurück (GPS schlägt die Schätzung der Uhr). Trainingszeit, Ø-Puls und Höhenmeter gibt es **nur** im
-  Workout-Sheet.
-  `istLauf()` filtert die Workout-Zeilen per Stichwort, weil Apple je nach Sprache
-  andere Namen liefert. `LAUF_ARTEN`/`laufArt()` sind **entfallen**: ihr einziger
-  Zweck war die Farbe der Laufart in der Tagesansicht, und dort ist alles gleich
-  gesetzt (siehe „Tagesdetail: eine Schriftgrösse").
-  **Layout 1:1 aus FitTrack übernommen (03.09.2026).** Masse in `:root`:
-  `--lp-zelle: 21px` (vorher 14), `--lp-gap: 3px`, Label-Spalte 24 px, Radius 5 px,
-  Kern `inset 3.5px`, Ringe 1.6 px, Planrahmen 1.2 px/Radius 6, Monatszeile mit
-  **fester** Höhe 16 px + 10 px Abstand. Folge: rund 14 statt 20 Wochen im Bild,
-  dafür sicher treffbare Tage.
-  - **`--lp-gap` ist die einzige Quelle für die Lücke** — CSS *und* JS lesen sie
-    (`planBaenderHTML`, `lpKalenderScrollen`). Vorher stand sie an vier Stellen fest
-    im CSS und einmal gerechnet im JS; liefen die auseinander, verschoben sich die
-    Planrahmen gegenüber den Spalten, je weiter rechts desto stärker.
-  - **Die Wochentagsspalte steht AUSSERHALB des Scrollers** (`position:absolute` über
-    dem linken Rand von `.lp-body`), der Scroller bekommt Platz per `margin-left`.
-    Die Kästchen verschwinden dadurch an dessen Kante, statt von einer deckenden
-    Fläche überdeckt zu werden — die frühere Lösung (sticky Spalte + Maske in
-    Kartenfarbe) brauchte eine deckende Farbe.
-  - **`.lp-scroll` MUSS ein gewöhnlicher Block bleiben**, kein Flex-/Grid-Kind: In
-    FitTrack stockte das Wischen auf dem iPhone, als es eines war. Dazu gehört
-    `.lp-sticky-anker` (0×0, unsichtbar) — ein klebendes Kind zwingt WebKit, den
-    Scrollbereich auf der Compositor-Ebene zu führen.
-  - `overscroll-behavior-x: contain` hält die Wischgeste im Kalender. Preis: aus dem
-    Kalender heraus lässt sich der Tab nicht per Wisch wechseln.
-  - Die Fusszeile steht **immer** im Markup und blendet sich per `:empty` aus.
-  **Waagrechte Startposition (`lpKalenderScrollen`):** beim **ersten** Aufbau steht
-  heute bei **70 %** der Breite (rechts der Mitte — die zurückliegenden Wochen brauchen
-  mehr Platz als die leere Zukunft). Danach wird die Position des Nutzers gehalten
-  (`_lpPositioniert` / `_lpScrollPos` + Scroll-Listener); ein erneutes Positionieren
-  zöge das Raster bei jedem Neuaufbau zur laufenden Woche zurück. Der Tipp auf einen
-  Tag rettet deshalb **nur noch** die senkrechte Position der Seite — zwei Stellen, die
-  die waagrechte setzen, kämen sich in die Quere. Der Rasterbeginn muss **exakt wie in
-  `laufKalenderHTML`** gerechnet werden (Montag der Woche, die den 1. Januar enthält),
-  und die Tagesdifferenz wird gerundet — eine reine ms-Division kippt an der
-  Zeitumstellung um eine ganze Spalte. Bei `clientWidth === 0` bricht die Funktion ab.
-  Bewusst **synchron** statt in `requestAnimationFrame` (anders als FitTrack): in einer
-  nicht gezeichneten Seite feuert rAF nie, und der Tab wird im Hintergrund vorgerendert.
-- **Laufplan-Tab: zwei Seiten** über einen Segment-Umschalter (`.seg-toggle`, Layout aus
-  FitTrack übernommen). `_lpSeite` merkt die Wahl über Re-Render hinweg.
-  **Aktueller Laufplan** = Kalender, laufender Plan, Wochenumfang, Bestleistungen,
-  Einheitenliste. **Laufplanverwaltung** = Liste der Pläne, jede Karte aufklappbar zur
-  Detailansicht (Name, Notizen, Start, Ende, Wochen, Lauftage) und darunter Woche für
-  Woche die Lauftage mit Strecke, Zeit und Herzzone. Archivierte Pläne stehen unter
-  einer eigenen Überschrift.
-  Die **Dauer in Wochen** wird aus Start und Ende gerechnet (`_lpWochenAus`, ab dem
-  Montag der Startwoche und in ganzen Tagen — sonst wird ein mitten in der Woche
-  begonnener Plan zu kurz und die Zeitumstellung kippt das Ergebnis). Das Feld ist
-  reine Anzeige und bestimmt zugleich die Zahl der Wochenblöcke.
-  Die Zeilen der Lauftage stehen **mittig** (`.lp-einheit{justify-content:center}`) —
-  linksbündig blieb rechts ein breiter leerer Streifen.
-  Mehrere Wochen bleiben **gleichzeitig** offen (`_lpOffeneWochen` ist ein Set).
-  Der Inhalt jedes Wochenblocks steht **immer** im DOM und wird nur ein-/ausgeblendet;
-  das Auf- und Zuklappen läuft ohne `_renderTab`. Beides zusammen ist Bedingung:
-  baut das Aufklappen die Seite neu, verlieren die Kopffelder darüber (Name, Notizen,
-  Datum, Lauftage) ihre noch nicht gespeicherten Eingaben.
-  **Alle Schreibvorgänge laufen durch EINE Kette** (`_lpKette`) und damit nacheinander.
-  Vorher stand dort ein Riegel, der jeden Aufruf verwarf, welcher während eines
-  laufenden startete — tippte man mehrere Felder zügig, kam nur das erste an.
-  Ein Plan trägt optional ein **Wettkampfdatum** (Spalte `Wettkampf`); dieser Tag
-  bekommt im Kalender einen Ring in `#D97706` und in der Tagesansicht eine Marke.
-  Die Einheiten **sichern sich selbst** beim Verlassen eines Feldes und **ohne**
-  Re-Render: Ein Neuaufbau nähme dem Nutzer Fokus und halb getippte Werte, und beim
-  Aufklappen einer anderen Woche gingen die Eingaben verloren. Grüne Umrandung
-  bestätigt, rote meldet den Fehlschlag. Der `＋`-Knopf im Banner erscheint **nur** im Laufplan-Tab
-  (`_currentRenderingTab` in `pgBanner`).
-- **Laufpläne im Sheet:** zwei weitere Blätter im Workout-Spreadsheet, damit der Plan
-  dort von Hand lesbar bleibt: **`Laufplaene`** (ID, Name, Notizen, Start, Ende, Wochen,
-  Lauftage, Archiviert, Wettkampf) und **`Laufplan-Einheiten`** (PlanID, Woche,
-  Wochentag, Datum, Strecke, Zeit, Herzzone). Gelesen **und geschrieben** wird direkt
-  über die Sheets-API (`_blattUmschreiben`); die Spaltenlisten stehen in
-  `LP_KOPF_SPALTEN` / `LP_EINHEIT_SPALTEN` in `app.js` — sie sind seit dem Wegfall der
-  Apps-Script-Endpunkte die einzige Quelle dafür.
-  `geplanteTage()` führt Planeinheiten **und** freie Einzeltermine zusammen — beide
-  erscheinen im Kalender als „geplant". Das Datum einer Planeinheit rechnet
-  `_lpDatumAus` aus Startwoche + Wochennummer + Wochentag, es muss also nicht im Sheet
-  stehen.
-- **Planverwaltung (einzelne Termine):** Blatt **`Laufplan`** im Workout-Spreadsheet
-  (`Date | Distance (km) | Note`, Spalten in `PLAN_SPALTEN`). Gelesen über
-  `_fetchSheet(id, blattName)` — die Funktion nahm vorher immer `sheets[0]`.
-  Geschrieben über `_blattUmschreiben`, das nach Datum sortiert zurückschreibt, damit
-  das Blatt von Hand lesbar bleibt. Im Kalender ist ein geplanter Tag ein Ring
-  (`.geplant`), ein gelaufener der gefüllte Kern; beides zusammen ist möglich.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
   `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
   aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei
@@ -662,9 +480,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Cache-Bump nicht vergessen** — häufigste Fehlerquelle.
 - **NIE ein Geheimnis in `app.js`, `index.html`, `style.css` oder `sw.js`.** GitHub Pages
   liefert diese Dateien an jeden aus — ein Schlüssel darin ist veröffentlicht, egal wie
-  er heisst. Genau daran hing der Apps-Script-`SECRET`, mit dem Fremde Laufplan-Einträge
-  ändern konnten. Braucht etwas eine Absicherung, führt sie über die Google-Anmeldung
-  (Sheets-API direkt) oder über eine Prüfung des Google-Zugangs im Apps Script
+  er heisst. Genau daran hing der Apps-Script-`SECRET`, mit dem Fremde die damaligen
+  Laufplan-Einträge ändern konnten. Braucht etwas eine Absicherung, führt sie über die
+  Google-Anmeldung oder über eine Prüfung des Google-Zugangs im Apps Script
   (`zugangGueltig`). Das Repo privat zu machen hilft NICHT: `app.js` bleibt öffentlich.
 - **`_apps-script/` ist Referenz, kein Deploy.** Änderungen dort wirken erst, wenn der
   Code im Apps-Script-Projekt eingefügt UND als **neue Version bereitgestellt** wird.

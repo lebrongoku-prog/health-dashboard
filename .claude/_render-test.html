@@ -19,7 +19,6 @@
     <section id="screen-overview"   class="screen"></section>
     <section id="screen-herz"       class="screen"></section>
     <section id="screen-schlaf"     class="screen"></section>
-    <section id="screen-laufplan"   class="screen"></section>
     <section id="screen-training"   class="screen"></section>
   </div>
 </div>
@@ -27,7 +26,6 @@
   <button class="nav-btn active" id="nav-overview"   data-tab="overview"><span>Übersicht</span></button>
   <button class="nav-btn"        id="nav-herz"       data-tab="herz"><span>Herz</span></button>
   <button class="nav-btn"        id="nav-schlaf"     data-tab="schlaf"><span>Schlaf</span></button>
-  <button class="nav-btn"        id="nav-laufplan"   data-tab="laufplan"><span>Laufplan</span></button>
   <button class="nav-btn"        id="nav-training"   data-tab="training"><span>Training</span></button>
 </nav>
 
@@ -51,12 +49,10 @@
 // Zusatzschalter ?auth=aus       – kein gueltiger Token: die App muss aus dem
 //                 Zwischenspeicher weiterlaufen und die Hinweisleiste oben zeigen
 //                 (frueher: Login-Screen, gar keine Daten).
-// Zusatzschalter ?auth=lesen     – Anmeldung von vor der Schreib-Umstellung (nur
-//                 Leserecht): Lesen laeuft, Speichern muss nach neuer Anmeldung fragen.
 // Zusatzschalter ?cache=behalten – den Datei-Zwischenspeicher NICHT leeren. Erst
 //                 normal laden (schreibt ihn), dann damit neu laden: die App muss
 //                 sofort zeichnen und im Hintergrund nachladen.
-// window.__anfragen zaehlt die Netzabrufe (meta/werte/schreiben/script) – damit laesst sich
+// window.__anfragen zaehlt die Netzabrufe (meta/werte/script) – damit laesst sich
 // belegen, dass der Blattnamen-Zwischenspeicher die Meta-Abfragen einspart.
 //
 // Zusatzschalter ?raf=timer – ersetzt requestAnimationFrame durch einen Timer, damit
@@ -93,18 +89,12 @@ if ('serviceWorker' in navigator) {
 // die App muss dann aus dem Zwischenspeicher weiterlaufen statt den Login zu zeigen.
 const _P = new URLSearchParams(location.search);
 if (_P.get('auth') === 'aus') {
-  localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); localStorage.removeItem('g_scope');
+  localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry');
 } else {
   localStorage.setItem('g_token', 'testtoken');
   localStorage.setItem('g_expiry', String(Date.now() + 3600e3));
-  // ?auth=lesen simuliert eine Anmeldung von VOR der Umstellung: sie traegt nur das
-  // Leserecht. Lesen muss weiterlaufen, erst das Speichern darf nach einer neuen
-  // Anmeldung fragen. Wichtig, weil '.../spreadsheets.readonly' den kurzen Namen als
-  // Teilstring enthaelt – eine schlampige Pruefung haelt das faelschlich fuer erlaubt.
-  localStorage.setItem('g_scope', _P.get('auth') === 'lesen'
-    ? 'https://www.googleapis.com/auth/spreadsheets.readonly'
-    : 'https://www.googleapis.com/auth/spreadsheets');
 }
+
 // Zwischenspeicher: standardmaessig leeren, sonst startet jeder Lauf aus dem Stand
 // des vorigen und die Szenarien waeren nicht mehr vergleichbar.
 // ?cache=behalten laesst ihn stehen – so laesst sich der Sofortstart pruefen:
@@ -115,7 +105,7 @@ if (_P.get('cache') !== 'behalten') {
 }
 // Zaehler fuer die Netzanfragen – damit sich belegen laesst, dass der Blattnamen-
 // Zwischenspeicher die Meta-Abfragen wirklich einspart.
-window.__anfragen = { meta: 0, werte: 0, script: 0, schreiben: 0 };
+window.__anfragen = { meta: 0, werte: 0, script: 0 };
 // Wann stand das erste Diagramm? Misst den eigentlichen Gewinn des Zwischenspeichers.
 // Ein Beobachter statt einer Abfrage nach dem Laden – nur so ist der Zeitpunkt echt.
 window.__ersterChartMs = null;
@@ -220,25 +210,6 @@ if (SC === 'dubletten') {
   letzte.forEach(r => health.push(r));
 }
 
-// Laufplan-Blatt: der Pruefstand haelt es im Speicher und beantwortet damit sowohl
-// das Lesen (Sheets-API) als auch das Schreiben (Apps-Script-Aufruf). So laesst sich
-// der ganze Weg Termin setzen -> speichern -> neu lesen pruefen, ohne Google.
-const planBlatt = [['Date','Distance (km)','Note']];
-(function(){ const d=new Date(); d.setDate(d.getDate()+2);
-  planBlatt.push([ymd(d), '8', 'Langer Lauf']); })();
-
-// Laufplaene und ihre Einheiten – zwei weitere Blaetter im Workout-Spreadsheet.
-const lpPlaene = [['ID','Name','Notizen','Start','Ende','Wochen','Lauftage','Archiviert','Wettkampf']];
-const lpEinheiten = [['PlanID','Woche','Wochentag','Datum','Strecke (km)','Zeit (min)','Herzzone']];
-(function(){
-  const mo = new Date(); mo.setDate(mo.getDate() - ((mo.getDay()+6)%7) - 14);   // vor 2 Wochen
-  const ende = new Date(mo); ende.setDate(mo.getDate() + 6*7 - 1);
-  lpPlaene.push(['lp-test','Herbstaufbau','Ruhig aufbauen', ymd(mo), ymd(ende), '6', 'Di,Do,So', '']);
-  lpEinheiten.push(['lp-test','1','Di','','5','30','Z2']);
-  lpEinheiten.push(['lp-test','1','So','','12','75','Z2']);
-  lpPlaene.push(['lp-alt','Sommerblock','', '2026-05-04','2026-06-14','6','Mo,Mi','ja']);
-})();
-
 const HEALTH_ID = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
 // ?netz=langsam verzoegert JEDE Antwort um NETZ_MS. Damit laesst sich zeigen, was der
@@ -248,20 +219,6 @@ const ok = body => new Promise(res => setTimeout(() => {
   if (window.__ersteAntwortMs === null) window.__ersteAntwortMs = Math.round(performance.now());
   res({ ok:true, status:200, json:()=>Promise.resolve(body), text:()=>Promise.resolve('') });
 }, NETZ_MS));
-
-// Der Pruefstand bildet jetzt eine ECHTE Tabelle nach: Lesen und Schreiben laufen
-// beide ueber die Sheets-API, so wie in der App seit der Umstellung auf Variante A.
-// Der frueher hier nachgebildete Apps-Script-Schreibweg ist entfallen – es gibt ihn
-// nicht mehr. Uebrig bleibt am Apps Script nur der Import-Ausloeser.
-const blaetter = { 'Laufplan': planBlatt, 'Laufplaene': lpPlaene, 'Laufplan-Einheiten': lpEinheiten };
-window.__schreibvorgaenge = 0;
-
-// 'Blattname'!A2 oder 'Blatt-Name'!A5:G12 → { blatt, zeile, letzteZeile }
-function bereichLesen(txt) {
-  const m = decodeURIComponent(txt).match(/^'?(.+?)'?!([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
-  if (!m) return null;
-  return { blatt: m[1].replace(/''/g, "'"), zeile: parseInt(m[3]), letzteZeile: m[5] ? parseInt(m[5]) : null };
-}
 
 window.fetch = (url, opt = {}) => {
   const u = String(url);
@@ -283,39 +240,11 @@ window.fetch = (url, opt = {}) => {
     const dec = decodeURIComponent(u);
 
     // Blattnamen
-    if (u.includes('?fields=sheets')) { window.__anfragen.meta++; return ok({ sheets: isWorkout
-      ? [{properties:{title:'Data'}}].concat(Object.keys(blaetter).map(t => ({properties:{title:t}})))
-      : [{ properties:{ title:'Data' } }] }); }
-
-    // Schreiben: Werte setzen (PUT), Bereich leeren (POST :clear), Blatt anlegen (batchUpdate)
-    if (methode === 'PUT' && dec.includes('/values/')) {
-      window.__anfragen.schreiben++; window.__schreibvorgaenge++;
-      const b = bereichLesen(dec.split('/values/')[1].split('?')[0]);
-      const ziel = b && blaetter[b.blatt];
-      if (!ziel) return ok({});
-      const werte = JSON.parse(opt.body).values;
-      werte.forEach((r, i) => { ziel[b.zeile - 1 + i] = r.map(v => v == null ? '' : String(v)); });
-      return ok({ updatedRows: werte.length });
-    }
-    if (methode === 'POST' && dec.includes(':clear')) {
-      window.__anfragen.schreiben++; window.__schreibvorgaenge++;
-      const b = bereichLesen(dec.split('/values/')[1].replace(/:clear.*$/, ''));
-      const ziel = b && blaetter[b.blatt];
-      if (ziel) ziel.splice(b.zeile - 1, (b.letzteZeile || b.zeile) - b.zeile + 1);
-      return ok({});
-    }
-    if (methode === 'POST' && dec.includes(':batchUpdate')) {
-      window.__anfragen.schreiben++;
-      const reqs = JSON.parse(opt.body).requests || [];
-      reqs.forEach(r => { const t = r.addSheet && r.addSheet.properties.title;
-        if (t && !blaetter[t]) blaetter[t] = []; });
-      return ok({});
-    }
+    if (u.includes('?fields=sheets')) { window.__anfragen.meta++;
+      return ok({ sheets: [{ properties:{ title:'Data' } }] }); }
 
     // Lesen
     window.__anfragen.werte++;
-    const blattName = (dec.split('/values/')[1] || '').split('?')[0];
-    if (blaetter[blattName]) return ok({ values: blaetter[blattName] });
     if (isWorkout && SC === 'woerror') return Promise.reject(
       new Error('Simulierter Netzwerkfehler <img src=x onerror="window.__pwned=1">'));
     return ok({ values: isWorkout ? workout : health });
@@ -324,10 +253,7 @@ window.fetch = (url, opt = {}) => {
 };
 // Rohdaten offenlegen, damit sich im Test nachweisen laesst, aus WELCHEM Sheet ein
 // angezeigter Wert stammt (die App selbst ist eine IIFE und gibt nichts preis).
-// __lpPlaene/__lpEinheiten/__planBlatt sind zugleich das SCHREIB-Ziel: was dort nach
-// einer Eingabe steht, ist das, was im echten Sheet stuende.
 window.__health = health; window.__workout = workout;
-window.__lpPlaene = lpPlaene; window.__lpEinheiten = lpEinheiten; window.__planBlatt = planBlatt;
 console.log('[Prüfstand] Szenario:', SC, '· Health-Zeilen:', health.length-1, '· Workouts:', workout.length-1);
 </script>
 <script src="/app.js"></script>
