@@ -1310,7 +1310,10 @@ function _computePatternInsights() {
   }
 
   // Insight 4: Training → HRV am Folgetag
-  const trainDates = new Set(allData.filter(r=>r.runSpeed!=null).map(r=>r.date));
+  // Trainingstage aus dem Workout-Sheet – dieselbe Regel wie ueberall sonst in der App.
+  // Frueher stand hier `r.runSpeed != null`, also ein Feld des Health-Sheets: Indoor-
+  // Laeufe ohne GPS fehlten dadurch, obwohl sie als Training erfasst waren.
+  const trainDates = new Set(Object.keys(workoutData).filter(d=>workoutData[d]?.durationMin>0));
   if (trainDates.size >= 5) {
     const afterTrain=[], afterRest=[];
     allData.forEach(r => {
@@ -2272,8 +2275,7 @@ async function pgTraining() {
   ];
 
   // ── Trainingstage im aktuellen Filterzeitraum ──
-  // Quelle ist ausschließlich das Workout-Sheet (workoutData). Tage mit runSpeed
-  // in Health-CSV, die NICHT im Workout-Sheet stehen, zählen nicht mehr als Training.
+  // Quelle ist ausschließlich das Workout-Sheet (workoutData).
   const _healthDates=new Set(D.map(r=>r.date));
   const trainDates=Object.keys(workoutData).filter(d=>_healthDates.has(d)).sort();
   // Workout rows for current period (with HR data)
@@ -2291,15 +2293,11 @@ async function pgTraining() {
   // minField removed – durationMin comes exclusively from Workout Data sheet (workoutData)
 
   // New chart data — durationMin + distanceKm from CSV workout files
-  // Pace vorrangig aus runSpeed (Health-Sheet, GPS-gemessen). Fehlt der Wert, springt
-  // die Geschwindigkeit aus dem Workout-Sheet ein – bei Indoor-Läufen gibt es kein GPS,
-  // dort schätzt die Uhr über die Armbewegung. Ohne diesen Rückgriff fehlte für jeden
-  // Lauf auf dem Laufband der Punkt im Diagramm, obwohl der Trainingstag selbst
-  // (aus dem Workout-Sheet) korrekt erkannt wurde.
+  // Pace ausschliesslich aus `Speed (km/h)` des Workout-Sheets (Wunsch 05.09.2026).
+  // Damit stammen Strecke UND Pace aus derselben Messung – vorher kam die Strecke aus
+  // dem Workout-Sheet, die Pace aber aus `runSpeed` des Health-Sheets.
   const trendPace=trendDates.map(d=>{
-    const row=D.find(r=>r.date===d);
-    const kmh = row?.runSpeed>0 ? row.runSpeed
-              : (workoutData[d]?.avgSpeedKph>0 ? workoutData[d].avgSpeedKph : null);
+    const kmh = workoutData[d]?.avgSpeedKph>0 ? workoutData[d].avgSpeedKph : null;
     return kmh!=null ? Math.round(paceFromSpeed(kmh)*100)/100 : null;
   });
   // Werktags / Wochenende splits for new chart footers
@@ -2327,11 +2325,11 @@ async function pgTraining() {
   const {labels:tL,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
-  // NOTE: _woByDate was removed — it filtered to runSpeed-dates only, excluding indoor workouts
+  // NOTE: _woByDate was removed — es filterte auf Health-Sheet-Tage und liess Indoor-Workouts aus
   const woRows=D.map(r=>({date:r.date,_woDurMin:workoutData[r.date]?.durationMin??null,_woDistKm:workoutData[r.date]?.distanceKm??null,
     _woHR:workoutData[r.date]?.avgHR??null,
-    // Pace mit demselben Rueckgriff wie im Pace-Diagramm: erst GPS, dann Uhr.
-    _woPace:(()=>{const kmh=r.runSpeed>0?r.runSpeed:(workoutData[r.date]?.avgSpeedKph>0?workoutData[r.date].avgSpeedKph:null);
+    // Pace aus derselben Quelle wie im Pace-Diagramm: Workout-Sheet.
+    _woPace:(()=>{const kmh=workoutData[r.date]?.avgSpeedKph>0?workoutData[r.date].avgSpeedKph:null;
       return kmh!=null?paceFromSpeed(kmh):null;})(),
     // Zaehlt die Trainings je Zeitraum – gebraucht fuer "Oe pro Training".
     _woAnzahl:workoutData[r.date]?1:null}));
@@ -2364,8 +2362,8 @@ async function pgTraining() {
     _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
     _1mHRData=_moDays.map(d=>workoutData[d]?.avgHR??null);
-    _1mPaceData=_moDays.map(d=>{const row=_bd[d];
-      const kmh=row?.runSpeed>0?row.runSpeed:(workoutData[d]?.avgSpeedKph>0?workoutData[d].avgSpeedKph:null);
+    _1mPaceData=_moDays.map(d=>{
+      const kmh=workoutData[d]?.avgSpeedKph>0?workoutData[d].avgSpeedKph:null;
       return kmh!=null?paceFromSpeed(kmh):null;});
   }
 

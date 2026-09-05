@@ -464,11 +464,27 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Fusszeilen:** `Total` überspringt Puls und Pace (`summierbar:false`) und entfällt
   ganz, wenn keine summierbare Reihe aktiv ist; die Ø-Zeilen zeigen alle aktiven
   Reihen, getrennt durch `|`.
-- **Training-Tab-Daten:** ausschließlich `workoutData`; Ausnahmen: Pace-Chart primär aus
-  `runSpeed` mit Rückgriff auf `workoutData[d].avgSpeedKph`, VO₂max-Sektion (zuunterst)
-  aus `r.vo2max`. Der Rückgriff ist nötig, weil `runSpeed` GPS-gestützt ist und bei
-  Indoor-Läufen fehlt — ohne ihn blieb dort jeder Punkt leer, obwohl der Trainingstag
-  selbst (aus dem Workout-Sheet) erkannt wurde.
+- **Training-Tab-Daten:** ausschließlich `workoutData`; einzige Ausnahme ist die
+  VO₂max-Sektion (zuunterst) aus `r.vo2max`. **Auch die Pace** kommt seit 05.09.2026 nur
+  noch aus `Speed (km/h)` des Workout-Sheets — vorher zuerst aus `runSpeed` des
+  Health-Sheets mit Rückgriff auf die Workout-Geschwindigkeit. Damit stammen Strecke
+  UND Pace aus derselben Messung; `runSpeed` ist aus dem Health-Sheet entfallen.
+- **Welche Spalten die App wirklich liest** (Stand 05.09.2026 — beide Sheets wurden auf
+  genau diese gekürzt):
+  **Health Dashboard Data (12):** `date`, `steps`, `restHR`, `hrv`, `sleepTotal`,
+  `sleepCore`, `sleepRem`, `sleepDeep`, `sleepAwake`, `vo2max`, `sleepStart`, `sleepEnd`.
+  `sleepScore` liest die App zwar, das Apps Script schreibt es aber nicht — die
+  Score-Kachel bleibt deshalb leer, bis die Spalte jemand befüllt.
+  **Workout Data (6):** `Date`, `Type`, `Duration (min)`, `Distance (km)`, `Avg HR`,
+  `Speed (km/h)`. `Type` wird derzeit nirgends angezeigt, bleibt aber: es ist die
+  einzige Angabe, die eine Einheit benennt.
+  **Beide Importe schreiben POSITIONSBASIERT** ab Spalte A und die Kopfzeile nur, wenn
+  das Blatt leer ist. Wer `COLUMNS` oder `WORKOUT_SPALTEN` ändert, MUSS die bestehenden
+  Zeilen mitziehen — sonst stehen alte Werte unter neuen Überschriften und die App liest
+  sie falsch. Dafür gibt es `migriereSpalten()` in `Maintenance.gs` (legt zuerst eine
+  Sicherung an, ordnet nach Spaltennamen um, liest zur Kontrolle zurück; mehrfach
+  ausführbar). Beide `getOrCreateSheet`-Wege prüfen die Kopfzeile jetzt und **brechen
+  mit einer Meldung ab**, statt still zu verschieben.
 
 - **App-Version:** `versionAnzeigen()` liest die laufende Version aus den Namen der
   Caches (`hcc-vNN`) — `sw.js` löscht beim Aktivieren alle fremden, es bleibt genau

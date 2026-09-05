@@ -194,29 +194,8 @@ function parseDay(date, metrics) {
     var pts = m.data || [];
     switch (m.name) {
       case 'step_count':                       d.steps         = Math.round(S(pts));         break;
-      case 'walking_running_distance':         d.distKm        = R1(S(pts));                 break;
-      case 'active_energy':                    d.activeCal     = Math.round(S(pts) / 4.184); break;
-      case 'basal_energy_burned':              d.basalCal      = Math.round(S(pts) / 4.184); break;
-      case 'heart_rate':
-        if (pts.length) {
-          var hrAvg = pts[0].Avg, hrMin = pts[0].Min, hrMax = pts[0].Max;
-          if (!hrAvg) {
-            var vals = pts.map(function(p){ return p.qty||0; }).filter(function(v){ return v>0; });
-            if (vals.length) {
-              hrAvg = vals.reduce(function(a,b){ return a+b; },0) / vals.length;
-              hrMin = Math.min.apply(null, vals);
-              hrMax = Math.max.apply(null, vals);
-            }
-          }
-          d.hrAvg = Math.round(hrAvg||0);
-          d.hrMin = Math.round(hrMin||0);
-          d.hrMax = Math.round(hrMax||0);
-        }
-        break;
       case 'resting_heart_rate':               d.restHR        = Math.round(A(pts));         break;
       case 'heart_rate_variability':           d.hrv           = Math.round(A(pts));         break;
-      case 'blood_oxygen_saturation':          d.spo2          = R1(A(pts));                 break;
-      case 'respiratory_rate':                 d.respRate      = R1(A(pts));                 break;
       case 'sleep_analysis':
         if (pts[0]) {
           var s        = pts[0];
@@ -230,18 +209,15 @@ function parseDay(date, metrics) {
         }
         break;
       case 'vo2_max':                          d.vo2max        = R1(A(pts));                 break;
-      case 'apple_exercise_time':              d.exerciseMin   = Math.round(S(pts));         break;
-      case 'apple_stand_time':                 d.standMin      = Math.round(S(pts));         break;
-      case 'apple_stand_hour':                 d.standHours    = Math.round(S(pts));         break;
-      case 'flights_climbed':                  d.flights       = Math.round(S(pts));         break;
-      case 'time_in_daylight':                 d.daylight      = Math.round(S(pts));         break;
-      case 'apple_sleeping_wrist_temperature': d.wristTemp     = R1(A(pts));                 break;
-      case 'breathing_disturbances':           d.breathDisturb = R1(A(pts));                 break;
-      case 'running_speed':      if (pts.length) d.runSpeed    = R1(A(pts));                 break;
-      case 'running_power':      if (pts.length) d.runPower    = Math.round(A(pts));         break;
-      case 'walking_speed':                    d.walkSpeed     = R1(A(pts));                 break;
-      case 'physical_effort':                  d.physEffort    = R1(A(pts));                 break;
-      case 'walking_heart_rate_average':       d.walkHR        = Math.round(A(pts));         break;
+      // Bewusst NICHT mehr ausgewertet (05.09.2026), weil das Dashboard sie nirgends
+      // zeigt: walking_running_distance, active_energy, basal_energy_burned, heart_rate
+      // (hrAvg/Min/Max), blood_oxygen_saturation, respiratory_rate, apple_exercise_time,
+      // apple_stand_time, apple_stand_hour, flights_climbed, time_in_daylight,
+      // apple_sleeping_wrist_temperature, breathing_disturbances, running_speed,
+      // running_power, walking_speed, physical_effort, walking_heart_rate_average.
+      // Die Rohdaten liegen weiterhin vollstaendig in Drive — wer eine davon wieder
+      // braucht, ergaenzt hier den Fall UND den Spaltennamen in COLUMNS (dann
+      // migriereSpalten() erneut laufen lassen).
     }
   });
   return d;
@@ -264,14 +240,17 @@ function R1(v) { return Math.round(v * 10) / 10; }
 // ================================================================
 
 var SHEET_NAME = 'Health Dashboard Data';
+// Nur noch die Spalten, die das Dashboard tatsaechlich liest (05.09.2026).
+// Vorher standen hier 32; 20 davon wurden geschrieben und nie ausgewertet — sie
+// blaehten jeden Abruf der App um rund zwei Drittel auf.
+// ACHTUNG beim Aendern dieser Liste: `upsertDay` schreibt POSITIONSBASIERT ab Spalte A.
+// Wer hier etwas einfuegt, entfernt oder umstellt, muss die bestehenden Zeilen
+// mitziehen — sonst stehen alte Werte unter neuen Ueberschriften. Dafuer gibt es
+// `migriereSpalten()` in Maintenance.gs.
 var COLUMNS = [
-  'date','steps','distKm','activeCal','basalCal',
-  'hrAvg','hrMin','hrMax','restHR','hrv','spo2','respRate',
+  'date','steps','restHR','hrv',
   'sleepTotal','sleepCore','sleepRem','sleepDeep','sleepAwake',
-  'vo2max','exerciseMin','standMin','standHours','flights',
-  'daylight','wristTemp','breathDisturb','runSpeed','runPower',
-  'walkSpeed','physEffort','walkHR',
-  'sleepStart','sleepEnd'
+  'vo2max','sleepStart','sleepEnd'
 ];
 
 function getHealthFolder() {
@@ -354,7 +333,20 @@ function getOrCreateSheet() {
     Logger.log('✅ Sheet-ID gespeichert: ' + ss.getId());
   }
   var sheet = ss.getActiveSheet();
-  if (sheet.getLastRow() === 0) sheet.appendRow(COLUMNS);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(COLUMNS);
+  } else {
+    // Kopfzeile gegenpruefen. Steht dort etwas anderes als COLUMNS, schreibt upsertDay
+    // seine Werte unter falsche Ueberschriften — der Fehler faellt erst im Dashboard
+    // auf, wenn Zahlen in der falschen Spalte landen. Lieber hier laut abbrechen.
+    var ist = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+                   .map(function(v) { return String(v).trim(); });
+    var passt = ist.length === COLUMNS.length && COLUMNS.every(function(c, i) { return ist[i] === c; });
+    if (!passt) {
+      throw new Error('Kopfzeile passt nicht zu COLUMNS (' + ist.length + ' statt '
+        + COLUMNS.length + ' Spalten). Erst migriereSpalten() in Maintenance.gs ausfuehren.');
+    }
+  }
   return { ss: ss, sheet: sheet };
 }
 
@@ -446,6 +438,16 @@ function writeToSheet() {
 // WORKOUT DATA IMPORT
 // ================================================================
 
+// Spalten des Workout-Sheets — nur noch die, die das Dashboard liest (05.09.2026).
+// Entfallen: 'Max HR', 'Elevation (m)', 'Energy (kJ)', 'Cadence', 'Steps'.
+// 'Type' bleibt, obwohl es derzeit nirgends angezeigt wird: Es ist die einzige Angabe,
+// die eine Einheit ueberhaupt benennt — ohne sie liesse sich ein Lauf nicht von einer
+// Radfahrt unterscheiden.
+// Wie bei COLUMNS gilt: positionsbasiert geschrieben. Aenderungen brauchen
+// migriereSpalten() in Maintenance.gs.
+var WORKOUT_SPALTEN = [
+  'Date', 'Type', 'Duration (min)', 'Distance (km)', 'Avg HR', 'Speed (km/h)'
+];
 var WORKOUT_FOLDER_ID    = '11ZJtwDCrV_UNofOMTi1VUeWnltONSgQI';
 var WORKOUT_SHEET_TITLE  = 'Workout Data';
 var WORKOUT_DAYS_TO_REFRESH = 30;
@@ -558,11 +560,7 @@ function makeGetters(hdrs, vals) {
 }
 
 function importWorkoutData() {
-  var HEADERS = [
-    'Date', 'Type', 'Duration (min)', 'Distance (km)',
-    'Avg HR', 'Max HR', 'Speed (km/h)', 'Elevation (m)',
-    'Energy (kJ)', 'Cadence', 'Steps'
-  ];
+  var HEADERS = WORKOUT_SPALTEN;
   var ss, sheet;
   var existing = DriveApp.getFilesByName(WORKOUT_SHEET_TITLE);
   if (existing.hasNext()) {
@@ -575,6 +573,18 @@ function importWorkoutData() {
   sheet = ss.getSheets()[0];
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  } else {
+    // Wie im Health-Sheet: passt die Kopfzeile nicht, landen Werte unter falschen
+    // Ueberschriften. Lieber abbrechen als still verschieben.
+    var istKopf = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+                       .map(function(v) { return String(v).trim(); });
+    var kopfPasst = istKopf.length === HEADERS.length
+      && HEADERS.every(function(c, i) { return istKopf[i] === c; });
+    if (!kopfPasst) {
+      throw new Error('Workout-Kopfzeile passt nicht zu WORKOUT_SPALTEN ('
+        + istKopf.length + ' statt ' + HEADERS.length
+        + ' Spalten). Erst migriereSpalten() in Maintenance.gs ausfuehren.');
+    }
   }
   // Bestehende Zeilen einlesen. Anders als beim Health-Sheet darf hier NICHT pro Datum
   // auf eine Zeile zusammengefasst werden – zwei Einheiten am selben Tag sind legitim.
@@ -627,18 +637,14 @@ function importWorkoutData() {
       if (!parsed) continue;
       var g = makeGetters(parsed.hdrs, parsed.vals);
       var durationMin = parseDurationStr(g.getRaw('Duration'));
+      // Reihenfolge MUSS WORKOUT_SPALTEN entsprechen – hier wird positionsbasiert gebaut.
       rows.push([
         date,
         (g.getRaw('Type') || '').trim(),
         durationMin !== null ? Math.round(durationMin * 100) / 100 : null,
         g.getN('Distance', 'Distanz', 'Dist'),
         g.getN('Avg Heart', 'Avg HR'),
-        g.getN('Max Heart', 'Max HR'),
-        g.getN('Speed'),
-        g.getN('Elevation Ascend'),
-        g.getN('Active Energy'),
-        g.getN('Cadence'),
-        g.getN('Step Count', 'Steps')
+        g.getN('Speed')
       ]);
     } catch (e) {
       Logger.log('Fehler bei Datei ' + name + ': ' + e.message);

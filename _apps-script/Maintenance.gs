@@ -86,70 +86,10 @@ function writeToSheetBatch() {
 }
 
 // ── Fehlende HR-Werte im Sheet aus den JSON-Dateien nachladen ─
-function fixHRValues() {
-  var BATCH = 40;
-  var props = PropertiesService.getScriptProperties();
-  var startRow = parseInt(props.getProperty('fix_hr_last_row') || '2');
-  var r = getOrCreateSheet();
-  var sheet = r.sheet;
-  var lastRow = sheet.getLastRow();
-  if (startRow > lastRow) {
-    Logger.log('🎉 Fertig! Alle HR-Werte wurden geprüft.');
-    props.deleteProperty('fix_hr_last_row');
-    return;
-  }
-  var folder = getHealthFolder();
-  var hrAvgCol = COLUMNS.indexOf('hrAvg') + 1;
-  var hrMinCol = COLUMNS.indexOf('hrMin') + 1;
-  var hrMaxCol = COLUMNS.indexOf('hrMax') + 1;
-  var endRow = Math.min(startRow + BATCH - 1, lastRow);
-  var numRows = endRow - startRow + 1;
-  var batchData = sheet.getRange(startRow, 1, numRows, COLUMNS.length).getValues();
-  var fixed = 0;
-  for (var i = 0; i < batchData.length; i++) {
-    var row = batchData[i];
-    var hrAvg = row[COLUMNS.indexOf('hrAvg')];
-    if (hrAvg !== 0 && hrAvg !== '') continue;
-    var dateVal = row[0];
-    var dateStr = (dateVal instanceof Date)
-      ? Utilities.formatDate(dateVal, Session.getScriptTimeZone(), 'yyyy-MM-dd')
-      : String(dateVal);
-    if (!dateStr || dateStr.length < 10) continue;
-    var found = folder.getFilesByName('HealthAutoExport-' + dateStr + '.json');
-    if (!found.hasNext()) continue;
-    try {
-      var raw = JSON.parse(found.next().getBlob().getDataAsString());
-      var hrMetric = null;
-      for (var j = 0; j < raw.data.metrics.length; j++) {
-        if (raw.data.metrics[j].name === 'heart_rate') { hrMetric = raw.data.metrics[j]; break; }
-      }
-      if (!hrMetric || !hrMetric.data || !hrMetric.data.length) continue;
-      var pts = hrMetric.data;
-      var avg = pts[0].Avg, mn = pts[0].Min, mx = pts[0].Max;
-      if (!avg) {
-        var vals = pts.map(function(p){ return p.qty||0; }).filter(function(v){ return v>0; });
-        if (vals.length) {
-          avg = vals.reduce(function(a,b){ return a+b; },0)/vals.length;
-          mn = Math.min.apply(null,vals);
-          mx = Math.max.apply(null,vals);
-        }
-      }
-      var sheetRow = startRow + i;
-      sheet.getRange(sheetRow, hrAvgCol).setValue(Math.round(avg||0));
-      sheet.getRange(sheetRow, hrMinCol).setValue(Math.round(mn||0));
-      sheet.getRange(sheetRow, hrMaxCol).setValue(Math.round(mx||0));
-      fixed++;
-    } catch(e) { Logger.log('Fehler ' + dateStr + ': ' + e); }
-  }
-  props.setProperty('fix_hr_last_row', String(endRow + 1));
-  var remaining = lastRow - endRow;
-  if (remaining > 0) {
-    Logger.log('✅ ' + fixed + ' Zeilen korrigiert. Noch ~' + remaining + ' übrig → fixHRValues() erneut ausführen!');
-  } else {
-    Logger.log('🎉 Fertig! ' + fixed + ' HR-Einträge korrigiert.');
-    props.deleteProperty('fix_hr_last_row');
-  }
-}
+// Hinweis: `fixHRValues()` ist entfallen (05.09.2026). Es reparierte die Spalten
+// hrAvg/hrMin/hrMax, die es seit der Spaltenkuerzung nicht mehr gibt — der Aufruf
+// waere in einen Fehler gelaufen (COLUMNS.indexOf('hrAvg') + 1 ergibt 0, und
+// getRange(zeile, 0) bricht ab).
 
 // ── Sheet sortieren, Datums-Strings vereinheitlichen, Duplikate raus ──
 function cleanSheet() {
@@ -253,13 +193,25 @@ function restoreFromBackup() {
   var backupSheet = SpreadsheetApp.open(backupFiles.next()).getActiveSheet();
   var lastRow = backupSheet.getLastRow();
   if (lastRow < 2) { Logger.log('❌ Backup ist leer.'); return; }
-  var data = backupSheet.getRange(2, 1, lastRow - 1, COLUMNS.length - 2).getValues();
+  // Diese Sicherung stammt aus der Zeit der 32-Spalten-Fassung; die Zeilen
+  // positionsbasiert in das gekuerzte Blatt zu schreiben, wuerde die Werte unter
+  // falsche Ueberschriften legen. Wer sie wirklich zurueckholen will, laesst sie
+  // erst durch _spaltenUmbau() laufen.
+  var backupKopf = backupSheet.getRange(1, 1, 1, backupSheet.getLastColumn()).getValues()[0]
+                              .map(function (v) { return String(v).trim(); });
+  var passt = backupKopf.length === COLUMNS.length
+    && COLUMNS.every(function (c, i) { return backupKopf[i] === c; });
+  if (!passt) {
+    throw new Error('Backup hat ' + backupKopf.length + ' Spalten, das Blatt erwartet '
+      + COLUMNS.length + '. Positionsbasiertes Zurueckschreiben wuerde die Werte '
+      + 'verschieben — Sicherung zuerst mit _spaltenUmbau() umstellen.');
+  }
+  var data = backupSheet.getRange(2, 1, lastRow - 1, COLUMNS.length).getValues();
   var r = getOrCreateSheet();
   var sheet = r.sheet;
   var curLast = sheet.getLastRow();
   if (curLast > 1) sheet.getRange(2, 1, curLast - 1, COLUMNS.length).clearContent();
-  sheet.getRange(2, 1, data.length, COLUMNS.length - 2).setValues(data);
-  PropertiesService.getScriptProperties().deleteProperty('fix_hr_last_row');
+  sheet.getRange(2, 1, data.length, COLUMNS.length).setValues(data);
   PropertiesService.getScriptProperties().deleteProperty('fix_sleep_last_row');
   Logger.log('✅ Wiederhergestellt: ' + data.length + ' Tage aus Backup.');
 }
@@ -287,4 +239,86 @@ function getWorkoutData() {
     });
     return obj;
   });
+}
+
+// ════════════════════════════════════════════════════════════════
+// EINMALIGE UMSCHICHTUNG AUF DIE GEKUERZTEN SPALTENLISTEN (05.09.2026)
+// ════════════════════════════════════════════════════════════════
+// Warum das noetig ist: Beide Importe schreiben ihre Zeilen POSITIONSBASIERT ab
+// Spalte A und die Kopfzeile nur, wenn das Blatt leer ist. Kuerzt man COLUMNS bzw.
+// WORKOUT_SPALTEN einfach, stehen die neuen Werte unter den alten Ueberschriften —
+// das Dashboard liest nach Namen und faende dann z. B. den Ruhepuls unter 'distKm'.
+//
+// Diese Funktion baut deshalb beide Blaetter einmalig um: Sicherung anlegen, Zeilen
+// NACH SPALTENNAMEN in die neue Reihenfolge bringen, zurueckschreiben, gegenlesen.
+// Danach nicht mehr noetig — ausser die Spaltenlisten aendern sich erneut.
+//
+// AUSFUEHREN: einmal von Hand im Editor. Das Protokoll sagt, was passiert ist.
+function migriereSpalten() {
+  var zeilen = [];
+  zeilen.push(_spaltenUmbau(getOrCreateSheet().sheet, COLUMNS, 'Health Dashboard Data'));
+  zeilen.push(_spaltenUmbau(_workoutBlatt(), WORKOUT_SPALTEN, 'Workout Data'));
+  var text = zeilen.join('\n\n');
+  Logger.log(text);
+  return text;
+}
+
+// Das Workout-Blatt finden, ohne den Import anzustossen.
+function _workoutBlatt() {
+  var dateien = DriveApp.getFilesByName(WORKOUT_SHEET_TITLE);
+  if (!dateien.hasNext()) throw new Error('Workout-Sheet nicht gefunden: ' + WORKOUT_SHEET_TITLE);
+  return SpreadsheetApp.open(dateien.next()).getSheets()[0];
+}
+
+function _spaltenUmbau(blatt, neueSpalten, name) {
+  var alle = blatt.getDataRange().getValues();
+  if (!alle.length) return name + ': leer, nichts zu tun.';
+
+  var altKopf = alle[0].map(function (v) { return String(v).trim(); });
+
+  // Schon umgestellt? Dann nichts anfassen — die Funktion ist damit gefahrlos
+  // mehrfach ausfuehrbar.
+  var schonFertig = altKopf.length === neueSpalten.length
+    && neueSpalten.every(function (c, i) { return altKopf[i] === c; });
+  if (schonFertig) return name + ': bereits im neuen Layout (' + (alle.length - 1) + ' Zeilen), nichts geaendert.';
+
+  // Jede gewuenschte Spalte in der ALTEN Kopfzeile suchen. Fehlt eine, bleibt sie leer –
+  // das ist kein Fehler (eine Spalte kann spaeter dazugekommen sein).
+  var quelle = neueSpalten.map(function (c) { return altKopf.indexOf(c); });
+  var fehlend = neueSpalten.filter(function (c, i) { return quelle[i] < 0; });
+
+  var daten = alle.slice(1);
+  var neu = daten.map(function (r) {
+    return quelle.map(function (i) { return i >= 0 ? r[i] : ''; });
+  });
+
+  // 1. Sicherung ANLEGEN, bevor irgendetwas geschrieben wird.
+  var stempel = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  var sicherung = blatt.copyTo(blatt.getParent()).setName('Backup ' + stempel);
+
+  // 2. Blatt leeren und im neuen Layout neu schreiben.
+  blatt.clear();
+  blatt.getRange(1, 1, 1, neueSpalten.length).setValues([neueSpalten]);
+  if (neu.length) {
+    var benoetigt = neu.length + 1;
+    if (benoetigt > blatt.getMaxRows()) blatt.insertRowsAfter(blatt.getMaxRows(), benoetigt - blatt.getMaxRows());
+    blatt.getRange(2, 1, neu.length, neueSpalten.length).setValues(neu);
+  }
+  blatt.setFrozenRows(1);
+
+  // 3. GEGENLESEN: das tatsaechlich Geschriebene mit dem Erwarteten vergleichen.
+  //    Ohne diesen Schritt waere nur belegt, dass der Aufruf nicht abgebrochen ist.
+  var kontrolle = blatt.getDataRange().getValues();
+  var abweichungen = 0;
+  for (var z = 0; z < neu.length; z++) {
+    for (var sp = 0; sp < neueSpalten.length; sp++) {
+      if (String(kontrolle[z + 1][sp]) !== String(neu[z][sp])) abweichungen++;
+    }
+  }
+
+  return name + ': ' + altKopf.length + ' → ' + neueSpalten.length + ' Spalten, '
+    + neu.length + ' Zeilen umgestellt.'
+    + (fehlend.length ? ' In der alten Kopfzeile fehlten: ' + fehlend.join(', ') + ' (leer gelassen).' : '')
+    + ' Gegenprobe: ' + (abweichungen === 0 ? 'alle Werte stimmen.' : abweichungen + ' ABWEICHUNGEN!')
+    + ' Sicherung: "' + sicherung.getName() + '".';
 }

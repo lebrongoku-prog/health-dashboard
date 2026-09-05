@@ -139,15 +139,17 @@ function rnd(){ _seed = (_seed*1103515245 + 12345) & 0x7fffffff; return _seed / 
 
 const N_DAYS = 120;
 const endOffset = SC === 'stale' ? 3 : 0;
-const health = [['date','sleepTotal','restHR','hrv','steps','activeCal','vo2max','sleepDeep','sleepRem','sleepCore','sleepAwake','sleepScore','runSpeed','distKm','sleepStart','sleepEnd']];
-const workout = [['Date','Type','Duration (min)','Distance (km)','Avg HR','Max HR','Speed (km/h)','Elevation (m)','Energy (kJ)']];
+// Spalten wie im echten Sheet NACH der Kuerzung vom 05.09.2026 – der Pruefstand soll
+// zeigen, was die App tatsaechlich vorfindet, nicht mehr.
+const health = [['date','steps','restHR','hrv','sleepTotal','sleepCore','sleepRem','sleepDeep','sleepAwake','vo2max','sleepScore','sleepStart','sleepEnd']];
+const workout = [['Date','Type','Duration (min)','Distance (km)','Avg HR','Speed (km/h)']];
 
 for (let i = N_DAYS - 1; i >= endOffset; i--) {
   const d = new Date(); d.setDate(d.getDate() - i);
   const ds = ymd(d);
   const dow = d.getDay();
   const isLast = (i === endOffset);
-  if (isLast && SC === 'nodata') { health.push([ds,'','','','','','','','','','','','','','','']); continue; }
+  if (isLast && SC === 'nodata') { health.push([ds,'','','','','','','','','','','','']); continue; }
 
   const sleep = 6.4 + rnd()*2.2 + (dow===0||dow===6 ? 0.5 : 0);
   const deep = sleep*0.17, rem = sleep*0.22, core = sleep*0.55, awake = sleep*0.06;
@@ -156,28 +158,25 @@ for (let i = N_DAYS - 1; i >= endOffset; i--) {
   const steps = Math.round(4200 + rnd()*9000);
   const train = rnd() < 0.4;
   health.push([
-    ds, sleep.toFixed(2), restHR.toFixed(1), hrv.toFixed(1), steps,
-    Math.round(320 + rnd()*600), (44 + i*0.01 + rnd()*0.6).toFixed(1),
-    deep.toFixed(2), rem.toFixed(2), core.toFixed(2), awake.toFixed(2),
+    ds, steps, restHR.toFixed(1), hrv.toFixed(1),
+    sleep.toFixed(2), core.toFixed(2), rem.toFixed(2), deep.toFixed(2), awake.toFixed(2),
+    (44 + i*0.01 + rnd()*0.6).toFixed(1),
     Math.round(62 + rnd()*33),
-    train ? (9.5 + rnd()*3).toFixed(2) : '',
-    train ? (4 + rnd()*8).toFixed(2) : '',
     ds + ' 23:' + String(Math.floor(rnd()*59)).padStart(2,'0'),
     ds + ' 07:' + String(Math.floor(rnd()*59)).padStart(2,'0')
   ]);
-  // Jeder vierte Lauf ist ein Indoor-Lauf: die Uhr misst dort keine GPS-Geschwindigkeit,
-  // im Health-Sheet bleibt runSpeed leer. Das Workout-Sheet liefert trotzdem eine
-  // geschaetzte Speed. Genau der Fall, in dem die Pace frueher fehlte.
+  // Jeder vierte Lauf ist ein Indoor-Lauf. Frueher fehlte dort die GPS-Geschwindigkeit
+  // im Health-Sheet und die Pace blieb leer; seit die Pace ausschliesslich aus
+  // `Speed (km/h)` des Workout-Sheets kommt, ist der Fall unauffaellig – der Szenario
+  // bleibt trotzdem, weil er die Trainingsart-Erkennung abdeckt.
   const indoor = train && rnd() < 0.25;
-  if (indoor) health[health.length-1][12] = '';
   if (train) {
     const speed = 9.5 + rnd()*3, dur = 28 + rnd()*55;
     // Bezeichnungen wie sie Apple/Health Auto Export tatsächlich liefert – inklusive
     // der eigenwilligen Übersetzungen, an denen die frühere exakte Namensliste scheiterte.
     workout.push([ds, indoor ? 'Innenräume Ausführen'
       : ['Outdoor Ausführen','Hochintensives Intervalltraining','Trail-Laufen'][Math.floor(rnd()*3)],
-      dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30),
-      Math.round(165+rnd()*20), speed.toFixed(2), Math.round(rnd()*260), Math.round(1200+rnd()*1600)]);
+      dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30), speed.toFixed(2)]);
   }
 }
 
@@ -191,16 +190,16 @@ if (SC === 'inject') {
   // 2) Zeile mit unsinnigem Datum im Health-Sheet – muss verworfen werden
   health.push([payload, '7.5', '55', '60', '9000', '400', '45', '1.2', '1.6', '4.1', '0.4', '80', '', '', '', '']);
   // 3) Datumsspalte mit Text statt Datum
-  health.push(['kein Datum', '7.0', '58', '55', '8000', '380', '45', '', '', '', '', '', '', '', '', '']);
+  health.push(['kein Datum', '8000', '58', '55', '7.0', '', '', '', '', '45', '', '', '']);
 }
 
-// Ein Tag, an dem beide Sheets die Strecke fuehren – mit klar verschiedenen Zahlen.
-// Dashboard Data muss gewinnen (Strecke, Pace), Workout Data die uebrigen Werte liefern.
+// Ein Tag mit eindeutigen Werten im Workout-Sheet. Seit dem 05.09.2026 ist es die
+// EINZIGE Quelle fuer Strecke und Pace – das Health-Sheet fuehrt beide gar nicht mehr.
+// Der Fall belegt, dass genau diese Zahlen im Training-Tab erscheinen:
+// 3.33 km, 44 min, 145 bpm und eine Pace von 60/6.00 = 10'00".
 if (SC === 'quellen') {
   const ds = ymd(new Date());
-  const zeile = health.find(r => r[0] === ds);
-  if (zeile) { zeile[13] = '7.77'; zeile[12] = '12.00'; }   // distKm, runSpeed
-  workout.push([ds, 'Outdoor Ausführen', '44', '3.33', '145', '170', '6.00', '99', '1673']);
+  workout.push([ds, 'Outdoor Ausführen', '44', '3.33', '145', '6.00']);
 }
 
 // Dubletten-Szenario: die letzten drei Tage stehen ein zweites Mal im Sheet – genau
