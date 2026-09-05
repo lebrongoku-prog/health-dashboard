@@ -256,11 +256,33 @@ function getWorkoutData() {
 // AUSFUEHREN: einmal von Hand im Editor. Das Protokoll sagt, was passiert ist.
 function migriereSpalten() {
   var zeilen = [];
-  zeilen.push(_spaltenUmbau(getOrCreateSheet().sheet, COLUMNS, 'Health Dashboard Data'));
+  // WICHTIG: NICHT ueber getOrCreateSheet() gehen. Die Funktion prueft die Kopfzeile
+  // und bricht ab, wenn sie nicht zu COLUMNS passt — also genau in dem Zustand, den
+  // diese Migration beheben soll. Sie wuerde sich selbst blockieren.
+  zeilen.push(_spaltenUmbau(_healthBlatt(), COLUMNS, 'Health Dashboard Data'));
   zeilen.push(_spaltenUmbau(_workoutBlatt(), WORKOUT_SPALTEN, 'Workout Data'));
   var text = zeilen.join('\n\n');
   Logger.log(text);
   return text;
+}
+
+// Das Health-Blatt finden — OHNE die Kopfzeilenpruefung aus getOrCreateSheet().
+// Dieselbe Suchreihenfolge wie dort: erst die gemerkte ID, sonst ueber den Namen.
+function _healthBlatt() {
+  var props = PropertiesService.getScriptProperties();
+  var sheetId = props.getProperty('sheet_id');
+  var ss = null;
+  if (sheetId) {
+    try { ss = SpreadsheetApp.openById(sheetId); }
+    catch (e) { Logger.log('Gemerkte Sheet-ID ungueltig, suche ueber den Namen: ' + e); }
+  }
+  if (!ss) {
+    var dateien = DriveApp.getFilesByName(SHEET_NAME);
+    if (!dateien.hasNext()) throw new Error('Health-Sheet nicht gefunden: ' + SHEET_NAME);
+    ss = SpreadsheetApp.open(dateien.next());
+    props.setProperty('sheet_id', ss.getId());
+  }
+  return ss.getActiveSheet();
 }
 
 // Das Workout-Blatt finden, ohne den Import anzustossen.
