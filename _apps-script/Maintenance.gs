@@ -10,7 +10,10 @@
 // ================================================================
 
 // ── Fehlende Spalten ans Sheet-Header anhängen ────────────────
-// Hilfreich nach Erweiterung von COLUMNS in Code.gs.
+// Nur fuer die ERWEITERUNG von COLUMNS in Code.gs. Zum Kuerzen oder Umsortieren taugt
+// es nicht (es haengt bloss hinten an) und es kommt ohnehin nicht bis zum Sheet:
+// getOrCreateSheet() bricht bei abweichender Kopfzeile vorher ab. Dafuer ist
+// migriereSpalten() weiter unten zustaendig.
 function addMissingColumns() {
   var r = getOrCreateSheet();
   var sheet = r.sheet;
