@@ -51,8 +51,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `window.__ersterChartMs` / `__ersteAntwortMs` (belegen den Sofortstart), `__anfragen`
   (meta/werte/script), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
   sie racet jede Prüfung von aussen gegen die Antwortzeit).
-  Jeder vierte Lauf ist dort ein **Indoor-Lauf**: `runSpeed` leer, Workout-Speed
-  vorhanden — der Fall, in dem die Pace früher fehlte.
+  Zwei Sonderfälle stecken fest in den erfundenen Daten: Jeder vierte Lauf ist ein
+  **Indoor-Lauf** (`Innenräume Ausführen` — deckt die Trainingsart-Erkennung ab;
+  früher fehlte dort auch die Pace, weil sie aus `runSpeed` kam). Und jede dritte
+  Einheit bekommt am **selben Tag ein zweites Training** dazu: ein
+  `Hochintensives Intervalltraining`, kurz, hoher Puls, **ohne Strecke und ohne
+  Geschwindigkeit** — der Fall, in dem die App früher eine der beiden Einheiten
+  verlor und in dem eine falsch gerechnete Pace sofort auffällt.
   Zusätzlich `?raf=timer`: ersetzt `requestAnimationFrame` durch einen Timer. Nötig,
   weil der verdeckte Vorschau-Pane nicht zeichnet — dort feuert weder `rAF` noch ein
   `scroll`-Event, und framegebundene Logik (Auto-Hide der Nav, Blickanker) liesse sich
