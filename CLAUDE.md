@@ -97,7 +97,22 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Daten:** `allData` = Tageszeilen (aus Sheet), **pro Datum genau eine Zeile** — doppelte
   Datumszeilen werden beim Einlesen zusammengeführt (das Apps-Script schreibt beim Refresh
   die letzten Tage neu und kann Dubletten erzeugen; ungefiltert zählte so ein Tag in jeden
-  Durchschnitt doppelt). `workoutData` = nach Datum gekeyt, dadurch von Haus aus eindeutig.
+  Durchschnitt doppelt). `workoutData` = nach Datum gekeyt. **Mehrere Einheiten am
+  selben Tag werden ZUSAMMENGEFASST, nicht überschrieben.** Vorher stand in
+  `_parseWorkoutRows` schlicht `workoutData[date] = {…}`: bei zwei Einträgen am selben
+  Tag (etwa Lauf am Morgen, Intervalltraining am Abend) gewann der zuletzt gelesene,
+  der andere verschwand spurlos aus jedem Diagramm — gemessen 93.2 min im Sheet gegen
+  32.9 min in der Anzeige. Die Regeln:
+  - **Dauer und Strecke werden summiert.**
+  - **Puls wird nach Dauer gewichtet** gemittelt — eine Stunde Lauf und zwanzig Minuten
+    Intervall dürfen nicht gleich schwer wiegen.
+  - **Die Geschwindigkeit mittelt NUR über Einheiten, die eine melden.** Ein
+    Intervalltraining hat keine Strecke und keine Geschwindigkeit; flösse seine Dauer in
+    eine Rechnung Strecke ÷ Zeit ein, sähe die Pace des Tages deutlich langsamer aus als
+    tatsächlich gelaufen wurde. Nachgemessen: Tag mit 60.3 min Lauf (10.13 km/h) plus
+    32.9 min Intervall → Pace 5.92, also unverändert die des Laufs.
+  - `anzahl` hält die Zahl der Einheiten. `_woAnzahl` zählt damit **Einheiten statt
+    Tage**, sonst fiele „Ø pro Training" an solchen Tagen zu hoch aus.
 - **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
   auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
   Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
