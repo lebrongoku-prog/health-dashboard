@@ -522,6 +522,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (`zugangGueltig`). Das Repo privat zu machen hilft NICHT: `app.js` bleibt öffentlich.
 - **`_apps-script/` ist Referenz, kein Deploy.** Änderungen dort wirken erst, wenn der
   Code im Apps-Script-Projekt eingefügt UND als **neue Version bereitgestellt** wird.
+- **Die App liest die ANGEZEIGTE Zeichenkette, nicht den gespeicherten Wert.** Der
+  Abruf in `_fetchSheet` setzt kein `valueRenderOption`; der Standard der Sheets-API
+  ist `FORMATTED_VALUE`. Was im Blatt steht, ist damit erst die halbe Wahrheit — es
+  zählt, was das Blatt **anzeigt**. Aufgefallen ist das an `sleepStart`/`sleepEnd`:
+  Sheets speichert eine reine Uhrzeit als Datum 30.12.1899 mit Tageszeit, und ohne
+  Zahlenformat zeigt es davon nur `12/30/1899`. Der Wert war unversehrt, die App
+  bekam trotzdem nur das Platzhalterdatum, und `parseTV` lieferte `null` — die
+  Tooltip-Zeilen „Eingeschlafen"/„Aufgewacht" im Schlafdauer-Diagramm blieben leer.
+  Ausgelöst hatte es `migriereSpalten()`: `clear()` löscht neben dem Inhalt auch die
+  **Formate**. Seither setzt `_spaltenUmbau` das Zeitformat wieder (`ZEIT_SPALTEN`,
+  `_zeitformatAnwenden`) und weist es im Protokoll mit `getDisplayValues()` nach —
+  derselben Zeichenkette, die auch die API liefert. Für ein bereits umgestelltes
+  Blatt gibt es `zeitformatSetzen()`. **Merke:** Wer am Sheet formatiert, ändert
+  Daten. Eine Prüfung mit `getValues()` allein beweist hier nichts.
 - **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
   **Programmdateien**; `hcc_daten_v1` im `localStorage` hält die **Messdaten**. Der
   Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen

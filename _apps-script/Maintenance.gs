@@ -330,6 +330,7 @@ function _spaltenUmbau(blatt, neueSpalten, name) {
     blatt.getRange(2, 1, neu.length, neueSpalten.length).setValues(neu);
   }
   blatt.setFrozenRows(1);
+  _zeitformatAnwenden(blatt, neueSpalten);   // clear() hat auch die Formate geloescht
 
   // 3. GEGENLESEN: das tatsaechlich Geschriebene mit dem Erwarteten vergleichen.
   //    Ohne diesen Schritt waere nur belegt, dass der Aufruf nicht abgebrochen ist.
@@ -345,5 +346,60 @@ function _spaltenUmbau(blatt, neueSpalten, name) {
     + neu.length + ' Zeilen umgestellt.'
     + (fehlend.length ? ' In der alten Kopfzeile fehlten: ' + fehlend.join(', ') + ' (leer gelassen).' : '')
     + ' Gegenprobe: ' + (abweichungen === 0 ? 'alle Werte stimmen.' : abweichungen + ' ABWEICHUNGEN!')
+    + _zeitProbe(blatt, neueSpalten)
     + ' Sicherung: "' + sicherung.getName() + '".';
+}
+
+// ── Zeitformat der Uhrzeit-Spalten ────────────────────────────
+// Sheets speichert eine reine Uhrzeit als Datum 30.12.1899 mit Tageszeit. OHNE
+// Zahlenformat zeigt es davon nur das Platzhalterdatum an ("12/30/1899") — der Wert
+// ist zwar noch da, aber unsichtbar.
+//
+// Das ist hier KEINE Frage des Aussehens: Die App holt die Werte ueber die
+// Sheets-API ohne `valueRenderOption`, und deren Standard ist FORMATTED_VALUE —
+// sie bekommt also genau die ZEICHENKETTE, die im Blatt steht. Statt "21:41" kaeme
+// "12/30/1899" an, und `parseTV` in app.js laesst beides nicht durch: die
+// Tooltip-Zeilen "Eingeschlafen" und "Aufgewacht" im Schlafdauer-Diagramm blieben
+// leer. Das Format gehoert damit zu den Daten.
+//
+// `_spaltenUmbau` braucht das, weil `clear()` neben dem Inhalt auch die Formate
+// entfernt. Der Import selbst braucht es nicht: `extractTime` schreibt "21:41" als
+// Zeichenkette, die Sheets beim Schreiben von sich aus als Uhrzeit erkennt.
+var ZEIT_SPALTEN = ['sleepStart', 'sleepEnd'];
+var ZEIT_FORMAT  = 'HH:mm';
+
+function _zeitformatAnwenden(blatt, spalten) {
+  var zeilen = blatt.getLastRow() - 1;         // ohne Kopfzeile
+  if (zeilen < 1) return 0;
+  var gesetzt = 0;
+  ZEIT_SPALTEN.forEach(function (name) {
+    var i = spalten.indexOf(name);
+    if (i < 0) return;                          // Spalte gibt es hier nicht
+    blatt.getRange(2, i + 1, zeilen, 1).setNumberFormat(ZEIT_FORMAT);
+    gesetzt++;
+  });
+  return gesetzt;
+}
+
+// Belegt, was die App tatsaechlich sehen wuerde: getDisplayValues() liefert dieselbe
+// Zeichenkette wie FORMATTED_VALUE der Sheets-API.
+function _zeitProbe(blatt, spalten) {
+  var i = spalten.indexOf(ZEIT_SPALTEN[0]);
+  if (i < 0 || blatt.getLastRow() < 2) return '';
+  var wie = blatt.getRange(2, i + 1, Math.min(3, blatt.getLastRow() - 1), 1)
+                 .getDisplayValues().map(function (r) { return r[0] || '(leer)'; });
+  return ' Anzeige ' + ZEIT_SPALTEN[0] + ': ' + wie.join(', ') + '.';
+}
+
+// Setzt das Zeitformat nachtraeglich — fuer ein Blatt, das bereits im neuen Layout
+// steht und deshalb von migriereSpalten() nicht mehr angefasst wird.
+function zeitformatSetzen() {
+  var blatt = _healthBlatt();
+  var kopf = blatt.getRange(1, 1, 1, blatt.getLastColumn()).getValues()[0]
+                  .map(function (v) { return String(v).trim(); });
+  var n = _zeitformatAnwenden(blatt, kopf);
+  var text = 'Zeitformat auf ' + n + ' von ' + ZEIT_SPALTEN.length + ' Spalte(n) gesetzt ('
+    + (blatt.getLastRow() - 1) + ' Zeilen).' + _zeitProbe(blatt, kopf);
+  Logger.log(text);
+  return text;
 }
