@@ -98,24 +98,62 @@ function _awaitWorkoutSheet(timeoutMs = 10000) {
 // ── Workout-Daten aus API-Response parsen ──────────────
 // Symbol zur Trainingsart – Stichwortsuche statt exakter Namensliste.
 function _parseWorkoutRows(rows) {
-  // Sheet values arrive as strings via .toString() – parse to numbers explicitly
+  // Sheet-Werte kommen als Strings – hier ausdruecklich in Zahlen wandeln.
   const pN = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
+
+  // MEHRERE Einheiten am selben Tag werden ZUSAMMENGEFASST, nicht ueberschrieben.
+  // Vorher stand hier schlicht `workoutData[date] = {…}` – bei zwei Eintraegen am
+  // selben Tag (etwa Lauf am Morgen, Intervalltraining am Abend) gewann der zuletzt
+  // gelesene und der andere verschwand spurlos aus jedem Diagramm. Gemessen an
+  // Testdaten: 93.2 min im Sheet, 32.9 min in der Anzeige.
+  const proTag = {};
   rows.forEach(r => {
     const date = r['Date'] || r['date'];
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
-    const typeRaw = String(r['Type'] || r['type'] || '').trim();
+    (proTag[date] = proTag[date] || []).push({
+      typeRaw:  String(r['Type'] || r['type'] || '').trim(),
+      dauer:    pN(r['Duration (min)']),
+      strecke:  pN(r['Distance (km)']),
+      puls:     pN(r['Avg HR']),
+      speed:    pN(r['Speed (km/h)'])
+    });
+  });
+
+  // Gewichteter Mittelwert nach Trainingsdauer: eine Stunde Lauf und zwanzig Minuten
+  // Intervall duerfen nicht gleich schwer wiegen. Beruecksichtigt nur Einheiten, die
+  // den Wert ueberhaupt melden.
+  const gewichtet = (liste, feld) => {
+    const mit = liste.filter(e => e[feld] != null && e.dauer > 0);
+    if (!mit.length) {
+      const ohneDauer = liste.filter(e => e[feld] != null);
+      if (!ohneDauer.length) return null;
+      return ohneDauer.reduce((a, e) => a + e[feld], 0) / ohneDauer.length;
+    }
+    const gesamt = mit.reduce((a, e) => a + e.dauer, 0);
+    return mit.reduce((a, e) => a + e[feld] * e.dauer, 0) / gesamt;
+  };
+  const summe = (liste, feld) => {
+    const mit = liste.filter(e => e[feld] != null);
+    return mit.length ? mit.reduce((a, e) => a + e[feld], 0) : null;
+  };
+
+  Object.keys(proTag).forEach(date => {
+    const e = proTag[date];
+    // Die Geschwindigkeit wird NUR ueber Einheiten gemittelt, die eine melden. Ein
+    // Intervalltraining ohne Strecke traegt keine – wuerde es als 0 einfliessen oder
+    // seine Dauer in eine Rechnung Strecke/Zeit eingehen, saehe die Pace des Tages
+    // deutlich langsamer aus, als tatsaechlich gelaufen wurde.
+    const arten = [...new Set(e.map(x => x.typeRaw).filter(Boolean))];
     workoutData[date] = {
-      // typeRaw bleibt roh; typeLabel ist die Anzeigefassung und bereits entschärft.
-      date, typeRaw, typeLabel: esc(typeRaw || 'Workout'),
-      durationMin:    pN(r['Duration (min)']),
-      distanceKm:     pN(r['Distance (km)']),
-      avgHR:          pN(r['Avg HR']),
-      maxHR:          pN(r['Max HR']),
-      avgSpeedKph:    pN(r['Speed (km/h)']),
-      elevationM:     pN(r['Elevation (m)']),
-      activeEnergyKJ: pN(r['Energy (kJ)']),
-      cadence:        pN(r['Cadence']),
-      stepCount:      pN(r['Steps'])
+      date,
+      // typeRaw bleibt roh; typeLabel ist die Anzeigefassung und bereits entschaerft.
+      typeRaw:  arten.join(' · '),
+      typeLabel: esc(arten.join(' · ') || 'Workout'),
+      anzahl:      e.length,
+      durationMin: summe(e, 'dauer'),
+      distanceKm:  summe(e, 'strecke'),
+      avgHR:       gewichtet(e, 'puls'),
+      avgSpeedKph: gewichtet(e, 'speed')
     };
   });
   // workoutSheetReady wird vom Aufrufer gesetzt (auch im Fehlerfall) – siehe loadFromAPI.
@@ -2331,8 +2369,9 @@ async function pgTraining() {
     // Pace aus derselben Quelle wie im Pace-Diagramm: Workout-Sheet.
     _woPace:(()=>{const kmh=workoutData[r.date]?.avgSpeedKph>0?workoutData[r.date].avgSpeedKph:null;
       return kmh!=null?paceFromSpeed(kmh):null;})(),
-    // Zaehlt die Trainings je Zeitraum – gebraucht fuer "Oe pro Training".
-    _woAnzahl:workoutData[r.date]?1:null}));
+    // Zaehlt die EINHEITEN je Zeitraum – gebraucht fuer "Oe pro Training". Vorher
+    // stand hier 1 je Tag; an Tagen mit zwei Einheiten fiel der Schnitt dadurch zu hoch aus.
+    _woAnzahl:workoutData[r.date]?(workoutData[r.date].anzahl||1):null}));
   const {align:tAvgWo,alignSum:tASwo}=timeDim(woRows);
   // Gesamtwerte des dargestellten Zeitraums – Summe ueber alle Tage des Fensters,
   // unabhaengig von der gewaehlten Aggregation (Tag/Woche/Monat).
