@@ -28,6 +28,18 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
   Weil das Auffrisch-Fenster (2 Tage Health, 30 Tage Workout) deutlich grösser ist
   als der Abstand der Läufe, holt ein späterer Lauf jeden ausgefallenen nach — ein
   verpasster Zeitplan reisst keine Lücke.
+  **Der iPhone-Kurzbefehl stösst den Import NICHT an — bewusst.** Er lässt allein
+  Health Auto Export nach Drive exportieren; den Rest macht der Zeitplan. Sein alter
+  Schritt „Inhalte von …/exec?refresh=true&token=… abrufen" war nach der
+  Sicherheitsumstellung wirkungslos (GET tut nichts, und der `token` war das
+  entfernte `SECRET`), meldete über die abschliessende Mitteilung aber weiter Erfolg
+  — deshalb fiel es lange nicht auf; entfernt am 06.09.2026. Ein Kurzbefehl kann sich
+  keinen Google-Zugang beschaffen, ihn auslösen zu lassen ginge also nur über ein
+  neues gemeinsames Passwort. Auf Nachfrage **abgelehnt**: der Zeitplan plus „Daten
+  aktualisieren" in der App decken den Bedarf, und ein Passwort weniger ist ein
+  Angriffsweg weniger. Wer das künftig doch will, braucht POST mit dem Passwort im
+  **Rumpf** (nicht in der Adresse — die landet in Server-Protokollen) und eine
+  Wartezeit im Kurzbefehl, sonst liegt die Export-Datei noch nicht in Drive.
   (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
   Der zuletzt geladene Stand liegt zusätzlich als Kopie im `localStorage` — die App
   startet daraus (siehe „Sofortstart aus dem Zwischenspeicher").
