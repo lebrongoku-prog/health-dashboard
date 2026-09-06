@@ -142,7 +142,12 @@ const endOffset = SC === 'stale' ? 3 : 0;
 // Spalten wie im echten Sheet NACH der Kuerzung vom 05.09.2026 – der Pruefstand soll
 // zeigen, was die App tatsaechlich vorfindet, nicht mehr.
 const health = [['date','steps','restHR','hrv','sleepTotal','sleepCore','sleepRem','sleepDeep','sleepAwake','vo2max','sleepScore','sleepStart','sleepEnd']];
-const workout = [['Date','Type','Duration (min)','Distance (km)','Avg HR','Speed (km/h)']];
+// Elf Spalten wie im echten Blatt. Die App liest nur sechs davon, der Prueftstand
+// fuehrt trotzdem alle: 'Workout Data' gehoert auch FitTrack, und ein Kopf, der
+// kuerzer ist als der echte, wuerde genau den Fehler verstecken, der am 05.09.2026
+// dort Daten gekostet hat — die App liest nach Namen und merkt nichts davon.
+const workout = [['Date','Type','Duration (min)','Distance (km)','Avg HR','Max HR',
+  'Speed (km/h)','Elevation (m)','Energy (kJ)','Cadence','Steps']];
 
 for (let i = N_DAYS - 1; i >= endOffset; i--) {
   const d = new Date(); d.setDate(d.getDate() - i);
@@ -176,14 +181,21 @@ for (let i = N_DAYS - 1; i >= endOffset; i--) {
     // der eigenwilligen Übersetzungen, an denen die frühere exakte Namensliste scheiterte.
     workout.push([ds, indoor ? 'Innenräume Ausführen'
       : ['Outdoor Ausführen','Trail-Laufen'][Math.floor(rnd()*2)],
-      dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30), speed.toFixed(2)]);
+      dur.toFixed(1), (speed*dur/60).toFixed(2), Math.round(132+rnd()*30),
+      Math.round(168+rnd()*20),                                   // Max HR
+      speed.toFixed(2),
+      indoor ? '' : Math.round(rnd()*180),                        // Elevation – drinnen keine
+      Math.round(dur*38 + rnd()*200),                             // Energy (kJ)
+      Math.round(158+rnd()*14),                                   // Cadence
+      Math.round(dur*speed*2.7)]);                                // Steps
     // Jede dritte Einheit bekommt am SELBEN Tag ein Intervalltraining dazu: kurz,
     // hoher Puls, OHNE Strecke und ohne Geschwindigkeit. Genau der Fall, in dem die
     // App frueher eine der beiden Einheiten verlor – workoutData ist nach Datum
     // gekeyt, und die zweite Zeile ueberschrieb die erste.
     if (rnd() < 0.33) {
       workout.push([ds, 'Hochintensives Intervalltraining',
-        (18 + rnd()*15).toFixed(1), '', Math.round(150 + rnd()*25), '']);
+        (18 + rnd()*15).toFixed(1), '', Math.round(150 + rnd()*25),
+        Math.round(178+rnd()*12), '', '', Math.round(600+rnd()*400), '', '']);
     }
   }
 }

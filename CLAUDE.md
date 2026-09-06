@@ -489,15 +489,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   noch aus `Speed (km/h)` des Workout-Sheets — vorher zuerst aus `runSpeed` des
   Health-Sheets mit Rückgriff auf die Workout-Geschwindigkeit. Damit stammen Strecke
   UND Pace aus derselben Messung; `runSpeed` ist aus dem Health-Sheet entfallen.
-- **Welche Spalten die App wirklich liest** (Stand 05.09.2026 — beide Sheets wurden auf
-  genau diese gekürzt):
-  **Health Dashboard Data (12):** `date`, `steps`, `restHR`, `hrv`, `sleepTotal`,
-  `sleepCore`, `sleepRem`, `sleepDeep`, `sleepAwake`, `vo2max`, `sleepStart`, `sleepEnd`.
-  `sleepScore` liest die App zwar, das Apps Script schreibt es aber nicht — die
-  Score-Kachel bleibt deshalb leer, bis die Spalte jemand befüllt.
-  **Workout Data (6):** `Date`, `Type`, `Duration (min)`, `Distance (km)`, `Avg HR`,
-  `Speed (km/h)`. `Type` wird derzeit nirgends angezeigt, bleibt aber: es ist die
-  einzige Angabe, die eine Einheit benennt.
+- **Was die App liest, ist NICHT dasselbe wie das, was in den Blättern stehen muss.**
+  Die beiden Sheets gehören unterschiedlich vielen Anwendungen, und danach richtet sich,
+  ob eine Spalte entbehrlich ist:
+  **Health Dashboard Data (12) — nur dieses Dashboard.** `date`, `steps`, `restHR`,
+  `hrv`, `sleepTotal`, `sleepCore`, `sleepRem`, `sleepDeep`, `sleepAwake`, `vo2max`,
+  `sleepStart`, `sleepEnd`. Am 05.09.2026 von 32 auf diese gekürzt — hier war das
+  richtig, weil niemand sonst mitliest. `sleepScore` liest die App zwar, das Apps
+  Script schreibt es aber nicht — die Score-Kachel bleibt leer, bis die Spalte
+  jemand befüllt.
+  **Workout Data (11) — auch FitTrack liest diese Datei.** `Date`, `Type`,
+  `Duration (min)`, `Distance (km)`, `Avg HR`, `Max HR`, `Speed (km/h)`,
+  `Elevation (m)`, `Energy (kJ)`, `Cadence`, `Steps`. Dieses Dashboard wertet davon
+  nur sechs aus (`Max HR`, `Elevation`, `Energy`, `Cadence`, `Steps` nicht) — **das
+  ist kein Grund, sie zu entfernen.** Genau das geschah am 05.09.2026 und entzog
+  FitTrack fünf Spalten; zurückgeholt am 06.09.2026 aus der Sicherung
+  (`workoutZurueck()`). `Type` zeigt auch dieses Dashboard nirgends an, es bleibt
+  trotzdem: es ist die einzige Angabe, die eine Einheit benennt.
   **Beide Importe schreiben POSITIONSBASIERT** ab Spalte A und die Kopfzeile nur, wenn
   das Blatt leer ist. Wer `COLUMNS` oder `WORKOUT_SPALTEN` ändert, MUSS die bestehenden
   Zeilen mitziehen — sonst stehen alte Werte unter neuen Überschriften und die App liest
@@ -522,6 +530,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (`zugangGueltig`). Das Repo privat zu machen hilft NICHT: `app.js` bleibt öffentlich.
 - **`_apps-script/` ist Referenz, kein Deploy.** Änderungen dort wirken erst, wenn der
   Code im Apps-Script-Projekt eingefügt UND als **neue Version bereitgestellt** wird.
+- **Ein Blatt gehört nicht automatisch dieser App.** `Workout Data` liest auch
+  **FitTrack**. „Das Dashboard wertet die Spalte nicht aus" ist deshalb kein Befund
+  über die Spalte, sondern nur über einen von zwei Lesern — und rechtfertigt kein
+  Löschen. Vor jeder Kürzung an einem Blatt zuerst klären, wer sonst noch mitliest;
+  im Zweifel fragen statt entfernen. Ungenutzte Spalten kosten etwas Ladezeit, ein
+  Datenverlust bei einer anderen App kostet mehr. `_spaltenUmbau` **bricht jetzt ab**,
+  wenn eine gewünschte Spalte in der aktuellen Kopfzeile fehlt und damit leer
+  entstünde — vorher legte es sie stillschweigend leer an und meldete es erst
+  hinterher.
 - **Die App liest die ANGEZEIGTE Zeichenkette, nicht den gespeicherten Wert.** Der
   Abruf in `_fetchSheet` setzt kein `valueRenderOption`; der Standard der Sheets-API
   ist `FORMATTED_VALUE`. Was im Blatt steht, ist damit erst die halbe Wahrheit — es

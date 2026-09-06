@@ -312,6 +312,17 @@ function _spaltenUmbau(blatt, neueSpalten, name) {
   var quelle = neueSpalten.map(function (c) { return altKopf.indexOf(c); });
   var fehlend = neueSpalten.filter(function (c, i) { return quelle[i] < 0; });
 
+  // Wuerde eine gewuenschte Spalte in der alten Kopfzeile fehlen, entstuende sie hier
+  // LEER — und der einzige Ort, an dem ihre Werte noch stehen, waere eine Sicherung.
+  // Genau so gingen am 05.09.2026 die fuenf FitTrack-Spalten des Workout-Sheets
+  // verloren. Lieber abbrechen und den Anwender entscheiden lassen.
+  if (fehlend.length) {
+    throw new Error(name + ': ' + fehlend.length + ' Spalte(n) fehlen in der aktuellen '
+      + 'Kopfzeile und wuerden leer angelegt: ' + fehlend.join(', ') + '. '
+      + 'Kommen die Werte aus einer Sicherung zurueck? Dann diese zuerst einspielen '
+      + '(fuer das Workout-Sheet: workoutZurueck()).');
+  }
+
   var daten = alle.slice(1);
   var neu = daten.map(function (r) {
     return quelle.map(function (i) { return i >= 0 ? r[i] : ''; });
@@ -344,7 +355,6 @@ function _spaltenUmbau(blatt, neueSpalten, name) {
 
   return name + ': ' + altKopf.length + ' → ' + neueSpalten.length + ' Spalten, '
     + neu.length + ' Zeilen umgestellt.'
-    + (fehlend.length ? ' In der alten Kopfzeile fehlten: ' + fehlend.join(', ') + ' (leer gelassen).' : '')
     + ' Gegenprobe: ' + (abweichungen === 0 ? 'alle Werte stimmen.' : abweichungen + ' ABWEICHUNGEN!')
     + _zeitProbe(blatt, neueSpalten)
     + ' Sicherung: "' + sicherung.getName() + '".';
@@ -400,6 +410,76 @@ function zeitformatSetzen() {
   var n = _zeitformatAnwenden(blatt, kopf);
   var text = 'Zeitformat auf ' + n + ' von ' + ZEIT_SPALTEN.length + ' Spalte(n) gesetzt ('
     + (blatt.getLastRow() - 1) + ' Zeilen).' + _zeitProbe(blatt, kopf);
+  Logger.log(text);
+  return text;
+}
+
+// ── Workout-Sheet aus der Sicherung zuruecknehmen ─────────────
+// Warum es das gibt: Am 05.09.2026 wurde 'Workout Data' von elf auf sechs Spalten
+// gekuerzt, weil dieses Dashboard die anderen fuenf nicht auswertet. Uebersehen war,
+// dass **auch FitTrack diese Datei liest** — dort fehlten sie danach. Die Werte selbst
+// lagen nur noch in der Sicherung, die die Migration zuvor angelegt hatte.
+//
+// Diese Funktion spielt sie zurueck: juengste Sicherung suchen, Kopfzeile gegen
+// WORKOUT_SPALTEN pruefen, den JETZIGEN Stand vorher separat sichern, zurueckschreiben,
+// gegenlesen. Danach `writeToSheet` laufen lassen — der Import fuellt die letzten
+// dreissig Tage wieder mit allen elf Feldern.
+function workoutZurueck() {
+  var blatt = _workoutBlatt();
+  var ss = blatt.getParent();
+
+  var sicherungen = ss.getSheets().filter(function (b) { return b.getName().indexOf('Backup ') === 0; });
+  if (!sicherungen.length) {
+    throw new Error('Keine Sicherung im Workout-Sheet gefunden. Ohne sie sind die fuenf '
+      + 'Spalten nur ueber einen Neuaufbau aus den Drive-Dateien zu holen.');
+  }
+  // Die Namen tragen 'yyyy-MM-dd HH:mm' — alphabetisch absteigend ist die juengste zuerst.
+  sicherungen.sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });
+  var quelle = sicherungen[0];
+
+  var daten = quelle.getDataRange().getValues();
+  if (daten.length < 2) throw new Error('Sicherung "' + quelle.getName() + '" enthaelt keine Zeilen.');
+
+  var kopf = daten[0].map(function (v) { return String(v).trim(); });
+  var passt = kopf.length === WORKOUT_SPALTEN.length
+    && WORKOUT_SPALTEN.every(function (c, i) { return kopf[i] === c; });
+  if (!passt) {
+    throw new Error('Sicherung "' + quelle.getName() + '" passt nicht zu WORKOUT_SPALTEN.\n'
+      + 'Sicherung: ' + kopf.join(', ') + '\nErwartet:  ' + WORKOUT_SPALTEN.join(', '));
+  }
+
+  // Den jetzigen Stand sichern, BEVOR er ueberschrieben wird.
+  var stempel = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  var vorher = blatt.copyTo(ss).setName('Vor Ruecknahme ' + stempel);
+
+  if (blatt.getMaxColumns() < kopf.length) blatt.insertColumnsAfter(blatt.getMaxColumns(), kopf.length - blatt.getMaxColumns());
+  if (blatt.getMaxRows() < daten.length)   blatt.insertRowsAfter(blatt.getMaxRows(), daten.length - blatt.getMaxRows());
+  blatt.clear();
+  blatt.getRange(1, 1, daten.length, kopf.length).setValues(daten);
+  blatt.setFrozenRows(1);
+
+  // Gegenlesen — und zwar zweifach.
+  var kontrolle = blatt.getDataRange().getValues();
+  var abweichungen = 0;
+  for (var z = 1; z < daten.length; z++) {
+    for (var sp = 0; sp < kopf.length; sp++) {
+      if (String(kontrolle[z][sp]) !== String(daten[z][sp])) abweichungen++;
+    }
+  }
+  // Zweitens die ANZEIGE der Datumsspalte: die App liest ueber die Sheets-API
+  // FORMATTED_VALUE und laesst nur 'yyyy-MM-dd' durch. Ein Datum, das nach dem
+  // Schreiben als '9/5/2026' erscheint, waere fuer sie unbrauchbar — auch wenn der
+  // gespeicherte Wert stimmt. Das war die Lehre aus den Schlafzeiten.
+  var probe = blatt.getRange(2, 1, Math.min(3, daten.length - 1), 1).getDisplayValues()
+                   .map(function (r) { return r[0]; });
+  var datumOk = probe.every(function (t) { return /^\d{4}-\d{2}-\d{2}$/.test(t); });
+
+  var text = 'Workout Data aus "' + quelle.getName() + '" zurueckgenommen: '
+    + kopf.length + ' Spalten, ' + (daten.length - 1) + ' Zeilen. '
+    + 'Gegenprobe: ' + (abweichungen === 0 ? 'alle Werte stimmen.' : abweichungen + ' ABWEICHUNGEN!') + ' '
+    + 'Anzeige Date: ' + probe.join(', ') + (datumOk ? ' (Format ok).' : ' — FORMAT FALSCH, die App liest das nicht!')
+    + ' Vorheriger Stand gesichert als "' + vorher.getName() + '". '
+    + 'Jetzt writeToSheet ausfuehren, damit die letzten Tage alle elf Felder bekommen.';
   Logger.log(text);
   return text;
 }

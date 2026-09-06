@@ -438,15 +438,25 @@ function writeToSheet() {
 // WORKOUT DATA IMPORT
 // ================================================================
 
-// Spalten des Workout-Sheets — nur noch die, die das Dashboard liest (05.09.2026).
-// Entfallen: 'Max HR', 'Elevation (m)', 'Energy (kJ)', 'Cadence', 'Steps'.
-// 'Type' bleibt, obwohl es derzeit nirgends angezeigt wird: Es ist die einzige Angabe,
-// die eine Einheit ueberhaupt benennt — ohne sie liesse sich ein Lauf nicht von einer
-// Radfahrt unterscheiden.
+// Spalten des Workout-Sheets — alle elf, unveraendert seit jeher.
+//
+// ACHTUNG: Diese Liste NICHT auf das kuerzen, was dieses Dashboard liest. Am
+// 05.09.2026 war sie schon einmal auf sechs Spalten gestutzt ('Max HR',
+// 'Elevation (m)', 'Energy (kJ)', 'Cadence', 'Steps' entfernt) — mit der
+// Begruendung, das Dashboard werte sie nicht aus. Das stimmte und war trotzdem
+// falsch: **Die Datei 'Workout Data' gehoert nicht dieser App allein. Auch FitTrack
+// liest sie**, und zwar genau diese Spalten. Die Kuerzung hat dort Daten entzogen.
+//
+// Das Health-Sheet ist der andere Fall — das nutzt nur dieses Dashboard, dort sind
+// die zwoelf Spalten aus COLUMNS richtig. Wer hier etwas entfernen will, muss also
+// zuerst klaeren, wer sonst noch mitliest.
+//
 // Wie bei COLUMNS gilt: positionsbasiert geschrieben. Aenderungen brauchen
 // migriereSpalten() in Maintenance.gs.
 var WORKOUT_SPALTEN = [
-  'Date', 'Type', 'Duration (min)', 'Distance (km)', 'Avg HR', 'Speed (km/h)'
+  'Date', 'Type', 'Duration (min)', 'Distance (km)',
+  'Avg HR', 'Max HR', 'Speed (km/h)', 'Elevation (m)',
+  'Energy (kJ)', 'Cadence', 'Steps'
 ];
 var WORKOUT_FOLDER_ID    = '11ZJtwDCrV_UNofOMTi1VUeWnltONSgQI';
 var WORKOUT_SHEET_TITLE  = 'Workout Data';
@@ -644,7 +654,12 @@ function importWorkoutData() {
         durationMin !== null ? Math.round(durationMin * 100) / 100 : null,
         g.getN('Distance', 'Distanz', 'Dist'),
         g.getN('Avg Heart', 'Avg HR'),
-        g.getN('Speed')
+        g.getN('Max Heart', 'Max HR'),
+        g.getN('Speed'),
+        g.getN('Elevation Ascend'),
+        g.getN('Active Energy'),
+        g.getN('Cadence'),
+        g.getN('Step Count', 'Steps')
       ]);
     } catch (e) {
       Logger.log('Fehler bei Datei ' + name + ': ' + e.message);
