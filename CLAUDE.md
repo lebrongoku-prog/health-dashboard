@@ -282,10 +282,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      gilt** — die Blätterpfeile eingeschlossen, und ebenso beim Tabwechsel
      (`_applyTabState`). „Ausserhalb der ganzen Leiste" als Bedingung reichte nicht:
      ein Tipp auf `‹`/`›` liess sie offen stehen, obwohl sie ihre Aufgabe erfüllt hatte.
-  3. **`_applyTabState` setzt `document.body.className` komplett neu** — `nav-weg`
-     muss dort mitgeführt werden. Sonst löscht jeder Tabwechsel die Klasse, während
-     `nav-hidden` an der Bottom-Nav stehen bleibt: die Leiste ist weg, die Zeitleiste
-     rückt aber wieder hoch und hinterlässt eine Lücke am unteren Rand.
+  3. **Die Tabfarbe wird über `themaSetzen()` gewechselt — nie über
+     `document.body.className`.** Eine Zuweisung an `className` ersetzt ALLE Klassen,
+     also auch `dark`, `nav-weg` und `hinweis-an`. Genau das stand zweimal im Code
+     (Tabwechsel per Knopf und per Wisch) und kostete zwei Anläufe: Beim ersten
+     Reparieren führte ich `nav-weg` in der einen Kopie mit und übersah die zweite —
+     der Fehler blieb, nur trat er jetzt beim Wischen statt beim Tippen auf. Symptom
+     war beide Male: `nav-weg` verschwindet, die Bottom-Nav bleibt versteckt (ihre
+     Klasse sitzt an ihr selbst), die Zeitleiste rückt aber auf Nav-Höhe und
+     hinterlässt unten eine Lücke. `themaSetzen()` tauscht nur die `theme-*`-Klasse
+     und kann deshalb nichts mitreissen — auch nichts, was es heute noch nicht gibt.
   4. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
      Weil die Reihe zentriert ist, bleibt die Pille dabei an derselben Stelle stehen.
   5. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner

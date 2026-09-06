@@ -2994,17 +2994,33 @@ function setTabBackgroundInstant(name) {
 }
 
 // Tab-State setzen (Bottom-Nav-Active, Body-Theme-Klasse, ggf. lazy rendern)
+// Tabfarbe umschalten, ohne alles andere am <body> mitzureissen.
+//
+// Vorher stand hier zweimal `document.body.className = 'theme-' + name + …` — einmal
+// fuer den Tabwechsel per Knopf, einmal fuer den per Wisch. Eine Zuweisung an
+// `className` ersetzt ALLE Klassen, also auch `dark`, `nav-weg` und `hinweis-an`.
+// Beide Kopien mussten deshalb jede dieser Klassen einzeln mitfuehren, und wer eine
+// vergass, erzeugte einen Fehler, der nur beim Tabwechsel auftrat: `nav-weg` ging
+// verloren, die Bottom-Nav blieb versteckt (ihre Klasse sitzt an ihr selbst), die
+// Zeitleiste rueckte aber wieder auf Nav-Hoehe und liess unten eine Luecke.
+// Genau das ist zweimal passiert — beim Bauen und beim Reparieren, weil ich nur eine
+// der beiden Kopien erwischt hatte.
+//
+// Jetzt wird nur die Theme-Klasse getauscht. Was sonst am <body> haengt, bleibt
+// unberuehrt — auch Klassen, die es heute noch gar nicht gibt.
+function themaSetzen(name) {
+  const body = document.body;
+  Array.prototype.slice.call(body.classList)
+    .filter(function (c) { return c.indexOf('theme-') === 0; })
+    .forEach(function (c) { body.classList.remove(c); });
+  body.classList.add('theme-' + name);
+}
+
 function _applyTabState(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const navEl = document.getElementById('nav-'+name);
   if (navEl) navEl.classList.add('active');
-  const _isDark = document.body.classList.contains('dark');
-  // `nav-weg` MUSS mitgeführt werden: diese Zeile setzt className komplett neu und
-  // löschte die Klasse bei jedem Tabwechsel. Die Bottom-Nav blieb dann versteckt
-  // (ihre Klasse sitzt an ihr selbst), die Zeitleiste rückte aber wieder hoch, als
-  // wäre die Leiste da — und hinterliess eine Lücke am unteren Rand.
-  const _navWeg = document.body.classList.contains('nav-weg');
-  document.body.className = 'theme-' + name + (_isDark ? ' dark' : '') + (_navWeg ? ' nav-weg' : '');
+  themaSetzen(name);
   // Beim Tabwechsel hat eine offene Auswahl ausgedient.
   zeitleisteAuswahl(false);
   _setStatusBarColor(name);
@@ -3070,8 +3086,7 @@ function initTabScrollSync() {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         const navEl = document.getElementById('nav-'+name);
         if (navEl) navEl.classList.add('active');
-        const _isDark = document.body.classList.contains('dark');
-        document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
+        themaSetzen(name);
         _setStatusBarColor(name);
         lastReported = name;
       }
