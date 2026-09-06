@@ -648,7 +648,12 @@ function setR(r) {
 // ── Helpers ────────────────────────────────────────────
 const MO = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MO[m-1]+' '+String(y).slice(-2); }
-function zahl(v, dec=1) { return v == null ? '—' : Number(v).toFixed(dec); }
+// Nachkommastellen nur, wo sie etwas aussagen: "25.0" wird zu "25", "25.5" bleibt.
+// (Auf Wunsch, 06.09.2026.) `Number()` um `toFixed()` herum wirft die Nullen weg —
+// das gilt auch fuer die zweite Stelle: 25.10 -> "25.1", 25.00 -> "25".
+// `dec` bleibt damit eine OBERGRENZE, keine feste Breite. Wer je eine feste Breite
+// braucht (etwa fuer eine rechtsbuendige Spalte), darf nicht `zahl()` nehmen.
+function zahl(v, dec=1) { return v == null ? '—' : String(Number(Number(v).toFixed(dec))); }
 
 // ── Text aus fremder Quelle entschärfen ────────────────
 // PFLICHT für jeden Wert, der NICHT aus diesem Code stammt und als Text in eine
@@ -997,25 +1002,31 @@ const werteLabelPlugin = {
     ctx.fillStyle = _cssFarbe('--txt2', '#64748B');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
+    // Belegte Flaechen ueber ALLE Datensaetze hinweg. Erst nur die x-Achse zu
+    // pruefen reichte nicht: in "Ruhepuls & HRV" laufen zwei Reihen im selben
+    // Diagramm und kreuzen sich – dort stiessen die Zahlen aufeinander, obwohl in
+    // jeder Reihe fuer sich genug Platz war.
+    const belegt = [];
+    const frei = (x1, y1, x2, y2) => !belegt.some(b =>
+      x1 < b.x2 && x2 > b.x1 && y1 < b.y2 && y2 > b.y1);
     chart.data.datasets.forEach((ds, di) => {
       // Hilfslinien (Ø, Ziel) bleiben unbeschriftet – dieselbe Regel wie im Tooltip,
       // damit beide dasselbe unter "Messwert" verstehen.
       if (!ds || !nurMesswerte({ dataset: ds })) return;
       const meta = chart.getDatasetMeta(di);
       if (!meta || meta.hidden) return;
-      // Pro Datensatz zuruecksetzen: zwei Reihen liegen auf verschiedenen Hoehen und
-      // koennen sich nicht in die Quere kommen.
-      let belegtBis = -Infinity;
       meta.data.forEach((punkt, i) => {
         const wert = ds.data[i];
         if (wert == null || !punkt) return;
         const txt = fmt(wert);
         if (txt == null || txt === '') return;
         const halb = ctx.measureText(txt).width / 2 + 3;
-        if (punkt.x - halb < belegtBis) return;                // wuerde ueberlappen
         // Nicht ueber den oberen Rand der Zeichenflaeche hinausschreiben.
-        ctx.fillText(txt, punkt.x, Math.max(punkt.y - 4, flaeche.top + 9));
-        belegtBis = punkt.x + halb;
+        const y = Math.max(punkt.y - 4, flaeche.top + 9);
+        const x1 = punkt.x - halb, x2 = punkt.x + halb, y1 = y - 11, y2 = y + 2;
+        if (!frei(x1, y1, x2, y2)) return;
+        ctx.fillText(txt, punkt.x, y);
+        belegt.push({ x1, y1, x2, y2 });
       });
     });
     ctx.restore();
@@ -1506,7 +1517,7 @@ function _computePatternInsights() {
   if (last30hrv.length >= 7) {
     const slope = linTrend(last30hrv, 'hrv');
     if (slope!=null && Math.abs(slope) >= 0.05) {
-      const perWeek = (slope*7).toFixed(1);
+      const perWeek = zahl(slope*7,1);
       if (slope > 0)
         insights.push({icon:'📈',color:'#10B981',text:`Deine HRV zeigt einen positiven Trend: +${perWeek} ms pro Woche über die letzten 30 Tage – ein starkes Fitnesssignal.`,hl:[{phrase:`positiven Trend`,c:'#10B981'},{phrase:`starkes Fitnesssignal`,c:'#10B981'}],conf:'HRV-Trend 30 Tage'});
       else
@@ -1519,7 +1530,7 @@ function _computePatternInsights() {
   if (last30hr.length >= 7) {
     const slope = linTrend(last30hr, 'restHR');
     if (slope!=null && Math.abs(slope) >= 0.03) {
-      const perWeek = Math.abs(slope*7).toFixed(1);
+      const perWeek = zahl(Math.abs(slope*7),1);
       if (slope < 0)
         insights.push({icon:'📉',color:'#10B981',text:`Dein Ruhepuls sinkt: −${perWeek} bpm pro Woche über 30 Tage – ein klassisches Zeichen steigender Ausdauer.`,hl:[{phrase:'sinkt',c:'#10B981'},{phrase:'steigender Ausdauer',c:'#10B981'}],conf:'Ruhepuls-Trend 30 Tage'});
       else
@@ -1534,7 +1545,7 @@ function _computePatternInsights() {
     const first = mittel(vo2Rows.slice(0, Math.ceil(vo2Rows.length/3)), 'vo2max');
     const last  = mittel(vo2Rows.slice(-Math.ceil(vo2Rows.length/3)), 'vo2max');
     if (first&&last&&Math.abs(last-first)>=0.5) {
-      const diff = (last-first).toFixed(1);
+      const diff = zahl(last-first,1);
       if (last>first)
         insights.push({icon:'🫁',color:'#D97706',text:`Dein VO₂max hat sich um +${diff} ml/kg/min verbessert – deine aerobe Fitness entwickelt sich positiv.`,hl:[{phrase:`+${diff} ml/kg/min verbessert`,c:'#10B981'}],conf:'VO₂max-Entwicklung'});
       else
@@ -1650,7 +1661,7 @@ function datenStandZeilen() {
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
   const dir = delta==null?'neu':delta>0?'pos':'neg';
-  const dStr = delta==null?'—':(delta>0?'↑':'↓')+' '+Math.abs(delta).toFixed(1)+'% '+(deltaLabel||trendLabel());
+  const dStr = delta==null?'—':(delta>0?'↑':'↓')+' '+zahl(Math.abs(delta),1)+'% '+(deltaLabel||trendLabel());
   return `<div class="kpi" style="border-top-color:${color||'transparent'}">
     <div class="kpi-hd"><span class="kpi-lbl">${label}</span>${icon?`<span class="kpi-ico">${icon}</span>`:''}</div>
     <div class="kpi-val">${value}<span class="kpi-unit">${unit||''}</span></div>
@@ -1810,7 +1821,7 @@ function pgOverview() {
     }
     if(lbl==='Ruhepuls') return `${pre}Ruhepuls: ${v!=null?Math.round(v)+' bpm'+per:'—'}`;
     if(lbl==='HRV')      return `${pre}HRV: ${v!=null?Math.round(v)+' ms'+per:'—'}`;
-    return lbl+': '+(v!=null?v.toFixed(1):'—');
+    return lbl+': '+zahl(v,1);
   }
   if(wHas){
     zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
@@ -2013,7 +2024,11 @@ function pgHerz() {
       if(_yMin===_yMax)_yMax=_yMin+_yStep;
     }
     const _yAxis=extra=>({min:_yMin,max:_yMax,ticks:{color:'#94A3B8',font:{size:10},stepSize:_yStep,callback:v=>Math.round(v)},...extra});
-    zeichneDiagramm('c-herz',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[
+    zeichneDiagramm('c-herz',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,
+      // Puls in bpm, HRV in ms – beide ganzzahlig, eine Nachkommastelle waere
+      // hier Scheingenauigkeit.
+      __werteFmt:v=>String(Math.round(v)),
+      type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
       // Ø-Linien in der Farbe ihrer Reihe statt der beiden grauen Ziellinien: bei zwei
@@ -2355,7 +2370,9 @@ function pgSchlaf() {
     const _slZiel = ZIELE.sleepTotal.ziel;
     const _slErreicht = i => slMa[i]!=null && slMa[i] >= _slZiel;
     const _slFarbe = ctx => _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
-    zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:[
+    zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
+      __werteFmt:v=>v?zahl(v,1):'',
+      type:'bar',data:{labels:tL,datasets:[
       // EIN Balken je Nacht. Frueher waren es zwei gestapelte Segmente ("bis Ziel" /
       // "ueber Ziel") – ein Rest aus der Zeit, als sie verschiedene Farben trugen.
       // Seit beide dieselbe Farbe haben, war der Stapel nur noch schaedlich: Chart.js
@@ -2584,7 +2601,7 @@ async function pgTraining() {
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
-      __werteFmt:v=>v?(_zeitInH?(v/60).toFixed(1):String(Math.round(v))):'',
+      __werteFmt:v=>v?(_zeitInH?zahl(v/60,1):String(Math.round(v))):'',
       type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
@@ -2600,7 +2617,7 @@ async function pgTraining() {
       type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${ctx.raw.toFixed(1)} km`:null}}},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${zahl(ctx.raw,1)} km`:null}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});
   }
@@ -2666,7 +2683,7 @@ function vo2Abschnitt(D, P) {
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
         ${statZeile(`Einordnung`, `${v2cat}`, `${v2catColor}`)}
         ${statZeile(`Trend`, `${v2Trend!=null?(v2Trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}`, `${v2Trend!=null&&v2Trend>0?'#10B981':v2Trend!=null&&v2Trend<0?'#EF4444':null}`)}
-        ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+v2Trend.toFixed(1)+'%':'—'}`)}
+        ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}
         ${statZeile(`Messungen`, `${v2r.length}`)}
       </div>
     </div>`;
@@ -2684,10 +2701,10 @@ function vo2Abschnitt(D, P) {
       const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
       _v2Dsets.push(zielLinie('vo2max', _v2tL.length));
       zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,
-        __werteFmt:v=>v.toFixed(1),
+        __werteFmt:v=>zahl(v,1),
         type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${zahl(ctx.raw,2)} ml/kg/min`:null}}},
           scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,ticks:{...gy.ticks,stepSize:_v2Step}}}}});
     }
   }
