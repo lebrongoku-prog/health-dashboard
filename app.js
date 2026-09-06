@@ -693,7 +693,14 @@ function monatsSumme(rows, field) {
 }
 function allMonths(rows) { return [...new Set(rows.map(r=>r.date.slice(0,7)))].sort(); }
 function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])); return mos.map(m2=>m[m2]??null); }
-function alsStdMin(h) { if(h==null) return '—'; return Math.floor(h)+'h '+Math.round((h%1)*60).toString().padStart(2,'0')+'m'; }
+// Stunden als "7h 25m". Die aufgerundete Minute muss dabei ueberlaufen koennen:
+// 7.996 h ergaebe sonst "7h 60m" – dieselbe Falle, die fmtPace bei 5'60" abfaengt.
+function alsStdMin(h) {
+  if (h == null) return '—';
+  let st = Math.floor(h), mi = Math.round((h % 1) * 60);
+  if (mi === 60) { st++; mi = 0; }
+  return st + 'h ' + String(mi).padStart(2,'0') + 'm';
+}
 // Pace: km/h → min/km, plus einheitliche Darstellung 5'30".
 // Vorher an drei Stellen ausgeschrieben, dabei zweimal mit '' statt " als Sekundenzeichen.
 function paceFromSpeed(kph) { return kph > 0 ? 60/kph : null; }
@@ -2371,7 +2378,9 @@ function pgSchlaf() {
     const _slErreicht = i => slMa[i]!=null && slMa[i] >= _slZiel;
     const _slFarbe = ctx => _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
-      __werteFmt:v=>v?zahl(v,1):'',
+      // "7h 25m" statt "7.4" – dasselbe Format wie in der Ziele-Karte und den
+      // Minikacheln, damit dieselbe Nacht ueberall gleich aussieht.
+      __werteFmt:v=>v?alsStdMin(v):'',
       type:'bar',data:{labels:tL,datasets:[
       // EIN Balken je Nacht. Frueher waren es zwei gestapelte Segmente ("bis Ziel" /
       // "ueber Ziel") – ein Rest aus der Zeit, als sie verschiedene Farben trugen.

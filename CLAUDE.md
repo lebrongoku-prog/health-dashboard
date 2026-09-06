@@ -467,7 +467,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Datenbeschriftungen (`werteLabelPlugin`, 06.09.2026):** Zahlen über Balken und
   Datenpunkten — **nur im Querformat** und nur, wo ein Diagramm sie über
   `cfg.__werteFmt` anfordert: die vier Karten des Training-Tabs sowie
-  **Ruhepuls & HRV** (`c-herz`) und **Schlafdauer** (`c-sl-dur`). Im
+  **Ruhepuls & HRV** (`c-herz`) und **Schlafdauer** (`c-sl-dur`).
+  **Das Format kommt aus denselben Helfern wie der Rest der App** — `alsStdMin()` für
+  die Schlafdauer (`7h 25m`, auf Wunsch statt `7.4`), `fmtPace()` für die Pace,
+  `zahl()` für Strecke und VO₂max. Dieselbe Nacht sieht damit über dem Balken so aus
+  wie in der Ziele-Karte und in der Minikachel. Breite Texte kosten Beschriftungen:
+  `7h 25m` ist rund doppelt so breit wie `7.4`, im vollen Monat (31 Nächte, 23 px je
+  Spalte) tragen deshalb 24 von 31 Balken eine Zahl. Das regelt die Rechteck-Prüfung
+  von selbst. Im
   Hochformat ist die Karte halb so breit; dort stünden die Zahlen bei einem
   Monatsfenster als graues Band über den Balken.
   **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs.** Chart.js
