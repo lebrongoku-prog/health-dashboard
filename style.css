@@ -323,14 +323,19 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   /* Passiver Modus schrumpft die Reihe. Der Ursprung liegt an der UNTERKANTE, damit
      sie dabei am unteren Bildschirmrand stehen bleibt und nicht nach oben wandert. */
   transform-origin: bottom center;
-  transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 /* 30 % kleiner, sobald man scrollt oder daneben tippt. Bewusst ueber `transform`
    statt ueber kleinere Masse: so schrumpfen Hoehe, Schrift, Abstaende und Rundungen
    im selben Verhaeltnis, und es kann nichts umbrechen. Der Platzbedarf im Layout
    aendert sich dadurch nicht — die Leiste liegt ohnehin `fixed` ueber dem Inhalt.
    Bedienbar bleibt sie: 44 px werden zu 31 px, ein Tipp darauf macht sie wieder gross. */
-#zeitleiste.passiv .zl-reihe { transform: scale(0.7); }
+/* Dazu halb durchsichtig. Die Deckkraft sitzt an der REIHE, nicht an Pille und
+   Pfeilen einzeln: so verblassen Flaeche, Rand, Schatten und Schrift gleichmaessig,
+   und die beiden Elemente bleiben untereinander gleich stark. Auf die Tippflaeche
+   wirkt sich das nicht aus — durchsichtig heisst nicht durchlaessig. */
+#zeitleiste.passiv .zl-reihe { transform: scale(0.7); opacity: .5; }
 /* Pille und Pfeile teilen dieselbe durchscheinende Flaeche: sie liegen mal auf dem
    farbigen Tab-Hintergrund, mal auf einer Karte — deckend wirkten sie wie ein
    Fremdkoerper, ganz ohne Flaeche waeren sie auf hellen Karten unlesbar. */
