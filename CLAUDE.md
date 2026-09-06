@@ -122,7 +122,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   die App liest sie nur nicht mehr. Damit ist auch der Schreib-Scope entfallen
   (siehe Kopf) — die App liest jetzt wieder ausschliesslich.
 
-- **Globaler State:** `timeRange` (`heute`/`7d`/`1m`/`3m`/`6m`/`12m`/`24m`) + `referenceDate`.
+- **Globaler State:** `timeRange` (`7d`/`1m`/`3m`/`6m`/`12m`/`24m`) + `referenceDate`.
+  **Einen Bereich `heute` gibt es nicht mehr** (entfallen 06.09.2026): ein Diagramm
+  zeigt nie nur einen einzigen Tag. „Heute" ist seither ein **Sprung**, kein Zeitraum.
   `filtered()` liefert die Zeilen des Fensters. `timeDim(D,…)` liefert
   `{labels, align, alignSum, hasData}` und aggregiert je nach Range täglich/wöchentlich/monatlich.
 - **Daten:** `allData` = Tageszeilen (aus Sheet), **pro Datum genau eine Zeile** — doppelte
@@ -239,8 +241,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Bildschirmrand (siehe „Zeitleiste"), nur der angezeigte Zeitraum bleibt **je
   Diagramm** rechts in der Titelzeile (`filterTitelTeil()`). Einen „Heute"-Knopf gibt
   es dort seit 06.09.2026 nicht mehr — siehe „Zeitleiste", Punkt 6. Der Zeitraum
-  erscheint erst ab **1M** (`zeitraumText()`, z. B. `Jun–Aug 26`); bei Heute/7T steht
-  das Datum auf der Zeitachse.
+  erscheint erst ab **1M** (`zeitraumText()`, z. B. `Jun–Aug 26`); bei 7T steht das
+  Datum auf der Zeitachse.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
   die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
   Warnzeilen tragen keine. Ausgenommen bleiben die beiden Banner-Knöpfe (🔄/🌙) — ohne
@@ -297,24 +299,29 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Klasse sitzt an ihr selbst), die Zeitleiste rückt aber auf Nav-Höhe und
      hinterlässt unten eine Lücke. `themaSetzen()` tauscht nur die `theme-*`-Klasse
      und kann deshalb nichts mitreissen — auch nichts, was es heute noch nicht gibt.
-  4. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
-     Weil die Reihe zentriert ist, bleibt die Pille dabei an derselben Stelle stehen.
-  6. **„Heute" ist Bereich UND Sprung.** Der frühere `.nav-today`-Knopf in jeder
-     Diagrammkarte ist auf Wunsch entfallen; seine Aufgabe hat der Eintrag „Heute"
-     der Zeitleiste übernommen. Ein Tipp darauf setzt den Bereich **und** ruft
-     `aufHeuteSpringen()` — immer, auch wenn „Heute" schon aktiv war. Damit ist
-     `referenceDate` wieder auf dem neuesten Tag und `_datumSelbstGewaehlt` false,
-     das Nachladen darf also wieder mitziehen. Wer den neuesten **3M**-Ausschnitt
-     will, tippt „Heute" und dann „3M" — zwei Tipps statt einem, dafür ein
-     Bedienelement weniger je Karte.
+  4. **Die Pfeile sind immer sichtbar.** Sie verschwanden früher beim Bereich
+     „Heute" — den gibt es nicht mehr, und jeder verbliebene Bereich lässt sich
+     blättern. Ob ein Schritt möglich ist, sagt allein `updateNavUI()` über `disabled`.
+  6. **„Heute" ist ein Sprung, kein Bereich** (`.zl-heute`, ohne `data-range`). Ein
+     Tipp ruft `aufHeuteSpringen()` und lässt `timeRange` **unangetastet**: steht man
+     auf 3M im März, bleibt es 3M und zeigt die neuesten drei Monate. Damit ist
+     `referenceDate` wieder am neuesten Tag und `_datumSelbstGewaehlt` false, das
+     Nachladen darf also wieder mitziehen. Es trägt nie `aktiv` — es hat keinen
+     Zustand. Optisch deshalb **Umrandung statt Füllung** und durch `.zl-trenner`
+     abgesetzt: als siebter Chip in Chip-Optik erwartete man eine Tagesansicht, und
+     genau die gibt es nicht mehr. Der Weg dorthin: erst `.nav-today` in jeder
+     Diagrammkarte, dann kurz ein Bereich `heute`, seit 06.09.2026 dieser Knopf.
   5. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
      Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
      `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
      Blättern genau so, wie der Anker es verhindern soll.
-  Die Chips der Auswahl sind knapp bemessen (`padding: 0 .55rem`, `gap: 4px`), damit
-  alle sieben auf iPhone-Breite in **eine** Zeile passen: gemessen 332.7 von 337 px.
-  Mit 5 px Lücken fehlten 3.7 px und die letzten beiden rutschten in eine zweite
-  Zeile. Schmalere Geräte brechen weiterhin um.
+  **Die Auswahl passt nur knapp in eine Zeile — jede Änderung dort nachmessen.**
+  Stand: „Heute" + Trenner + sechs Chips brauchen **332 von 332 px** bei 375 px
+  Fenster, also exakt. Dafür sind `gap: 3px`, `.zl-opt{padding:0 .55rem}`,
+  `.zl-heute{padding:0 .5rem}` und `.zl-trenner{margin:0 1px}` nötig. Mit den
+  Ausgangswerten (`gap:4px`, `.6rem`, `2px`) waren es 340.2 px und die Leiste brach
+  auf zwei Zeilen um — sie wird dann 86 statt 48 px hoch und drängt sich vor die
+  Diagramme. Schmalere Geräte brechen weiterhin um; das ist hingenommen.
   `--zeit-h` (44 px) steht auch im `padding-bottom` von `.screen` — sonst verschwindet
   die unterste Karte unter der Leiste.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
@@ -550,7 +557,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
   zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
   nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
-  ihn: „Weitere Auswertungen" (Herz, Schlaf) und „Muster & Zusammenhänge". Die
+  ihn: „Weitere Auswertungen" (Herz, Schlaf) und „Muster & Zusammenhänge" — **alle
+  drei starten zu** (`_weitereOffen`, `_musterOffen`; letzteres seit 06.09.2026 auf
+  Wunsch, vorher offen). Die
   frühere dritte Stelle, die App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug
   auf die Einstellungen-Seite entfallen.
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**

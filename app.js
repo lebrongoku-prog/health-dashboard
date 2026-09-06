@@ -480,7 +480,10 @@ function findField(rows, ...candidates) {
 
 // ── Window / filter ────────────────────────────────────
 // Die auswählbaren Bereiche stehen in _RANGE_OPTS (Quelle für das Dropdown).
-function windowDays() { return {'heute':1,'7d':7}[timeRange] || null; }
+// 'heute' stand hier bis 06.09.2026 als eigener Bereich (ein einzelner Tag). Er ist
+// auf Wunsch entfallen: „Heute" ist jetzt ein Sprung auf den neuesten Ausschnitt,
+// kein Zeitraum. Diagramme zeigen damit nie mehr nur einen einzigen Tag.
+function windowDays() { return {'7d':7}[timeRange] || null; }
 function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24}[timeRange] || null; }
 
 // Always format as local YYYY-MM-DD (avoids UTC-offset-off-by-one bug)
@@ -1971,7 +1974,9 @@ function pgHerz() {
 let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
 // Muster-Abschnitt der Übersicht: auf- oder zugeklappt. Startet offen, damit sich
 // beim ersten Öffnen nichts versteckt.
-let _musterOffen = true;
+// Start ZU (auf Wunsch, 06.09.2026): die Uebersicht soll mit Zielen, Kacheln und
+// Verlauf beginnen; die Deutungen holt man sich dazu, wenn man sie will.
+let _musterOffen = false;
 // Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
 // hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
 const _weitereOffen = { herz:false, schlaf:false };
@@ -2833,8 +2838,8 @@ const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 // Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
 // Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
 const _RANGE_OPTS = [
-  ['heute','Heute'],['7d','7T'],['1m','1M'],
-  ['3m','3M'],['6m','6M'],['12m','12M'],['24m','24M']
+  ['7d','7T'],['1m','1M'],['3m','3M'],
+  ['6m','6M'],['12m','12M'],['24m','24M']
 ];
 // Angezeigter Zeitraum als Text – nur bei den Monatsbereichen. Bei Heute/7T steht das
 // Datum bereits auf der Zeitachse; ab 1M zeigt sie je nach Bereich nur noch Monate,
@@ -2860,8 +2865,8 @@ function zeitraumText() {
 // Nur noch der angezeigte Zeitraum. Der frueher hier stehende „Heute"-Knopf ist auf
 // Wunsch entfallen; seine Aufgabe – auf den neuesten Tag springen – hat der Eintrag
 // „Heute" in der Zeitleiste uebernommen (aufHeuteSpringen).
-// Bei Heute/7T liefert zeitraumText() nichts; `.filter-titel:empty` blendet den
-// leeren Kasten dann aus.
+// Bei 7T liefert zeitraumText() nichts (dort steht das Datum auf der Zeitachse);
+// `.filter-titel:empty` blendet den leeren Kasten dann aus.
 function filterTitelTeil() {
   const zeitraum = zeitraumText();
   return `<div class="filter-titel">${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}</div>`;
@@ -2893,9 +2898,14 @@ function zeitleisteBauen() {
   // Aus _RANGE_OPTS erzeugt — die Liste der Zeiträume bleibt damit an einer Stelle.
   const opts = _RANGE_OPTS.map(([k,lbl]) =>
     `<button class="zl-opt" data-range="${k}">${lbl}</button>`).join('');
+  // „Heute" steht in derselben Leiste, ist aber KEIN Bereich, sondern ein Sprung auf
+  // den neuesten Ausschnitt — der Bereich bleibt, wie er ist. Deshalb ohne
+  // `data-range`, mit eigener Klasse und durch einen Strich abgesetzt: sonst sähe es
+  // aus wie eine siebte Auswahl und man erwartete eine Tagesansicht.
+  const heute = `<button class="zl-heute">Heute</button><span class="zl-trenner" aria-hidden="true"></span>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
-  el.innerHTML = `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${opts}</div>`
+  el.innerHTML = `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${heute}${opts}</div>`
     + `<div class="zl-reihe">`
     + `<button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>`
     + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
@@ -2911,12 +2921,9 @@ function zeitleisteAktualisieren() {
   const treffer = _RANGE_OPTS.find(([k]) => k === timeRange);
   const pille = el.querySelector('.zl-pille');
   if (pille) pille.textContent = treffer ? treffer[1] : timeRange;
-  // Bei „Heute" gibt es nichts zu blättern — heute ist heute. Die Reihe ist
-  // zentriert, deshalb bleibt die Pille beim Ausblenden der Pfeile an derselben
-  // Stelle stehen; es springt nichts.
-  el.querySelectorAll('.zl-reihe .nav-arrow').forEach(b => {
-    b.style.display = timeRange === 'heute' ? 'none' : 'inline-flex';
-  });
+  // Die Pfeile sind immer da. Frueher verschwanden sie beim Bereich „Heute" — den
+  // gibt es nicht mehr, und jeder verbliebene Bereich laesst sich blaettern.
+  // Ob ein Schritt moeglich ist, sagt weiterhin `updateNavUI()` ueber `disabled`.
   el.querySelectorAll('.zl-opt').forEach(b => {
     b.classList.toggle('aktiv', b.dataset.range === timeRange);
   });
@@ -3294,16 +3301,18 @@ document.body.addEventListener('click', (e) => {
   // BEWUSST ohne `return` — der Tipp soll trotzdem noch das tun, wofür er gedacht war.
   if (_zlOffen && !t.closest('.zl-pille') && !t.closest('.zl-opt')) zeitleisteAuswahl(false);
   if (t.closest('.zl-pille')) { zeitleisteAuswahl(!_zlOffen); return; }
-  const zlOpt = t.closest('.zl-opt');
-  if (zlOpt) {
+  // „Heute" wechselt den Bereich NICHT – es schiebt nur den Ausschnitt ans Ende.
+  // Steht man auf 3M im Maerz, bleibt es 3M und zeigt die neuesten drei Monate.
+  if (t.closest('.zl-heute')) {
     zeitleisteAuswahl(false);
-    // „Heute" springt IMMER auf den neuesten Tag – auch wenn der Bereich schon
-    // „Heute" war. Es hat damit die Aufgabe des frueheren Knopfes in den Diagrammen
-    // mituebernommen. Erst springen, dann den Bereich setzen: setR() zeichnet neu.
-    if (zlOpt.dataset.range === 'heute') aufHeuteSpringen();
-    setR(zlOpt.dataset.range);
+    blickAnkerMerken(t);
+    aufHeuteSpringen();
+    updateNavUI();
+    _refreshAfterStateChange();
     return;
   }
+  const zlOpt = t.closest('.zl-opt');
+  if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
   if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
   if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
   // Jeder Knopf hat eine EIGENE Auslöser-Klasse. `.update-btn` ist reine Optik und

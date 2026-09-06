@@ -355,7 +355,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    Tipphoehe von 34 px ist davon unberuehrt. */
 .zl-optionen {
   pointer-events: auto;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 3px;
   max-width: 100%;
   padding: 6px;
   border-radius: 18px;
@@ -379,6 +379,28 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    wird zwar gesetzt, hat aber keine Wirkung. Dasselbe Muster steht bereits bei
    `#hinweis-oben[hidden]` und `.weitere-inhalt[hidden]`. */
 .zl-optionen[hidden] { display: none; }
+
+/* „Heute" ist kein Zeitraum, sondern ein Sprung ans Ende des Datenbestands — der
+   gewaehlte Bereich bleibt. Deshalb sieht es anders aus als die Bereichs-Chips
+   (Umrandung statt Fuellung) und steht durch einen Strich abgesetzt: als siebter
+   Chip in derselben Optik erwartete man eine Tagesansicht, und genau die gibt es
+   nicht mehr. Es traegt NIE die Klasse `aktiv` — es hat keinen Zustand. */
+.zl-heute {
+  /* Knapp bemessen wie die Bereichs-Chips: mit `.6rem` und 2-px-Trennerrand brauchte
+     die Zeile 340.2 von 337 px und brach um. Siehe die Messnotiz bei `.zl-optionen`. */
+  height: 34px; padding: 0 .5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--txt);
+  font-family: inherit; font-size: .84rem; font-weight: 700;
+  cursor: pointer; flex: 0 0 auto;
+}
+.zl-trenner {
+  width: 1px; height: 20px; flex: 0 0 auto;
+  margin: 0 1px;
+  background: var(--border);
+}
 
 /* Der gewaehlte Zeitraum in der Tabfarbe – dieselbe Sprache wie sonst in der App. */
 .zl-opt.aktiv {
