@@ -6,6 +6,9 @@
 
 :root {
   --nav-h: 60px;
+  /* Hoehe der Zeitleiste ueber der Tableiste – auch im .screen-Padding gebraucht,
+     damit die unterste Karte nicht darunter verschwindet. */
+  --zeit-h: 44px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   /* Landscape-Safe-Areas für die Notch-Seite (links oder rechts, je nach Drehung) */
@@ -93,7 +96,6 @@ body.theme-training   { --tab-color: #F97316; }
 /* ── Topbar pro Tab (inline) ─────────────────────────────
    Die Topbar wird per JS in jede .screen-Fläche injiziert und scrollt
    mit dem Inhalt. Kein position:fixed, kein Auto-Hide. */
-.date-nav { display: flex; align-items: center; gap: 4px; min-width: 0; }
 
 /* Refresh + Dark-Toggle: deutlich unterscheidbare Tönung gegen versehentliche Verwechslung */
 .nav-arrow {
@@ -160,7 +162,7 @@ body.dark .dark-toggle { color: #FBBF24; }
   scroll-snap-stop: always;
   /* Padding: Top = Safe-Area (Status-Bar), L/R = Safe-Area+12px (Landscape-Notch),
      Bottom = Nav-Höhe + Safe-Area + Puffer. Topbar ist Teil des Inhalts und scrollt mit. */
-  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--zeit-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
 }
@@ -246,6 +248,89 @@ body.dark #bottom-nav {
   border-top-color: #334155;
 }
 #bottom-nav.nav-hidden { transform: translateY(110%); }
+
+/* ── Zeitleiste (Vorbild: FitTracks Pille bei laufender Einheit) ──────────
+   EIN Bedienelement fuer die ganze App statt einer Kopie in jeder Diagrammkarte:
+   Pille = gewaehlter Zeitraum, Pfeile = blaettern. Sitzt ueber der Tableiste, ist in
+   jedem Tab sichtbar und verschwindet weder beim Scrollen noch beim Tippen — nur
+   ihre Hoehe folgt der Tableiste.
+
+   WICHTIG: Die Leiste spannt sich ueber die volle Breite, nimmt aber KEINE Tipps an
+   (`pointer-events:none`); nur die Kinder tun das. Sonst faengt der freie Platz
+   links und rechts der Pille die Tipps ab, mit denen man die Tableiste einblendet. */
+#zeitleiste {
+  position: fixed; left: 0; right: 0;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 6px);
+  z-index: 99;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0 calc(var(--safe-r) + 12px) 0 calc(var(--safe-l) + 12px);
+  pointer-events: none;
+  transition: bottom .25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
+
+.zl-reihe {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 8px;
+}
+/* Pille und Pfeile teilen dieselbe durchscheinende Flaeche: sie liegen mal auf dem
+   farbigen Tab-Hintergrund, mal auf einer Karte — deckend wirkten sie wie ein
+   Fremdkoerper, ganz ohne Flaeche waeren sie auf hellen Karten unlesbar. */
+.zl-pille, #zeitleiste .nav-arrow {
+  height: var(--zeit-h);
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--txt);
+  font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.zl-pille {
+  min-width: 92px; padding: 0 1.1rem;
+  border-radius: 999px;
+  font-size: .95rem; font-weight: 700;
+  letter-spacing: .01em;
+}
+#zeitleiste .nav-arrow {
+  width: 52px; border-radius: 999px;
+  font-size: 1.35rem; color: var(--txt2);
+}
+#zeitleiste .nav-arrow:disabled { opacity: .35; cursor: default; }
+
+/* Auswahl ueber der Pille. Die sieben Zeitraeume sollen auf iPhone-Breite (375 px)
+   in EINE Zeile passen. Nachgemessen: die sieben Chips brauchen 308.7 px, mit sechs
+   Luecken a 4 px sind es 332.7 – bei 337 verfuegbaren Pixeln bleiben gut 4 px Luft.
+   Mit 5 px Luecken fehlten 3.7 px und die letzten beiden rutschten in eine zweite
+   Zeile. Auf schmaleren Geraeten brechen sie weiterhin um und bleiben zentriert; die
+   Tipphoehe von 34 px ist davon unberuehrt. */
+.zl-optionen {
+  pointer-events: auto;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+  max-width: 100%;
+  padding: 6px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.zl-opt {
+  height: 34px; padding: 0 .55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--txt2);
+  font-family: inherit; font-size: .84rem; font-weight: 600;
+  cursor: pointer;
+}
+/* Der gewaehlte Zeitraum in der Tabfarbe – dieselbe Sprache wie sonst in der App. */
+.zl-opt.aktiv {
+  background: var(--tab-color);
+  border-color: var(--tab-color);
+  color: #fff;
+}
 .nav-btn {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; gap: 3px;
@@ -324,19 +409,11 @@ body.dark #bottom-nav {
 .chart-card h3{font-size:.94rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;min-width:0}
 .chart-card h3>.filter-titel .nav-arrow,.chart-card h3>.filter-titel .zeitraum-text{font-weight:600}
 .chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem}
-/* Legendenzeile: Einträge links, Auswahlfeld und Pfeile rechts auf derselben Zeile.
-   Die Einträge stehen in einem eigenen Block, damit eine lange Legende beim Umbruch
-   die Bedienelemente nicht mitnimmt. Reicht die Breite nicht, rutschen die
-   BEDIENELEMENTE in die zweite Zeile und die Legende bleibt einzeilig – nie
-   umgekehrt, sonst wird die Karte höher. */
-.chart-legend.mit-filter{flex-wrap:wrap;align-items:center;gap:.35rem}
-.chart-legend .cl-items{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center;min-width:0;flex:1 1 auto}
-.chart-legend .filter-legende{margin:0 0 0 auto;flex:0 0 auto}
 
 /* "Heute" + Zeitraum rechts in der Titelzeile. Der Titel selbst ist bereits ein
    Flex-Container; min-width:0 lässt ihn schrumpfen, statt die Knöpfe hinauszudrücken. */
 .chart-card h3>.filter-titel{margin-left:auto;flex:0 0 auto}
-.filter-titel,.filter-legende{display:flex;align-items:center;gap:.25rem;flex-wrap:nowrap}
+.filter-titel{display:flex;align-items:center;gap:.25rem;flex-wrap:nowrap}
 .filter-titel:empty{display:none}
 /* Legendenschalter des Vergleichsdiagramms: sieht aus wie ein Legendeneintrag,
    ist aber ein Knopf. Ausgeschaltete Reihen treten zurueck, bleiben aber lesbar. */
@@ -363,7 +440,6 @@ body.dark #bottom-nav {
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
 .chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chart-head .chart-filter{margin:0;flex:0 0 auto;flex-wrap:nowrap}
 
 /* ── App-Version + Update (Ende der Übersicht) ───────────
    Bewusst unauffällig: eine Wartungsfunktion, die selten gebraucht wird und den
@@ -424,21 +500,12 @@ body.dark .scope-badge{background:#0F172A}
 /* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
 /* Eigene Zeile unter dem Diagramm-Titel: volle Breite, dadurch Platz fuer
    Bedienelemente in Fingergroesse (Pfeile 36 px). */
-/* Enge Abstaende zwischen den Bedienelementen: die Leiste bleibt schmal, ohne dass
-   die Tippflaechen (29 px) kleiner werden. */
-.chart-filter{display:flex;align-items:center;gap:.25rem;margin:.15rem 0 .55rem;flex-wrap:wrap}
-.chart-filter .date-nav{margin-left:auto;gap:.4rem}
-/* Angezeigter Zeitraum zwischen "Heute" und dem Auswahlfeld. Bleibt einzeilig – ein
-   Umbruch hier zerreisst die Leiste. */
-.chart-filter .zeitraum-text,.filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
-.chart-filter .range-select,.filter-legende .range-select{height:29px;padding:0 1.05rem 0 .45rem;font-size:.79rem;font-weight:600;color:var(--txt2);background-color:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;outline:none;font-family:inherit;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2394A3B8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .35rem center;background-size:9px 6px}
-.chart-filter .date-nav{align-items:center;gap:2px}
-.chart-filter .nav-arrow,.filter-titel .nav-arrow,.filter-legende .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
-/* Pfeile 50 % breiter als hoch – sie werden am haeufigsten getippt. */
-.date-nav .nav-arrow{width:44px}
+/* Angezeigter Zeitraum neben "Heute". Bleibt einzeilig – ein Umbruch zerreisst die
+   Titelzeile. */
+.filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
+.filter-titel .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
-.chart-filter .nav-today,.filter-titel .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.77rem;font-weight:600;border-radius:8px}
-body.dark .chart-filter .range-select,body.dark .filter-legende .range-select{background-color:#0F172A}
+.filter-titel .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.77rem;font-weight:600;border-radius:8px}
 
 /* Multi-column layouts */
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
@@ -784,6 +851,10 @@ h5,
   }
   body.dark #bottom-nav { border-left-color: #334155; border-right-color: #334155; }
   #bottom-nav.nav-hidden { transform: translateX(-50%) translateY(110%); }
+
+  /* Zeitleiste folgt der Tableiste in die Mitte, sonst schwebte sie im Querformat
+     ueber der ganzen Fensterbreite statt ueber der App. */
+  #zeitleiste { left: 50%; right: auto; width: 600px; max-width: 600px; transform: translateX(-50%); }
 }
 
 /* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf

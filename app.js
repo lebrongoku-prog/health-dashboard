@@ -558,6 +558,8 @@ function fmtDayShort(d) {
 function updateNavUI() {
   // Die Zeitspanne als Text entfiel mit der neuen Filterleiste (sie steht auf der
   // Zeitachse). Geblieben ist der Aktiv-/Inaktiv-Zustand der beiden Pfeile.
+  // Zuerst die Zeitleiste, denn der Bereichsname stimmt auch ohne Daten.
+  zeitleisteAktualisieren();
   if (!allData.length) return;
   const minDate = allData[0].date;
   const maxDate = allData[allData.length-1].date;
@@ -2748,8 +2750,9 @@ const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 
 // Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
 // jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
-// Zeitfilter + Datumsnavigator liegen in den einzelnen Diagrammen
-// (siehe filterTitelTeil / filterLegendenTeil / _injectChartFilters).
+// „Heute" + angezeigter Zeitraum liegen in der Titelzeile jedes Diagramms
+// (filterTitelTeil / _injectChartFilters); Bereichswahl und Blätterpfeile stehen
+// EINMAL in der Zeitleiste unten am Bildschirm (zeitleisteBauen).
 
 // Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
 // Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
@@ -2785,15 +2788,62 @@ function filterTitelTeil() {
     ${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}
   </div>`;
 }
-function filterLegendenTeil() {
-  const opts = _RANGE_OPTS.map(([k,lbl]) => `<option value="${k}"${k===timeRange?' selected':''}>${lbl}</option>`).join('');
-  return `<div class="filter-legende">
-    <select class="range-select" aria-label="Zeitraum">${opts}</select>
-    <div class="date-nav" style="display:${timeRange==='heute'?'none':'inline-flex'}">
-      <button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>
-      <button class="nav-arrow nav-next" aria-label="Vor">›</button>
-    </div>
-  </div>`;
+
+// ── Zeitleiste: EIN Bedienelement für die ganze App ───────────────────────────
+// Vorbild ist FitTracks Pille bei laufender Einheit: ein Element, das unten am
+// Bildschirm stehen bleibt, in jedem Tab sichtbar ist und beim Scrollen oder Tippen
+// nicht verschwindet.
+//
+// Vorher steckten Auswahlfeld und Blätterpfeile in JEDER Diagrammkarte — zwölf
+// Kopien desselben Bedienelements für einen einzigen globalen Zustand. Sie
+// brauchten je Karte eine zweite Zeile und drängten die Legende so weit zusammen,
+// dass zwei Diagramme sie zweizeilig setzen mussten. Jetzt gibt es sie genau einmal.
+// In den Karten bleibt nur, was sich je Karte unterscheidet: „Heute" und der
+// angezeigte Zeitraum (filterTitelTeil).
+let _zlOffen = false;
+
+function zeitleisteBauen() {
+  if (document.getElementById('zeitleiste')) return;
+  // Aus _RANGE_OPTS erzeugt — die Liste der Zeiträume bleibt damit an einer Stelle.
+  const opts = _RANGE_OPTS.map(([k,lbl]) =>
+    `<button class="zl-opt" data-range="${k}">${lbl}</button>`).join('');
+  const el = document.createElement('div');
+  el.id = 'zeitleiste';
+  el.innerHTML = `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${opts}</div>`
+    + `<div class="zl-reihe">`
+    + `<button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>`
+    + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
+    + `<button class="nav-arrow nav-next" aria-label="Vor">›</button>`
+    + `</div>`;
+  document.body.appendChild(el);
+  zeitleisteAktualisieren();
+}
+
+function zeitleisteAktualisieren() {
+  const el = document.getElementById('zeitleiste');
+  if (!el) return;
+  const treffer = _RANGE_OPTS.find(([k]) => k === timeRange);
+  const pille = el.querySelector('.zl-pille');
+  if (pille) pille.textContent = treffer ? treffer[1] : timeRange;
+  // Bei „Heute" gibt es nichts zu blättern — heute ist heute. Die Reihe ist
+  // zentriert, deshalb bleibt die Pille beim Ausblenden der Pfeile an derselben
+  // Stelle stehen; es springt nichts.
+  el.querySelectorAll('.zl-reihe .nav-arrow').forEach(b => {
+    b.style.display = timeRange === 'heute' ? 'none' : 'inline-flex';
+  });
+  el.querySelectorAll('.zl-opt').forEach(b => {
+    b.classList.toggle('aktiv', b.dataset.range === timeRange);
+  });
+}
+
+function zeitleisteAuswahl(offen) {
+  const el = document.getElementById('zeitleiste');
+  if (!el) return;
+  _zlOffen = !!offen;
+  const box = el.querySelector('.zl-optionen');
+  if (box) box.hidden = !_zlOffen;
+  const pille = el.querySelector('.zl-pille');
+  if (pille) pille.setAttribute('aria-expanded', _zlOffen ? 'true' : 'false');
 }
 // Zeitfilter EINMAL pro Tab, direkt unter dem Banner.
 //
@@ -2813,25 +2863,10 @@ function _injectChartFilters(name) {
     if (card.querySelector('.filter-titel')) return;   // nicht doppelt injizieren
     const titel = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
     if (titel) titel.insertAdjacentHTML('beforeend', filterTitelTeil());
-    const legende = card.querySelector(':scope > .chart-legend');
-    if (legende) { legendeMitFilter(legende); return; }
-    // Karte ohne Legende (Schlaf-Score): der zweite Teil bekommt eine eigene Zeile.
-    if (titel) titel.insertAdjacentHTML('afterend', `<div class="chart-filter">${filterLegendenTeil()}</div>`);
-    else card.insertAdjacentHTML('afterbegin', `<div class="chart-filter">${filterLegendenTeil()}</div>`);
+    // Zweite Zeile mit Auswahlfeld und Pfeilen gibt es nicht mehr — das steht jetzt
+    // in der Zeitleiste unten am Bildschirm. Die Legende bekommt damit die volle
+    // Kartenbreite zurück.
   });
-}
-
-// Legendenzeile um Auswahlfeld und Pfeile ergänzen. Die vorhandenen Einträge kommen
-// dabei in einen eigenen Block: sonst nimmt eine lange Legende beim Umbruch die
-// Bedienelemente mit in die nächste Zeile. So bleiben sie rechts auf der Zeile stehen
-// und nur die Einträge selbst brechen um.
-function legendeMitFilter(legende) {
-  const eintraege = document.createElement('div');
-  eintraege.className = 'cl-items';
-  while (legende.firstChild) eintraege.appendChild(legende.firstChild);
-  legende.appendChild(eintraege);
-  legende.insertAdjacentHTML('beforeend', filterLegendenTeil());
-  legende.classList.add('mit-filter');
 }
 
 // Nach dem Render eines Tabs: Filter-Controls in die Diagramme setzen und
@@ -3056,6 +3091,14 @@ function initTabScrollSync() {
 
 // Auto-Hide nur noch für Bottom-Nav (Topbar ist jetzt Teil des Scroll-Inhalts
 // und rollt natürlich nach oben raus, keine separate Animation nötig).
+// Die Zeitleiste sitzt ueber der Tableiste und folgt ihr nach unten, wenn diese
+// ausgeblendet wird — sie selbst bleibt immer sichtbar. Beides an EINER Stelle
+// umgeschaltet, sonst laufen Leiste und Tableiste auseinander.
+function navAusblenden(nav, aus) {
+  nav.classList.toggle('nav-hidden', aus);
+  document.body.classList.toggle('nav-weg', aus);
+}
+
 function initScrollHideNav() {
   const nav = document.getElementById('bottom-nav');
   if (!nav) return;
@@ -3079,7 +3122,7 @@ function initScrollHideNav() {
         // Scrollen blendet die Leiste nur AUS. Zurück kommt sie ausschliesslich über
         // einen Tipp auf den freien Kartenhintergrund – auch beim Zurückscrollen und
         // am Seitenanfang bleibt sie weg. So gewünscht.
-        if (y > 60 && dy > 4) nav.classList.add('nav-hidden');
+        if (y > 60 && dy > 4) navAusblenden(nav, true);
       });
     }, { passive: true });
   });
@@ -3092,8 +3135,8 @@ function initScrollHideNav() {
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
     // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
     // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-filter, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
-    nav.classList.toggle('nav-hidden');
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
+    navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
 
@@ -3149,6 +3192,12 @@ document.body.addEventListener('click', (e) => {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
+  // Zeitleiste zuerst: die aufgeklappte Auswahl schliesst bei jedem Tipp daneben.
+  // BEWUSST ohne `return` — der Tipp soll trotzdem noch das tun, wofür er gedacht war.
+  if (_zlOffen && !t.closest('#zeitleiste')) zeitleisteAuswahl(false);
+  if (t.closest('.zl-pille')) { zeitleisteAuswahl(!_zlOffen); return; }
+  const zlOpt = t.closest('.zl-opt');
+  if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
   if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
   if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
   if (t.closest('.nav-today')) {
@@ -3173,11 +3222,6 @@ document.body.addEventListener('click', (e) => {
   }
   const pill = t.closest('.tbtn[data-range]');
   if (pill) { setR(pill.dataset.range); return; }
-});
-// Bereichs-Dropdown in den Diagrammen (Variante A) → setzt den globalen Zeitfilter.
-document.body.addEventListener('change', (e) => {
-  const sel = e.target;
-  if (sel && sel.classList && sel.classList.contains('range-select')) setR(sel.value);
 });
 // Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
@@ -3264,12 +3308,29 @@ async function jetztAktualisieren() {
 // an dieselbe Stelle im Sichtfenster setzen.
 let _blickAnker = null;   // { canvasId, abstandOben }
 
+// Die oberste Diagrammkarte, die gerade zu sehen ist — der Anker, wenn der Auslöser
+// selbst zu keiner Karte gehört.
+function obersteSichtbareKarte(screenEl) {
+  const oben = screenEl.getBoundingClientRect().top;
+  const karten = screenEl.querySelectorAll('.chart-card');
+  for (let i = 0; i < karten.length; i++) {
+    if (!karten[i].querySelector('canvas')) continue;
+    if (karten[i].getBoundingClientRect().bottom > oben + 8) return karten[i];
+  }
+  return null;
+}
+
 function blickAnkerMerken(el) {
   _blickAnker = null;
-  const karte = el && el.closest ? el.closest('.chart-card') : null;
-  const canvas = karte ? karte.querySelector('canvas') : null;
   const screenEl = document.getElementById('screen-' + currentScreen);
-  if (!canvas || !canvas.id || !screenEl) return;
+  if (!screenEl) return;
+  // Die Blätterpfeile sitzen seit der Zeitleiste NICHT mehr in einer Karte. Ohne
+  // Rückfall bliebe der Anker leer und die Ansicht spränge beim Blättern genau so,
+  // wie es der Anker verhindern soll. Dann zählt, worauf man gerade schaut.
+  let karte = el && el.closest ? el.closest('.chart-card') : null;
+  if (!karte) karte = obersteSichtbareKarte(screenEl);
+  const canvas = karte ? karte.querySelector('canvas') : null;
+  if (!canvas || !canvas.id) return;
   _blickAnker = {
     canvasId: canvas.id,
     abstandOben: karte.getBoundingClientRect().top - screenEl.getBoundingClientRect().top
@@ -3424,6 +3485,7 @@ updateNavUI();
 
 // Tab-Snap-Sync + Auto-Hide-Bottom-Nav initialisieren
 initTabScrollSync();
+zeitleisteBauen();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');

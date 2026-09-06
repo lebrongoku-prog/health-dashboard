@@ -213,7 +213,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Muster-Insights → App-Karte (installierte Version + Update-Knopf). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/`.nav-today`/
-  `.refresh-btn`/`.dark-toggle` (click) und `.range-select` (change). Jede State-Änderung
+  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt` (alle click — der frühere
+  `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
   → `_refreshAfterStateChange()`.
 
 ## UI-/Namens-Konventionen
@@ -229,16 +230,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
   in der App-Karte der Übersicht — zusammen mit „App-Version aktualisieren" darunter,
   jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
-  deshalb die Beschriftung auf „Lädt…" statt den Knopf zu drehen. Der Zeitfilter (Heute + Dropdown + `‹ ›`) sitzt
-  **in jeder Diagramm-Karte**, verteilt auf **zwei Zeilen**: `filterTitelTeil()` setzt
-  „Heute" + Zeitraum rechts in die **Titelzeile**, `filterLegendenTeil()` das Dropdown
-  + `‹ ›` rechts in die **Legendenzeile** (`legendeMitFilter`). Karten ohne Legende
-  bekommen den zweiten Teil als eigene Zeile. Alles zusammen in einer Zeile ging nicht —
-  dort belegte es zwei Drittel der Breite und schnitt den Titel ab. Die Legendeneinträge
-  stehen in einem eigenen `.cl-items`-Block: reicht die Breite nicht (2 der 11
-  Diagramme), rutschen die **Bedienelemente** in die zweite Zeile und die Legende bleibt
-  einzeilig — nie umgekehrt. Der Zeitraum erscheint erst ab **1M** (`zeitraumText()`,
-  z. B. `Jun–Aug 26`); bei Heute/7T steht das Datum auf der Zeitachse.
+  deshalb die Beschriftung auf „Lädt…" statt den Knopf zu drehen. Der Zeitfilter ist **geteilt**:
+  Bereichswahl und Blätterpfeile stehen **einmal** in der Zeitleiste am unteren
+  Bildschirmrand (siehe „Zeitleiste"), „Heute" und der angezeigte Zeitraum bleiben
+  **je Diagramm** rechts in der Titelzeile (`filterTitelTeil()`). Der Zeitraum
+  erscheint erst ab **1M** (`zeitraumText()`, z. B. `Jun–Aug 26`); bei Heute/7T steht
+  das Datum auf der Zeitachse.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
   die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
   Warnzeilen tragen keine. Ausgenommen bleiben die beiden Banner-Knöpfe (🔄/🌙) — ohne
@@ -252,17 +249,47 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   ist die gestrichelte Variante für Ø-Linien. Ihre Farbe kommt inline als **`color`**,
   nicht als `background` — der Verlauf liest sie über `currentColor`. Die Regel muss
   **nach** `.cl-line` stehen, sonst gewinnt dessen `background`.
-- **Legendentexte kurz halten.** Neben der Leiste bleiben rund 140 px. Einheiten gehören
-  auf die Achse, nicht in die Legende (`Puls` statt `Ruhepuls · Ø 57 bpm`). Ab drei
-  Einträgen wird es eng, ab vier passt es nicht mehr: allein Punkte und Abstände
-  belegen dann ~70 px. Zweizeilig sind deshalb Wochenverlauf, Schlafdauer und
-  Schlafphasen — dort fehlen 31–46 px.
+- **Legendentexte kurz halten.** Seit die Bedienelemente in der Zeitleiste sitzen,
+  hat die Legende die volle Kartenbreite — der frühere Engpass (rund 140 px neben dem
+  Auswahlfeld, dadurch drei zweizeilige Legenden) ist weg. Kurz bleiben sie trotzdem:
+  Einheiten gehören auf die Achse, nicht in die Legende (`Puls` statt
+  `Ruhepuls · Ø 57 bpm`).
 - **Wochentrenner statt Wochenend-Tönung:** `wochentrennerPlugin` zieht **nur im
   1M-Fenster** einen feinen Strich (`ACHSEN_COLOR`) auf die linke Kante jeder
   Montagsspalte — die Grenze Sonntag/Montag. Die früher grau getönten Wochenendspalten
   sind entfallen: sie legten eine zweite Fläche unter die Daten, wo ohnehin Ziel- und
   Markierungsflächen liegen. Bei 7T liegt der Montag auf Index 0 (dort steht die
   Achse), ab 3M gibt es keine Tagesschlüssel — in beiden Fällen erscheint nichts.
+- **Zeitleiste (Vorbild FitTracks Pille bei laufender Einheit):** `#zeitleiste`,
+  erzeugt in `zeitleisteBauen()`, fest am unteren Bildschirmrand: `‹` — Pille mit dem
+  gewählten Zeitraum — `›`, darüber die aufklappbare Auswahl der sieben Bereiche.
+  Sie ist in **jedem Tab** sichtbar und verschwindet weder beim Scrollen noch beim
+  Tippen; nur ihre Höhe folgt der Bottom-Nav (`body.nav-weg`, in `navAusblenden()`
+  gemeinsam mit `nav-hidden` umgeschaltet — getrennt gesetzt liefen die beiden
+  auseinander).
+  **Warum überhaupt:** vorher steckten Auswahlfeld und Pfeile in **jeder** der zwölf
+  Diagrammkarten — zwölf Kopien eines Bedienelements für einen einzigen globalen
+  Zustand. Sie brauchten je Karte eine zweite Zeile und drängten die Legende so weit
+  zusammen, dass zwei Diagramme sie zweizeilig setzen mussten. Mit dem Umzug sind
+  `filterLegendenTeil()`, `legendeMitFilter()`, `.cl-items`, `.chart-filter`,
+  `.range-select` und `.date-nav` **ersatzlos entfallen**; die Legenden haben ihre
+  volle Kartenbreite zurück.
+  **Drei Dinge, die daran hängen:**
+  1. **`pointer-events: none` auf `#zeitleiste`**, `auto` erst auf den Kindern. Die
+     Leiste spannt sich über die volle Breite; ohne das fängt der freie Platz neben
+     der Pille die Tipps ab, mit denen man die Bottom-Nav wieder einblendet.
+  2. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
+     Weil die Reihe zentriert ist, bleibt die Pille dabei an derselben Stelle stehen.
+  3. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
+     Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
+     `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
+     Blättern genau so, wie der Anker es verhindern soll.
+  Die Chips der Auswahl sind knapp bemessen (`padding: 0 .55rem`, `gap: 4px`), damit
+  alle sieben auf iPhone-Breite in **eine** Zeile passen: gemessen 332.7 von 337 px.
+  Mit 5 px Lücken fehlten 3.7 px und die letzten beiden rutschten in eine zweite
+  Zeile. Schmalere Geräte brechen weiterhin um.
+  `--zeit-h` (44 px) steht auch im `padding-bottom` von `.screen` — sonst verschwindet
+  die unterste Karte unter der Leiste.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
 - **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
@@ -272,6 +299,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   eine gemeinsame Variable täuschte beim Tabwechsel einen Sprung vor (Tab A bei 800,
   Tab B bei 0) und blendete bei der ersten Bewegung im neuen Tab aus. Solange nur das
   Zurückscrollen wieder einblendete, fiel das nicht auf.
+  Die **Zeitleiste** verschwindet dabei nie — sie rückt nur nach unten nach. Beide
+  Zustände hängen an `navAusblenden()`.
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
   funktionieren Wochentrenner und Markierung nicht. `timeDim` liefert beides mit;
