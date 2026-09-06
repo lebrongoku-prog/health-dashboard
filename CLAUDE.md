@@ -617,6 +617,17 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   derselben Zeichenkette, die auch die API liefert. Für ein bereits umgestelltes
   Blatt gibt es `zeitformatSetzen()`. **Merke:** Wer am Sheet formatiert, ändert
   Daten. Eine Prüfung mit `getValues()` allein beweist hier nichts.
+- **`hidden` allein blendet NICHTS aus, sobald eigenes CSS `display` setzt.** Das
+  Attribut wirkt nur über das Browser-Stylesheet, und jede Klassenregel mit `display`
+  schlägt es. Zu jedem `hidden`-Element gehört deshalb eine eigene Regel — im Code
+  dreimal: `#hinweis-oben[hidden]`, `.weitere-inhalt[hidden]`, `.zl-optionen[hidden]`.
+  Bei der letzten fehlte sie: die Auswahl der Zeitleiste stand dauerhaft offen und
+  liess sich nicht zuklappen, obwohl das Attribut korrekt gesetzt wurde.
+  **Die eigentliche Lehre betrifft das Prüfen:** Ich hatte `el.hidden` abgefragt — die
+  Eigenschaft war richtig, nur eben wirkungslos. Ob etwas verschwindet, beweist allein
+  das Ergebnis: `getComputedStyle(el).display`, die gemessene Höhe oder ein Bild im
+  geschlossenen Zustand. Ein Zustandsflag zu prüfen heisst, den eigenen Code zu
+  befragen statt den Browser.
 - **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
   **Programmdateien**; `hcc_daten_v1` im `localStorage` hält die **Messdaten**. Der
   Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen
