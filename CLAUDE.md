@@ -492,7 +492,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Was die App liest, ist NICHT dasselbe wie das, was in den Blättern stehen muss.**
   Die beiden Sheets gehören unterschiedlich vielen Anwendungen, und danach richtet sich,
   ob eine Spalte entbehrlich ist:
-  **Health Dashboard Data (12) — nur dieses Dashboard.** `date`, `steps`, `restHR`,
+  **Health Dashboard Data (12) — nur dieses Dashboard** (von Leonard am 06.09.2026
+  ausdrücklich bestätigt; FitTrack nutzt allein `Workout Data`). `date`, `steps`, `restHR`,
   `hrv`, `sleepTotal`, `sleepCore`, `sleepRem`, `sleepDeep`, `sleepAwake`, `vo2max`,
   `sleepStart`, `sleepEnd`. Am 05.09.2026 von 32 auf diese gekürzt — hier war das
   richtig, weil niemand sonst mitliest. `sleepScore` liest die App zwar, das Apps
