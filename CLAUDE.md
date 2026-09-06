@@ -171,7 +171,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   selbst zu Google weiter (das riss den Nutzer mitten aus der Ansicht), sondern liefert
   `{authError:true}`; der Aufrufer entscheidet. Ohne Token laufen Anzeige und
   Zeitfilter aus dem Zwischenspeicher weiter. Der **Stand der Anmeldung steht in der
-  App-Karte** der Übersicht, nicht mehr als Leiste über allen Tabs: Zeile
+  App-Karte** auf der Einstellungen-Seite, nicht mehr als Leiste über allen Tabs: Zeile
   „Google-Anmeldung" (`aktiv` / `nur Lesen` / `abgelaufen`, die letzten beiden
   orange), darunter Knopf + Erklärung — beide nur, wenn wirklich etwas zu tun ist.
   `anmeldeStand()` ist die **einzige** Quelle dafür — die Zeile entsteht in
@@ -181,10 +181,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   dreien. Wird sie als Auslöser abgefragt, löst „Mit Google anmelden" zusätzlich das
   App-Update samt Rückfrage aus — genau das war passiert. `#hinweis-oben` bleibt allein
   dem Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
-  **Folge:** Eine abgelaufene Anmeldung fällt erst auf, wenn man die App-Karte
-  aufklappt oder etwas speichern will — das ist die gewollte Zurückhaltung.
+  **Folge:** Eine abgelaufene Anmeldung fällt erst auf, wenn man die
+  Einstellungen öffnet oder etwas laden will — das ist die gewollte Zurückhaltung,
+  seit 06.09.2026 eine Ebene tiefer als vorher.
   Fehlertexte dürfen deshalb **nicht** mehr auf „oben" verweisen, sondern auf
-  „Übersicht → App". **Schreiben ist dann gesperrt**
+  „Übersicht → Einstellungen". **Schreiben ist dann gesperrt**
   (`_schreibenErlaubt()`) — seit der Umstellung schon deshalb, weil die App ohne
   Anmeldung gar nicht mehr ins Sheet schreiben kann.
 - **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
@@ -210,10 +211,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
 - **Übersicht (`pgOverview`):** Ziel-Karte → Tageswert-Kacheln → Verlaufs-Chart →
-  Muster-Insights → App-Karte (installierte Version + Update-Knopf). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
+  Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
+  eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
-- **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/`.nav-today`/
-  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt` (alle click — der frühere
+- **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
+  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`
+  (alle click — der frühere
   `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
   → `_refreshAfterStateChange()`.
 
@@ -224,16 +227,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   erklärende Untertitel und die Zeile „Daten bis … · geladen …" sind entfernt. Der
   Untertitel wiederholte den Tabnamen, der Daten-Stand stand fünfmal identisch da;
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
-  der App-Karte der Übersicht (`datenStandZeilen()`, ab 2 Tagen Rückstand orange).
+  der App-Karte auf der Einstellungen-Seite (`datenStandZeilen()`, ab 2 Tagen
+  Rückstand orange).
 - **Bedienelemente:** 🌙 Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
   (`pgBanner()`). Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
-  in der App-Karte der Übersicht — zusammen mit „App-Version aktualisieren" darunter,
+  auf der Einstellungen-Seite — zusammen mit „App-Version aktualisieren" darunter,
   jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
   deshalb die Beschriftung auf „Lädt…" statt den Knopf zu drehen. Der Zeitfilter ist **geteilt**:
   Bereichswahl und Blätterpfeile stehen **einmal** in der Zeitleiste am unteren
-  Bildschirmrand (siehe „Zeitleiste"), „Heute" und der angezeigte Zeitraum bleiben
-  **je Diagramm** rechts in der Titelzeile (`filterTitelTeil()`). Der Zeitraum
+  Bildschirmrand (siehe „Zeitleiste"), nur der angezeigte Zeitraum bleibt **je
+  Diagramm** rechts in der Titelzeile (`filterTitelTeil()`). Einen „Heute"-Knopf gibt
+  es dort seit 06.09.2026 nicht mehr — siehe „Zeitleiste", Punkt 6. Der Zeitraum
   erscheint erst ab **1M** (`zeitraumText()`, z. B. `Jun–Aug 26`); bei Heute/7T steht
   das Datum auf der Zeitachse.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
@@ -294,6 +299,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      und kann deshalb nichts mitreissen — auch nichts, was es heute noch nicht gibt.
   4. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
      Weil die Reihe zentriert ist, bleibt die Pille dabei an derselben Stelle stehen.
+  6. **„Heute" ist Bereich UND Sprung.** Der frühere `.nav-today`-Knopf in jeder
+     Diagrammkarte ist auf Wunsch entfallen; seine Aufgabe hat der Eintrag „Heute"
+     der Zeitleiste übernommen. Ein Tipp darauf setzt den Bereich **und** ruft
+     `aufHeuteSpringen()` — immer, auch wenn „Heute" schon aktiv war. Damit ist
+     `referenceDate` wieder auf dem neuesten Tag und `_datumSelbstGewaehlt` false,
+     das Nachladen darf also wieder mitziehen. Wer den neuesten **3M**-Ausschnitt
+     will, tippt „Heute" und dann „3M" — zwei Tipps statt einem, dafür ein
+     Bedienelement weniger je Karte.
   5. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
      Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
      `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
@@ -304,6 +317,26 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zeile. Schmalere Geräte brechen weiterhin um.
   `--zeit-h` (44 px) steht auch im `padding-bottom` von `.screen` — sonst verschwindet
   die unterste Karte unter der Leiste.
+- **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
+  `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
+  `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
+  Auffrisch-Pfad für den Normalfall; `appKarteAuffrischen()` baut sie nur neu, wenn
+  sie **gerade offen** ist. Erreichbar über das Zahnrad in der Kopfzeile der
+  Übersicht, zurück über den Pfeil oben links **oder** einen Wisch vom linken
+  Bildschirmrand (`einstellungenWischen()`, Start nur bei x ≤ 28 px, Schwelle 30 %
+  der Breite — weiter innen gehört die waagrechte Bewegung dem Inhalt).
+  **Bottom-Nav und Zeitleiste sind währenddessen ausgeblendet** — über die eigene
+  Klasse `body.einst-offen`, NICHT über `nav-hidden`: der Zustand der Tableiste soll
+  erhalten bleiben und beim Schliessen genau so zurückkommen.
+  **Drei Fallen, die dort stecken:**
+  1. `.unterseite[hidden]{display:none}` ist Pflicht — siehe den `hidden`-Gotcha.
+  2. Im 600-px-Kasten (`min-width:768px and min-height:600px`) wird die Seite über
+     **`margin-left:-300px`** zentriert, nicht über `translateX(-50%)`: das `transform`
+     gehört der Ein-/Ausblend-Animation und läge sonst um die halbe Breite daneben.
+  3. Der **Render-Prüfstand hat eine eigene Kopie der Shell**. `#seite-einstellungen`
+     musste dort mit aufgenommen werden, sonst findet `pgEinstellungen()` nichts und
+     tut still gar nichts — die Seite wäre lokal nicht prüfbar, ohne dass es auffiele.
+  **Folge:** Daten-Stand, Anmeldestatus und beide Update-Knöpfe stehen nur noch hier.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
 - **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
@@ -473,7 +506,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `prozentDiff()` statt `pct()`, `monatsMittel`/`wochenSumme` statt `mAvg`/`wSum`.
 - **Gemeinsame Helfer statt Copy-Paste:** `statZeile(label, wert, farbe)` (Label links,
   Wert rechts — 44 Stellen), `splitWeekWknd(rows)` (Wochentag/Wochenende),
-  `fmtPace`/`paceFromSpeed` (Pace), `datenStandZeilen()` (Daten-Stand in der App-Karte).
+  `fmtPace`/`paceFromSpeed` (Pace), `datenStandZeilen()` (Daten-Stand in der App-Karte
+  der Einstellungen).
 - **`esc()` bei jedem Fremdtext — nicht verhandelbar.** Alles, was NICHT aus diesem Code
   stammt und als **Text** angezeigt wird (Sheet-Zellen, Google-Fehlermeldungen), muss durch
   `esc()`. Die Seiten entstehen per `innerHTML`; ohne `esc()` würde Auszeichnungscode in
@@ -498,8 +532,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   als SVG (18 px, `stroke-width:1.8`, runde Enden) — nach unten zum Aufklappen, nach
   oben zum Einklappen. Die Strichfarbe folgt hier `--tab-color` statt FitTracks fester
   Akzentfarbe. Er hebt sich damit bewusst von den durchscheinenden Nachbarn (＋, 🌙) ab.
-  Der Ausklapp-Knopf der **App-Karte** bleibt davon unberührt — er steht weiter als
-  `.weitere-btn` im Inhalt der Übersicht.
+  **Links davon steht in der Übersicht das Zahnrad** (`.pg-act.einst-act`) zur
+  Einstellungen-Seite. Es trägt bewusst die durchscheinende Optik der übrigen
+  `.pg-act` — der Ausklapp-Knopf ist der einzige helle Knopf der Zeile und soll das
+  bleiben.
 - **Tipp-Animation (aus FitTrack):** `button` und `.info-i` tragen
   `transition: opacity .15s, transform .1s` und im gedrückten Zustand
   `opacity:.75; scale(.97)`. Bewusst als **Element-Regel** (Spezifität 0,0,1), damit
@@ -514,10 +550,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
   zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
   nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
-  ihn: „Weitere Auswertungen" (Herz, Schlaf), „Muster & Zusammenhänge" und die
-  **App-Karte** der Übersicht (`_appOffen`, Start **zu**). Die App-Karte klappt ohne
-  `_renderTab` auf — in ihr steckt kein Diagramm, das im verborgenen Zustand mit
-  Breite 0 gezeichnet würde.
+  ihn: „Weitere Auswertungen" (Herz, Schlaf) und „Muster & Zusammenhänge". Die
+  frühere dritte Stelle, die App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug
+  auf die Einstellungen-Seite entfallen.
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
   Diagramm; der Rest liegt hinter einem Knopf über die volle Kartenbreite
   (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das schliessende
@@ -626,7 +661,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **`hidden` allein blendet NICHTS aus, sobald eigenes CSS `display` setzt.** Das
   Attribut wirkt nur über das Browser-Stylesheet, und jede Klassenregel mit `display`
   schlägt es. Zu jedem `hidden`-Element gehört deshalb eine eigene Regel — im Code
-  dreimal: `#hinweis-oben[hidden]`, `.weitere-inhalt[hidden]`, `.zl-optionen[hidden]`.
+  viermal: `#hinweis-oben[hidden]`, `.weitere-inhalt[hidden]`, `.zl-optionen[hidden]`,
+  `.unterseite[hidden]`.
   Bei der letzten fehlte sie: die Auswahl der Zeitleiste stand dauerhaft offen und
   liess sich nicht zuklappen, obwohl das Attribut korrekt gesetzt wurde.
   **Die eigentliche Lehre betrifft das Prüfen:** Ich hatte `el.hidden` abgefragt — die

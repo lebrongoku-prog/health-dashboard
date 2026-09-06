@@ -249,6 +249,54 @@ body.dark #bottom-nav {
 }
 #bottom-nav.nav-hidden { transform: translateY(110%); }
 
+/* ── Unterseite (Einstellungen) ─────────────────────────────
+   Eigene Seite statt Tab: schiebt sich von rechts ueber die App, zurueck ueber den
+   Pfeil oben links oder einen Wisch vom linken Rand (Vorbild FitTrack/iOS).
+   z-index 200 liegt ueber Bottom-Nav (100) und Zeitleiste (99), aber unter den
+   Overlays (9999) – ein Ladefehler oder der Login muessen weiterhin alles ueberdecken. */
+.unterseite {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.unterseite.offen { transform: translateX(0); }
+/* PFLICHT wie bei jedem `hidden`-Element mit eigener display-Regel – siehe
+   `.zl-optionen[hidden]`. Ohne das bliebe die Seite dauerhaft im Weg. */
+.unterseite[hidden] { display: none; }
+
+/* Bottom-Nav und Zeitleiste gehoeren zu den Tabs, nicht hierher. Ausblenden ueber
+   eine eigene Klasse statt ueber `nav-hidden`: der Zustand der Tableiste soll
+   erhalten bleiben und beim Schliessen genau so zurueckkommen. */
+body.einst-offen #bottom-nav,
+body.einst-offen #zeitleiste { display: none; }
+
+.us-kopf {
+  display: flex; align-items: center; gap: .35rem;
+  padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 8px);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.us-zurueck {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 10px;
+  color: var(--txt); cursor: pointer; font-family: inherit;
+}
+.us-zurueck svg {
+  width: 24px; height: 24px; fill: none;
+  stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.us-titel { font-size: 1.06rem; font-weight: 700; color: var(--txt); }
+.us-inhalt {
+  flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 12px calc(var(--safe-r) + 12px) calc(var(--safe-b) + 24px) calc(var(--safe-l) + 12px);
+}
+
 /* ── Zeitleiste (Vorbild: FitTracks Pille bei laufender Einheit) ──────────
    EIN Bedienelement fuer die ganze App statt einer Kopie in jeder Diagrammkarte:
    Pille = gewaehlter Zeitraum, Pfeile = blaettern. Sitzt ueber der Tableiste, ist in
@@ -512,7 +560,6 @@ body.dark .scope-badge{background:#0F172A}
 .filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
 .filter-titel .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
-.filter-titel .nav-today{width:auto;min-width:0;height:29px;padding:0 .55rem;font-size:.77rem;font-weight:600;border-radius:8px}
 
 /* Multi-column layouts */
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
@@ -862,6 +909,10 @@ h5,
   /* Zeitleiste folgt der Tableiste in die Mitte, sonst schwebte sie im Querformat
      ueber der ganzen Fensterbreite statt ueber der App. */
   #zeitleiste { left: 50%; right: auto; width: 600px; max-width: 600px; transform: translateX(-50%); }
+  /* Die Einstellungen-Seite folgt demselben 600-px-Kasten. Zentriert ueber
+     `margin-left`, NICHT ueber `translateX(-50%)`: das transform gehoert hier der
+     Ein-/Ausblend-Animation und wuerde sonst um die halbe Breite danebenliegen. */
+  .unterseite { left: 50%; right: auto; width: 600px; max-width: 600px; margin-left: -300px; }
 }
 
 /* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf
@@ -874,6 +925,11 @@ h5,
   border-radius:10px;
   box-shadow:0 2px 8px rgba(0,0,0,.15);
   -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+.pg-act.einst-act svg{
+  width:20px;height:20px;fill:none;
+  stroke:#fff;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
 }
 .pg-act.ausklapp-act svg{
   width:18px;height:18px;fill:none;

@@ -1545,7 +1545,7 @@ function scopeBadge(text) {
 // ── Daten-Stand ────────────────────────────────────────
 // Zeigt, bis wann Daten vorliegen und wann zuletzt geladen wurde. Ohne diese
 // Angabe war nach einem Abruf nicht erkennbar, ob er etwas bewirkt hat.
-// Steht als Zeilen in der App-Karte der Übersicht (früher im Tab-Titel — dort
+// Steht als Zeilen in der App-Karte auf der Einstellungen-Seite (früher im Tab-Titel — dort
 // wiederholte sich dieselbe Angabe auf allen fünf Tabs).
 function datenStandZeilen() {
   if (!allData.length) return '';
@@ -1720,36 +1720,10 @@ function pgOverview() {
         <div class="pi-text">${txt}</div>
       </div>`;}).join('')}
     </div>`:''}
-    <!-- App-Version + Update: eine installierte PWA übernimmt einen neuen Stand sonst
-         erst beim zweiten Start. Der Knopf holt ihn in einem Schritt.
-         Hinter demselben Ausklapp-Knopf wie "Weitere Auswertungen" und
-         "Muster & Zusammenhänge" – der Abschnitt wird selten gebraucht und muss
-         nicht dauerhaft unter der Übersicht stehen. Der Knopf traegt den Namen,
-         die Karte darunter deshalb keine eigene Überschrift mehr. -->
-    <button type="button" class="weitere-btn" data-appklapp aria-expanded="${_appOffen?'true':'false'}">
-      App<span class="weitere-pfeil">${_appOffen?'▾':'▸'}</span>
-    </button>
-    <div class="weitere-inhalt"${_appOffen?'':' hidden'}>
-    <div class="chart-card app-karte">
-      <div class="stats-list">
-        ${datenStandZeilen()}
-        ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
-      </div>
-      ${(()=>{ const a = anmeldeStand();
-        // Knopf und Erklaerung nur, wenn wirklich etwas zu tun ist – sonst staende hier
-        // dauerhaft eine Handlungsaufforderung ohne Anlass.
-        return a.hinweis ? `<button class="update-btn anmelde-btn">Mit Google anmelden</button>
-        <div class="app-hinweis">${a.hinweis}</div>` : ''; })()}
-      <button class="update-btn refresh-btn">Daten aktualisieren</button>
-      <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
-      <button class="update-btn appver-btn">App-Version aktualisieren</button>
-      <div class="app-hinweis">Holt eine neue Fassung der App selbst. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
-    </div>
-    </div>
+    <!-- Die App-Karte stand hier bis 06.09.2026 hinter einem Ausklapp-Knopf. Sie
+         liegt jetzt auf einer eigenen Seite „Einstellungen" (pgEinstellungen),
+         erreichbar ueber den Zahnrad-Knopf in der Kopfzeile dieses Tabs. -->
     `;
-
-
-  versionAnzeigen();   // asynchron, füllt .app-version nach
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){
@@ -1998,8 +1972,6 @@ let _kombiAktiv = { zeit:true, hr:false, strecke:true, pace:false };
 // Muster-Abschnitt der Übersicht: auf- oder zugeklappt. Startet offen, damit sich
 // beim ersten Öffnen nichts versteckt.
 let _musterOffen = true;
-// App-Karte: startet zu, wie die uebrigen Ausklapp-Abschnitte.
-let _appOffen = false;
 // Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
 // hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
 const _weitereOffen = { herz:false, schlaf:false };
@@ -2010,6 +1982,102 @@ const _weitereOffen = { herz:false, schlaf:false };
 // Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
 function weitereAuf(tab) {
   return `<div class="weitere-inhalt"${_weitereOffen[tab] ? '' : ' hidden'}>`;
+}
+
+// ── Einstellungen: eigene Seite statt Karte in der Uebersicht ────────────────
+// Vorbild ist FitTrack: eine Seite, die sich von rechts ueber die App schiebt, mit
+// Pfeil oben links zurueck – zusaetzlich zum Wisch vom linken Bildschirmrand.
+// Vorher lag alles davon als „App"-Karte hinter einem Ausklapp-Knopf unten in der
+// Uebersicht; damit endete jeder Besuch der Uebersicht mit einem Abschnitt, der
+// selten gebraucht wird.
+//
+// FOLGE, die man kennen muss: Der Stand der Google-Anmeldung und die Zeilen
+// „Daten bis" / „Zuletzt geladen" stehen NUR hier. Eine abgelaufene Anmeldung faellt
+// also erst auf, wenn man diese Seite oeffnet oder etwas laden will. Das war schon
+// vorher so gewollt (siehe anmeldeStand) und ist jetzt eine Ebene tiefer.
+let _einstOffen = false;
+
+function pgEinstellungen() {
+  const el = document.getElementById('seite-einstellungen');
+  if (!el) return;
+  const a = anmeldeStand();
+  el.innerHTML = `
+    <div class="us-kopf">
+      <button class="us-zurueck" aria-label="Zurück zur Übersicht" title="Zurück">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 5 8 12 15 19"/></svg>
+      </button>
+      <div class="us-titel">Einstellungen</div>
+    </div>
+    <div class="us-inhalt">
+      <div class="chart-card app-karte">
+        <div class="stats-list">
+          ${datenStandZeilen()}
+          ${statZeile('Installierte Version', '<span class="app-version">wird geprüft…</span>')}
+        </div>
+        ${a.hinweis ? `<button class="update-btn anmelde-btn">Mit Google anmelden</button>
+        <div class="app-hinweis">${a.hinweis}</div>` : ''}
+        <button class="update-btn refresh-btn">Daten aktualisieren</button>
+        <div class="app-hinweis">Liest Schlaf-, Herz- und Trainingsdaten neu aus den Google-Sheets. Nutze das, wenn heutige Werte noch fehlen.</div>
+        <button class="update-btn appver-btn">App-Version aktualisieren</button>
+        <div class="app-hinweis">Holt eine neue Fassung der App selbst. Ohne diesen Knopf greift ein Update erst, wenn du die App zweimal neu startest.</div>
+      </div>
+    </div>`;
+  versionAnzeigen();   // asynchron, füllt .app-version nach
+}
+
+function einstellungenOeffnen() {
+  const el = document.getElementById('seite-einstellungen');
+  if (!el || _einstOffen) return;
+  _einstOffen = true;
+  pgEinstellungen();
+  el.hidden = false;
+  // Layout erzwingen, BEVOR die Klasse kommt: sonst setzt der Browser Ausgangs- und
+  // Zielzustand in denselben Stilrechnungsschritt und die Animation faellt aus.
+  void el.offsetHeight;
+  el.classList.add('offen');
+  document.body.classList.add('einst-offen');
+}
+
+function einstellungenSchliessen() {
+  const el = document.getElementById('seite-einstellungen');
+  if (!el || !_einstOffen) return;
+  _einstOffen = false;
+  el.style.transform = '';       // eine laufende Wischgeste zuruecksetzen
+  el.classList.remove('offen');
+  document.body.classList.remove('einst-offen');
+  // Erst nach der Animation wegnehmen – sonst verschwindet sie schlagartig.
+  setTimeout(() => { if (!_einstOffen) el.hidden = true; }, 300);
+}
+
+// Wisch vom linken Bildschirmrand = zurueck, wie in iOS. Bewusst nur vom Rand aus
+// (<= 28 px): weiter innen gehoert die waagrechte Bewegung dem Inhalt.
+function einstellungenWischen() {
+  const el = document.getElementById('seite-einstellungen');
+  if (!el) return;
+  let startX = 0, dx = 0, aktiv = false;
+  el.addEventListener('touchstart', (e) => {
+    if (!_einstOffen || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX;
+    if (x > 28) return;
+    aktiv = true; startX = x; dx = 0;
+    el.style.transition = 'none';
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (!aktiv) return;
+    dx = Math.max(0, e.touches[0].clientX - startX);   // nur nach rechts
+    el.style.transform = 'translateX(' + dx + 'px)';
+  }, { passive: true });
+  const ende = () => {
+    if (!aktiv) return;
+    aktiv = false;
+    el.style.transition = '';
+    // Ab einem Drittel der Breite gilt die Geste als „zurueck", sonst schnappt die
+    // Seite zurueck – dieselbe Schwelle wie in iOS.
+    if (dx > el.getBoundingClientRect().width * 0.3) einstellungenSchliessen();
+    else el.style.transform = '';
+  };
+  el.addEventListener('touchend', ende);
+  el.addEventListener('touchcancel', ende);
 }
 
 // Welche Tabs haben ueberhaupt etwas zum Aufklappen – und wie heisst es?
@@ -2291,7 +2359,7 @@ async function pgTraining() {
       <div class="no-data">
         <strong>Workout-Daten nicht verfügbar</strong>
         ${esc(woProblem)}
-        <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Erneut versuchen mit „Daten aktualisieren" in der App-Karte der Übersicht.</div>
+        <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet. Erneut versuchen mit „Daten aktualisieren" unter Übersicht → Einstellungen.</div>
       </div>`;
     return;
   }
@@ -2719,11 +2787,11 @@ function pgBanner(icon,title){
   // Dark-Toggle sitzt rechtsbündig direkt auf der Titelzeile (keine eigene
   // Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
   // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
-  // Tabnamen, der Daten-Stand steht jetzt einmal in der App-Karte der Übersicht.
+  // Tabnamen, der Daten-Stand steht jetzt einmal auf der Einstellungen-Seite.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
   // Aufklapp-Schalter links vom Dark-Toggle – nur in den Tabs, die etwas zu zeigen
   // haben. Er ersetzt die frueheren breiten Balken im Inhalt ("Weitere Auswertungen",
-  // "Muster & Zusammenhänge"); der Ausklapp-Knopf der App-Karte bleibt, wo er ist.
+  // "Muster & Zusammenhänge").
   const k = AUSKLAPP[_currentRenderingTab];
   // Doppel-Chevron wie in FitTracks Uebungen-Tab (`.ex-sort-btn`): nach unten zum
   // Aufklappen, nach oben zum Einklappen. Die Punkte der Polylinien sind von dort
@@ -2736,7 +2804,15 @@ function pgBanner(icon,title){
          aria-expanded="${k.offen() ? 'true' : 'false'}"
          title="${k.titel}" aria-label="${k.titel}">${chevron}</button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  // Zahnrad NUR in der Uebersicht, links vom Ausklapp-Knopf. Es traegt die
+  // durchscheinende Optik der uebrigen `.pg-act` – der Ausklapp-Knopf ist bewusst der
+  // einzige helle Knopf in der Zeile.
+  const einst = _currentRenderingTab === 'overview'
+    ? `<button class="pg-act einst-act" title="Einstellungen" aria-label="Einstellungen">
+         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
+       </button>`
+    : '';
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -2781,12 +2857,22 @@ function zeitraumText() {
 // Die Bedienelemente sind auf zwei Zeilen verteilt: "Heute" und der Zeitraum stehen
 // rechts neben dem Kartentitel, Auswahlfeld und Pfeile rechts in der Legendenzeile.
 // So bleibt jede Zeile schmal genug – zusammen belegten sie zwei Drittel einer Zeile.
+// Nur noch der angezeigte Zeitraum. Der frueher hier stehende „Heute"-Knopf ist auf
+// Wunsch entfallen; seine Aufgabe – auf den neuesten Tag springen – hat der Eintrag
+// „Heute" in der Zeitleiste uebernommen (aufHeuteSpringen).
+// Bei Heute/7T liefert zeitraumText() nichts; `.filter-titel:empty` blendet den
+// leeren Kasten dann aus.
 function filterTitelTeil() {
   const zeitraum = zeitraumText();
-  return `<div class="filter-titel">
-    <button class="nav-arrow nav-today" title="Aktuellster Zeitraum" aria-label="Aktuellster Zeitraum" style="display:${timeRange==='heute'?'none':'inline-flex'}">Heute</button>
-    ${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}
-  </div>`;
+  return `<div class="filter-titel">${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}</div>`;
+}
+
+// Auf den neuesten vorhandenen Tag springen. `_datumSelbstGewaehlt` wieder auf false:
+// wer am neuesten Tag steht, will beim naechsten Nachladen mitgezogen werden.
+function aufHeuteSpringen() {
+  if (!allData.length) return;
+  referenceDate = allData[allData.length-1].date;
+  _datumSelbstGewaehlt = false;
 }
 
 // ── Zeitleiste: EIN Bedienelement für die ganze App ───────────────────────────
@@ -3180,19 +3266,6 @@ document.body.addEventListener('click', (e) => {
   _renderTab(tab);
 });
 
-// App-Karte auf-/zuklappen. Hier genuegt Ein-/Ausblenden: in der Karte steckt kein
-// Diagramm, das im verborgenen Zustand mit Breite 0 gezeichnet wuerde.
-document.body.addEventListener('click', (e) => {
-  const knopf = e.target.closest('[data-appklapp]');
-  if (!knopf) return;
-  _appOffen = !_appOffen;
-  knopf.setAttribute('aria-expanded', _appOffen);
-  const pfeil = knopf.querySelector('.weitere-pfeil');
-  if (pfeil) pfeil.textContent = _appOffen ? '▾' : '▸';
-  const inhalt = knopf.nextElementSibling;
-  if (inhalt) inhalt.hidden = !_appOffen;
-});
-
 // Legende des Vergleichsdiagramms: Tipp schaltet eine Reihe ein oder aus. Die
 // Schalter sind <button>, damit der Hintergrund-Tipp (Bottom-Nav) sie ausnimmt.
 document.body.addEventListener('click', (e) => {
@@ -3222,22 +3295,22 @@ document.body.addEventListener('click', (e) => {
   if (_zlOffen && !t.closest('.zl-pille') && !t.closest('.zl-opt')) zeitleisteAuswahl(false);
   if (t.closest('.zl-pille')) { zeitleisteAuswahl(!_zlOffen); return; }
   const zlOpt = t.closest('.zl-opt');
-  if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
-  if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
-  if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
-  if (t.closest('.nav-today')) {
-    blickAnkerMerken(t);
-    if (allData.length) {
-      referenceDate = allData[allData.length-1].date;
-      _datumSelbstGewaehlt = false;   // wieder am neuesten Tag → Nachladen darf mitziehen
-      updateNavUI();
-      _refreshAfterStateChange();
-    }
+  if (zlOpt) {
+    zeitleisteAuswahl(false);
+    // „Heute" springt IMMER auf den neuesten Tag – auch wenn der Bereich schon
+    // „Heute" war. Es hat damit die Aufgabe des frueheren Knopfes in den Diagrammen
+    // mituebernommen. Erst springen, dann den Bereich setzen: setR() zeichnet neu.
+    if (zlOpt.dataset.range === 'heute') aufHeuteSpringen();
+    setR(zlOpt.dataset.range);
     return;
   }
+  if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
+  if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
   // Jeder Knopf hat eine EIGENE Auslöser-Klasse. `.update-btn` ist reine Optik und
   // sitzt auf allen dreien – wurde sie hier abgefragt, loeste „Mit Google anmelden"
   // zusaetzlich das App-Update samt Rueckfrage aus.
+  if (t.closest('.einst-act'))   { einstellungenOeffnen(); return; }
+  if (t.closest('.us-zurueck'))  { einstellungenSchliessen(); return; }
   if (t.closest('.anmelde-btn')) { signIn(); return; }
   if (t.closest('.refresh-btn')) { refreshData(); return; }
   if (t.closest('.appver-btn'))  { jetztAktualisieren(); return; }
@@ -3406,7 +3479,7 @@ function hinweisAus() {
   document.body.style.removeProperty('--hinweis-h');
 }
 // Der Stand der Google-Anmeldung steht NICHT mehr als Leiste ueber allen Tabs,
-// sondern als Zeile „Google-Anmeldung" in der App-Karte der Uebersicht – dort, wo
+// sondern als Zeile „Google-Anmeldung" in der App-Karte der Einstellungen – dort, wo
 // auch die uebrigen App-Angelegenheiten liegen. Die Leiste oben bleibt allein dem
 // Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
 // `anmeldeStand()` ist die einzige Quelle fuer diesen Zustand.
@@ -3418,9 +3491,11 @@ function anmeldeStand() {
 // Frueher zeigte das die Leiste oben. Es frischt jetzt die App-Karte auf, damit die
 // Zeile dort den neuen Stand traegt.
 function hinweisAuthZeigen() { appKarteAuffrischen(); }
-// Nur die Uebersicht neu aufbauen, und auch das nur, wenn sie gerade gerendert ist.
+// Die App-Karte liegt seit 06.09.2026 auf der Einstellungen-Seite. Neu aufgebaut wird
+// sie nur, wenn diese gerade offen ist – sonst holt sie sich den Stand beim naechsten
+// Oeffnen ohnehin frisch (einstellungenOeffnen ruft pgEinstellungen).
 function appKarteAuffrischen() {
-  if (_renderedTabs.has('overview')) _renderTab('overview');
+  if (_einstOffen) pgEinstellungen();
 }
 document.body.addEventListener('click', (e) => {
   if (!e.target.closest('.hinweis-akt')) return;
@@ -3511,6 +3586,7 @@ updateNavUI();
 // Tab-Snap-Sync + Auto-Hide-Bottom-Nav initialisieren
 initTabScrollSync();
 zeitleisteBauen();
+einstellungenWischen();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');

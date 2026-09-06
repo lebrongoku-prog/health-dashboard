@@ -22,6 +22,10 @@
     <section id="screen-training"   class="screen"></section>
   </div>
 </div>
+<!-- Muss dem Aufbau in index.html entsprechen: pgEinstellungen() sucht dieses
+     Element und tut ohne es gar nichts – die Seite waere im Pruefstand dann nicht
+     pruefbar, ohne dass etwas auffiele. -->
+<section id="seite-einstellungen" class="unterseite" hidden aria-label="Einstellungen"></section>
 <nav id="bottom-nav">
   <button class="nav-btn active" id="nav-overview"   data-tab="overview"><span>Übersicht</span></button>
   <button class="nav-btn"        id="nav-herz"       data-tab="herz"><span>Herz</span></button>
