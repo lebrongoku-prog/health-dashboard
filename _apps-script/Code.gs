@@ -100,11 +100,28 @@ function doPost(e) {
 // gar keinen Ausloeser mehr – das ist zugleich zuverlaessiger als der fruehere Ping,
 // der bei jedem Netzfehler auf dem Handy einfach ausfiel.
 //
-// EINMAL im Apps-Script-Editor ausfuehren. Danach laeuft der Import stuendlich.
-function installiereStuendlichenImport() {
+// Wie oft der Import laeuft. Auf Wunsch von 1 auf 6 Stunden gestellt (06.09.2026):
+// Health Auto Export legt die Dateien ohnehin nur einige Male am Tag ab, und die
+// App zeigt Tageswerte — viermal taeglich reicht dafuer. Weniger Laeufe heisst auch
+// weniger Drive-Kontingent und kuerzere Ausfuehrungsprotokolle.
+//
+// ZULAESSIG sind nur die Werte, die Apps Script fuer everyHours kennt:
+// 1, 2, 4, 6, 8 oder 12. Ein anderer Wert (etwa 5) wird beim Anlegen abgelehnt.
+//
+// Die Abstaende des Auffrisch-Fensters bleiben davon unberuehrt und sind weiterhin
+// grosszuegiger als der Zeitplan: DAYS_TO_REFRESH = 2 Tage beim Health-Sheet,
+// WORKOUT_DAYS_TO_REFRESH = 30 Tage beim Workout-Sheet. Auch ein ausgefallener Lauf
+// wird damit beim naechsten Mal nachgeholt — es entsteht keine Luecke.
+var IMPORT_INTERVALL_STUNDEN = 6;
+
+// EINMAL im Apps-Script-Editor ausfuehren. Danach laeuft der Import selbsttaetig.
+// Frueher hiess die Funktion installiereStuendlichenImport(); der Name stimmte nach
+// der Umstellung nicht mehr, das Intervall steht jetzt in IMPORT_INTERVALL_STUNDEN.
+function installiereImportZeitplan() {
   loescheImportTrigger();
-  ScriptApp.newTrigger('writeToSheet').timeBased().everyHours(1).create();
-  var msg = 'Stuendlicher Import eingerichtet. Naechster Lauf innerhalb der naechsten Stunde.';
+  ScriptApp.newTrigger('writeToSheet').timeBased().everyHours(IMPORT_INTERVALL_STUNDEN).create();
+  var msg = 'Import eingerichtet: alle ' + IMPORT_INTERVALL_STUNDEN + ' Stunden. '
+    + 'Naechster Lauf innerhalb der naechsten ' + IMPORT_INTERVALL_STUNDEN + ' Stunden.';
   Logger.log(msg);
   return msg;
 }
@@ -173,7 +190,7 @@ function selbsttest() {
   var eigene = alle.filter(function (t) { return t.getHandlerFunction() === 'writeToSheet'; });
   zeilen.push(eigene.length
     ? '   OK – ' + eigene.length + ' Zeitplan fuer writeToSheet aktiv.'
-    : '   FEHLT – einmal installiereStuendlichenImport() ausfuehren.');
+    : '   FEHLT – einmal installiereImportZeitplan() ausfuehren.');
   // Alle Zeitplaene auflisten: hier faellt auf, wenn noch ein alter aus frueheren
   // Zeiten mitlaeuft oder etwas anderes den Import schon anstoesst.
   zeilen.push('   Alle Zeitplaene im Projekt: ' + (alle.length

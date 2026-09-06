@@ -13,7 +13,21 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
   `spreadsheets.readonly` — die App **liest nur**. Mit dem Laufplan ist der einzige
   Schreibweg entfallen; ein Zugang, der nicht schreiben kann, kann durch einen Fehler
   auch nichts zerstören. Das **Apps Script** (`_apps-script/`) macht
-  nur noch das eine, was die App nicht kann: den Import Drive→Sheet (`REFRESH_URL`).
+  nur noch das eine, was die App nicht kann: den Import Drive→Sheet. Der läuft auf
+  **zwei** Wegen, beide ohne Geheimnis im Quelltext:
+  1. **Von selbst nach Zeitplan** — ein Trigger ruft `writeToSheet` auf,
+     Intervall in `IMPORT_INTERVALL_STUNDEN` (seit 06.09.2026 **alle 6 Stunden**,
+     vorher stündlich). Eingerichtet wird er ausschliesslich über
+     `installiereImportZeitplan()`: die Funktion löscht erst alle bestehenden
+     `writeToSheet`-Trigger und legt dann genau einen an. Von Hand im Trigger-Dialog
+     angelegt, liefe bei einem übersehenen Alt-Trigger der Import doppelt.
+  2. **Auf Zuruf** — „Daten aktualisieren" in der App schickt einen POST an
+     `REFRESH_URL` mit dem Google-Token im **Rumpf** (nicht in der Adresse, die
+     landet in Server-Protokollen); `doPost` prüft ihn mit `zugangGueltig`. `doGet`
+     macht bewusst nichts.
+  Weil das Auffrisch-Fenster (2 Tage Health, 30 Tage Workout) deutlich grösser ist
+  als der Abstand der Läufe, holt ein späterer Lauf jeden ausgefallenen nach — ein
+  verpasster Zeitplan reisst keine Lücke.
   (Kein Silent-Refresh, kein Apps-Script-Daten-Proxy — bewusst.)
   Der zuletzt geladene Stand liegt zusätzlich als Kopie im `localStorage` — die App
   startet daraus (siehe „Sofortstart aus dem Zwischenspeicher").
