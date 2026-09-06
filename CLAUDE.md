@@ -278,9 +278,17 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   1. **`pointer-events: none` auf `#zeitleiste`**, `auto` erst auf den Kindern. Die
      Leiste spannt sich über die volle Breite; ohne das fängt der freie Platz neben
      der Pille die Tipps ab, mit denen man die Bottom-Nav wieder einblendet.
-  2. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
+  2. **Die Auswahl schliesst bei jedem Tipp, der nicht der Pille oder einem Eintrag
+     gilt** — die Blätterpfeile eingeschlossen, und ebenso beim Tabwechsel
+     (`_applyTabState`). „Ausserhalb der ganzen Leiste" als Bedingung reichte nicht:
+     ein Tipp auf `‹`/`›` liess sie offen stehen, obwohl sie ihre Aufgabe erfüllt hatte.
+  3. **`_applyTabState` setzt `document.body.className` komplett neu** — `nav-weg`
+     muss dort mitgeführt werden. Sonst löscht jeder Tabwechsel die Klasse, während
+     `nav-hidden` an der Bottom-Nav stehen bleibt: die Leiste ist weg, die Zeitleiste
+     rückt aber wieder hoch und hinterlässt eine Lücke am unteren Rand.
+  4. **Bei „Heute" werden die Pfeile ausgeblendet** — dort gibt es nichts zu blättern.
      Weil die Reihe zentriert ist, bleibt die Pille dabei an derselben Stelle stehen.
-  3. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
+  5. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
      Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
      `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
      Blättern genau so, wie der Anker es verhindern soll.

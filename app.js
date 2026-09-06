@@ -2999,7 +2999,14 @@ function _applyTabState(name) {
   const navEl = document.getElementById('nav-'+name);
   if (navEl) navEl.classList.add('active');
   const _isDark = document.body.classList.contains('dark');
-  document.body.className = 'theme-' + name + (_isDark ? ' dark' : '');
+  // `nav-weg` MUSS mitgeführt werden: diese Zeile setzt className komplett neu und
+  // löschte die Klasse bei jedem Tabwechsel. Die Bottom-Nav blieb dann versteckt
+  // (ihre Klasse sitzt an ihr selbst), die Zeitleiste rückte aber wieder hoch, als
+  // wäre die Leiste da — und hinterliess eine Lücke am unteren Rand.
+  const _navWeg = document.body.classList.contains('nav-weg');
+  document.body.className = 'theme-' + name + (_isDark ? ' dark' : '') + (_navWeg ? ' nav-weg' : '');
+  // Beim Tabwechsel hat eine offene Auswahl ausgedient.
+  zeitleisteAuswahl(false);
   _setStatusBarColor(name);
   if (!_renderedTabs.has(name)) {
     _renderTab(name);
@@ -3192,9 +3199,12 @@ document.body.addEventListener('click', (e) => {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
-  // Zeitleiste zuerst: die aufgeklappte Auswahl schliesst bei jedem Tipp daneben.
+  // Zeitleiste zuerst: die aufgeklappte Auswahl schliesst bei JEDEM Tipp, der nicht
+  // der Pille selbst oder einem ihrer Einträge gilt — die Blätterpfeile eingeschlossen.
+  // Vorher galt „ausserhalb der ganzen Leiste": ein Tipp auf ‹ oder › liess die
+  // Auswahl offen stehen, obwohl sie ihre Aufgabe erfüllt hatte.
   // BEWUSST ohne `return` — der Tipp soll trotzdem noch das tun, wofür er gedacht war.
-  if (_zlOffen && !t.closest('#zeitleiste')) zeitleisteAuswahl(false);
+  if (_zlOffen && !t.closest('.zl-pille') && !t.closest('.zl-opt')) zeitleisteAuswahl(false);
   if (t.closest('.zl-pille')) { zeitleisteAuswahl(!_zlOffen); return; }
   const zlOpt = t.closest('.zl-opt');
   if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
