@@ -592,26 +592,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →
   Schlafdauer → (Weitere Auswertungen) Schlafqualität-Verteilung → Schlafschuld →
   Schlafphasen-Verlauf → Schlaf-Score-Verlauf.
-  **Training** Trainingszeit → Vergleich → Laufstrecke → Leistungs-Trend → Pace →
-  VO₂max. Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
-  dann deren Deutung. Der frühere **Trainingskalender** zuoberst im Training-Tab ist
-  auf Wunsch **ersatzlos entfernt** (samt `_buildCalHTML`, `_calDate`, `#cal-tip`
-  und den `.cal-*`-Regeln).
-- **Vergleichsdiagramm (`c-kombi`, im Training-Tab nach der Trainingszeit):** vier Reihen —
-  Trainingszeit (Balken), Puls, Laufstrecke, Pace (Linien). `KOMBI_REIHEN` ist die
-  **einzige** Quelle für Farbe, Einheit, Achse und Format; die Legende, die Datensätze
-  und die Fusszeilen werden daraus erzeugt. Die Legendeneinträge sind `<button>` —
-  sonst würde der Hintergrund-Tipp die Bottom-Nav umschalten. Die Auswahl liegt in
-  `_kombiAktiv` **ausserhalb** von `pgTraining`, sonst wäre sie nach jedem Re-Render
-  zurückgesetzt; die letzte aktive Reihe lässt sich nicht abschalten.
-  **Zwei Achsen nach Grössenordnung:** links Minuten + bpm, rechts km + min/km. Eine
-  Achse erscheint nur, wenn eine ihrer Reihen aktiv ist.
-  **Ab 3M zeigen Zeit UND Strecke den Ø pro Training**, nicht die Summe — als Summen
-  (500+ min, 100+ km) drückten sie Puls und Pace auf derselben Achse platt. Die
-  Fusszeile `Total` nennt weiterhin die echte Summe, eine `chart-note` sagt es an.
-  **Fusszeilen:** `Total` überspringt Puls und Pace (`summierbar:false`) und entfällt
-  ganz, wenn keine summierbare Reihe aktiv ist; die Ø-Zeilen zeigen alle aktiven
-  Reihen, getrennt durch `|`.
+  **Training** Laufstrecke → Trainingszeit → Pace → VO₂max (Stand 06.09.2026).
+  Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
+  dann deren Deutung. **Drei Karten sind aus dem Training-Tab entfernt** und stecken
+  nur noch in der Git-Historie:
+  - der **Trainingskalender** zuoberst (samt `_buildCalHTML`, `_calDate`, `#cal-tip`,
+    `.cal-*`),
+  - das **Vergleichsdiagramm** `c-kombi` (samt `KOMBI_REIHEN`, `_kombiAktiv`,
+    `window._kombiZeichnen`/`_kombiFussHTML`, `.kombi-schalter`, `#kombi-fuss`,
+    `.chart-note`),
+  - der **Leistungs-Trend** `c-wo-trend`. Achtung: „Leistungs-Trend: Distanz & HR pro
+    Training" und „Distanz & HR pro Monat" waren **dasselbe** Diagramm — nur der Titel
+    wechselte mit dem Zeitraum. Wer nach zwei Karten sucht, sucht vergebens.
+  Mit ihnen entfielen 30 Bezeichner; die Rechenkette dahinter (`wRows`, `trendHR`,
+  `hrGesamt`/`hrWkdAvg`/`hrWkndAvg`, `paceGesamt`, `_1mHRData`/`_1mPaceData`) wurde
+  Schritt für Schritt nachgezogen, bis kein Name mehr nur bei seiner eigenen
+  Deklaration stand. **Puls und Pace-Durchschnitt werden im Training-Tab seither
+  nirgends mehr berechnet** — wer sie zurückwill, holt sie aus `workoutData`.
 - **Training-Tab-Daten:** ausschließlich `workoutData`; einzige Ausnahme ist die
   VO₂max-Sektion (zuunterst) aus `r.vo2max`. **Auch die Pace** kommt seit 05.09.2026 nur
   noch aus `Speed (km/h)` des Workout-Sheets — vorher zuerst aus `runSpeed` des

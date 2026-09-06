@@ -509,9 +509,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .filter-titel:empty{display:none}
 /* Legendenschalter des Vergleichsdiagramms: sieht aus wie ein Legendeneintrag,
    ist aber ein Knopf. Ausgeschaltete Reihen treten zurueck, bleiben aber lesbar. */
-.kombi-schalter{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
-.kombi-schalter.aus{opacity:.38}
-.kombi-schalter.aus .cl-dot,.kombi-schalter.aus .cl-line{background:var(--txt3) !important}
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.73rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
@@ -560,7 +557,6 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
 .chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
-.chart-note{font-size:.66rem;color:var(--txt3);margin:-.15rem 0 .4rem;line-height:1.4}
 .stat-hint{font-size:.69rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
 
 /* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
