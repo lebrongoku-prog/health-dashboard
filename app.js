@@ -727,6 +727,20 @@ function getWeekMonday(dateStr) {
   const mon = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay()+6)%7));
   return toLocalDateStr(mon);
 }
+// Kalenderwoche nach ISO 8601. Die Woche gehoert dem Jahr, in dem ihr DONNERSTAG
+// liegt — deshalb wird zuerst auf den Donnerstag derselben Woche gesprungen und erst
+// dann gezaehlt. Ohne diesen Umweg lieferten die Tage um den Jahreswechsel falsche
+// Nummern (der 29.12.2025 gehoert zur KW 1 von 2026, nicht zur KW 53 von 2025).
+// Bewusst mit lokalen Date-Objekten und ohne toISOString(): das rechnet nach UTC um
+// und verschoebe in der Schweiz jeden Montag auf den Vortag.
+function isoKW(dateStr) {
+  const dt = new Date(dateStr + 'T00:00:00');
+  const do_ = new Date(dt);
+  do_.setDate(dt.getDate() - ((dt.getDay() + 6) % 7) + 3);   // Montag dieser Woche + 3
+  const jahresanfang = new Date(do_.getFullYear(), 0, 1);
+  return Math.floor(Math.round((do_ - jahresanfang) / 86400000) / 7) + 1;
+}
+
 function weekDays7() {
   if (!referenceDate) return [];
   const mon = getWeekMonday(referenceDate);
@@ -2676,6 +2690,13 @@ const _RANGE_OPTS = [
 // und aus "Jun 26" allein ist nicht ablesbar, wie weit das Fenster zurückreicht.
 const MONAT_KURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 function zeitraumText() {
+  // Bei 7T die Kalenderwoche des angezeigten Fensters. Das Fenster laeuft Montag bis
+  // Sonntag (weekDays7 baut es ueber getWeekMonday auf) und ist damit genau eine
+  // ISO-Woche — der erste Tag bestimmt sie eindeutig.
+  if (is7D()) {
+    const tage = weekDays7();
+    return tage.length ? 'KW ' + isoKW(tage[0]) : '';
+  }
   const mw = moWindow();
   if (!mw) return '';
   const monat = ds => MONAT_KURZ[+ds.slice(5,7) - 1];
@@ -2695,8 +2716,8 @@ function zeitraumText() {
 // Nur noch der angezeigte Zeitraum. Der frueher hier stehende „Heute"-Knopf ist auf
 // Wunsch entfallen; seine Aufgabe – auf den neuesten Tag springen – hat der Eintrag
 // „Heute" in der Zeitleiste uebernommen (aufHeuteSpringen).
-// Bei 7T liefert zeitraumText() nichts (dort steht das Datum auf der Zeitachse);
-// `.filter-titel:empty` blendet den leeren Kasten dann aus.
+// zeitraumText() liefert bei 7T die Kalenderwoche ("KW 36"), ab 1M den Monatsbereich.
+// Leer bleibt es nur ohne Bezugsdatum; `.filter-titel:empty` blendet den Kasten dann aus.
 function filterTitelTeil() {
   const zeitraum = zeitraumText();
   return `<div class="filter-titel">${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}</div>`;

@@ -241,8 +241,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Bildschirmrand (siehe „Zeitleiste"), nur der angezeigte Zeitraum bleibt **je
   Diagramm** rechts in der Titelzeile (`filterTitelTeil()`). Einen „Heute"-Knopf gibt
   es dort seit 06.09.2026 nicht mehr — siehe „Zeitleiste", Punkt 6. Der Zeitraum
-  erscheint erst ab **1M** (`zeitraumText()`, z. B. `Jun–Aug 26`); bei 7T steht das
-  Datum auf der Zeitachse.
+  richtet sich nach dem Bereich (`zeitraumText()`): bei **7T** die **Kalenderwoche**
+  (`KW 36`, seit 06.09.2026), ab **1M** der Monatsbereich (`Jun–Aug 26`).
+  Die Woche kommt aus `isoKW()` nach **ISO 8601** — gerechnet über den **Donnerstag**
+  der Woche, weil die Woche dem Jahr gehört, in dem ihr Donnerstag liegt. Ohne diesen
+  Umweg wären die Tage um den Jahreswechsel falsch (der 29.12.2025 gehört zur KW 1
+  von 2026, nicht zur KW 53 von 2025). Das 7T-Fenster läuft ohnehin Montag bis
+  Sonntag (`weekDays7()` über `getWeekMonday()`) und ist damit genau eine ISO-Woche.
+  Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
   die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
   Warnzeilen tragen keine. Ausgenommen bleiben die beiden Banner-Knöpfe (🔄/🌙) — ohne
