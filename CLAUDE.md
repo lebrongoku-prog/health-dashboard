@@ -464,6 +464,26 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Mit einer gemeinsamen Farbe war die Begrenzung des Datenbereichs nicht von den
   Hilfslinien zu unterscheiden. Beide stehen ganz oben, **vor** dem ersten
   `Chart.defaults`-Zugriff — `const` wird nicht hochgezogen.
+- **Datenbeschriftungen (`werteLabelPlugin`, 06.09.2026):** Zahlen über Balken und
+  Datenpunkten — **nur im Querformat** und nur, wo ein Diagramm sie über
+  `cfg.__werteFmt` anfordert (derzeit die vier Karten des Training-Tabs). Im
+  Hochformat ist die Karte halb so breit; dort stünden die Zahlen bei einem
+  Monatsfenster als graues Band über den Balken.
+  **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs.** Chart.js
+  zeichnet bei jeder Grössenänderung ohnehin neu, dadurch kommen und gehen die Zahlen
+  beim Drehen von selbst — ohne `_renderTab`, ohne `resize`-Listener.
+  **Überlappungen löst das Plugin selbst:** es zeichnet von links nach rechts und
+  lässt weg, was nicht mehr neben die zuletzt gesetzte Zahl passt (gemessen an
+  `measureText`). Deshalb braucht es keine Sonderregel je Zeitraum — bei 7T steht
+  über jedem Balken eine Zahl, bei 24M im Pace-Diagramm über 16 von 48 Punkten.
+  **Hilfslinien bleiben unbeschriftet**: dieselbe Regel wie im Tooltip
+  (`nurMesswerte`, Label beginnt mit `Ø` oder `Ziel`) — beide müssen dasselbe unter
+  „Messwert" verstehen. `__werteFmt` bestimmt zugleich das Format; gibt es `''`
+  zurück, wird nichts gezeichnet. Genau so unterdrücken die beiden Balken-Diagramme
+  die Null an trainingsfreien Tagen: ein Balken der Höhe 0 sagt das bereits.
+- **Laufstrecke rundet auf eine Dezimalstelle** (auf Wunsch, 06.09.2026) — in der
+  Beschriftung, im Tooltip **und** in der Fusszeile. Zwei Nachkommastellen
+  (`465.17 km`) täuschten bei GPS-Distanzen eine Genauigkeit vor, die nicht da ist.
 - **Blickposition beim Navigieren:** ein Klick auf `‹ ›` baut den Tab neu auf. Ändert
   sich dabei die Gesamthöhe, klemmt der Browser die Scrollposition und die Ansicht
   springt — am stärksten beim untersten Diagramm. `blickAnkerMerken()` merkt sich die

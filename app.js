@@ -969,7 +969,60 @@ function _chartTipp(chart, evt) {
   setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : k);
 }
 
-Chart.register(wochentrennerPlugin, markierungPlugin);
+// ── Datenbeschriftungen ueber Balken und Punkten ─────────────────────────────
+// Nur im QUERFORMAT und nur, wo ein Diagramm sie ueber `cfg.__werteFmt` anfordert
+// (derzeit die vier Karten des Training-Tabs). Im Hochformat ist die Karte halb so
+// breit — dort stuenden die Zahlen bei einem Monatsfenster als graues Band ueber
+// den Balken.
+//
+// Die Entscheidung faellt beim ZEICHNEN, nicht beim Aufbau des Tabs. Chart.js
+// zeichnet bei jeder Groessenaenderung ohnehin neu, dadurch kommen und gehen die
+// Zahlen beim Drehen des Geraets von selbst — ohne dass `_renderTab` laufen muss.
+//
+// Ueberlappungen loest es selbst: gezeichnet wird von links nach rechts, und was
+// nicht mehr neben die zuletzt gesetzte Zahl passt, faellt weg. Lieber einzelne
+// Werte auslassen als eine unlesbare Reihe. Deshalb braucht es auch keine
+// Sonderregel je Zeitraum: bei 7T steht ueber jedem Balken eine Zahl, bei 1M nur
+// ueber so vielen, wie nebeneinander Platz haben.
+const werteLabelPlugin = {
+  id: 'werteLabel',
+  afterDatasetsDraw(chart) {
+    const fmt = chart.$werteFmt;
+    if (!fmt) return;
+    if (window.innerWidth <= window.innerHeight) return;       // Hochformat
+    const flaeche = chart.chartArea; if (!flaeche) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = '600 10px ' + (Chart.defaults.font.family || 'sans-serif');
+    ctx.fillStyle = _cssFarbe('--txt2', '#64748B');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    chart.data.datasets.forEach((ds, di) => {
+      // Hilfslinien (Ø, Ziel) bleiben unbeschriftet – dieselbe Regel wie im Tooltip,
+      // damit beide dasselbe unter "Messwert" verstehen.
+      if (!ds || !nurMesswerte({ dataset: ds })) return;
+      const meta = chart.getDatasetMeta(di);
+      if (!meta || meta.hidden) return;
+      // Pro Datensatz zuruecksetzen: zwei Reihen liegen auf verschiedenen Hoehen und
+      // koennen sich nicht in die Quere kommen.
+      let belegtBis = -Infinity;
+      meta.data.forEach((punkt, i) => {
+        const wert = ds.data[i];
+        if (wert == null || !punkt) return;
+        const txt = fmt(wert);
+        if (txt == null || txt === '') return;
+        const halb = ctx.measureText(txt).width / 2 + 3;
+        if (punkt.x - halb < belegtBis) return;                // wuerde ueberlappen
+        // Nicht ueber den oberen Rand der Zeichenflaeche hinausschreiben.
+        ctx.fillText(txt, punkt.x, Math.max(punkt.y - 4, flaeche.top + 9));
+        belegtBis = punkt.x + halb;
+      });
+    });
+    ctx.restore();
+  }
+};
+
+Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin);
 
 function killCharts() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -988,6 +1041,9 @@ function zeichneDiagramm(id, cfg) {
   // unberührt – so lassen sich einzelne Diagramme bewusst ausnehmen.
   charts[id].$keys   = cfg.__keys   || null;
   charts[id].$keyTyp = cfg.__keyTyp || null;
+  // Ohne __werteFmt bleibt ein Diagramm unbeschriftet – so lassen sich einzelne
+  // bewusst ausnehmen, genau wie bei __keys.
+  charts[id].$werteFmt = cfg.__werteFmt || null;
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
@@ -2480,10 +2536,10 @@ async function pgTraining() {
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
-          ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,2)} km`)}`:''}
-        ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,2)} km`)}`:''}
-          ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,2)} km`)}`:''}
-          ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,2)} km`)}`:''}
+          ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
+        ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`)}`:''}
+          ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`)}`:''}
+          ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,1)} km`)}`:''}
         </div>
       </div>
 
@@ -2524,7 +2580,12 @@ async function pgTraining() {
     const _lZeitKeys=_is1m?_1mKeys:tKeys;
     const _lKeyTyp=_is1m?'tag':tKeyTyp;
 
-    zeichneDiagramm('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lZeitLbls,datasets:[
+    zeichneDiagramm('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
+      // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
+      // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
+      // stuenden sonst Dutzende Nullen auf der Grundlinie.
+      __werteFmt:v=>v?(_zeitInH?(v/60).toFixed(1):String(Math.round(v))):'',
+      type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
@@ -2534,10 +2595,12 @@ async function pgTraining() {
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
-    zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,type:'bar',data:{labels:_lStrLbls,datasets:[
+    zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
+      __werteFmt:v=>v?zahl(v,1):'',
+      type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${ctx.raw.toFixed(2)} km`:null}}},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${ctx.raw.toFixed(1)} km`:null}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});
   }
@@ -2551,7 +2614,9 @@ async function pgTraining() {
     const _paceData=_hasP?trendPace:tL.map(()=>null);
     const _pMin=_hasP?Math.floor(Math.min(...trendPace.filter(v=>v!=null))*0.97*10)/10:4;
     const _pMax=_hasP?Math.ceil(Math.max(...trendPace.filter(v=>v!=null))*1.03*10)/10:8;
-    zeichneDiagramm('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,type:'line',data:{labels:_paceLabels,datasets:[
+    zeichneDiagramm('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,
+      __werteFmt:v=>fmtPace(v),
+      type:'line',data:{labels:_paceLabels,datasets:[
       {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true}
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
@@ -2618,7 +2683,9 @@ function vo2Abschnitt(D, P) {
       const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
       const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
       _v2Dsets.push(zielLinie('vo2max', _v2tL.length));
-      zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
+      zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,
+        __werteFmt:v=>v.toFixed(1),
+        type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
         options:{responsive:true,maintainAspectRatio:false,
           plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${ctx.raw.toFixed(2)} ml/kg/min`:null}}},
           scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,ticks:{...gy.ticks,stepSize:_v2Step}}}}});
