@@ -695,6 +695,17 @@ function allMonths(rows) { return [...new Set(rows.map(r=>r.date.slice(0,7)))].s
 function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])); return mos.map(m2=>m[m2]??null); }
 // Stunden als "7h 25m". Die aufgerundete Minute muss dabei ueberlaufen koennen:
 // 7.996 h ergaebe sonst "7h 60m" – dieselbe Falle, die fmtPace bei 5'60" abfaengt.
+// Beschriftung fuer Stunden-Werte: "7h 25m", bei 24M zweizeilig ("7h" / "25m").
+// Dort stehen bis zu 24 Balken nebeneinander, und der einzeilige Text waere breiter
+// als die Spalte – umgebrochen passt er, weil er nur halb so breit wird.
+// Ein fuehrendes "0h " faellt weg: bei einem Training von 38 Minuten sagt "0h 38m"
+// nichts, was "38m" nicht auch sagt.
+function stdMinLabel(stunden) {
+  let t = alsStdMin(stunden);
+  if (t.startsWith('0h ')) t = t.slice(3);
+  return timeRange === '24m' ? t.replace(' ', '\n') : t;
+}
+
 function alsStdMin(h) {
   if (h == null) return '—';
   let st = Math.floor(h), mi = Math.round((h % 1) * 60);
@@ -996,6 +1007,9 @@ function _chartTipp(chart, evt) {
 // Werte auslassen als eine unlesbare Reihe. Deshalb braucht es auch keine
 // Sonderregel je Zeitraum: bei 7T steht ueber jedem Balken eine Zahl, bei 1M nur
 // ueber so vielen, wie nebeneinander Platz haben.
+// Zeilenhoehe der Beschriftungen – auch die Grundlage fuer die Ueberlappungspruefung
+// und den Abstand mehrzeiliger Texte. Eine Quelle, damit beides zusammenpasst.
+const ZEILE_H = 11;
 const werteLabelPlugin = {
   id: 'werteLabel',
   afterDatasetsDraw(chart) {
@@ -1027,12 +1041,20 @@ const werteLabelPlugin = {
         if (wert == null || !punkt) return;
         const txt = fmt(wert);
         if (txt == null || txt === '') return;
-        const halb = ctx.measureText(txt).width / 2 + 3;
-        // Nicht ueber den oberen Rand der Zeichenflaeche hinausschreiben.
-        const y = Math.max(punkt.y - 4, flaeche.top + 9);
-        const x1 = punkt.x - halb, x2 = punkt.x + halb, y1 = y - 11, y2 = y + 2;
+        // Ein `\n` im Ergebnis des Formatierers bricht die Beschriftung um. So kann
+        // jedes Diagramm selbst entscheiden, wann sein Text zu breit fuer die Spalte
+        // wird – das Plugin muss die Zeitraeume nicht kennen.
+        const zeilen = String(txt).split('\n');
+        const halb = Math.max(...zeilen.map(z => ctx.measureText(z).width)) / 2 + 3;
+        const hoehe = zeilen.length * ZEILE_H;
+        // Nicht ueber den oberen Rand der Zeichenflaeche hinausschreiben – bei zwei
+        // Zeilen braucht es entsprechend mehr Luft.
+        const y = Math.max(punkt.y - 4, flaeche.top + hoehe);
+        const x1 = punkt.x - halb, x2 = punkt.x + halb, y1 = y - hoehe, y2 = y + 2;
         if (!frei(x1, y1, x2, y2)) return;
-        ctx.fillText(txt, punkt.x, y);
+        // textBaseline ist 'bottom': die LETZTE Zeile sitzt auf y, die uebrigen
+        // darueber.
+        zeilen.forEach((z, k) => ctx.fillText(z, punkt.x, y - (zeilen.length - 1 - k) * ZEILE_H));
         belegt.push({ x1, y1, x2, y2 });
       });
     });
@@ -2380,7 +2402,7 @@ function pgSchlaf() {
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
       // "7h 25m" statt "7.4" – dasselbe Format wie in der Ziele-Karte und den
       // Minikacheln, damit dieselbe Nacht ueberall gleich aussieht.
-      __werteFmt:v=>v?alsStdMin(v):'',
+      __werteFmt:v=>v?stdMinLabel(v):'',
       type:'bar',data:{labels:tL,datasets:[
       // EIN Balken je Nacht. Frueher waren es zwei gestapelte Segmente ("bis Ziel" /
       // "ueber Ziel") – ein Rest aus der Zeit, als sie verschiedene Farben trugen.
@@ -2610,7 +2632,8 @@ async function pgTraining() {
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
-      __werteFmt:v=>v?(_zeitInH?zahl(v/60,1):String(Math.round(v))):'',
+      // Dasselbe Format wie beim Schlaf – die Werte liegen hier in Minuten.
+      __werteFmt:v=>v?stdMinLabel(v/60):'',
       type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,
@@ -2622,7 +2645,9 @@ async function pgTraining() {
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
     zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
-      __werteFmt:v=>v?zahl(v,1):'',
+      // Ganze Kilometer mit Einheit: ueber dem Balken zaehlt der schnelle Blick,
+      // die Nachkommastelle steht im Tooltip.
+      __werteFmt:v=>v?Math.round(v)+' km':'',
       type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS}
     ]},options:{responsive:true,maintainAspectRatio:false,

@@ -468,13 +468,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Datenpunkten — **nur im Querformat** und nur, wo ein Diagramm sie über
   `cfg.__werteFmt` anfordert: die vier Karten des Training-Tabs sowie
   **Ruhepuls & HRV** (`c-herz`) und **Schlafdauer** (`c-sl-dur`).
-  **Das Format kommt aus denselben Helfern wie der Rest der App** — `alsStdMin()` für
-  die Schlafdauer (`7h 25m`, auf Wunsch statt `7.4`), `fmtPace()` für die Pace,
-  `zahl()` für Strecke und VO₂max. Dieselbe Nacht sieht damit über dem Balken so aus
-  wie in der Ziele-Karte und in der Minikachel. Breite Texte kosten Beschriftungen:
-  `7h 25m` ist rund doppelt so breit wie `7.4`, im vollen Monat (31 Nächte, 23 px je
-  Spalte) tragen deshalb 24 von 31 Balken eine Zahl. Das regelt die Rechteck-Prüfung
-  von selbst. Im
+  **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
+  die Pace, `zahl()` für VO₂max, `Math.round` + `km` für die Laufstrecke (auf Wunsch
+  ganze Kilometer: über dem Balken zählt der schnelle Blick, die Nachkommastelle
+  steht im Tooltip und in der Fusszeile).
+  **`stdMinLabel()` bedient Schlafdauer und Trainingszeit** (`7h 25m`) und ist die
+  einzige Stelle, die zwei Sonderfälle kennt:
+  - **Bei 24M bricht der Text um** (`7h` über `25m`). Dort stehen 24 Balken
+    nebeneinander; einzeilig wäre der Text breiter als die Spalte, umgebrochen halb
+    so breit. Der Umbruch geschieht über ein `\n` im Rückgabewert — **das Plugin
+    kennt die Zeiträume nicht**, jedes Diagramm entscheidet selbst, wann sein Text
+    zu breit wird.
+  - **Ein führendes `0h ` fällt weg**: bei 38 Minuten Training sagt `0h 38m` nichts,
+    was `38m` nicht auch sagt. Beim Schlaf tritt der Fall praktisch nie ein.
+  Mehrzeilige Beschriftungen sind im Plugin allgemein gelöst: es misst die breiteste
+  Zeile für die Kollisionsprüfung, stapelt nach oben (`textBaseline: bottom`, letzte
+  Zeile auf `y`) und hält mit `ZEILE_H` (11 px) Zeilenabstand und Prüfhöhe zusammen.
+  Breite Texte kosten Beschriftungen: `7h 25m` ist rund doppelt so breit wie `7.4`,
+  im vollen Monat (31 Nächte, 23 px je Spalte) tragen deshalb 24 von 31 Balken eine
+  Zahl. Das regelt die Rechteck-Prüfung von selbst. Im
   Hochformat ist die Karte halb so breit; dort stünden die Zahlen bei einem
   Monatsfenster als graues Band über den Balken.
   **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs.** Chart.js
