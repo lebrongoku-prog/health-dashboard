@@ -2929,6 +2929,26 @@ function zeitleisteAktualisieren() {
   });
 }
 
+// ── Passiver Modus ───────────────────────────────────────────────────────────
+// Die Leiste steht dauerhaft ueber dem Inhalt. Wer gerade liest oder scrollt,
+// braucht sie nicht — dann schrumpft sie auf 70 %, bleibt aber sichtbar, bedienbar
+// und an derselben Unterkante stehen. Ein Tipp auf Pille oder Pfeil holt sie zurueck.
+//
+// Absichtlich NICHT wie das Ausblenden der Bottom-Nav geloest: die verschwindet ganz
+// und kommt nur ueber einen Tipp auf den Hintergrund zurueck. Die Zeitleiste muss
+// jederzeit erreichbar bleiben — sie ist das einzige Bedienelement fuer den Zeitraum.
+let _zlPassiv = false;
+
+function zeitleistePassiv(ja) {
+  const el = document.getElementById('zeitleiste');
+  if (!el || _zlPassiv === !!ja) return;   // nichts tun, wenn der Zustand schon stimmt
+  _zlPassiv = !!ja;
+  el.classList.toggle('passiv', _zlPassiv);
+  // Eine offene Auswahl gehoert zum aktiven Bedienen. Sie stehen zu lassen, waehrend
+  // die Reihe darunter schrumpft, saehe nach einem Fehler aus.
+  if (_zlPassiv) zeitleisteAuswahl(false);
+}
+
 function zeitleisteAuswahl(offen) {
   const el = document.getElementById('zeitleiste');
   if (!el) return;
@@ -3238,6 +3258,11 @@ function initScrollHideNav() {
         // einen Tipp auf den freien Kartenhintergrund – auch beim Zurückscrollen und
         // am Seitenanfang bleibt sie weg. So gewünscht.
         if (y > 60 && dy > 4) navAusblenden(nav, true);
+        // Die Zeitleiste tritt schon bei der kleinsten Bewegung zurück, und zwar in
+        // BEIDE Richtungen — anders als die Bottom-Nav, die nur beim Runterscrollen
+        // verschwindet. Die 2 px Schwelle fangen das Nachfedern von iOS ab, das sonst
+        // nach jedem Antippen ein Mini-dy meldet.
+        if (Math.abs(dy) > 2) zeitleistePassiv(true);
       });
     }, { passive: true });
   });
@@ -3294,6 +3319,14 @@ document.body.addEventListener('click', (e) => {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
+  // Passiver Modus: ein Tipp auf Pille oder Pfeil holt die Leiste zurueck, ein Tipp
+  // irgendwo daneben schickt sie zurueck. Ein Tipp auf einen Eintrag der offenen
+  // Auswahl (`.zl-opt`, `.zl-heute`) laesst den Zustand, wie er ist — er gehoert zum
+  // Bedienen der Leiste, liegt aber nicht in der Reihe.
+  // BEWUSST ohne `return`: der Tipp soll danach noch das tun, wofuer er gedacht war.
+  if (t.closest('.zl-reihe')) zeitleistePassiv(false);
+  else if (!t.closest('#zeitleiste')) zeitleistePassiv(true);
+
   // Zeitleiste zuerst: die aufgeklappte Auswahl schliesst bei JEDEM Tipp, der nicht
   // der Pille selbst oder einem ihrer Einträge gilt — die Blätterpfeile eingeschlossen.
   // Vorher galt „ausserhalb der ganzen Leiste": ein Tipp auf ‹ oder › liess die

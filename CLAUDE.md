@@ -311,6 +311,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      abgesetzt: als siebter Chip in Chip-Optik erwartete man eine Tagesansicht, und
      genau die gibt es nicht mehr. Der Weg dorthin: erst `.nav-today` in jeder
      Diagrammkarte, dann kurz ein Bereich `heute`, seit 06.09.2026 dieser Knopf.
+  7. **Passiver Modus** (`#zeitleiste.passiv`, 06.09.2026): Die Reihe schrumpft auf
+     **70 %**, sobald man scrollt (in **beide** Richtungen, Schwelle 2 px gegen iOS'
+     Nachfedern) oder irgendwo neben die Leiste tippt. Ein Tipp auf Pille oder Pfeil
+     holt sie zurück; ein Tipp auf einen Eintrag der offenen Auswahl lässt den
+     Zustand, wie er ist. Geschrumpft wird über `transform: scale(.7)` mit
+     `transform-origin: bottom center` — so bleibt die **Unterkante exakt stehen**
+     (gemessen 746 px, mit versteckter Nav 804, beides unverändert beim Umschalten)
+     und Höhe, Schrift und Abstände schrumpfen im selben Verhältnis. Kleinere Masse
+     einzeln zu setzen hätte dasselbe Umbruch-Risiko wie die Auswahlleiste.
+     **Anders als die Bottom-Nav verschwindet sie nie** — sie ist das einzige
+     Bedienelement für den Zeitraum und muss erreichbar bleiben (44 px werden zu
+     31 px). Eine offene Auswahl wird beim Wechsel in den passiven Modus geschlossen.
   5. **`blickAnkerMerken()` braucht einen Rückfall.** Die Pfeile sitzen in keiner
      Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
      `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
