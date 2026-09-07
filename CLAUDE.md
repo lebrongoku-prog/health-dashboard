@@ -367,7 +367,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Folge:** Daten-Stand, Anmeldestatus und beide Update-Knöpfe stehen nur noch hier.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
-- **Bottom-Nav-Ausblenden:** Runterscrollen blendet die Leiste aus
+- **Bottom-Nav-Ausblenden:** Die Leiste **startet eingeklappt** (auf Wunsch,
+  07.09.2026) — `navAusblenden(nav, true)` läuft direkt nach `zeitleisteBauen()` und
+  damit vor dem ersten `showScreen`, sonst sässe die Zeitleiste kurz auf der falschen
+  Höhe. Runterscrollen blendet sie aus
   (`initScrollHideNav`). Scrollen blendet sie **nie wieder ein** — auch nicht beim
   Zurückscrollen und nicht am Seitenanfang. Zurück kommt sie nur über einen Tipp auf
   den freien Kartenhintergrund. Die letzte Scrollposition wird **pro Tab** gemerkt:
@@ -632,9 +635,22 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **ohne** die frühere Haarlinie — die wirkte neben dem Knopf wie eine Umrandung.
   Im Dunkelmodus dieselbe Form mit `.45` statt `.18`: ein 18%-Schwarz verschwindet
   auf dunklem Grund und die Karten hätten keine Kante mehr.
-- **Aufklapp-Schalter sitzt in der Kopfzeile.** „Weitere Auswertungen" (Herz, Schlaf)
-  und „Muster & Zusammenhänge" (Übersicht) haben keinen breiten Balken im Inhalt mehr,
-  sondern einen `.pg-act.ausklapp-act` links vom Dark-Toggle (`▾` zu / `▴` offen).
+- **Aufklapp-Schalter sitzt unten links in der Zeitleiste** (seit 07.09.2026; davor
+  kurz als `.pg-act.ausklapp-act` in der Kopfzeile, davor als breiter Balken im
+  Inhalt). Er ist ein Kind von `#zeitleiste`, absolut auf `bottom: 0` gesetzt und
+  liegt damit auf **derselben Unterkante wie die Pille**. Er trägt deren Fläche,
+  Rahmen und Schatten und macht den **passiven Modus mit** — `scale(.7)` und
+  `opacity: .5`, ausgelöst von denselben Ereignissen; ein Tipp darauf weckt die
+  Leiste ebenso wie ein Tipp auf Pille oder Pfeil.
+  Sein Skalierungs-Ursprung ist `bottom left`, nicht `bottom center` wie bei der
+  Reihe: sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg.
+  **Sein Inhalt hängt am Tab, nicht an der Leiste.** `zeitleisteAusklapp()` liest
+  `AUSKLAPP[currentScreen]` und setzt Chevron, Titel und `data-ausklapp`; Tabs ohne
+  Eintrag (Training) blenden ihn aus. Aufgerufen wird es aus
+  `zeitleisteAktualisieren()` **und** aus `_applyTabState` — beim Wechsel auf einen
+  bereits gerenderten Tab läuft kein `_renderTab`, der Knopf zeigte sonst den
+  vorherigen Tab an. `.zl-ausklapp[hidden]{display:none}` ist Pflicht (siehe
+  `hidden`-Gotcha).
   **`AUSKLAPP` ist die einzige Quelle** dafür, welcher Tab etwas zum Aufklappen hat,
   wie es heisst und wie umgeschaltet wird — Knopf, Zustand und Handler lesen dieselbe
   Tabelle. Tabs ohne Eintrag zeigen den Knopf gar nicht.

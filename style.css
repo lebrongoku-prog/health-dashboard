@@ -336,6 +336,37 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    und die beiden Elemente bleiben untereinander gleich stark. Auf die Tippflaeche
    wirkt sich das nicht aus — durchsichtig heisst nicht durchlaessig. */
 #zeitleiste.passiv .zl-reihe { transform: scale(0.7); opacity: .5; }
+
+/* Ausklapp-Knopf der Tabs – seit 07.09.2026 hier statt in der Kopfzeile: unten links
+   auf der Hoehe der Pille. Er gehoert damit zur Zeitleiste und macht deren aktiven
+   und passiven Zustand mit: gleiche Flaeche, gleiche Deckkraft, gleiche Skalierung.
+   `bottom: 0` setzt ihn auf dieselbe Unterkante wie `.zl-reihe` (die Leiste hat unten
+   kein Padding). Der Skalierungs-Ursprung liegt unten LINKS statt unten mittig —
+   sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg. */
+.zl-ausklapp {
+  position: absolute; bottom: 0; left: calc(var(--safe-l) + 12px);
+  pointer-events: auto;
+  width: var(--zeit-h); height: var(--zeit-h);
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  cursor: pointer; font-family: inherit;
+  transform-origin: bottom left;
+  transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   .2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Strichfarbe folgt dem Tab – wie schon in der Kopfzeile. */
+.zl-ausklapp svg {
+  width: 20px; height: 20px; fill: none;
+  stroke: var(--tab-color, #0891B2); stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* PFLICHT, siehe `hidden`-Gotcha: die display-Regel oben schlaegt das Attribut sonst. */
+.zl-ausklapp[hidden] { display: none; }
+#zeitleiste.passiv .zl-ausklapp { transform: scale(0.7); opacity: .5; }
 /* Pille und Pfeile teilen dieselbe durchscheinende Flaeche: sie liegen mal auf dem
    farbigen Tab-Hintergrund, mal auf einer Karte — deckend wirkten sie wie ein
    Fremdkoerper, ganz ohne Flaeche waeren sie auf hellen Karten unlesbar. */
@@ -958,21 +989,9 @@ h5,
    mit Doppel-Chevron in der Tabfarbe – dort ist es die Akzentfarbe, hier folgt sie
    dem Tab. Masse, Radius, Schatten und Strichstaerke sind von dort uebernommen; er
    hebt sich damit bewusst von den beiden durchscheinenden Nachbarn (＋, 🌙) ab. */
-.pg-act.ausklapp-act{
-  background:rgba(255,255,255,.95);
-  border:1px solid transparent;
-  border-radius:10px;
-  box-shadow:0 2px 8px rgba(0,0,0,.15);
-  -webkit-backdrop-filter:none;backdrop-filter:none;
-}
 .pg-act.einst-act svg{
   width:20px;height:20px;fill:none;
   stroke:#fff;stroke-width:1.7;
-  stroke-linecap:round;stroke-linejoin:round;
-}
-.pg-act.ausklapp-act svg{
-  width:18px;height:18px;fill:none;
-  stroke:var(--tab-color,#0891B2);stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round;
 }
 

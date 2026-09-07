@@ -2842,30 +2842,16 @@ function pgBanner(icon,title){
   // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
   // Tabnamen, der Daten-Stand steht jetzt einmal auf der Einstellungen-Seite.
   const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  // Aufklapp-Schalter links vom Dark-Toggle – nur in den Tabs, die etwas zu zeigen
-  // haben. Er ersetzt die frueheren breiten Balken im Inhalt ("Weitere Auswertungen",
-  // "Muster & Zusammenhänge").
-  const k = AUSKLAPP[_currentRenderingTab];
-  // Doppel-Chevron wie in FitTracks Uebungen-Tab (`.ex-sort-btn`): nach unten zum
-  // Aufklappen, nach oben zum Einklappen. Die Punkte der Polylinien sind von dort
-  // uebernommen, damit der Knopf in beiden Apps derselbe ist.
-  const chevron = k && k.offen()
-    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 11 12 6 17 11"/><polyline points="7 18 12 13 17 18"/></svg>`
-    : `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>`;
-  const ausklapp = k
-    ? `<button class="pg-act ausklapp-act" data-ausklapp="${_currentRenderingTab}"
-         aria-expanded="${k.offen() ? 'true' : 'false'}"
-         title="${k.titel}" aria-label="${k.titel}">${chevron}</button>`
-    : '';
-  // Zahnrad NUR in der Uebersicht, links vom Ausklapp-Knopf. Es traegt die
-  // durchscheinende Optik der uebrigen `.pg-act` – der Ausklapp-Knopf ist bewusst der
-  // einzige helle Knopf in der Zeile.
+  // Der Ausklapp-Schalter sass bis 07.09.2026 hier. Er steht jetzt unten links in der
+  // Zeitleiste (`zeitleisteAusklapp()`) und macht dort deren passiven Modus mit.
+  // Zahnrad NUR in der Uebersicht. Es traegt die durchscheinende Optik der uebrigen
+  // `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
     ? `<button class="pg-act einst-act" title="Einstellungen" aria-label="Einstellungen">
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}${ausklapp}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -2960,7 +2946,8 @@ function zeitleisteBauen() {
   const heute = `<button class="zl-heute">Heute</button><span class="zl-trenner" aria-hidden="true"></span>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
-  el.innerHTML = `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${heute}${opts}</div>`
+  el.innerHTML = `<button class="zl-ausklapp" hidden></button>`
+    + `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${heute}${opts}</div>`
     + `<div class="zl-reihe">`
     + `<button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>`
     + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
@@ -2968,6 +2955,26 @@ function zeitleisteBauen() {
     + `</div>`;
   document.body.appendChild(el);
   zeitleisteAktualisieren();
+}
+
+// Ausklapp-Knopf des AKTUELLEN Tabs. Er sitzt in der Zeitleiste, sein Inhalt haengt
+// aber am Tab: `AUSKLAPP` sagt, ob es dort etwas zu klappen gibt und wie es heisst.
+// Tabs ohne Eintrag (Training) zeigen ihn gar nicht.
+function zeitleisteAusklapp() {
+  const knopf = document.querySelector('#zeitleiste .zl-ausklapp');
+  if (!knopf) return;
+  const k = AUSKLAPP[currentScreen];
+  knopf.hidden = !k;
+  if (!k) { knopf.removeAttribute('data-ausklapp'); return; }
+  knopf.dataset.ausklapp = currentScreen;
+  knopf.setAttribute('aria-expanded', k.offen() ? 'true' : 'false');
+  knopf.setAttribute('title', k.titel);
+  knopf.setAttribute('aria-label', k.titel);
+  // Doppel-Chevron wie in FitTracks Uebungen-Tab: nach unten zum Aufklappen, nach
+  // oben zum Einklappen.
+  knopf.innerHTML = k.offen()
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 11 12 6 17 11"/><polyline points="7 18 12 13 17 18"/></svg>`
+    : `<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>`;
 }
 
 function zeitleisteAktualisieren() {
@@ -2982,6 +2989,7 @@ function zeitleisteAktualisieren() {
   el.querySelectorAll('.zl-opt').forEach(b => {
     b.classList.toggle('aktiv', b.dataset.range === timeRange);
   });
+  zeitleisteAusklapp();
 }
 
 // ── Passiver Modus ───────────────────────────────────────────────────────────
@@ -3191,6 +3199,9 @@ function _applyTabState(name) {
   themaSetzen(name);
   // Beim Tabwechsel hat eine offene Auswahl ausgedient.
   zeitleisteAuswahl(false);
+  // Der Ausklapp-Knopf gehoert zum Tab – bei einem bereits gerenderten Tab laeuft
+  // kein _renderTab, also hier nachziehen.
+  zeitleisteAusklapp();
   _setStatusBarColor(name);
   if (!_renderedTabs.has(name)) {
     _renderTab(name);
@@ -3372,7 +3383,7 @@ document.body.addEventListener('click', (e) => {
   // Auswahl (`.zl-opt`, `.zl-heute`) laesst den Zustand, wie er ist — er gehoert zum
   // Bedienen der Leiste, liegt aber nicht in der Reihe.
   // BEWUSST ohne `return`: der Tipp soll danach noch das tun, wofuer er gedacht war.
-  if (t.closest('.zl-reihe')) zeitleistePassiv(false);
+  if (t.closest('.zl-reihe') || t.closest('.zl-ausklapp')) zeitleistePassiv(false);
   else if (!t.closest('#zeitleiste')) zeitleistePassiv(true);
 
   // Zeitleiste zuerst: die aufgeklappte Auswahl schliesst bei JEDEM Tipp, der nicht
@@ -3676,6 +3687,10 @@ updateNavUI();
 // Tab-Snap-Sync + Auto-Hide-Bottom-Nav initialisieren
 initTabScrollSync();
 zeitleisteBauen();
+// Die Tableiste startet eingeklappt (auf Wunsch, 07.09.2026). Zurueck kommt sie wie
+// sonst auch: durch einen Tipp auf den freien Kartenhintergrund. Muss VOR dem ersten
+// showScreen stehen, damit die Zeitleiste gleich auf der richtigen Hoehe sitzt.
+navAusblenden(document.getElementById('bottom-nav'), true);
 einstellungenWischen();
 initScrollHideNav();
 // Initial render des ersten Tabs
