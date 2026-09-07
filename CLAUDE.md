@@ -376,6 +376,31 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zurückscrollen wieder einblendete, fiel das nicht auf.
   Die **Zeitleiste** verschwindet dabei nie — sie rückt nur nach unten nach. Beide
   Zustände hängen an `navAusblenden()`.
+- **Wochenschnitt bei Monatsbalken** (Laufstrecke und Trainingszeit, 07.09.2026):
+  Sobald die Diagramme Monate zeigen (`tKeyTyp === 'monat'`), erscheint direkt nach
+  `Total` eine Zeile „Durchschn. Strecke/Zeit pro Woche", und der Tooltip jedes
+  Monatsbalkens bekommt eine zweite Zeile mit demselben Wert **für diesen Monat**.
+  Grund: Monatssummen lassen sich untereinander schlecht vergleichen — ein Februar
+  hat 28, ein Juli 31 Tage.
+  **`wochenZwischen()` und `wochenImMonat()` rechnen mit Kommastellen**, nicht mit
+  „vier Wochen": 28 Tage sind 4.00 Wochen, 31 Tage 4.43. Rund gerechnet läge der
+  Wochenschnitt je nach Monat um bis zu 10 % daneben — und genau der Vergleich
+  zwischen Monaten ist der Zweck der Zahl.
+- **Gestrichelte Ø-Linien im Training-Tab** (auf Wunsch, 07.09.2026) in allen vier
+  Diagrammen, **abschaltbar über einen Legendeneintrag** (`oeLegende()`,
+  `.oe-schalter`, Optik vom entfernten Vergleichsdiagramm übernommen).
+  **Das kehrt die ältere Regel „Ø gehört in die Fusszeile, nicht ins Diagramm" für
+  diesen Tab um** — für Herz und Schlaf gilt sie weiter.
+  Drei Dinge hängen daran:
+  1. Der Zustand `_oeLinie` liegt **ausserhalb** von `pgTraining`, sonst wäre er nach
+     jedem Neuaufbau zurückgesetzt (derselbe Grund wie beim früheren `_kombiAktiv`).
+     Fehlender Eintrag heisst „an".
+  2. Das Label der Linie ist **`Ø`** — damit hält `nurMesswerte` sowohl den Tooltip
+     als auch die Datenbeschriftungen von ihr fern. Eine Umbenennung bricht beides.
+  3. `oeDatensatz()` liefert ein **Array** (leer, wenn abgeschaltet), damit der
+     Aufrufer es mit `...` einsetzen kann und kein `null` im Datensatz-Array landet.
+  Umgeschaltet wird über `_renderTab('training')`: die Linie ist ein Datensatz, kein
+  Sichtbarkeitsschalter.
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
   funktionieren Wochentrenner und Markierung nicht. `timeDim` liefert beides mit;
@@ -465,13 +490,19 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien zu unterscheiden. Beide stehen ganz oben, **vor** dem ersten
   `Chart.defaults`-Zugriff — `const` wird nicht hochgezogen.
 - **Datenbeschriftungen (`werteLabelPlugin`, 06.09.2026):** Zahlen über Balken und
-  Datenpunkten — **nur im Querformat** und nur, wo ein Diagramm sie über
-  `cfg.__werteFmt` anfordert: die vier Karten des Training-Tabs sowie
-  **Ruhepuls & HRV** (`c-herz`) und **Schlafdauer** (`c-sl-dur`).
+  Datenpunkten. **Sichtbar im Querformat immer, im Hochformat nur bei 7T** (seit
+  07.09.2026) — dort stehen höchstens sieben Säulen nebeneinander, ab 1M wären es
+  über dreissig. **Alle neun Diagramme der App** melden inzwischen ein
+  `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
+  und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
+  für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
-  die Pace, `zahl()` für VO₂max, `Math.round` + `km` für die Laufstrecke (auf Wunsch
-  ganze Kilometer: über dem Balken zählt der schnelle Blick, die Nachkommastelle
-  steht im Tooltip und in der Fusszeile).
+  die Pace, `zahl()` für VO₂max, `Math.round`+`km` für die Laufstrecke (auf Wunsch
+  ganze Kilometer und **ohne Leerzeichen**: `120km`; über dem Balken zählt der
+  schnelle Blick, die Nachkommastelle steht im Tooltip und in der Fusszeile).
+  **Die Trainingszeit weicht bei 24M ab**: dort ganze Stunden (`10h`) statt
+  `10h 12m` — bei 24 Monatsbalken ist die Minute weder lesbar noch aussagekräftig.
+  Die Schlafdauer behält dort ihren Umbruch.
   **`stdMinLabel()` bedient Schlafdauer und Trainingszeit** (`7h 25m`) und ist die
   einzige Stelle, die zwei Sonderfälle kennt:
   - **Bei 24M bricht der Text um** (`7h` über `25m`). Dort stehen 24 Balken

@@ -653,6 +653,24 @@ function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Numbe
 // das gilt auch fuer die zweite Stelle: 25.10 -> "25.1", 25.00 -> "25".
 // `dec` bleibt damit eine OBERGRENZE, keine feste Breite. Wer je eine feste Breite
 // braucht (etwa fuer eine rechtsbuendige Spalte), darf nicht `zahl()` nehmen.
+// Mittelwert eines Arrays, leere Werte uebersprungen. `mittel(rows,feld)` gibt es
+// schon fuer Zeilenobjekte – hier liegen die Werte bereits als Reihe vor.
+function mittelArr(a) { const f=(a||[]).filter(v=>v!=null); return f.length?f.reduce((x,y)=>x+y,0)/f.length:null; }
+
+// Wochen in einem Zeitraum – als Kommazahl. Ein Monat ist NICHT "vier Wochen":
+// 28 Tage sind 4.00, 31 Tage 4.43. Wer rund rechnet, liegt je nach Monat um bis zu
+// 10 % daneben – und genau der Vergleich zwischen Monaten ist der Zweck der Zahl.
+function wochenZwischen(vonDs, bisDs) {
+  const tage = Math.round((new Date(bisDs+'T00:00:00') - new Date(vonDs+'T00:00:00')) / 86400000) + 1;
+  return tage > 0 ? tage / 7 : null;
+}
+// Wochen eines Kalendermonats aus dem Schluessel 'JJJJ-MM'. Tag 0 des Folgemonats ist
+// der letzte Tag des gesuchten – das kennt auch die Schaltjahre.
+function wochenImMonat(monatsKey) {
+  const [j, m] = String(monatsKey).split('-').map(Number);
+  return (j && m) ? new Date(j, m, 0).getDate() / 7 : null;
+}
+
 function zahl(v, dec=1) { return v == null ? '—' : String(Number(Number(v).toFixed(dec))); }
 
 // ── Text aus fremder Quelle entschärfen ────────────────
@@ -1015,7 +1033,9 @@ const werteLabelPlugin = {
   afterDatasetsDraw(chart) {
     const fmt = chart.$werteFmt;
     if (!fmt) return;
-    if (window.innerWidth <= window.innerHeight) return;       // Hochformat
+    // Querformat immer; Hochformat nur bei 7T. Dort stehen hoechstens sieben Saeulen
+    // nebeneinander, da ist auch auf der halben Breite Platz. Ab 1M waeren es 30+.
+    if (window.innerWidth <= window.innerHeight && timeRange !== '7d') return;
     const flaeche = chart.chartArea; if (!flaeche) return;
     const ctx = chart.ctx;
     ctx.save();
@@ -1039,7 +1059,7 @@ const werteLabelPlugin = {
       meta.data.forEach((punkt, i) => {
         const wert = ds.data[i];
         if (wert == null || !punkt) return;
-        const txt = fmt(wert);
+        const txt = fmt(wert, ds);
         if (txt == null || txt === '') return;
         // Ein `\n` im Ergebnis des Formatierers bricht die Beschriftung um. So kann
         // jedes Diagramm selbst entscheiden, wann sein Text zu breit fuer die Spalte
@@ -1218,6 +1238,35 @@ function zielErfuellt(key, wert) {
 // Tooltip-Filter: Hilfslinien (Ø-Linie, Ziellinie) sind Orientierung, keine Messwerte –
 // sie gehören nicht in die Werteliste beim Antippen eines Datenpunkts.
 const nurMesswerte = item => !/^(Ø|Ziel)/.test(item.dataset.label || '');
+
+// ── Gestrichelte Ø-Linien im Training-Tab (auf Wunsch, 07.09.2026) ────────────
+// Der Zustand liegt AUSSERHALB der Seitenfunktion, sonst waere er nach jedem
+// Neuaufbau des Tabs zurueckgesetzt – derselbe Grund wie beim frueheren
+// `_kombiAktiv`. Fehlender Eintrag heisst "an".
+//
+// Fuer Herz und Schlaf gilt weiterhin die aeltere Regel „Ø gehoert in die
+// Fusszeile"; im Training-Tab war die Linie ausdruecklich gewuenscht.
+const _oeLinie = {};
+function oeAn(id) { return _oeLinie[id] !== false; }
+
+// Legendeneintrag zum Ein-/Ausschalten. Ein <button>, damit der Tipp auf den
+// Kartenhintergrund die Bottom-Nav nicht mitschaltet.
+function oeLegende(id, farbe) {
+  return `<button type="button" class="cl-item oe-schalter${oeAn(id)?'':' aus'}" data-oe="${id}"
+    aria-pressed="${oeAn(id)?'true':'false'}" title="Ø-Linie ein-/ausblenden"><span
+    class="cl-line cl-strich" style="color:${farbe}"></span>Ø</button>`;
+}
+
+// Der Datensatz selbst. Das Label 'Ø' ist kein Zufall: `nurMesswerte` haelt damit
+// sowohl den Tooltip als auch die Datenbeschriftungen von der Linie fern.
+// Rueckgabe ist ein ARRAY, damit der Aufrufer es mit `...` einsetzen kann und der
+// ausgeschaltete Fall keinen `null`-Eintrag im Datensatz-Array hinterlaesst.
+function oeDatensatz(id, wert, farbe, laenge, achse) {
+  if (!oeAn(id) || wert == null) return [];
+  return [{ label:'Ø', data:new Array(laenge).fill(wert), borderColor:farbe,
+    borderDash:[5,4], borderWidth:1.5, pointRadius:0, tension:0, fill:false,
+    type:'line', spanGaps:true, ...(achse?{yAxisID:achse}:{}) }];
+}
 
 // Gestrichelte Ziellinie als zusätzlicher Chart-Datensatz.
 function zielLinie(key, laenge, achse) {
@@ -1854,6 +1903,10 @@ function pgOverview() {
   }
   if(wHas){
     zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
+      // Vier Reihen mit vier Einheiten – der Formatierer bekommt deshalb den
+      // Datensatz mit und entscheidet danach. Kurz halten: hier stehen bis zu vier
+      // Zahlen uebereinander an derselben Stelle.
+      __werteFmt:(v,ds)=>ds.label==='Schlaf (h)'?zahl(v,1):String(Math.round(v)),
       data:{labels:wLabels,datasets:[
         {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:BALKEN_RADIUS,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
@@ -2443,7 +2496,11 @@ function pgSchlaf() {
         {label:'REM',data:remMa,backgroundColor:'#5BC8FA',borderRadius:BALKEN_RADIUS,stack:'s'}
       ];
       if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:BALKEN_RADIUS,stack:'s'});
-      zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
+      zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,
+        // Gestapelte Balken: die Beschriftung sitzt auf der Oberkante des jeweiligen
+        // Segments. Sehr kurze Phasen bekommen keine – dort ist schlicht kein Platz.
+        __werteFmt:v=>v>=0.5?zahl(v,1):'',
+        type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
             if(ctx.raw==null)return null;
@@ -2454,7 +2511,9 @@ function pgSchlaf() {
         }}},
         scales:{x:{...gx,stacked:true},y:{...gy,stacked:true,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}}}}});
     }
-    if(hasScore) zeichneDiagramm('c-sl-score',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,type:'line',data:{labels:tdL.labels,datasets:[{data:scMa,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3}]},
+    if(hasScore) zeichneDiagramm('c-sl-score',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,
+      __werteFmt:v=>String(Math.round(v)),
+      type:'line',data:{labels:tdL.labels,datasets:[{data:scMa,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:gx,y:{...gy,min:0,max:100}}}});
   }
 }
@@ -2526,6 +2585,11 @@ async function pgTraining() {
   const minWknd=mittel(_woDur(woMinSplit.wknd));
 
   const {labels:tL,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
+  // Zeigt das Diagramm Monatsbalken? Dann kommt der Wochenschnitt dazu: Monatssummen
+  // lassen sich untereinander schlecht vergleichen (28 bis 31 Tage), Wochenwerte schon.
+  const _mw = moWindow();
+  const _monatsModus = tKeyTyp === 'monat' && !!_mw;
+  const _fensterWochen = _monatsModus ? wochenZwischen(_mw.s, _mw.e) : null;
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
   // NOTE: _woByDate was removed — es filterte auf Health-Sheet-Tage und liess Indoor-Workouts aus
@@ -2581,10 +2645,11 @@ async function pgTraining() {
     ${pgBanner('🏃','Training')}
       <div class="chart-card">
         <h3>Laufstrecke</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${oeLegende('c-tot-strecke','#FB923C')}</div>
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
+          ${_monatsModus&&distGesamt!=null&&_fensterWochen?`${statZeile(`Durchschn. Strecke pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`)}`:''}
           ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,1)} km`)}`:''}
@@ -2593,10 +2658,11 @@ async function pgTraining() {
 
       <div class="chart-card">
         <h3>Trainingszeit</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div></div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${oeLegende('c-tot-zeit','#F97316')}</div>
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
+          ${_monatsModus&&minGesamt!=null&&_fensterWochen?`${statZeile(`Durchschn. Zeit pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
           ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
@@ -2605,7 +2671,7 @@ async function pgTraining() {
 
     <div class="chart-card">
       <h3>Pace pro Training ${infoI('pace')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div></div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${oeLegende('c-tr-pace','#7C3AED')}</div>
       <div class="chart-wrap" style="--h:300px"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
@@ -2633,25 +2699,43 @@ async function pgTraining() {
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
       // Dasselbe Format wie beim Schlaf – die Werte liegen hier in Minuten.
-      __werteFmt:v=>v?stdMinLabel(v/60):'',
+      // Bei 24M ganze Stunden (auf Wunsch): 24 Monatsbalken nebeneinander, da ist
+      // die Minute weder lesbar noch aussagekraeftig.
+      __werteFmt:v=>v?(timeRange==='24m'?Math.round(v/60)+'h':stdMinLabel(v/60)):'',
       type:'bar',data:{labels:_lZeitLbls,datasets:[
-      {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS}
+      {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
+      ...oeDatensatz('c-tot-zeit', mittelArr(_lZeitData), '#F97316', _lZeitLbls.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
       // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-        label:ctx=>ctx.raw==null?null:fmtMin(ctx.raw)}}},
+        label:ctx=>{
+          if(ctx.raw==null)return null;
+          const t=fmtMin(ctx.raw);
+          if(!_monatsModus)return t;
+          // Zweite Zeile: derselbe Monat auf eine Woche gerechnet.
+          const w=wochenImMonat(_lZeitKeys[ctx.dataIndex]);
+          return w?[t,`Ø ${fmtMin(ctx.raw/w)} / Woche`]:t;
+        }}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
     zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
       // Ganze Kilometer mit Einheit: ueber dem Balken zaehlt der schnelle Blick,
       // die Nachkommastelle steht im Tooltip.
-      __werteFmt:v=>v?Math.round(v)+' km':'',
+      __werteFmt:v=>v?Math.round(v)+'km':'',
       type:'bar',data:{labels:_lStrLbls,datasets:[
-      {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS}
+      {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
+      ...oeDatensatz('c-tot-strecke', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.raw!=null?`${zahl(ctx.raw,1)} km`:null}}},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+        label:ctx=>{
+          if(ctx.raw==null)return null;
+          const t=`${zahl(ctx.raw,1)} km`;
+          if(!_monatsModus)return t;
+          const w=wochenImMonat(_lZeitKeys[ctx.dataIndex]);
+          return w?[t,`Ø ${zahl(ctx.raw/w,1)} km / Woche`]:t;
+        }}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});
   }
@@ -2668,7 +2752,8 @@ async function pgTraining() {
     zeichneDiagramm('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,
       __werteFmt:v=>fmtPace(v),
       type:'line',data:{labels:_paceLabels,datasets:[
-      {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true}
+      {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true},
+      ...oeDatensatz('c-tr-pace', mittelArr(_paceData), '#7C3AED', _paceLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
         if(ctx.raw==null)return null;
@@ -2711,7 +2796,7 @@ function vo2Abschnitt(D, P) {
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div></div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${oeLegende('c-vo2','#D97706')}</div>
       <div class="chart-wrap" style="--h:300px"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
@@ -2734,6 +2819,7 @@ function vo2Abschnitt(D, P) {
       const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
       const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
       _v2Dsets.push(zielLinie('vo2max', _v2tL.length));
+      _v2Dsets.push(...oeDatensatz('c-vo2', mittelArr(v2MaFull), '#D97706', _v2tL.length));
       zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,
         __werteFmt:v=>zahl(v,1),
         type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
@@ -3265,6 +3351,15 @@ document.body.addEventListener('click', (e) => {
   // Container. Der Nutzer oeffnet hier einen ganzen Abschnitt, ein Neuaufbau faellt
   // dabei nicht ins Gewicht.
   _renderTab(tab);
+});
+
+// Ø-Linien der Training-Diagramme ein-/ausschalten. Neu aufgebaut wird der ganze
+// Tab: die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
+document.body.addEventListener('click', (e) => {
+  const sch = e.target.closest('.oe-schalter');
+  if (!sch) return;
+  _oeLinie[sch.dataset.oe] = !oeAn(sch.dataset.oe);
+  _renderTab('training');
 });
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────

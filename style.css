@@ -517,6 +517,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    sonst gewinnt dessen background. */
 .cl-line.cl-strich{background:transparent;
   background-image:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 6px)}
+/* Legendeneintrag, der die Ø-Linie eines Diagramms schaltet. Sieht aus wie ein
+   Eintrag, ist aber ein Knopf – ausgeschaltet tritt er zurueck, bleibt aber
+   lesbar. Uebernommen vom entfernten Vergleichsdiagramm (`.kombi-schalter`). */
+.oe-schalter{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+.oe-schalter.aus{opacity:.38}
+.oe-schalter.aus .cl-line{color:var(--txt3) !important}
 .chart-wrap{position:relative;overflow:hidden;height:var(--h,200px)}
 /* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
    Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
