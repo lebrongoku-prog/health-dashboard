@@ -399,8 +399,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   1. Der Zustand `_oeLinie` liegt **ausserhalb** von `pgTraining`, sonst wäre er nach
      jedem Neuaufbau zurückgesetzt (derselbe Grund wie beim früheren `_kombiAktiv`).
      Fehlender Eintrag heisst „an".
-  2. Das Label der Linie ist **`Ø`** — damit hält `nurMesswerte` sowohl den Tooltip
-     als auch die Datenbeschriftungen von ihr fern. Eine Umbenennung bricht beides.
+  2. Das Label der Linie ist **`Ø`**, damit `nurMesswerte` sie erkennt. **Bei den
+     Datenbeschriftungen genügt das** — das Plugin wendet die Regel selbst an. **Beim
+     Tooltip NICHT:** dort muss jedes Diagramm `filter: nurMesswerte` selbst setzen.
+     Genau das fehlte beim Einbau, und der Tooltip zeigte für jeden Monatsbalken
+     **zwei** Werte — den echten und den der Ø-Linie, beide durch dieselbe
+     Label-Funktion geschickt („231.2 km / Ø 52.2 km je Woche" gefolgt von
+     „81.7 km / Ø 18.5 km je Woche"). `c-sl-dur` und `c-herz` fielen nicht auf, weil
+     sie eigene Filter mitbringen (`datasetIndex!==0` bzw. eine Namensliste).
   3. `oeDatensatz()` liefert ein **Array** (leer, wenn abgeschaltet), damit der
      Aufrufer es mit `...` einsetzen kann und kein `null` im Datensatz-Array landet.
   Umgeschaltet wird über `_renderTab('training')`: die Linie ist ein Datensatz, kein
@@ -500,11 +506,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
-  **Im Verlauf tragen nur Schlaf und Training Zahlen** (07.09.2026): mit allen vier
-  Reihen standen bis zu 28 Beschriftungen im Diagramm, und gerade die beiden Linien
-  Puls und HRV kreuzen sich ständig — der Formatierer gibt für sie `''` zurück.
-  Ebenso fallen **Nullen** weg: an trainingsfreien Tagen stünde sonst eine Reihe von
-  `0` auf der Grundlinie.
+  **Zwei Diagramme sind ausgenommen** (07.09.2026, beides auf Wunsch nach einem
+  Zwischenschritt): Das **Verlaufs-Diagramm** hat gar kein `__werteFmt` mehr — vier
+  Reihen auf zwei Achsen blieben auch nach dem Weglassen von Puls und HRV unruhig.
+  **Ruhepuls & HRV** trägt `__werteNurQuer: true` und bleibt im **Hochformat** leer;
+  dort liegen die beiden Kurven eng beieinander und kreuzen sich.
+  Zahlen, die auf `0` gerundet werden, fallen überall weg: an trainingsfreien Tagen
+  stünde sonst eine Reihe von `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
   die Pace, `zahl()` für VO₂max, `Math.round`+`km` für die Laufstrecke (auf Wunsch
   ganze Kilometer und **ohne Leerzeichen**: `120km`; über dem Balken zählt der

@@ -1035,7 +1035,8 @@ const werteLabelPlugin = {
     if (!fmt) return;
     // Querformat immer; Hochformat nur bei 7T. Dort stehen hoechstens sieben Saeulen
     // nebeneinander, da ist auch auf der halben Breite Platz. Ab 1M waeren es 30+.
-    if (window.innerWidth <= window.innerHeight && timeRange !== '7d') return;
+    // Einzelne Diagramme koennen sich das Hochformat ganz verbitten (`__werteNurQuer`).
+    if (window.innerWidth <= window.innerHeight && (timeRange !== '7d' || chart.$nurQuer)) return;
     const flaeche = chart.chartArea; if (!flaeche) return;
     const ctx = chart.ctx;
     ctx.save();
@@ -1104,6 +1105,7 @@ function zeichneDiagramm(id, cfg) {
   // Ohne __werteFmt bleibt ein Diagramm unbeschriftet – so lassen sich einzelne
   // bewusst ausnehmen, genau wie bei __keys.
   charts[id].$werteFmt = cfg.__werteFmt || null;
+  charts[id].$nurQuer  = !!cfg.__werteNurQuer;
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
@@ -1903,19 +1905,9 @@ function pgOverview() {
   }
   if(wHas){
     zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
-      // Vier Reihen mit vier Einheiten – der Formatierer bekommt deshalb den
-      // Datensatz mit und entscheidet danach.
-      // Puls und HRV bleiben UNBESCHRIFTET (auf Wunsch, 07.09.2026): mit allen vier
-      // Reihen standen bis zu 28 Zahlen im Diagramm, und gerade die beiden Linien
-      // kreuzen sich staendig. Uebrig bleiben Schlaf (Balken) und Training.
-      __werteFmt:(v,ds)=>{
-        if(ds.label==='Ruhepuls'||ds.label==='HRV')return '';
-        const t=ds.label==='Schlaf (h)'?zahl(v,1):String(Math.round(v));
-        // Nullen weglassen: an trainingsfreien Tagen stuende sonst eine Reihe von
-        // "0" auf der Grundlinie – dieselbe Unruhe, wegen der Puls und HRV rausfielen.
-        // Die Trainingsdiagramme halten es genauso.
-        return t==='0'?'':t;
-      },
+      // KEIN __werteFmt: das Verlaufs-Diagramm bleibt ganz ohne Datenbeschriftungen
+      // (auf Wunsch, 07.09.2026, in beiden Ausrichtungen). Vier Reihen auf zwei Achsen
+      // ergaben selbst nach dem Weglassen von Puls und HRV ein unruhiges Bild.
       data:{labels:wLabels,datasets:[
         {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:BALKEN_RADIUS,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
@@ -2119,6 +2111,9 @@ function pgHerz() {
       // Puls in bpm, HRV in ms – beide ganzzahlig, eine Nachkommastelle waere
       // hier Scheingenauigkeit.
       __werteFmt:v=>String(Math.round(v)),
+      // Nur im Querformat (auf Wunsch, 07.09.2026): im Hochformat liegen die beiden
+      // Kurven eng beieinander und kreuzen sich, die Zahlen stiessen dort aneinander.
+      __werteNurQuer:true,
       type:'line',data:{labels:tdL.labels,datasets:[
       {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
@@ -2717,7 +2712,7 @@ async function pgTraining() {
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
       // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{
         label:ctx=>{
           if(ctx.raw==null)return null;
           const t=fmtMin(ctx.raw);
@@ -2737,7 +2732,7 @@ async function pgTraining() {
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
       ...oeDatensatz('c-tot-strecke', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{
         label:ctx=>{
           if(ctx.raw==null)return null;
           const t=`${zahl(ctx.raw,1)} km`;
@@ -2764,7 +2759,7 @@ async function pgTraining() {
       {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true},
       ...oeDatensatz('c-tr-pace', mittelArr(_paceData), '#7C3AED', _paceLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>{
         if(ctx.raw==null)return null;
         return `Pace: ${fmtPace(ctx.raw)} min/km`;
       }}}},
