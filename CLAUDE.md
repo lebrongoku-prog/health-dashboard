@@ -381,7 +381,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zustände hängen an `navAusblenden()`.
 - **Wochenschnitt bei Monatsbalken** (Laufstrecke und Trainingszeit, 07.09.2026):
   Sobald die Diagramme Monate zeigen (`tKeyTyp === 'monat'`), erscheint direkt nach
-  `Total` eine Zeile „Durchschn. Strecke/Zeit pro Woche", und der Tooltip jedes
+  `Total` eine Zeile „Ø pro Woche" (in beiden Diagrammen gleich benannt — die Einheit
+  steht im Wert), und der Tooltip jedes
   Monatsbalkens bekommt eine zweite Zeile mit demselben Wert **für diesen Monat**.
   Grund: Monatssummen lassen sich untereinander schlecht vergleichen — ein Februar
   hat 28, ein Juli 31 Tage.
@@ -499,6 +500,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
+  **Im Verlauf tragen nur Schlaf und Training Zahlen** (07.09.2026): mit allen vier
+  Reihen standen bis zu 28 Beschriftungen im Diagramm, und gerade die beiden Linien
+  Puls und HRV kreuzen sich ständig — der Formatierer gibt für sie `''` zurück.
+  Ebenso fallen **Nullen** weg: an trainingsfreien Tagen stünde sonst eine Reihe von
+  `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
   die Pace, `zahl()` für VO₂max, `Math.round`+`km` für die Laufstrecke (auf Wunsch
   ganze Kilometer und **ohne Leerzeichen**: `120km`; über dem Balken zählt der

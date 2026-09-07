@@ -1904,9 +1904,18 @@ function pgOverview() {
   if(wHas){
     zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
       // Vier Reihen mit vier Einheiten – der Formatierer bekommt deshalb den
-      // Datensatz mit und entscheidet danach. Kurz halten: hier stehen bis zu vier
-      // Zahlen uebereinander an derselben Stelle.
-      __werteFmt:(v,ds)=>ds.label==='Schlaf (h)'?zahl(v,1):String(Math.round(v)),
+      // Datensatz mit und entscheidet danach.
+      // Puls und HRV bleiben UNBESCHRIFTET (auf Wunsch, 07.09.2026): mit allen vier
+      // Reihen standen bis zu 28 Zahlen im Diagramm, und gerade die beiden Linien
+      // kreuzen sich staendig. Uebrig bleiben Schlaf (Balken) und Training.
+      __werteFmt:(v,ds)=>{
+        if(ds.label==='Ruhepuls'||ds.label==='HRV')return '';
+        const t=ds.label==='Schlaf (h)'?zahl(v,1):String(Math.round(v));
+        // Nullen weglassen: an trainingsfreien Tagen stuende sonst eine Reihe von
+        // "0" auf der Grundlinie – dieselbe Unruhe, wegen der Puls und HRV rausfielen.
+        // Die Trainingsdiagramme halten es genauso.
+        return t==='0'?'':t;
+      },
       data:{labels:wLabels,datasets:[
         {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:BALKEN_RADIUS,yAxisID:'yL'},
         {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
@@ -2360,7 +2369,7 @@ function pgSchlaf() {
         </div>
         <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
-          ${slRows.length>0?`${statZeile(`Schlafziel (${alsStdMin(ZIELE.sleepTotal.ziel)}) erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
+          ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
           ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
           ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
@@ -2649,7 +2658,7 @@ async function pgTraining() {
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
-          ${_monatsModus&&distGesamt!=null&&_fensterWochen?`${statZeile(`Durchschn. Strecke pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
+          ${_monatsModus&&distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`)}`:''}
           ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,1)} km`)}`:''}
@@ -2662,7 +2671,7 @@ async function pgTraining() {
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
-          ${_monatsModus&&minGesamt!=null&&_fensterWochen?`${statZeile(`Durchschn. Zeit pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
+          ${_monatsModus&&minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
           ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}

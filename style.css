@@ -344,7 +344,8 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    kein Padding). Der Skalierungs-Ursprung liegt unten LINKS statt unten mittig —
    sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg. */
 .zl-ausklapp {
-  position: absolute; bottom: 0; left: calc(var(--safe-l) + 12px);
+  /* 12 px waeren buendig mit dem Kartenrand; auf Wunsch 5 px weiter nach innen. */
+  position: absolute; bottom: 0; left: calc(var(--safe-l) + 17px);
   pointer-events: auto;
   width: var(--zeit-h); height: var(--zeit-h);
   display: flex; align-items: center; justify-content: center;
