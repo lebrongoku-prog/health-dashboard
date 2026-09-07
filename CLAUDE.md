@@ -379,13 +379,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zurückscrollen wieder einblendete, fiel das nicht auf.
   Die **Zeitleiste** verschwindet dabei nie — sie rückt nur nach unten nach. Beide
   Zustände hängen an `navAusblenden()`.
-- **Wochenschnitt bei Monatsbalken** (Laufstrecke und Trainingszeit, 07.09.2026):
-  Sobald die Diagramme Monate zeigen (`tKeyTyp === 'monat'`), erscheint direkt nach
-  `Total` eine Zeile „Ø pro Woche" (in beiden Diagrammen gleich benannt — die Einheit
-  steht im Wert), und der Tooltip jedes
-  Monatsbalkens bekommt eine zweite Zeile mit demselben Wert **für diesen Monat**.
-  Grund: Monatssummen lassen sich untereinander schlecht vergleichen — ein Februar
-  hat 28, ein Juli 31 Tage.
+- **Wochenschnitt in Laufstrecke und Trainingszeit** (07.09.2026). Dahinter stehen
+  **zwei verschiedene Fragen**, deshalb zwei Grössen — wer sie zusammenlegt, bekommt
+  eine davon falsch:
+  - **`_fensterWochen`: wie viele Wochen umfasst das angezeigte Fenster?** Daraus
+    entsteht die Fusszeile „Ø pro Woche" direkt nach `Total` (in beiden Diagrammen
+    gleich benannt — die Einheit steht im Wert). Sie erscheint **ab 1M**, also
+    überall, wo `moWindow()` ein Fenster liefert. Bei 7T nicht: dort wäre sie sinnlos,
+    weil das Fenster selbst eine Woche ist.
+  - **`_monatsModus`: zeigt ein einzelner Balken einen ganzen Monat?** Nur dann
+    bekommt der Tooltip eine zweite Zeile mit dem Wochenschnitt **dieses Monats**.
+    Bei 1M steht je Balken ein **Tag** — ein Wochenschnitt für einen Tag ergäbe
+    keinen Sinn, obwohl die Fusszeile dort sehr wohl einen hat.
+  Grund für beides: Summen über verschieden lange Zeiträume lassen sich nicht
+  vergleichen — ein Februar hat 28, ein Juli 31 Tage.
   **`wochenZwischen()` und `wochenImMonat()` rechnen mit Kommastellen**, nicht mit
   „vier Wochen": 28 Tage sind 4.00 Wochen, 31 Tage 4.43. Rund gerechnet läge der
   Wochenschnitt je nach Monat um bis zu 10 % daneben — und genau der Vergleich

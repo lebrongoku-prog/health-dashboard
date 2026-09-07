@@ -2589,11 +2589,20 @@ async function pgTraining() {
   const minWknd=mittel(_woDur(woMinSplit.wknd));
 
   const {labels:tL,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
-  // Zeigt das Diagramm Monatsbalken? Dann kommt der Wochenschnitt dazu: Monatssummen
-  // lassen sich untereinander schlecht vergleichen (28 bis 31 Tage), Wochenwerte schon.
+  // Zwei verschiedene Fragen, deshalb zwei Groessen:
+  //
+  // `_fensterWochen` — wie viele Wochen umfasst das ANGEZEIGTE FENSTER? Daraus wird
+  // die Fusszeile „Ø pro Woche". `moWindow()` liefert ab 1M ein Fenster, bei 7T nicht:
+  // dort waere der Wochenschnitt sinnlos, weil das Fenster selbst eine Woche IST.
+  // Seit 07.09.2026 ist 1M ausdruecklich eingeschlossen (vorher nur ab 3M) – ein
+  // Monat ist keine Woche, die Summe sagt fuer sich also ebenso wenig.
+  //
+  // `_monatsModus` — zeigt ein BALKEN einen ganzen Monat? Nur dann bekommt der
+  // Tooltip seine zweite Zeile. Bei 1M steht je Balken ein Tag; ein Wochenschnitt
+  // fuer einen einzelnen Tag ergaebe keinen Sinn.
   const _mw = moWindow();
+  const _fensterWochen = _mw ? wochenZwischen(_mw.s, _mw.e) : null;
   const _monatsModus = tKeyTyp === 'monat' && !!_mw;
-  const _fensterWochen = _monatsModus ? wochenZwischen(_mw.s, _mw.e) : null;
 
   // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
   // NOTE: _woByDate was removed — es filterte auf Health-Sheet-Tage und liess Indoor-Workouts aus
@@ -2653,7 +2662,7 @@ async function pgTraining() {
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
-          ${_monatsModus&&distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
+          ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
         ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`)}`:''}
           ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`)}`:''}
           ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,1)} km`)}`:''}
@@ -2666,7 +2675,7 @@ async function pgTraining() {
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
-          ${_monatsModus&&minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
+          ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
           ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
           ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
