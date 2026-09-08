@@ -106,8 +106,13 @@ body.theme-training   { --tab-color: #F97316; }
   cursor: pointer; flex-shrink: 0;
   font-family: inherit;
 }
-.nav-arrow:hover:not(:disabled) { background: #F8FAFC; color: var(--txt); }
-.nav-arrow:disabled { opacity: 0.3; cursor: default; }
+.nav-arrow:hover:not(:disabled):not(.inaktiv) { background: #F8FAFC; color: var(--txt); }
+/* Am Rand des Datenbestands. `.inaktiv` statt `:disabled` – siehe updateNavUI: ein
+   deaktivierter Knopf reicht den Tipp in WebKit weiter und blendete damit die
+   Bottom-Nav ein. `:disabled` bleibt fuer den Fall, dass es doch jemand setzt. */
+.nav-arrow:disabled, .nav-arrow.inaktiv { opacity: 0.3; cursor: default; }
+/* Kein Druckpunkt, wenn nichts passiert – sonst sieht es aus, als haette es gewirkt. */
+.nav-arrow.inaktiv:active { opacity: 0.3; transform: none; }
 body.dark .dark-toggle { color: #FBBF24; }
 
 /* Filter pills (horizontal scrollable) */
@@ -392,7 +397,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   width: 52px; border-radius: 999px;
   font-size: 1.35rem; color: var(--txt2);
 }
-#zeitleiste .nav-arrow:disabled { opacity: .35; cursor: default; }
+/* Diese Regel macht das Verblassen in der Zeitleiste – sie schlaegt die allgemeine
+   `.nav-arrow.inaktiv` weiter oben (ID-Selektor). Beim Umstieg von `:disabled`
+   auf `.inaktiv` MUSS sie mit umgestellt werden, sonst blieben die Pfeile am Rand
+   des Datenbestands voll deckend und saehen bedienbar aus. */
+#zeitleiste .nav-arrow:disabled,
+#zeitleiste .nav-arrow.inaktiv { opacity: .35; cursor: default; }
 
 /* Auswahl ueber der Pille. Die sieben Zeitraeume sollen auf iPhone-Breite (375 px)
    in EINE Zeile passen. Nachgemessen: die sieben Chips brauchen 308.7 px, mit sechs

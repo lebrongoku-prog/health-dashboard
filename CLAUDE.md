@@ -307,7 +307,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      und kann deshalb nichts mitreissen — auch nichts, was es heute noch nicht gibt.
   4. **Die Pfeile sind immer sichtbar.** Sie verschwanden früher beim Bereich
      „Heute" — den gibt es nicht mehr, und jeder verbliebene Bereich lässt sich
-     blättern. Ob ein Schritt möglich ist, sagt allein `updateNavUI()` über `disabled`.
+     blättern. Ob ein Schritt möglich ist, sagt `updateNavUI()` über die Klasse
+     **`.inaktiv`** — **bewusst NICHT über das `disabled`-Attribut** (08.09.2026).
+     Ein deaktivierter Knopf nimmt in WebKit keine Tipps an; auf dem iPhone lief der
+     Tipp an ihm vorbei und blendete die **Bottom-Nav** ein. Als ganz normaler Knopf
+     fängt er den Tipp ab, und die Ausnahmeliste des Hintergrund-Tipps
+     (`button, a, input, …`) greift ohnehin. Der Klick-Handler prüft `.inaktiv` und
+     tut dann nichts; `aria-disabled` erhält die Ansage für Screenreader.
+     **Wer das je zurückdreht, holt den Fehler zurück.**
+     Das Verblassen hängt an **zwei** Regeln, die beide `.inaktiv` führen müssen:
+     `.nav-arrow.inaktiv` (allgemein) und `#zeitleiste .nav-arrow.inaktiv` — letztere
+     gewinnt in der Leiste über den ID-Selektor. Beim Umstellen war zuerst nur die
+     erste angepasst, und die Pfeile blieben voll deckend.
   6. **„Heute" ist ein Sprung, kein Bereich** (`.zl-heute`, ohne `data-range`). Ein
      Tipp ruft `aufHeuteSpringen()` und lässt `timeRange` **unangetastet**: steht man
      auf 3M im März, bleibt es 3M und zeigt die neuesten drei Monate. Damit ist

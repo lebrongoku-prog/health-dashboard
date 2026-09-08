@@ -576,8 +576,18 @@ function updateNavUI() {
     prevDis = mw ? mw.s <= minDate : addMonths(referenceDate,-1) < minDate;
     nextDis = mw ? mw.e >= maxDate : referenceDate >= maxDate;
   }
-  document.querySelectorAll('.nav-prev').forEach(b => { b.disabled = prevDis; });
-  document.querySelectorAll('.nav-next').forEach(b => { b.disabled = nextDis; });
+  // BEWUSST kein `disabled`-Attribut, sondern eine eigene Klasse (07.09.2026).
+  // Ein deaktivierter Knopf nimmt in WebKit keine Tipps an; der Tipp lief dort an ihm
+  // vorbei und blendete die Bottom-Nav ein — der Nutzer tippte auf einen Pfeil und
+  // bekam die Tableiste. Als normaler Knopf schluckt er den Tipp wie jeder andere,
+  // und die Ausnahmeliste des Hintergrund-Tipps (`button, a, input, …`) greift.
+  // `aria-disabled` sagt Screenreadern trotzdem, dass hier nichts geht.
+  const setzeInaktiv = (b, aus) => {
+    b.classList.toggle('inaktiv', aus);
+    b.setAttribute('aria-disabled', aus ? 'true' : 'false');
+  };
+  document.querySelectorAll('.nav-prev').forEach(b => setzeInaktiv(b, prevDis));
+  document.querySelectorAll('.nav-next').forEach(b => setzeInaktiv(b, nextDis));
 }
 
 function navPrev() {
@@ -3418,8 +3428,11 @@ document.body.addEventListener('click', (e) => {
   }
   const zlOpt = t.closest('.zl-opt');
   if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
-  if (t.closest('.nav-prev')) { blickAnkerMerken(t); navPrev(); return; }
-  if (t.closest('.nav-next')) { blickAnkerMerken(t); navNext(); return; }
+  // Am Rand des Datenbestands passiert nichts – der Knopf bleibt aber ein Knopf und
+  // faengt den Tipp ab, statt ihn an die Bottom-Nav durchzureichen.
+  const pfeilZurueck = t.closest('.nav-prev'), pfeilVor = t.closest('.nav-next');
+  if (pfeilZurueck) { if (!pfeilZurueck.classList.contains('inaktiv')) { blickAnkerMerken(t); navPrev(); } return; }
+  if (pfeilVor)     { if (!pfeilVor.classList.contains('inaktiv'))     { blickAnkerMerken(t); navNext(); } return; }
   // Jeder Knopf hat eine EIGENE Auslöser-Klasse. `.update-btn` ist reine Optik und
   // sitzt auf allen dreien – wurde sie hier abgefragt, loeste „Mit Google anmelden"
   // zusaetzlich das App-Update samt Rueckfrage aus.
