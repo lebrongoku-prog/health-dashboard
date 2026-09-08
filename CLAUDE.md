@@ -361,14 +361,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Diagramme. Schmalere Geräte brechen weiterhin um; das ist hingenommen.
   `--zeit-h` (**53 px**, seit 08.09.2026 20 % grösser) steht auch im `padding-bottom`
   von `.screen` — sonst verschwindet die unterste Karte unter der Leiste.
-  **Die Vergrösserung stiess an eine Grenze, die man kennen muss:** Die Reihe ist
-  zentriert, der Ausklapp-Knopf sitzt links daneben. Bei voller Vergrösserung aller
-  Masse (Pfeile 62 px, Pille 110 px) wurde die Reihe 254 px breit, begann bei 375 px
-  Fenster schon bei x = 61 und **überlappte den Knopf um 19 px**. Höhe und Schrift
-  tragen deshalb die vollen +20 % (44 → 53 px, 15.2 → 18.2 px), die **Breiten nur
-  +8 %** (Pfeile 52 → 56, Pille 92 → 100). Der Knopf musste zusätzlich von 27 auf
-  **8 px** an den Rand. Damit bleiben 11 px Luft bei 375 px und 3 px bei 360 px —
-  wer hier etwas vergrössert, muss beides nachmessen.
+  **Reihe und Ausklapp-Knopf teilen sich eine Zeile — jede Massänderung an einem von
+  beiden muss am anderen nachgemessen werden.** Die Reihe ist zentriert, der Knopf
+  sitzt daneben; was die Reihe breiter macht oder den Knopf nach innen schiebt, geht
+  direkt auf den Abstand. Zweimal ist das schon aufgelaufen:
+  - Beim **20 %-Vergrössern** (08.09.2026) hätten volle Masse (Pfeile 62 px, Pille
+    110 px) die Reihe auf 254 px gebracht — sie überlappte den Knopf um 19 px. Höhe
+    und Schrift tragen deshalb die vollen +20 % (44 → 53 px, 15.2 → 18.2 px), die
+    **Breiten nur +8 %** (Pille 92 → 100).
+  - Beim **Verschieben des Knopfes um 15 px nach innen** (08.09.2026, auf Wunsch)
+    überlappte er erneut: 4 px bei 375, 12 px bei 360. Platz geschaffen haben die
+    **Pfeile: 56 → 42 px** — bewusst dort und nicht an der Pille, die kurz zuvor
+    ausdrücklich vergrössert worden war. Die Tippfläche bleibt mit 42 × 53 px bequem.
+  **Stand: `right: safe + 23px`, Pfeile 42 px, Pille min. 100 px.** Damit bleiben
+  10 px Luft bei 375 px und 2 px bei 360 px.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
@@ -738,7 +744,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Sein Skalierungs-Ursprung ist die Ecke, an der er klebt (`bottom right`), nicht
   `bottom center` wie bei der Reihe: sonst wanderte er beim Schrumpfen von seinem
   Platz am Rand weg. Weil die Reihe **zentriert** ist, ist der Platz links und rechts
-  gleich knapp — gemessen bleiben bei 375 px auf beiden Seiten 11 px Luft.
+  gleich knapp. Er steht auf `right: calc(var(--safe-r) + 23px)`; gemessen bleiben
+  10 px Luft bei 375 px und 2 px bei 360 px (siehe „Zeitleiste" — dort steht, was
+  dafür an den Pfeilen gekürzt wurde).
   **Sein Inhalt hängt am Tab, nicht an der Leiste.** `zeitleisteAusklapp()` liest
   `AUSKLAPP[currentScreen]` und setzt Chevron, Titel und `data-ausklapp`; Tabs ohne
   Eintrag (Training) blenden ihn aus. Aufgerufen wird es aus
