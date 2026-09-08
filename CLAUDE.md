@@ -546,13 +546,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
-  **Drei Diagramme sind ausgenommen**, alle auf Wunsch nach einem Zwischenschritt:
-  Das **Verlaufs-Diagramm** und der **Schlafphasen-Verlauf** haben gar kein
-  `__werteFmt` mehr — beim Verlauf blieben vier Reihen auf zwei Achsen auch nach dem
-  Weglassen von Puls und HRV unruhig, bei den Schlafphasen sitzt die Beschriftung
-  gestapelter Balken auf der Oberkante des jeweiligen Segments und damit mitten im
-  Balken. **Ruhepuls & HRV** trägt `__werteNurQuer: true` und bleibt im **Hochformat**
-  leer; dort liegen die beiden Kurven eng beieinander und kreuzen sich.
+  **Drei Diagramme weichen ab**, alle auf Wunsch nach einem Zwischenschritt:
+  Das **Verlaufs-Diagramm** hat gar kein `__werteFmt` — vier Reihen auf zwei Achsen
+  blieben auch nach dem Weglassen von Puls und HRV unruhig; es ist damit als einziges
+  vom Titel-Tipp ausgenommen. Der **Schlafphasen-Verlauf** trägt
+  `__werteAusStandard: true` (Beschriftung gestapelter Balken sitzt mitten im Balken),
+  **Ruhepuls & HRV** trägt `__werteNurQuer: true` (die beiden Kurven liegen im
+  Hochformat eng beieinander und kreuzen sich). Beide lassen sich über den Titel
+  trotzdem einschalten.
   Zahlen, die auf `0` gerundet werden, fallen überall weg: an trainingsfreien Tagen
   stünde sonst eine Reihe von `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
@@ -582,6 +583,21 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs.** Chart.js
   zeichnet bei jeder Grössenänderung ohnehin neu, dadurch kommen und gehen die Zahlen
   beim Drehen von selbst — ohne `_renderTab`, ohne `resize`-Listener.
+  **Ein Tipp auf den Kartentitel schaltet sie je Diagramm um** (auf Wunsch,
+  08.09.2026). `beschriftungStandard()` liefert, was ohne Zutun gilt (die Regeln
+  oben); `_beschriftung[canvasId]` hält den Wunsch des Nutzers und **gewinnt immer** —
+  auch gegen `__werteNurQuer` und gegen die Hochformat-Regel. Der Zustand liegt
+  ausserhalb der Seitenfunktionen und übersteht Zeitraum-, Tab- und Formatwechsel.
+  Umgeschaltet wird mit `chart.draw()`, nicht mit `_renderTab`: die Daten ändern sich
+  nicht, nur was darüber steht.
+  **Zwei Dinge hängen daran:** `.chart-card h3` musste in die Ausnahmeliste des
+  Hintergrund-Tipps (`initScrollHideNav`), sonst schaltete derselbe Tipp zusätzlich
+  die Bottom-Nav um. Und der **Schlafphasen-Verlauf** hat seinen Formatierer
+  zurückbekommen, jetzt mit `__werteAusStandard: true` — er zeigt nichts, bis man den
+  Titel antippt. Nur so gilt „alle Diagramme ausser dem Verlauf" und bleibt die
+  frühere Entscheidung bestehen, dass seine gestapelten Balken nicht dauerhaft
+  beschriftet sind. Das **Verlaufs-Diagramm** hat weiterhin gar keinen Formatierer und
+  reagiert deshalb nicht auf den Titel-Tipp.
   **Überlappungen löst das Plugin selbst:** es merkt sich die belegten **Rechtecke**
   (x *und* y, `measureText` für die Breite) und lässt weg, was in ein bereits
   gesetztes hineinragen würde. Nur die x-Achse zu prüfen reichte nicht: in
@@ -673,8 +689,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
   im Querformat also oben Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
   **über** dem Paar; zwischen zwei nebeneinanderliegenden Karten wäre kein Platz.
-- **Minikacheln der Übersicht (`.ti-metric`):** Inhalte waagrecht **und** senkrecht
-  zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
+- **Minikacheln der Übersicht (`.ti-metric`): ohne Kartenhintergrund** (auf Wunsch,
+  08.09.2026). `.ov-combo-card` trägt weder Fläche noch Schatten noch Polster mehr —
+  die vier Kacheln sitzen direkt auf dem Tab-Verlauf. **Der ist in beiden Themes
+  dunkel**, deshalb tragen `ti-metric-lbl`, `-val`, `-einheit` und `-delta.neu` jetzt
+  **Weiss** statt der Grautöne aus dem Type Scale; ohne das wären sie unlesbar.
+  Grün und Rot der Abweichungszeile bleiben — sie tragen die Bewertung, nicht die
+  Lesbarkeit. Die farbige Oberkante und der 5-%-Farbschleier jeder Kachel bleiben
+  ebenfalls: sie sind das Einzige, was die Kacheln noch voneinander abgrenzt.
+  Inhalte waagrecht **und** senkrecht zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
   Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
   einseitigen Rand als Ausgleich bräuchte. Dass es dabei auf eine zweite Zeile
   rutschen kann, ist unkritisch: die Kacheln sind Grid-Zellen und ohnehin gleich hoch.
@@ -700,15 +723,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **ohne** die frühere Haarlinie — die wirkte neben dem Knopf wie eine Umrandung.
   Im Dunkelmodus dieselbe Form mit `.45` statt `.18`: ein 18%-Schwarz verschwindet
   auf dunklem Grund und die Karten hätten keine Kante mehr.
-- **Aufklapp-Schalter sitzt unten links in der Zeitleiste** (seit 07.09.2026; davor
+- **Aufklapp-Schalter sitzt unten rechts in der Zeitleiste** (rechts seit
+  08.09.2026, davor kurz links; in der Zeitleiste seit 07.09.2026, davor
   kurz als `.pg-act.ausklapp-act` in der Kopfzeile, davor als breiter Balken im
   Inhalt). Er ist ein Kind von `#zeitleiste`, absolut auf `bottom: 0` gesetzt und
   liegt damit auf **derselben Unterkante wie die Pille**. Er trägt deren Fläche,
   Rahmen und Schatten und macht den **passiven Modus mit** — `scale(.7)` und
   `opacity: .5`, ausgelöst von denselben Ereignissen; ein Tipp darauf weckt die
   Leiste ebenso wie ein Tipp auf Pille oder Pfeil.
-  Sein Skalierungs-Ursprung ist `bottom left`, nicht `bottom center` wie bei der
-  Reihe: sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg.
+  Sein Skalierungs-Ursprung ist die Ecke, an der er klebt (`bottom right`), nicht
+  `bottom center` wie bei der Reihe: sonst wanderte er beim Schrumpfen von seinem
+  Platz am Rand weg. Weil die Reihe **zentriert** ist, ist der Platz links und rechts
+  gleich knapp — gemessen bleiben bei 375 px auf beiden Seiten 11 px Luft.
   **Sein Inhalt hängt am Tab, nicht an der Leiste.** `zeitleisteAusklapp()` liest
   `AUSKLAPP[currentScreen]` und setzt Chevron, Titel und `data-ausklapp`; Tabs ohne
   Eintrag (Training) blenden ihn aus. Aufgerufen wird es aus
@@ -742,11 +768,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
   zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
   nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
-  ihn: „Weitere Auswertungen" (Herz, Schlaf) und „Muster & Zusammenhänge" — **alle
-  drei starten zu** (`_weitereOffen`, `_musterOffen`; letzteres seit 06.09.2026 auf
-  Wunsch, vorher offen). Die
-  frühere dritte Stelle, die App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug
-  auf die Einstellungen-Seite entfallen.
+  ihn: „Weitere Auswertungen" in **allen drei** Tabs — **alle starten zu**
+  (`_weitereOffen = {overview, herz, schlaf}`). In der Übersicht steckt seit
+  08.09.2026 auch das **Verlaufs-Diagramm** dahinter, nicht mehr nur das
+  Muster-Raster; deshalb heisst der Zustand nicht mehr `_musterOffen` und der
+  Knopf nicht mehr „Muster & Zusammenhänge". Die frühere vierte Stelle, die
+  App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug auf die
+  Einstellungen-Seite entfallen.
 - **„Weitere Auswertungen" (Herz, Schlaf):** beide Tabs zeigen nur ihr **erstes**
   Diagramm; der Rest liegt hinter einem Knopf über die volle Kartenbreite
   (`weitereAuf(tab)` öffnet Knopf + `<div class="weitere-inhalt">`, das schliessende

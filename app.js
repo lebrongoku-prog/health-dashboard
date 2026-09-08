@@ -1035,6 +1035,31 @@ function _chartTipp(chart, evt) {
 // Werte auslassen als eine unlesbare Reihe. Deshalb braucht es auch keine
 // Sonderregel je Zeitraum: bei 7T steht ueber jedem Balken eine Zahl, bei 1M nur
 // ueber so vielen, wie nebeneinander Platz haben.
+// ── Datenbeschriftungen: Standard und Wunsch des Nutzers ─────────────────────
+// Ein Tipp auf den Kartentitel schaltet die Zahlen eines Diagramms um (auf Wunsch,
+// 08.09.2026) — unabhaengig von Zeitraum und Ausrichtung, und die Wahl bleibt
+// erhalten. Der Zustand liegt AUSSERHALB der Seitenfunktionen, sonst waere er nach
+// jedem Neuaufbau zurueckgesetzt.
+//
+// Fehlender Eintrag heisst „noch nicht entschieden" — dann gilt der Standard.
+// Ein gesetzter Eintrag gewinnt IMMER, auch gegen `__werteNurQuer` und gegen die
+// Hochformat-Regel: der Nutzer hat ausdruecklich gefragt.
+const _beschriftung = {};
+
+// Was ein Diagramm ohne Zutun zeigt.
+function beschriftungStandard(chart) {
+  if (!chart.$werteFmt) return false;
+  if (chart.$werteAus) return false;   // Schlafphasen: nur auf Wunsch
+  // Querformat immer; Hochformat nur bei 7T. Dort stehen hoechstens sieben Saeulen
+  // nebeneinander, da ist auch auf der halben Breite Platz. Ab 1M waeren es 30+.
+  if (window.innerWidth > window.innerHeight) return true;
+  return timeRange === '7d' && !chart.$nurQuer;
+}
+function beschriftungAn(chart) {
+  const w = _beschriftung[chart.canvas && chart.canvas.id];
+  return w === undefined ? beschriftungStandard(chart) : w;
+}
+
 // Zeilenhoehe der Beschriftungen – auch die Grundlage fuer die Ueberlappungspruefung
 // und den Abstand mehrzeiliger Texte. Eine Quelle, damit beides zusammenpasst.
 const ZEILE_H = 11;
@@ -1043,10 +1068,10 @@ const werteLabelPlugin = {
   afterDatasetsDraw(chart) {
     const fmt = chart.$werteFmt;
     if (!fmt) return;
-    // Querformat immer; Hochformat nur bei 7T. Dort stehen hoechstens sieben Saeulen
-    // nebeneinander, da ist auch auf der halben Breite Platz. Ab 1M waeren es 30+.
-    // Einzelne Diagramme koennen sich das Hochformat ganz verbitten (`__werteNurQuer`).
-    if (window.innerWidth <= window.innerHeight && (timeRange !== '7d' || chart.$nurQuer)) return;
+    // Ob gezeichnet wird, entscheidet beschriftungAn(): Wunsch des Nutzers, sonst
+    // Standard. Die Entscheidung faellt hier beim ZEICHNEN, damit sie beim Drehen
+    // des Geraets von selbst nachzieht.
+    if (!beschriftungAn(chart)) return;
     const flaeche = chart.chartArea; if (!flaeche) return;
     const ctx = chart.ctx;
     ctx.save();
@@ -1116,6 +1141,7 @@ function zeichneDiagramm(id, cfg) {
   // bewusst ausnehmen, genau wie bei __keys.
   charts[id].$werteFmt = cfg.__werteFmt || null;
   charts[id].$nurQuer  = !!cfg.__werteNurQuer;
+  charts[id].$werteAus = !!cfg.__werteAusStandard;
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
@@ -1883,8 +1909,9 @@ function pgOverview() {
     </div>
     </div>
     </div>
-    <!-- Zeile 2: Verlauf (oberhalb des Trends) -->
-    <div class="chart-card" style="margin-bottom:.7rem">
+    <!-- Zeile 2: Verlauf. Seit 08.09.2026 Teil des Ausklapp-Bereichs (auf Wunsch) –
+         dieselbe Bedingung wie das Muster-Raster darunter. -->
+    <div class="chart-card" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
       <h3 style="margin-bottom:.35rem">Verlauf</h3>
       <div class="chart-legend" style="margin-bottom:.3rem">
         <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf</div>
@@ -1897,7 +1924,7 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div class="pi-grid" style="${_musterOffen?'':'display:none'}">
+    <div class="pi-grid" style="${_weitereOffen.overview?'':'display:none'}">
       ${patternIns.map(p=>{
         let txt=p.text;
         if(p.hl)p.hl.forEach(h=>{txt=txt.replace(h.phrase,`<span style="color:${h.c};font-weight:700">${h.phrase}</span>`);});
@@ -2171,10 +2198,12 @@ function pgHerz() {
 // Tabwechsel – sonst waere die Auswahl nach jedem Klick auf die Zeitpfeile zurueck.
 // Start ZU (auf Wunsch, 06.09.2026): die Uebersicht soll mit Zielen, Kacheln und
 // Verlauf beginnen; die Deutungen holt man sich dazu, wenn man sie will.
-let _musterOffen = false;
 // Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
 // hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
-const _weitereOffen = { herz:false, schlaf:false };
+// Ausklapp-Zustand je Tab. Alle drei starten ZU. `overview` hiess bis 08.09.2026
+// `_musterOffen` und deckte nur das Muster-Raster ab; seit der Verlauf dazugehoert,
+// passt der eigene Name nicht mehr – jetzt fuehren alle drei Tabs denselben Weg.
+const _weitereOffen = { overview:false, herz:false, schlaf:false };
 // Knopf + oeffnendes <div>. Der schliessende Tag steht im Markup, damit die Karten
 // dazwischen unveraendert bleiben – ein String-Parameter haette die Template-Literale
 // der Karten verschachtelt und war nicht sauber zu escapen.
@@ -2284,8 +2313,8 @@ function einstellungenWischen() {
 // EINE Quelle fuer Knopf, Zustand und Umschalten; sonst muesste jede der drei
 // Stellen ihre eigene Fallunterscheidung fuehren.
 const AUSKLAPP = {
-  overview: { titel: 'Muster & Zusammenhänge', offen: () => _musterOffen,
-              um: () => { _musterOffen = !_musterOffen; } },
+  overview: { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.overview,
+              um: () => { _weitereOffen.overview = !_weitereOffen.overview; } },
   herz:     { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.herz,
               um: () => { _weitereOffen.herz = !_weitereOffen.herz; } },
   schlaf:   { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.schlaf,
@@ -2531,9 +2560,12 @@ function pgSchlaf() {
       ];
       if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:BALKEN_RADIUS,stack:'s'});
       zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,
-        // KEIN __werteFmt (auf Wunsch, 08.09.2026): bei gestapelten Balken sitzt die
-        // Beschriftung auf der Oberkante des jeweiligen Segments und damit mitten im
-        // Balken – das las sich nicht als Wert, sondern als Störung.
+        // Bei gestapelten Balken sitzt die Beschriftung auf der Oberkante des
+        // jeweiligen Segments und damit mitten im Balken – das las sich nicht als
+        // Wert, sondern als Stoerung. Deshalb standardmaessig AUS; der Titel-Tipp
+        // holt sie bei Bedarf trotzdem hervor.
+        __werteFmt:v=>v>=0.5?zahl(v,1):'',
+        __werteAusStandard:true,
         type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
@@ -3390,7 +3422,7 @@ function initScrollHideNav() {
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
     // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
     // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
@@ -3429,6 +3461,20 @@ document.body.addEventListener('click', (e) => {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
+  // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
+  // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
+  // ist dort null und der Zweig greift gar nicht.
+  const _titel = t.closest('.chart-card h3');
+  if (_titel && !t.closest(TT_TAP_SELECTOR) && !t.closest('button')) {
+    const _cv = _titel.closest('.chart-card').querySelector('canvas');
+    const _ch = _cv && Chart.getChart(_cv);
+    if (_ch && _ch.$werteFmt) {
+      _beschriftung[_cv.id] = !beschriftungAn(_ch);
+      _ch.draw();   // nur neu zeichnen – die Daten aendern sich nicht
+      return;
+    }
+  }
+
   // Passiver Modus: ein Tipp auf Pille oder Pfeil holt die Leiste zurueck, ein Tipp
   // irgendwo daneben schickt sie zurueck. Ein Tipp auf einen Eintrag der offenen
   // Auswahl (`.zl-opt`, `.zl-heute`) laesst den Zustand, wie er ist — er gehoert zum
