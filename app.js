@@ -1804,6 +1804,15 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
 
 
 // ── Übersicht ──────────────────────────────────────────
+// Farbschleier einer Minikachel. Seit die Kacheln ohne Karte direkt auf dem dunklen
+// Tab-Verlauf sitzen (08.09.2026), war der frühere Schleier praktisch unsichtbar —
+// auf Wunsch kraeftiger. EINE Stelle fuer alle vier: vorher standen drei Kacheln auf
+// 5 % und die Trainingskachel auf 7 %, ohne dass das je jemand entschieden haette.
+const KACHEL_SCHLEIER = .16;
+function kachelStil(farbe, rgb) {
+  return `border-top:3px solid ${farbe};background:rgba(${rgb},${KACHEL_SCHLEIER})`;
+}
+
 function pgOverview() {
   // Last day + 7-day window for mini-cards
   const lastDay = allData[allData.length-1] || {};
@@ -1866,17 +1875,17 @@ function pgOverview() {
         <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
-          ${hrLast!=null?`<div class="ti-metric" style="border-top:3px solid #EF4444;background:rgba(239,68,68,.05)">
+          ${hrLast!=null?`<div class="ti-metric" style="${kachelStil('#EF4444','239,68,68')}">
             <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
             <div class="ti-metric-val">${Math.round(hrLast)} bpm</div>
             ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
-          ${hvLast!=null?`<div class="ti-metric" style="border-top:3px solid #2563EB;background:rgba(37,99,235,.05)">
+          ${hvLast!=null?`<div class="ti-metric" style="${kachelStil('#2563EB','37,99,235')}">
             <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
             <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
-          ${slLast!=null?`<div class="ti-metric" style="border-top:3px solid #2186E8;background:rgba(33,134,232,.05)">
+          ${slLast!=null?`<div class="ti-metric" style="${kachelStil('#2186E8','33,134,232')}">
             <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
             <div class="ti-metric-val">${alsStdMin(slLast)}</div>
             ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
@@ -1884,7 +1893,7 @@ function pgOverview() {
           ${(()=>{
             const trMin=workoutData[lastDay.date]?.durationMin??null;
             const trAvg=(()=>{const v=priorDays.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
-            if(trMin!=null){return`<div class="ti-metric" style="border-top:3px solid #F97316;background:rgba(249,115,22,.07)">
+            if(trMin!=null){return`<div class="ti-metric" style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Training ${infoMini('training')}</div>
               <div class="ti-metric-val">${Math.round(trMin)} min</div>
               ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
@@ -1898,7 +1907,7 @@ function pgOverview() {
             const zaehl   = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
             const nWoche  = zaehl(tage7);
             const nVor    = tage7v.length >= 7 ? zaehl(tage7v) : null;
-            return`<div class="ti-metric" style="border-top:3px solid #F97316;background:rgba(249,115,22,.07)">
+            return`<div class="ti-metric" style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Trainings ${infoMini('trainWoche')}</div>
               <div class="ti-metric-val">${nWoche}<span class="ti-metric-einheit"> / 7 Tage</span></div>
               ${nVor!=null?`<div class="ti-metric-delta ${nWoche-nVor>0?'pos':nWoche-nVor<0?'neg':'neu'}">${(()=>{const d=nWoche-nVor;return(d>=0?'+':'')+d+' vs. Vorwoche';})()}</div>`:''}

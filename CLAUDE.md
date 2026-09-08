@@ -695,8 +695,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   dunkel**, deshalb tragen `ti-metric-lbl`, `-val`, `-einheit` und `-delta.neu` jetzt
   **Weiss** statt der Grautöne aus dem Type Scale; ohne das wären sie unlesbar.
   Grün und Rot der Abweichungszeile bleiben — sie tragen die Bewertung, nicht die
-  Lesbarkeit. Die farbige Oberkante und der 5-%-Farbschleier jeder Kachel bleiben
-  ebenfalls: sie sind das Einzige, was die Kacheln noch voneinander abgrenzt.
+  Lesbarkeit. Farbige Oberkante und Farbschleier jeder Kachel bleiben ebenfalls: sie
+  sind das Einzige, was die Kacheln ohne Karte noch voneinander abgrenzt. Der
+  Schleier steht deshalb auf **16 %** (`KACHEL_SCHLEIER`, auf Wunsch angehoben) —
+  die früheren 5 % waren auf dem dunklen Verlauf praktisch unsichtbar. **Eine
+  Quelle für alle vier**: vorher standen drei Kacheln auf 5 % und die
+  Trainingskachel auf 7 %, ohne dass das je jemand entschieden hätte.
   Inhalte waagrecht **und** senkrecht zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
   Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
   einseitigen Rand als Ausgleich bräuchte. Dass es dabei auf eine zweite Zeile
