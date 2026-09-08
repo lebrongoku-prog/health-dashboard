@@ -3310,6 +3310,12 @@ function initTabScrollSync() {
         if (navEl) navEl.classList.add('active');
         themaSetzen(name);
         _setStatusBarColor(name);
+        // Wischen zaehlt wie Scrollen: die Zeitleiste tritt zurueck (auf Wunsch,
+        // 08.09.2026). Der Wisch braucht einen EIGENEN Ausloeser, weil er keinen Klick
+        // erzeugt — beim Tabwechsel per Knopf greift laengst die Regel „Tipp neben die
+        // Leiste" aus dem body-Handler, die Tableiste liegt ausserhalb von
+        // `#zeitleiste`. Beide Wege enden damit im selben Zustand.
+        zeitleistePassiv(true);
         lastReported = name;
       }
       if (settleTimer) clearTimeout(settleTimer);

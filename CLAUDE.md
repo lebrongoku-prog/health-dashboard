@@ -329,8 +329,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      genau die gibt es nicht mehr. Der Weg dorthin: erst `.nav-today` in jeder
      Diagrammkarte, dann kurz ein Bereich `heute`, seit 06.09.2026 dieser Knopf.
   7. **Passiver Modus** (`#zeitleiste.passiv`, 06.09.2026): Die Reihe schrumpft auf
-     **70 %** und geht auf **50 % Deckkraft**, sobald man scrollt (in **beide** Richtungen, Schwelle 2 px gegen iOS'
-     Nachfedern) oder irgendwo neben die Leiste tippt. Ein Tipp auf Pille oder Pfeil
+     **70 %** und geht auf **50 % Deckkraft**, sobald man scrollt (in **beide**
+     Richtungen, Schwelle 2 px gegen iOS' Nachfedern), **auf einen anderen Tab wischt**
+     (seit 08.09.2026) oder irgendwo neben die Leiste tippt.
+     Der Wisch braucht einen **eigenen** Auslöser im Scroll-Handler des
+     `#tab-container`, weil er keinen Klick erzeugt. Beim Tabwechsel per **Knopf** greift
+     dagegen längst die Regel „Tipp neben die Leiste" — die Bottom-Nav liegt ausserhalb
+     von `#zeitleiste`. Beide Wege enden im selben Zustand; das war schon vorher so. Ein Tipp auf Pille oder Pfeil
      holt sie zurück; ein Tipp auf einen Eintrag der offenen Auswahl lässt den
      Zustand, wie er ist. Geschrumpft wird über `transform: scale(.7)` mit
      `transform-origin: bottom center` — so bleibt die **Unterkante exakt stehen**
