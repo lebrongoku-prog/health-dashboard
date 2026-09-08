@@ -8,7 +8,7 @@
   --nav-h: 60px;
   /* Hoehe der Zeitleiste ueber der Tableiste – auch im .screen-Padding gebraucht,
      damit die unterste Karte nicht darunter verschwindet. */
-  --zeit-h: 44px;
+  --zeit-h: 53px;   /* 20 % groesser auf Wunsch (08.09.2026), vorher 44 */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   /* Landscape-Safe-Areas für die Notch-Seite (links oder rechts, je nach Drehung) */
@@ -324,7 +324,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 
 .zl-reihe {
   pointer-events: auto;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 10px;
   /* Passiver Modus schrumpft die Reihe. Der Ursprung liegt an der UNTERKANTE, damit
      sie dabei am unteren Bildschirmrand stehen bleibt und nicht nach oben wandert. */
   transform-origin: bottom center;
@@ -349,8 +349,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    kein Padding). Der Skalierungs-Ursprung liegt unten LINKS statt unten mittig —
    sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg. */
 .zl-ausklapp {
-  /* 12 px waeren buendig mit dem Kartenrand; auf Wunsch 5 px weiter nach innen. */
-  position: absolute; bottom: 0; left: calc(var(--safe-l) + 27px);
+  /* Der Knopf teilt sich die Zeile mit der zentrierten Pillenreihe. Seit die Reihe
+     20 % groesser ist (08.09.2026), bleibt links von ihr weniger Platz: bei 375 px
+     beginnt sie bei 71, bei 360 px schon bei 64. Mit 53 px Breite muss der Knopf
+     deshalb bis 8 px an den Rand — bei den frueheren 27 px ueberlappte er die
+     Reihe um 19 px. */
+  position: absolute; bottom: 0; left: calc(var(--safe-l) + 8px);
   pointer-events: auto;
   width: var(--zeit-h); height: var(--zeit-h);
   display: flex; align-items: center; justify-content: center;
@@ -366,7 +370,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 }
 /* Strichfarbe folgt dem Tab – wie schon in der Kopfzeile. */
 .zl-ausklapp svg {
-  width: 20px; height: 20px; fill: none;
+  width: 24px; height: 24px; fill: none;
   stroke: var(--tab-color, #0891B2); stroke-width: 1.8;
   stroke-linecap: round; stroke-linejoin: round;
 }
@@ -388,14 +392,14 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   cursor: pointer;
 }
 .zl-pille {
-  min-width: 92px; padding: 0 1.1rem;
+  min-width: 100px; padding: 0 1.32rem;
   border-radius: 999px;
-  font-size: .95rem; font-weight: 700;
+  font-size: 1.14rem; font-weight: 700;
   letter-spacing: .01em;
 }
 #zeitleiste .nav-arrow {
-  width: 52px; border-radius: 999px;
-  font-size: 1.35rem; color: var(--txt2);
+  width: 56px; border-radius: 999px;
+  font-size: 1.62rem; color: var(--txt2);
 }
 /* Diese Regel macht das Verblassen in der Zeitleiste – sie schlaegt die allgemeine
    `.nav-arrow.inaktiv` weiter oben (ID-Selektor). Beim Umstieg von `:disabled`
@@ -562,9 +566,11 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 /* Legendeneintrag, der die Ø-Linie eines Diagramms schaltet. Sieht aus wie ein
    Eintrag, ist aber ein Knopf – ausgeschaltet tritt er zurueck, bleibt aber
    lesbar. Uebernommen vom entfernten Vergleichsdiagramm (`.kombi-schalter`). */
-.oe-schalter{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
-.oe-schalter.aus{opacity:.38}
-.oe-schalter.aus .cl-line{color:var(--txt3) !important}
+.hl-schalter{background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
+.hl-schalter.aus{opacity:.38}
+/* Ausgeschaltet tritt auch der Marker zurueck – `background` fuer durchgezogene,
+   `color` fuer gestrichelte Linien (die lesen ihre Farbe ueber currentColor). */
+.hl-schalter.aus .cl-line{color:var(--txt3) !important;background:var(--txt3) !important}
 .chart-wrap{position:relative;overflow:hidden;height:var(--h,200px)}
 /* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
    Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
@@ -644,7 +650,10 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Multi-column layouts */
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
-.two-col-eq>*{min-width:0;overflow:visible}
+/* Der Abstand kommt vom `gap` des Rasters, nicht von den Karten – sonst stuende er im
+   Querformat zusaetzlich zwischen den Spalten und verfaelschte die Zeilenhoehe.
+   Dieselbe Ueberlegung wie bei `.ov-oben`. */
+.two-col-eq>*{min-width:0;overflow:visible;margin-bottom:0}
 
 /* Stats rows */
 .stats-list{display:flex;flex-direction:column;gap:.2rem}
@@ -924,6 +933,15 @@ h5,
    Platz nicht doppelt für zwei Topbar-Zeilen draufgeht.
    ═══════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
+  /* Zwei Spalten, wo im Hochformat eine steht (auf Wunsch, 08.09.2026). Die Abstaende
+     kommen aus dem `gap` des jeweiligen Rasters, die Polster aus den Karten selbst –
+     an beidem ist nichts zu aendern, nur an der Spaltenzahl.
+     Betrifft: alle Karten unter „Muster & Zusammenhaenge" (.pi-grid) sowie die beiden
+     Paare „Ruhepuls-/HRV-Einordnung" und „Schlafqualitaet/Schlafschuld" (.two-col-eq,
+     beide tragen denselben Rahmen). */
+  .pi-grid,
+  .two-col-eq { grid-template-columns: 1fr 1fr; }
+
   /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
      Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
      Hoehe der laengeren gezogen wird. */

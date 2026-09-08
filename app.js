@@ -1258,26 +1258,38 @@ const nurMesswerte = item => !/^(Ø|Ziel)/.test(item.dataset.label || '');
 //
 // Fuer Herz und Schlaf gilt weiterhin die aeltere Regel „Ø gehoert in die
 // Fusszeile"; im Training-Tab war die Linie ausdruecklich gewuenscht.
-const _oeLinie = {};
-function oeAn(id) { return _oeLinie[id] !== false; }
+// Schluessel ist '<canvas-id>|<art>' mit art = 'oe' oder 'ziel'. Ein Diagramm kann
+// beide haben (Schlafdauer, VO2max), und zwei Diagramme duerfen sich nicht
+// gegenseitig schalten – deshalb die Canvas-ID im Schluessel.
+const _hilfslinie = {};
+function hlAn(schluessel) { return _hilfslinie[schluessel] !== false; }
 
 // Legendeneintrag zum Ein-/Ausschalten. Ein <button>, damit der Tipp auf den
 // Kartenhintergrund die Bottom-Nav nicht mitschaltet.
-function oeLegende(id, farbe) {
-  return `<button type="button" class="cl-item oe-schalter${oeAn(id)?'':' aus'}" data-oe="${id}"
-    aria-pressed="${oeAn(id)?'true':'false'}" title="Ø-Linie ein-/ausblenden"><span
-    class="cl-line cl-strich" style="color:${farbe}"></span>Ø</button>`;
+function hlLegende(schluessel, text, farbe, gestrichelt = true) {
+  const an = hlAn(schluessel);
+  return `<button type="button" class="cl-item hl-schalter${an?'':' aus'}" data-hl="${schluessel}"
+    aria-pressed="${an?'true':'false'}" title="Linie ein-/ausblenden"><span
+    class="cl-line${gestrichelt?' cl-strich':''}" style="${gestrichelt?'color':'background'}:${farbe}"></span>${text}</button>`;
 }
 
 // Der Datensatz selbst. Das Label 'Ø' ist kein Zufall: `nurMesswerte` haelt damit
 // sowohl den Tooltip als auch die Datenbeschriftungen von der Linie fern.
 // Rueckgabe ist ein ARRAY, damit der Aufrufer es mit `...` einsetzen kann und der
 // ausgeschaltete Fall keinen `null`-Eintrag im Datensatz-Array hinterlaesst.
-function oeDatensatz(id, wert, farbe, laenge, achse) {
-  if (!oeAn(id) || wert == null) return [];
+function oeDatensatz(schluessel, wert, farbe, laenge, achse) {
+  if (!hlAn(schluessel) || wert == null) return [];
   return [{ label:'Ø', data:new Array(laenge).fill(wert), borderColor:farbe,
     borderDash:[5,4], borderWidth:1.5, pointRadius:0, tension:0, fill:false,
     type:'line', spanGaps:true, ...(achse?{yAxisID:achse}:{}) }];
+}
+
+// Ziellinie, aber nur wenn eingeblendet. Liefert wie oeDatensatz ein ARRAY, damit der
+// Aufrufer es mit `...` einsetzen kann.
+function zielDatensatz(schluessel, key, laenge, achse) {
+  if (!hlAn(schluessel)) return [];
+  const z = zielLinie(key, laenge, achse);
+  return z ? [z] : [];
 }
 
 // Gestrichelte Ziellinie als zusätzlicher Chart-Datensatz.
@@ -2041,6 +2053,7 @@ function pgHerz() {
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
+        ${hlLegende('c-herz|oe','Ø','#94A3B8')}
       </div>
       <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
       <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
@@ -2130,10 +2143,14 @@ function pgHerz() {
       // Ø-Linien in der Farbe ihrer Reihe statt der beiden grauen Ziellinien: bei zwei
       // Kurven auf einer Skala liessen sich zwei gleich graue Hilfslinien nicht
       // zuordnen. Die Zielwerte stehen in der Statuszeile der Übersicht.
+      // EIN Schalter fuer beide Ø-Linien. Zwei Eintraege („Ø Puls", „Ø HRV") machten
+      // die Legende doppelt so lang fuer einen Zustand, den man ohnehin gemeinsam
+      // will. Der Marker ist deshalb grau statt rot oder blau.
+      ...(hlAn('c-herz|oe') ? [
       {label:'Ø Ruhepuls',data:hrMaL.map(()=>hrD),borderColor:'#EF4444',borderDash:[5,4],
        pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yL'},
       {label:'Ø HRV',data:hvMaL.map(()=>hvD),borderColor:'#2563EB',borderDash:[5,4],
-       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yR'}
+       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yR'}] : [])
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
         filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV',
@@ -2369,8 +2386,8 @@ function pgSchlaf() {
         <div class="chart-legend" style="margin-bottom:.3rem">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
-          <div class="cl-item"><span class="cl-line" style="background:#10B981"></span>Ziel</div>
-          <div class="cl-item"><span class="cl-line cl-strich" style="color:rgba(124,58,237,.85)"></span>Ø</div>
+          ${hlLegende('c-sl-dur|ziel','Ziel','#10B981',false)}
+          ${hlLegende('c-sl-dur|oe','Ø','rgba(124,58,237,.85)')}
         </div>
         <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
@@ -2384,6 +2401,7 @@ function pgSchlaf() {
       </div>
 
       ${weitereAuf('schlaf')}
+      <div class="two-col-eq">
       <div class="chart-card split2">
         <h3>Schlafqualität-Verteilung</h3>
         <div class="goal-list">
@@ -2419,6 +2437,7 @@ function pgSchlaf() {
             </div>
           </div>`:''}
         </div>
+      </div>
       </div>
 
 
@@ -2481,10 +2500,11 @@ function pgSchlaf() {
       // Beide Hilfslinien brauchen einen EIGENEN Stapel: sonst addiert Chart.js sie auf
       // die Balken darunter und sie lägen bei 15h statt bei 7h30.
       // Ziel: durchgezogen und im Grün, das die App für erreichte Ziele nutzt.
+      ...(hlAn('c-sl-dur|ziel') ? [
       {label:'Ziel Schlaf',data:tL.map(()=>_slZiel),borderColor:'#10B981',borderWidth:1.5,
-       pointRadius:0,tension:0,fill:false,type:'line',spanGaps:true,stack:'ziel'},
+       pointRadius:0,tension:0,fill:false,type:'line',spanGaps:true,stack:'ziel'}] : []),
       // Ø gestrichelt in der Farbe der Balken.
-      ...(slD!=null?[{label:'Ø Schlafdauer',data:tL.map(()=>slD),borderColor:'rgba(124,58,237,.85)',
+      ...(slD!=null&&hlAn('c-sl-dur|oe')?[{label:'Ø Schlafdauer',data:tL.map(()=>slD),borderColor:'rgba(124,58,237,.85)',
        borderDash:[5,4],borderWidth:1.5,pointRadius:0,tension:0,fill:false,type:'line',
        spanGaps:true,stack:'ziel-avg'}]:[])
     ]},
@@ -2511,9 +2531,9 @@ function pgSchlaf() {
       ];
       if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:BALKEN_RADIUS,stack:'s'});
       zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,
-        // Gestapelte Balken: die Beschriftung sitzt auf der Oberkante des jeweiligen
-        // Segments. Sehr kurze Phasen bekommen keine – dort ist schlicht kein Platz.
-        __werteFmt:v=>v>=0.5?zahl(v,1):'',
+        // KEIN __werteFmt (auf Wunsch, 08.09.2026): bei gestapelten Balken sitzt die
+        // Beschriftung auf der Oberkante des jeweiligen Segments und damit mitten im
+        // Balken – das las sich nicht als Wert, sondern als Störung.
         type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
@@ -2668,7 +2688,7 @@ async function pgTraining() {
     ${pgBanner('🏃','Training')}
       <div class="chart-card">
         <h3>Laufstrecke</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${oeLegende('c-tot-strecke','#FB923C')}</div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-strecke|oe','Ø','#FB923C')}</div>
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
@@ -2681,7 +2701,7 @@ async function pgTraining() {
 
       <div class="chart-card">
         <h3>Trainingszeit</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${oeLegende('c-tot-zeit','#F97316')}</div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-zeit|oe','Ø','#F97316')}</div>
         <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
@@ -2694,7 +2714,7 @@ async function pgTraining() {
 
     <div class="chart-card">
       <h3>Pace pro Training ${infoI('pace')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${oeLegende('c-tr-pace','#7C3AED')}</div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#7C3AED')}</div>
       <div class="chart-wrap" style="--h:300px"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
@@ -2727,7 +2747,7 @@ async function pgTraining() {
       __werteFmt:v=>v?(timeRange==='24m'?Math.round(v/60)+'h':stdMinLabel(v/60)):'',
       type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
-      ...oeDatensatz('c-tot-zeit', mittelArr(_lZeitData), '#F97316', _lZeitLbls.length)
+      ...oeDatensatz('c-tot-zeit|oe', mittelArr(_lZeitData), '#F97316', _lZeitLbls.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
       // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
@@ -2749,7 +2769,7 @@ async function pgTraining() {
       __werteFmt:v=>v?Math.round(v)+'km':'',
       type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
-      ...oeDatensatz('c-tot-strecke', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
+      ...oeDatensatz('c-tot-strecke|oe', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{
         label:ctx=>{
@@ -2776,7 +2796,7 @@ async function pgTraining() {
       __werteFmt:v=>fmtPace(v),
       type:'line',data:{labels:_paceLabels,datasets:[
       {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true},
-      ...oeDatensatz('c-tr-pace', mittelArr(_paceData), '#7C3AED', _paceLabels.length)
+      ...oeDatensatz('c-tr-pace|oe', mittelArr(_paceData), '#7C3AED', _paceLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>{
         if(ctx.raw==null)return null;
@@ -2819,7 +2839,7 @@ function vo2Abschnitt(D, P) {
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${oeLegende('c-vo2','#D97706')}</div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${hlLegende('c-vo2|ziel','Ziel','rgba(100,116,139,.55)')}${hlLegende('c-vo2|oe','Ø','#D97706')}</div>
       <div class="chart-wrap" style="--h:300px"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
@@ -2841,8 +2861,8 @@ function vo2Abschnitt(D, P) {
       const _v2YMin=Math.floor(_v2Min/_v2Step)*_v2Step;
       const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
       const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
-      _v2Dsets.push(zielLinie('vo2max', _v2tL.length));
-      _v2Dsets.push(...oeDatensatz('c-vo2', mittelArr(v2MaFull), '#D97706', _v2tL.length));
+      _v2Dsets.push(...zielDatensatz('c-vo2|ziel', 'vo2max', _v2tL.length));
+      _v2Dsets.push(...oeDatensatz('c-vo2|oe', mittelArr(v2MaFull), '#D97706', _v2tL.length));
       zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,
         __werteFmt:v=>zahl(v,1),
         type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
@@ -3390,10 +3410,12 @@ document.body.addEventListener('click', (e) => {
 // Ø-Linien der Training-Diagramme ein-/ausschalten. Neu aufgebaut wird der ganze
 // Tab: die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
 document.body.addEventListener('click', (e) => {
-  const sch = e.target.closest('.oe-schalter');
+  const sch = e.target.closest('.hl-schalter');
   if (!sch) return;
-  _oeLinie[sch.dataset.oe] = !oeAn(sch.dataset.oe);
-  _renderTab('training');
+  _hilfslinie[sch.dataset.hl] = !hlAn(sch.dataset.hl);
+  // Den AKTUELLEN Tab neu aufbauen – die Schalter stehen inzwischen in Herz, Schlaf
+  // und Training. Die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
+  _renderTab(currentScreen);
 });
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────

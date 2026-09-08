@@ -354,8 +354,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ausgangswerten (`gap:4px`, `.6rem`, `2px`) waren es 340.2 px und die Leiste brach
   auf zwei Zeilen um — sie wird dann 86 statt 48 px hoch und drängt sich vor die
   Diagramme. Schmalere Geräte brechen weiterhin um; das ist hingenommen.
-  `--zeit-h` (44 px) steht auch im `padding-bottom` von `.screen` — sonst verschwindet
-  die unterste Karte unter der Leiste.
+  `--zeit-h` (**53 px**, seit 08.09.2026 20 % grösser) steht auch im `padding-bottom`
+  von `.screen` — sonst verschwindet die unterste Karte unter der Leiste.
+  **Die Vergrösserung stiess an eine Grenze, die man kennen muss:** Die Reihe ist
+  zentriert, der Ausklapp-Knopf sitzt links daneben. Bei voller Vergrösserung aller
+  Masse (Pfeile 62 px, Pille 110 px) wurde die Reihe 254 px breit, begann bei 375 px
+  Fenster schon bei x = 61 und **überlappte den Knopf um 19 px**. Höhe und Schrift
+  tragen deshalb die vollen +20 % (44 → 53 px, 15.2 → 18.2 px), die **Breiten nur
+  +8 %** (Pfeile 52 → 56, Pille 92 → 100). Der Knopf musste zusätzlich von 27 auf
+  **8 px** an den Rand. Damit bleiben 11 px Luft bei 375 px und 3 px bei 360 px —
+  wer hier etwas vergrössert, muss beides nachmessen.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
@@ -408,15 +416,24 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „vier Wochen": 28 Tage sind 4.00 Wochen, 31 Tage 4.43. Rund gerechnet läge der
   Wochenschnitt je nach Monat um bis zu 10 % daneben — und genau der Vergleich
   zwischen Monaten ist der Zweck der Zahl.
-- **Gestrichelte Ø-Linien im Training-Tab** (auf Wunsch, 07.09.2026) in allen vier
-  Diagrammen, **abschaltbar über einen Legendeneintrag** (`oeLegende()`,
-  `.oe-schalter`, Optik vom entfernten Vergleichsdiagramm übernommen).
-  **Das kehrt die ältere Regel „Ø gehört in die Fusszeile, nicht ins Diagramm" für
-  diesen Tab um** — für Herz und Schlaf gilt sie weiter.
-  Drei Dinge hängen daran:
-  1. Der Zustand `_oeLinie` liegt **ausserhalb** von `pgTraining`, sonst wäre er nach
-     jedem Neuaufbau zurückgesetzt (derselbe Grund wie beim früheren `_kombiAktiv`).
-     Fehlender Eintrag heisst „an".
+- **Alle Ø- und Ziellinien sind über die Legende ein- und ausblendbar**
+  (Training seit 07.09.2026, alle übrigen seit 08.09.2026): `hlLegende()` erzeugt den
+  Schalter, `oeDatensatz()` bzw. `zielDatensatz()` die Linie, `.hl-schalter` die Optik.
+  Wo Linien liegen: **Ø** in Laufstrecke, Trainingszeit, Pace, VO₂max, Schlafdauer und
+  Ruhepuls & HRV; **Ziel** in Schlafdauer und VO₂max.
+  **Das kehrt die ältere Regel „Ø gehört in die Fusszeile, nicht ins Diagramm" um** —
+  sie galt zuletzt nur noch für Herz und Schlaf und gilt jetzt nirgends mehr.
+  Vier Dinge hängen daran:
+  1. Der Zustand `_hilfslinie` liegt **ausserhalb** der Seitenfunktionen, sonst wäre er
+     nach jedem Neuaufbau zurückgesetzt (derselbe Grund wie beim früheren
+     `_kombiAktiv`). Fehlender Eintrag heisst „an". Der Schlüssel lautet
+     **`<canvas-id>|<art>`** mit art `oe` oder `ziel` — ein Diagramm kann beides haben,
+     und zwei Diagramme dürfen sich nicht gegenseitig schalten.
+  0. **Ruhepuls & HRV hat EINEN Schalter für BEIDE Ø-Linien.** Zwei Einträge („Ø Puls",
+     „Ø HRV") machten die Legende doppelt so lang für einen Zustand, den man ohnehin
+     gemeinsam will; der Marker ist deshalb grau statt rot oder blau.
+     Umgeschaltet wird über `_renderTab(currentScreen)` — die Schalter stehen inzwischen
+     in drei Tabs, ein fest verdrahtetes `'training'` wäre falsch.
   2. Das Label der Linie ist **`Ø`**, damit `nurMesswerte` sie erkennt. **Bei den
      Datenbeschriftungen genügt das** — das Plugin wendet die Regel selbst an. **Beim
      Tooltip NICHT:** dort muss jedes Diagramm `filter: nurMesswerte` selbst setzen.
@@ -427,8 +444,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      sie eigene Filter mitbringen (`datasetIndex!==0` bzw. eine Namensliste).
   3. `oeDatensatz()` liefert ein **Array** (leer, wenn abgeschaltet), damit der
      Aufrufer es mit `...` einsetzen kann und kein `null` im Datensatz-Array landet.
-  Umgeschaltet wird über `_renderTab('training')`: die Linie ist ein Datensatz, kein
-  Sichtbarkeitsschalter.
+  Die Linie ist ein **Datensatz**, kein Sichtbarkeits-Schalter — deshalb der
+  Neuaufbau statt eines `hidden`-Flags.
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
   funktionieren Wochentrenner und Markierung nicht. `timeDim` liefert beides mit;
@@ -524,11 +541,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
-  **Zwei Diagramme sind ausgenommen** (07.09.2026, beides auf Wunsch nach einem
-  Zwischenschritt): Das **Verlaufs-Diagramm** hat gar kein `__werteFmt` mehr — vier
-  Reihen auf zwei Achsen blieben auch nach dem Weglassen von Puls und HRV unruhig.
-  **Ruhepuls & HRV** trägt `__werteNurQuer: true` und bleibt im **Hochformat** leer;
-  dort liegen die beiden Kurven eng beieinander und kreuzen sich.
+  **Drei Diagramme sind ausgenommen**, alle auf Wunsch nach einem Zwischenschritt:
+  Das **Verlaufs-Diagramm** und der **Schlafphasen-Verlauf** haben gar kein
+  `__werteFmt` mehr — beim Verlauf blieben vier Reihen auf zwei Achsen auch nach dem
+  Weglassen von Puls und HRV unruhig, bei den Schlafphasen sitzt die Beschriftung
+  gestapelter Balken auf der Oberkante des jeweiligen Segments und damit mitten im
+  Balken. **Ruhepuls & HRV** trägt `__werteNurQuer: true` und bleibt im **Hochformat**
+  leer; dort liegen die beiden Kurven eng beieinander und kreuzen sich.
   Zahlen, die auf `0` gerundet werden, fallen überall weg: an trainingsfreien Tagen
   stünde sonst eine Reihe von `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
@@ -625,6 +644,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **Zweispaltig im Querformat** (08.09.2026): `.pi-grid` (alle Karten unter
+  „Muster & Zusammenhänge") und `.two-col-eq` (die Paare „Ruhepuls-/HRV-Einordnung"
+  und „Schlafqualität-Verteilung/Schlafschuld") bekommen dort
+  `grid-template-columns: 1fr 1fr`. Beide Paare tragen denselben Rahmen — das
+  Schlaf-Paar wurde dafür nachträglich in `.two-col-eq` gefasst.
+  **Abstände kommen aus dem `gap` des Rasters, nicht aus den Karten:** `.two-col-eq>*`
+  setzt `margin-bottom: 0`, sonst stünde der Kartenabstand im Querformat zusätzlich
+  zwischen den Spalten und verfälschte die Zeilenhöhe — dieselbe Falle wie bei
+  `.ov-oben`. Gemessen bei 900 px: Spalten 281 px, Lücke 11 px.
 - **Übersicht im Querformat:** „Ziele" und die Kachel-Karte stehen **nebeneinander**
   (`.ov-oben`, Grid `1fr 1fr`) und sind **gleich hoch — nach dem Mass der Ziele-Karte**.
   Dafür bestimmt die Kachel-Spalte die Zeilenhöhe NICHT mit: `.ov-oben-kacheln` bleibt
