@@ -354,7 +354,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
      sie bei 304, bei 360 px schon bei 296. Mit 53 px Breite muss der Knopf deshalb
      bis 8 px an den Rand. Seit 08.09.2026 steht er RECHTS (auf Wunsch) — die Reihe
      ist zentriert, der Platz ist also auf beiden Seiten gleich knapp. */
-  position: absolute; bottom: 0; right: calc(var(--safe-r) + 23px);
+  position: absolute; bottom: 0; right: calc(var(--safe-r) + 8px);
   pointer-events: auto;
   width: var(--zeit-h); height: var(--zeit-h);
   display: flex; align-items: center; justify-content: center;
@@ -400,11 +400,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   letter-spacing: .01em;
 }
 #zeitleiste .nav-arrow {
-  /* 42 statt 56 px (08.09.2026): Der Ausklapp-Knopf rueckte auf Wunsch 15 px nach
-     innen und ueberlappte die Reihe sonst — bei 375 px um 4, bei 360 px um 12 px.
-     Gekuerzt wurden die PFEILE, nicht die Pille: die war kurz zuvor ausdruecklich
-     vergroessert worden. Mit 42x53 px bleibt die Tippflaeche bequem ueber der 44-px-Empfehlung in der Hoehe. */
-  width: 42px; border-radius: 999px;
+  width: 56px; border-radius: 999px;
   font-size: 1.62rem; color: var(--txt2);
 }
 /* Diese Regel macht das Verblassen in der Zeitleiste – sie schlaegt die allgemeine
