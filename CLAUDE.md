@@ -73,7 +73,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   → die App muss aus dem Zwischenspeicher weiterlaufen), `?cache=behalten`
   (Zwischenspeicher NICHT leeren — erst normal laden, dann damit neu laden),
   `?netz=langsam` (jede Antwort 1.5 s später), `?tipp=sofort` (Nutzer tippt gleich nach
-  dem Start → Hinweisleiste statt stillem Neuzeichnen). Messpunkte:
+  dem Start → Hinweisleiste statt stillem Neuzeichnen), `?tage=900` (statt 120 Tagen —
+  **nötig für den Jahresvergleich**, der denselben Monat in mehreren Jahren braucht),
+  `?meta=fehlt` (Blatt `Meta` gibt es nicht → „Daten bis" muss auf das blosse
+  Tagesdatum zurückfallen; das ist der Zustand jedes Sheets, solange das Apps Script
+  noch nicht eingespielt ist). Messpunkte:
   `window.__ersterChartMs` / `__ersteAntwortMs` (belegen den Sofortstart), `__anfragen`
   (meta/werte/script), `__fruehText` (Momentaufnahme der Übersicht nach 200 ms — ohne
   sie racet jede Prüfung von aussen gegen die Antwortzeit).
@@ -324,10 +328,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      auf 3M im März, bleibt es 3M und zeigt die neuesten drei Monate. Damit ist
      `referenceDate` wieder am neuesten Tag und `_datumSelbstGewaehlt` false, das
      Nachladen darf also wieder mitziehen. Es trägt nie `aktiv` — es hat keinen
-     Zustand. Optisch deshalb **Umrandung statt Füllung** und durch `.zl-trenner`
-     abgesetzt: als siebter Chip in Chip-Optik erwartete man eine Tagesansicht, und
-     genau die gibt es nicht mehr. Der Weg dorthin: erst `.nav-today` in jeder
-     Diagrammkarte, dann kurz ein Bereich `heute`, seit 06.09.2026 dieser Knopf.
+     Zustand. Optisch deshalb **Umrandung statt Füllung**: als siebter Chip in
+     Chip-Optik erwartete man eine Tagesansicht, und genau die gibt es nicht mehr.
+     Der Weg dorthin: erst `.nav-today` in jeder Diagrammkarte, dann kurz ein Bereich
+     `heute`, seit 06.09.2026 dieser Knopf.
+  8. **Die Auswahl hat zwei Zeilen** (seit 12.09.2026): oben die **Befehle**
+     („Heute", „YoY"), darunter die sechs **Bereiche** — beide als `.zl-zeile`
+     innerhalb von `.zl-optionen`, das dafür von `row` auf `column` umgestellt wurde.
+     Der frühere senkrechte `.zl-trenner` ist damit ersatzlos entfallen.
+     Der Grund ist Platz **und** Bedeutung: die eine Zeile war mit „Heute" und den
+     sechs Chips bei 375 px schon randvoll (332 von 332 px), „YoY" hätte sie an
+     beliebiger Stelle umbrechen lassen. Die Trennung nach Zeilen trennt zugleich,
+     was etwas **tut**, von dem, was den Zeitraum **wählt**.
+     Die Auswahl wächst nach **oben** (die Leiste ist am unteren Rand verankert) —
+     die Pille bleibt also stehen, die zweite Zeile verdeckt nur während des
+     Aufklappens etwas mehr Inhalt. Gemessen bei 375 px: Kasten 279 × 86 px,
+     Bereichszeile 265 px (von 337 verfügbaren), Befehlszeile 120 px, keine bricht um.
+  9. **Jahresvergleich („YoY")** — siehe den eigenen Abschnitt weiter unten.
   7. **Passiver Modus** (`#zeitleiste.passiv`, 06.09.2026): Die Reihe schrumpft auf
      **70 %** und geht auf **50 % Deckkraft**, sobald man scrollt (in **beide**
      Richtungen, Schwelle 2 px gegen iOS' Nachfedern), **auf einen anderen Tab wischt**
@@ -352,13 +369,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Karte mehr, `closest('.chart-card')` liefert also nichts. Ohne den Rückfall auf
      `obersteSichtbareKarte()` bliebe der Anker leer und die Ansicht spränge beim
      Blättern genau so, wie der Anker es verhindern soll.
-  **Die Auswahl passt nur knapp in eine Zeile — jede Änderung dort nachmessen.**
-  Stand: „Heute" + Trenner + sechs Chips brauchen **332 von 332 px** bei 375 px
-  Fenster, also exakt. Dafür sind `gap: 3px`, `.zl-opt{padding:0 .55rem}`,
-  `.zl-heute{padding:0 .5rem}` und `.zl-trenner{margin:0 1px}` nötig. Mit den
-  Ausgangswerten (`gap:4px`, `.6rem`, `2px`) waren es 340.2 px und die Leiste brach
-  auf zwei Zeilen um — sie wird dann 86 statt 48 px hoch und drängt sich vor die
-  Diagramme. Schmalere Geräte brechen weiterhin um; das ist hingenommen.
+  **Jede Änderung an der Auswahl nachmessen.** Stand seit der Zweizeiligkeit:
+  die sechs Bereichs-Chips brauchen mit ihren fünf Lücken **265 von 337 px** bei
+  375 px Fenster, die Befehlszeile 120 px. Dafür sind `gap: 3px` und
+  `.zl-opt{padding:0 .55rem}` nötig; die beiden Befehle dürfen in ihrer eigenen Zeile
+  grosszügiger greifen (`.75rem`). Vor der Zweizeiligkeit standen dort 332 von 332 px
+  — also exakt null Reserve, und genau daran wäre „YoY" gescheitert. Schmalere
+  Geräte brechen weiterhin um; das ist hingenommen.
   `--zeit-h` (**53 px**, seit 08.09.2026 20 % grösser) steht auch im `padding-bottom`
   von `.screen` — sonst verschwindet die unterste Karte unter der Leiste.
   **Die Vergrösserung stiess an eine Grenze, die man kennen muss:** Die Reihe ist
@@ -369,6 +386,38 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   +8 %** (Pfeile 52 → 56, Pille 92 → 100). Der Knopf musste zusätzlich von 27 auf
   **8 px** an den Rand. Damit bleiben 11 px Luft bei 375 px und 3 px bei 360 px —
   wer hier etwas vergrössert, muss beides nachmessen.
+- **Jahresvergleich („YoY", 12.09.2026, auf Wunsch):** derselbe Kalendermonat in
+  **allen** Jahren, die Daten haben — Sep 24, Sep 25, Sep 26 nebeneinander. Er ist
+  **kein Zeitraum im bisherigen Sinn**, läuft aber als eigener Wert von `timeRange`
+  (`'yoy'`), damit jede Stelle, die den Zeitraum auswertet, ihn auch sieht.
+  Eingeschaltet wird er über `.zl-yoy` in der Befehlszeile der Zeitleiste, neben
+  „Heute". Anders als „Heute" **hat er einen Zustand** und trägt deshalb `aktiv` in
+  der Tabfarbe; die Pille zeigt dann `YoY` statt eines Bereichs. `_yoyVorher` merkt
+  sich den Bereich, aus dem heraus eingeschaltet wurde — beim Ausschalten steht er
+  wieder da, sonst landete man in einem Bereich, den man nie gewählt hat.
+  **Vier Stellen tragen den Modus:**
+  1. `filtered()` gibt alle Zeilen zurück, deren Monat dem von `referenceDate`
+     entspricht — jahresübergreifend.
+  2. `windowDays`/`windowMonths` liefern **null**, damit auch `moWindow()` null
+     liefert: ein zusammenhängendes Fenster gibt es hier nicht. Alles, was `moWindow`
+     abfragt, fällt damit von selbst weg — unter anderem die Fusszeile **„Ø pro
+     Woche"** in Laufstrecke und Trainingszeit. Das ist richtig so: ein Wochenschnitt
+     über drei getrennte Septembers ergäbe keine Zahl, die etwas bedeutet.
+  3. `timeDim()` braucht **keinen** eigenen Zweig — ohne Tages- oder Wochenfenster
+     landet es in der Monatsaggregation, und `allMonths()` liefert genau die
+     gewünschten Schlüssel (`2024-09`, `2025-09`, `2026-09`). Markierung und
+     Tooltip-Synchronisierung funktionieren dadurch unverändert.
+  4. `prevPeriod()` gibt **[]** zurück. Eine „Vorperiode" ist hier nicht definiert —
+     die Jahre stehen ja bereits nebeneinander; die Kacheln zeigen dann „—" statt
+     einer Zahl ohne Bedeutung (siehe „Kein erfundener Platzhalter").
+  Die **Blätterpfeile verschieben den Monat** wie sonst auch um je einen Schritt
+  (`addMonths`), begrenzt durch den Datenbestand. Man wandert dabei durch die Jahre,
+  was man im Diagramm nicht sieht — das ist hingenommen: es ist dieselbe Bewegung wie
+  in jedem anderen Bereich, und der Kopf jeder Karte nennt den Monat
+  (`zeitraumText()` → `Sep · 3 Jahre`).
+  **Nicht verwechseln:** Der Modus vergleicht **Monate**, nicht Jahre als Ganzes.
+  „Total" in den Trainings-Fusszeilen ist deshalb die Summe über alle gezeigten
+  Septembers zusammen.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
@@ -389,6 +438,38 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      musste dort mit aufgenommen werden, sonst findet `pgEinstellungen()` nichts und
      tut still gar nichts — die Seite wäre lokal nicht prüfbar, ohne dass es auffiele.
   **Folge:** Daten-Stand, Anmeldestatus und beide Update-Knöpfe stehen nur noch hier.
+- **„Daten bis" nennt den Zeitstempel des Exports, nicht nur den Tag** (12.09.2026,
+  auf Wunsch): `12.09.26, 07:14 Uhr` statt `12.09.26`. Ein Tag ist auch um 00:05 Uhr
+  schon „heute" — erst die Uhrzeit sagt, wie frisch die Gesundheitswerte sind.
+  Die Angabe kommt aus einem **eigenen Blatt `Meta`** der Health-Tabelle
+  (Schlüssel/Wert; bisher eine Zeile `letzterExport`). Das Apps Script schreibt dort
+  bei jedem Import `getLastUpdated()` der **neuesten übernommenen JSON-Datei** —
+  also wann Health Auto Export sie abgelegt hat, nicht wann der Import lief.
+  **Warum ein eigenes Blatt und keine Spalte:** `upsertDay` schreibt positionsbasiert
+  ab Spalte A, und die Kopfzeilenprüfung in `getOrCreateSheet` zählt die Spalten —
+  ein Wert neben den Daten hielte den Import an.
+  **Fünf Dinge hängen daran:**
+  1. `_fetchSheet(HEALTH_SHEET_ID, META_BLATT)` fährt in derselben `Promise.all`-Welle
+     mit wie Health- und Workout-Blatt und kostet damit keine zusätzliche Wartestufe.
+  2. **Fehlt das Blatt** (Skript noch nicht eingespielt), liefert `_fetchSheet`
+     `{fehlt:true}` und die Zeile fällt auf das blosse Tagesdatum zurück. Solange es
+     fehlt, kostet das **eine** zusätzliche Blattnamen-Abfrage pro Start — der
+     gesuchte Name steht nicht im Zwischenspeicher, also fragt die App einmal nach.
+     Mit dem Blatt sind es null.
+  3. Der Wert wird **streng geparst** (`_stempelAusBlatt`): ISO oder deutsche
+     Schreibweise, und es kommen nur Ziffern heraus. Beide Formen, weil die Sheets-API
+     die **angezeigte** Zeichenkette liefert — das Skript formatiert die Zelle deshalb
+     als Text (`setNumberFormat('@')`), sonst deutet Sheets sie als Datum und zeigt
+     etwas anderes an, als es gespeichert hat (derselbe Fallstrick wie bei
+     `sleepStart`/`sleepEnd`).
+  4. Der Stempel liegt **neben** dem Fingerabdruck im Zwischenspeicher
+     (`{"v":1,"ts":…,"stempel":…,"d":…}`), nicht in `datenStand()`: der Fingerabdruck
+     soll sich nur ändern, wenn sich **Messwerte** ändern. Beim Lesen gilt dieselbe
+     Prüfung wie beim Sheet (`_stempelGeprueft`) — `localStorage` ist von aussen
+     beschreibbar.
+  5. Ist der Stempel **älter** als der neueste Tag im Sheet, wird er verworfen und
+     nur das Datum gezeigt: dann beschreibt er nicht diesen Stand, und eine falsche
+     Uhrzeit wäre schlechter als gar keine.
 - **Zeitachse:** bei Tagesauflösung (7T/1M) zweizeilige Labels via `tagLabel()` —
   Wochentag über dem Datum. Monats-/Wochenbereiche unverändert.
 - **Bottom-Nav-Ausblenden:** Die Leiste **startet eingeklappt** (auf Wunsch,
@@ -540,9 +621,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien zu unterscheiden. Beide stehen ganz oben, **vor** dem ersten
   `Chart.defaults`-Zugriff — `const` wird nicht hochgezogen.
 - **Datenbeschriftungen (`werteLabelPlugin`, 06.09.2026):** Zahlen über Balken und
-  Datenpunkten. **Sichtbar im Querformat immer, im Hochformat nur bei 7T** (seit
-  07.09.2026) — dort stehen höchstens sieben Säulen nebeneinander, ab 1M wären es
-  über dreissig. **Alle neun Diagramme der App** melden inzwischen ein
+  Datenpunkten. **Sichtbar im Querformat immer, im Hochformat nur bei 7T und im
+  Jahresvergleich** (7T seit 07.09.2026, YoY seit 12.09.2026) — dort stehen höchstens
+  sieben Säulen nebeneinander bzw. eine je Jahr, ab 1M wären es über dreissig.
+  **Alle neun Diagramme der App** melden inzwischen ein
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
@@ -557,21 +639,29 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zahlen, die auf `0` gerundet werden, fallen überall weg: an trainingsfreien Tagen
   stünde sonst eine Reihe von `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
-  die Pace, `zahl()` für VO₂max, `Math.round`+`km` für die Laufstrecke (auf Wunsch
-  ganze Kilometer und **ohne Leerzeichen**: `120km`; über dem Balken zählt der
-  schnelle Blick, die Nachkommastelle steht im Tooltip und in der Fusszeile).
-  **Die Trainingszeit weicht bei 24M ab**: dort ganze Stunden (`10h`) statt
-  `10h 12m` — bei 24 Monatsbalken ist die Minute weder lesbar noch aussagekräftig.
-  Die Schlafdauer behält dort ihren Umbruch.
-  **`stdMinLabel()` bedient Schlafdauer und Trainingszeit** (`7h 25m`) und ist die
-  einzige Stelle, die zwei Sonderfälle kennt:
-  - **Bei 24M bricht der Text um** (`7h` über `25m`). Dort stehen 24 Balken
-    nebeneinander; einzeilig wäre der Text breiter als die Spalte, umgebrochen halb
-    so breit. Der Umbruch geschieht über ein `\n` im Rückgabewert — **das Plugin
-    kennt die Zeiträume nicht**, jedes Diagramm entscheidet selbst, wann sein Text
-    zu breit wird.
-  - **Ein führendes `0h ` fällt weg**: bei 38 Minuten Training sagt `0h 38m` nichts,
-    was `38m` nicht auch sagt. Beim Schlaf tritt der Fall praktisch nie ein.
+  die Pace, `zahl()` für VO₂max, `Math.round` für die Laufstrecke (auf Wunsch ganze
+  Kilometer und seit 12.09.2026 **ohne Einheit**: `120`, nicht `120km`. Über dem
+  Balken zählt der schnelle Blick, und `km` steht bereits an der Achse; die
+  Nachkommastelle steht im Tooltip und in der Fusszeile).
+  **Alle Dauern schreibt `stdMinLabel()`** — Schlafdauer, Schlafphasen-Verlauf und
+  Trainingszeit (auf Wunsch, 12.09.2026):
+  - **Mit Stunden `1:37`**, Minuten immer **zweistellig** (`2:00`, nicht `2:0`).
+  - **Unter einer Stunde `28'`** — dasselbe Zeichen wie in `fmtPace`, damit Pace und
+    Dauer dieselbe Sprache sprechen.
+  - Die aufgerundete Minute muss **überlaufen** können: 7.996 h ergäbe sonst `7:60`
+    (dieselbe Falle, die `fmtPace` bei `5'60"` abfängt). 0.9917 h → `1:00`.
+  Damit sind **beide 24M-Sonderfälle entfallen** (auf Wunsch): die Trainingszeit
+  rundet dort nicht mehr auf ganze Stunden (`10h`), und die Schlafdauer bricht nicht
+  mehr über zwei Zeilen um. Nachgemessen bei 24 Monatsbalken im Querformat
+  (Spaltenbreite 30 px): Schlafdauer **24 von 24**, Laufstrecke **24 von 24**,
+  Trainingszeit **20 von 24** Beschriftungen. Der Umbruch hatte dort ohnehin nichts
+  gebracht — `7:26` ist mit 22.6 px praktisch so breit wie die breiteste Zeile des
+  umbrochenen `7h`/`25m` (22.3 px); nur das einzeilige `7h 25m` war mit 37.4 px zu
+  breit. Der **Schlafphasen-Verlauf** zeigte vorher Dezimalstunden (`1.5`) und damit
+  eine zweite Einheit für dieselbe Grösse im Nachbardiagramm.
+  `alsStdMin()` (`7h 25m`) bleibt daneben bestehen und bedient **Tooltips, Fusszeilen
+  und Kacheln** — dort steht der Wert für sich und hat Platz. Wer eines von beiden
+  ändert, ändert nicht das andere.
   Mehrzeilige Beschriftungen sind im Plugin allgemein gelöst: es misst die breiteste
   Zeile für die Kollisionsprüfung, stapelt nach oben (`textBaseline: bottom`, letzte
   Zeile auf `y`) und hält mit `ZEILE_H` (11 px) Zeilenabstand und Prüfhöhe zusammen.
@@ -590,6 +680,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   ausserhalb der Seitenfunktionen und übersteht Zeitraum-, Tab- und Formatwechsel.
   Umgeschaltet wird mit `chart.draw()`, nicht mit `_renderTab`: die Daten ändern sich
   nicht, nur was darüber steht.
+  **Im Training-Tab gilt der Tipp für ALLE Diagramme des Tabs** (auf Wunsch,
+  12.09.2026) — dort vergleicht man Strecke, Zeit, Pace und VO₂max miteinander, und
+  vier Titel nacheinander anzutippen wäre derselbe Wunsch in vier Schritten. In Herz
+  und Schlaf bleibt es beim einzelnen Diagramm. Welcher Tab es ist, sagt das **DOM**
+  (`_titel.closest('.screen').id`) und NICHT `currentScreen`: alle vier Screens liegen
+  gleichzeitig im Dokument, und während eines Wischs hinkt `currentScreen` dem
+  sichtbaren Tab hinterher.
   **Zwei Dinge hängen daran:** `.chart-card h3` musste in die Ausnahmeliste des
   Hintergrund-Tipps (`initScrollHideNav`), sonst schaltete derselbe Tipp zusätzlich
   die Bottom-Nav um. Und der **Schlafphasen-Verlauf** hat seinen Formatierer
@@ -834,6 +931,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   FitTrack fünf Spalten; zurückgeholt am 06.09.2026 aus der Sicherung
   (`workoutZurueck()`). `Type` zeigt auch dieses Dashboard nirgends an, es bleibt
   trotzdem: es ist die einzige Angabe, die eine Einheit benennt.
+  **Ein drittes Blatt `Meta`** liegt seit 12.09.2026 in der Health-Tabelle:
+  Schlüssel/Wert, bisher eine Zeile `letzterExport` für die Anzeige „Daten bis"
+  (siehe dort). Es gehört NICHT zu `COLUMNS` und wird vom Import nicht
+  positionsbasiert beschrieben. Damit es nicht mit dem Datenblatt verwechselt wird,
+  sucht `getOrCreateSheet()` das Datenblatt jetzt über **`ss.getSheets()[0]`** statt
+  über `getActiveSheet()`: Letzteres ist UI-Zustand und wandert, sobald ein Skript ein
+  Blatt einfügt — der Import schriebe dann ins falsche Blatt. `metaSchreiben()` legt
+  `Meta` deshalb zusätzlich **hinten** an und stellt die vorherige Auswahl wieder her.
   **Beide Importe schreiben POSITIONSBASIERT** ab Spalte A und die Kopfzeile nur, wenn
   das Blatt leer ist. Wer `COLUMNS` oder `WORKOUT_SPALTEN` ändert, MUSS die bestehenden
   Zeilen mitziehen — sonst stehen alte Werte unter neuen Überschriften und die App liest

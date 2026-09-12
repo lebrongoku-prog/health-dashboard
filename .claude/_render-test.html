@@ -141,7 +141,10 @@ function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'
 let _seed = 42;
 function rnd(){ _seed = (_seed*1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; }
 
-const N_DAYS = 120;
+// Vier Monate reichen fuer alles ausser dem Jahresvergleich – der braucht denselben
+// Monat in mehreren Jahren. `?tage=900` erzeugt zweieinhalb Jahre; die Erzeugung ist
+// deterministisch, der Lauf bleibt also vergleichbar.
+const N_DAYS = Math.max(7, Math.min(1400, +(_P.get('tage') || 120) || 120));
 const endOffset = SC === 'stale' ? 3 : 0;
 // Spalten wie im echten Sheet NACH der Kuerzung vom 05.09.2026 – der Pruefstand soll
 // zeigen, was die App tatsaechlich vorfindet, nicht mehr.
@@ -262,12 +265,25 @@ window.fetch = (url, opt = {}) => {
     const isWorkout = u.includes(WORKOUT_ID);
     const dec = decodeURIComponent(u);
 
-    // Blattnamen
+    // Blattnamen. `Meta` gehoert dazu, seit die App von dort den Zeitstempel der
+    // neuesten uebertragenen Health-Datei liest. `?meta=fehlt` laesst das Blatt
+    // verschwinden — der Zustand JEDES Sheets, solange das Apps Script noch nicht
+    // eingespielt ist. Die App muss dann auf das blosse Tagesdatum zurueckfallen,
+    // ohne Fehler und ohne Endlosschleife bei der Blattnamen-Abfrage.
+    const _meta = _P.get('meta') !== 'fehlt';
     if (u.includes('?fields=sheets')) { window.__anfragen.meta++;
-      return ok({ sheets: [{ properties:{ title:'Data' } }] }); }
+      return ok({ sheets: _meta ? [{ properties:{ title:'Data' } }, { properties:{ title:'Meta' } }]
+                                : [{ properties:{ title:'Data' } }] }); }
 
     // Lesen
     window.__anfragen.werte++;
+    // Das Meta-Blatt: Schluessel/Wert. Der Stempel gehoert zum NEUESTEN Tag der
+    // erfundenen Daten, sonst verwirft ihn die App als stehengeblieben (sie nimmt ihn
+    // nur, wenn er nicht aelter ist als der letzte Datentag).
+    if (dec.includes('/values/Meta')) return ok({ values: _meta ? [
+      ['schluessel', 'wert'],
+      ['letzterExport', health[health.length-1][0] + 'T07:14:33']
+    ] : [] });
     if (isWorkout && SC === 'woerror') return Promise.reject(
       new Error('Simulierter Netzwerkfehler <img src=x onerror="window.__pwned=1">'));
     return ok({ values: isWorkout ? workout : health });

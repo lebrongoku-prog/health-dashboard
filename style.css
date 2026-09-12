@@ -410,15 +410,18 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 #zeitleiste .nav-arrow:disabled,
 #zeitleiste .nav-arrow.inaktiv { opacity: .35; cursor: default; }
 
-/* Auswahl ueber der Pille. Die sieben Zeitraeume sollen auf iPhone-Breite (375 px)
-   in EINE Zeile passen. Nachgemessen: die sieben Chips brauchen 308.7 px, mit sechs
-   Luecken a 4 px sind es 332.7 – bei 337 verfuegbaren Pixeln bleiben gut 4 px Luft.
-   Mit 5 px Luecken fehlten 3.7 px und die letzten beiden rutschten in eine zweite
-   Zeile. Auf schmaleren Geraeten brechen sie weiterhin um und bleiben zentriert; die
-   Tipphoehe von 34 px ist davon unberuehrt. */
+/* Auswahl ueber der Pille, seit 12.09.2026 in ZWEI Zeilen: oben die Befehle
+   („Heute", „YoY"), darunter die sechs Bereiche. Vorher stand alles in einer Zeile,
+   getrennt durch einen senkrechten Strich — die war bei 375 px mit 332 von 332 px
+   aber schon randvoll, und der zweite Befehl haette sie an beliebiger Stelle
+   umbrechen lassen. Die Trennung nach Zeilen trennt zugleich nach Bedeutung: oben
+   was etwas TUT, unten was den Zeitraum WAEHLT.
+   Die Auswahl waechst nach oben (die Leiste ist am unteren Rand verankert), die
+   Pille bleibt also stehen; die zweite Zeile verdeckt nur waehrend des Aufklappens
+   etwas mehr vom Inhalt. */
 .zl-optionen {
   pointer-events: auto;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
   max-width: 100%;
   padding: 6px;
   border-radius: 18px;
@@ -436,6 +439,16 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   font-family: inherit; font-size: .84rem; font-weight: 600;
   cursor: pointer;
 }
+/* Eine Zeile der Auswahl. Die sechs Bereichs-Chips passen auf iPhone-Breite (375 px)
+   knapp nebeneinander — nachgemessen brauchen sie mit ihren fuenf Luecken 254 von
+   337 px. Dafuer sind `gap: 3px` und `.zl-opt{padding:0 .55rem}` noetig; mit den
+   Ausgangswerten (4 px / .6rem) waren es 265 px. Auf schmaleren Geraeten brechen sie
+   weiterhin um und bleiben zentriert, die Tipphoehe von 34 px bleibt unberuehrt. */
+.zl-zeile {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 3px;
+  max-width: 100%;
+}
+
 /* PFLICHT, nicht Kosmetik: `hidden` setzt display:none nur ueber das Browser-
    Stylesheet, und JEDE eigene display-Regel schlaegt das. Ohne diese Zeile bleibt die
    Auswahl dauerhaft sichtbar und laesst sich nicht zuklappen — das `hidden`-Attribut
@@ -443,15 +456,17 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    `#hinweis-oben[hidden]` und `.weitere-inhalt[hidden]`. */
 .zl-optionen[hidden] { display: none; }
 
-/* „Heute" ist kein Zeitraum, sondern ein Sprung ans Ende des Datenbestands — der
-   gewaehlte Bereich bleibt. Deshalb sieht es anders aus als die Bereichs-Chips
-   (Umrandung statt Fuellung) und steht durch einen Strich abgesetzt: als siebter
-   Chip in derselben Optik erwartete man eine Tagesansicht, und genau die gibt es
-   nicht mehr. Es traegt NIE die Klasse `aktiv` — es hat keinen Zustand. */
-.zl-heute {
-  /* Knapp bemessen wie die Bereichs-Chips: mit `.6rem` und 2-px-Trennerrand brauchte
-     die Zeile 340.2 von 337 px und brach um. Siehe die Messnotiz bei `.zl-optionen`. */
-  height: 34px; padding: 0 .5rem;
+/* „Heute" und „YoY" sind keine Zeitraeume, sondern Befehle: „Heute" springt ans Ende
+   des Datenbestands (der gewaehlte Bereich bleibt), „YoY" schaltet den
+   Jahresvergleich ein und aus. Deshalb sehen sie anders aus als die Bereichs-Chips
+   (Umrandung statt Fuellung) und stehen in einer eigenen Zeile darueber: als weitere
+   Chips in derselben Optik erwartete man von „Heute" eine Tagesansicht, und genau
+   die gibt es nicht mehr.
+   In ihrer eigenen Zeile ist Platz, deshalb duerfen sie breiter greifen als die
+   Chips (.75rem statt .55rem) — sie sind damit die groessten Tippflaechen der
+   Auswahl. Der frueher noetige senkrechte `.zl-trenner` ist mit der Zeile entfallen. */
+.zl-heute, .zl-yoy {
+  height: 34px; padding: 0 .75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: transparent;
@@ -459,14 +474,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   font-family: inherit; font-size: .84rem; font-weight: 700;
   cursor: pointer; flex: 0 0 auto;
 }
-.zl-trenner {
-  width: 1px; height: 20px; flex: 0 0 auto;
-  margin: 0 1px;
-  background: var(--border);
-}
 
-/* Der gewaehlte Zeitraum in der Tabfarbe – dieselbe Sprache wie sonst in der App. */
-.zl-opt.aktiv {
+/* Der gewaehlte Zeitraum in der Tabfarbe – dieselbe Sprache wie sonst in der App.
+   „YoY" traegt sie ebenfalls, denn anders als „Heute" HAT es einen Zustand: der
+   Jahresvergleich bleibt an, bis man ihn wieder ausschaltet. „Heute" bekommt sie
+   nie — ein Sprung ist nach dem Landen vorbei. */
+.zl-opt.aktiv, .zl-yoy.aktiv {
   background: var(--tab-color);
   border-color: var(--tab-color);
   color: #fff;

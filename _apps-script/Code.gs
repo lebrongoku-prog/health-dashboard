@@ -183,9 +183,31 @@ function selbsttest() {
   if (typeof buildDateIndex    !== 'function') fehlt.push('buildDateIndex');
   if (typeof writeToSheet      !== 'function') fehlt.push('writeToSheet');
   if (typeof importWorkoutData !== 'function') fehlt.push('importWorkoutData');
+  if (typeof metaSchreiben        !== 'function') fehlt.push('metaSchreiben');
+  if (typeof neuesterExportStempel !== 'function') fehlt.push('neuesterExportStempel');
   zeilen.push(fehlt.length ? '   FEHLT – ' + fehlt.join(', ') : '   OK – alle vorhanden.');
 
-  zeilen.push('4. Zeitplan fuer den automatischen Import:');
+  zeilen.push('4. Blatt `Meta` (Zeitstempel fuer „Daten bis" im Dashboard):');
+  try {
+    var mss = getOrCreateSheet().ss;
+    var mBlatt = mss.getSheetByName('Meta');
+    if (!mBlatt) {
+      zeilen.push('   FEHLT – wird beim naechsten writeToSheet() angelegt.');
+    } else {
+      var mWerte = mBlatt.getDataRange().getDisplayValues();
+      var gefunden = '';
+      mWerte.forEach(function (z) { if (String(z[0]).trim() === 'letzterExport') gefunden = String(z[1]); });
+      // ANGEZEIGTE Werte, nicht gespeicherte: genau die liefert die Sheets-API auch
+      // der App. Eine Pruefung mit getValues() bewiese hier nichts.
+      zeilen.push(gefunden
+        ? '   OK – letzterExport: ' + gefunden
+        : '   ACHTUNG – Blatt da, aber keine Zeile `letzterExport`.');
+    }
+  } catch (err) {
+    zeilen.push('   FEHLER – ' + err);
+  }
+
+  zeilen.push('5. Zeitplan fuer den automatischen Import:');
   var alle = ScriptApp.getProjectTriggers();
   var eigene = alle.filter(function (t) { return t.getHandlerFunction() === 'writeToSheet'; });
   zeilen.push(eigene.length
@@ -349,7 +371,13 @@ function getOrCreateSheet() {
     props.setProperty('sheet_id', ss.getId());
     Logger.log('✅ Sheet-ID gespeichert: ' + ss.getId());
   }
-  var sheet = ss.getActiveSheet();
+  // Das Datenblatt ist das ERSTE Blatt der Tabelle. Frueher stand hier
+  // getActiveSheet() — das ist UI-Zustand und kann sich verschieben, sobald ein
+  // Skript ein weiteres Blatt anlegt (Sicherung, `Meta`). Dann schriebe der Import
+  // in das falsche Blatt. Sicherungen legt `copyTo` ohnehin hinten an, das erste
+  // Blatt bleibt das Datenblatt. `_workoutBlatt()` in Maintenance.gs macht es seit
+  // jeher so.
+  var sheet = ss.getSheets()[0];
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(COLUMNS);
   } else {
@@ -386,6 +414,58 @@ function upsertDay(sheet, day, index) {
   return false;
 }
 
+// ── Blatt `Meta`: was das Dashboard ueber den Import wissen muss ─────────────
+// Bisher eine einzige Zeile: `letzterExport` — WANN Health Auto Export die neueste
+// uebernommene Datei geschrieben hat. Das Dashboard zeigt sie als „Daten bis";
+// vorher stand dort nur das Tagesdatum, und ein Tag ist auch um 00:05 Uhr schon
+// „heute". Erst die Uhrzeit sagt, wie frisch die Werte sind.
+//
+// BEWUSST ein eigenes Blatt und keine zusaetzliche Spalte: `upsertDay` schreibt
+// positionsbasiert ab Spalte A, und die Kopfzeilenpruefung in `getOrCreateSheet`
+// zaehlt die Spalten — ein Wert neben den Daten wuerde den Import anhalten.
+//
+// Das Blatt wird HINTEN angelegt und die vorherige Auswahl wiederhergestellt: ein
+// neu eingefuegtes Blatt wird aktiv, und davon darf das Datenblatt nichts merken.
+var META_BLATT = 'Meta';
+
+function metaSchreiben(ss, schluessel, wert) {
+  var blatt = ss.getSheetByName(META_BLATT);
+  if (!blatt) {
+    var vorher = ss.getActiveSheet();
+    blatt = ss.insertSheet(META_BLATT, ss.getNumSheets());
+    // Als Text formatieren. Sonst deutet Sheets den Zeitstempel als Datum und ZEIGT
+    // ihn anders an — und die App liest die ANGEZEIGTE Zeichenkette, nicht den
+    // gespeicherten Wert (derselbe Fallstrick wie bei sleepStart/sleepEnd).
+    blatt.getRange('A:B').setNumberFormat('@');
+    blatt.appendRow(['schluessel', 'wert']);
+    try { ss.setActiveSheet(vorher); } catch (e) {}
+  }
+  var letzte = blatt.getLastRow();
+  var zeile = 0;
+  if (letzte > 1) {
+    var schluessels = blatt.getRange(2, 1, letzte - 1, 1).getValues();
+    for (var i = 0; i < schluessels.length; i++) {
+      if (String(schluessels[i][0]).trim() === schluessel) { zeile = i + 2; break; }
+    }
+  }
+  if (!zeile) zeile = letzte + 1;
+  blatt.getRange(zeile, 1, 1, 2).setValues([[schluessel, wert]]);
+}
+
+// Zeitstempel der neuesten Health-Datei, als Text im ISO-Format (die App liest
+// beides, ISO und die deutsche Schreibweise — ISO ist eindeutig).
+// getLastUpdated() kostet einen Drive-Aufruf, deshalb NUR fuer die eine neueste
+// Datei: `getAllHealthFiles` meidet den Aufruf aus demselben Grund.
+function neuesterExportStempel(dateien) {
+  var neueste = null;
+  (dateien || []).forEach(function (it) {
+    if (!neueste || it.date > neueste.date) neueste = it;
+  });
+  if (!neueste) return null;
+  return Utilities.formatDate(neueste.file.getLastUpdated(),
+    Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
+}
+
 function writeToSheet() {
   var DAYS_TO_REFRESH = 2;
   var BATCH_LIMIT = 60;
@@ -411,7 +491,8 @@ function writeToSheet() {
     ? minusTage(vorhandene[vorhandene.length - 1], DAYS_TO_REFRESH - 1)
     : null;
 
-  var list = getAllHealthFiles().filter(function(item) {
+  var dateien = getAllHealthFiles();
+  var list = dateien.filter(function(item) {
     // (a) Tag fehlt noch → nachtragen, auch wenn er älter ist als das Fenster
     // (b) Tag liegt im Auffrisch-Fenster → neu schreiben
     return !index[item.date] || (refreshDate && item.date >= refreshDate);
@@ -436,6 +517,14 @@ function writeToSheet() {
   }
 
   sheet.getRange(1,1).setNote('Zuletzt aktualisiert: ' + new Date().toLocaleString('de-DE'));
+  // Zeitstempel der neuesten Datei ins Blatt `Meta`. Ein Fehlschlag darf den Import
+  // nicht anhalten — die Angabe ist eine Auskunft, keine Bedingung.
+  try {
+    var stempel = neuesterExportStempel(dateien);
+    if (stempel) metaSchreiben(r.ss, 'letzterExport', stempel);
+  } catch (e) {
+    Logger.log('⚠️ Meta-Blatt nicht geschrieben: ' + e);
+  }
   if (remaining > 0) {
     Logger.log('✅ ' + neu + ' neu, ' + ersetzt + ' aktualisiert. Noch ' + remaining + ' übrig → erneut ausführen!');
   } else {

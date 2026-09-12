@@ -3,6 +3,12 @@ const CLIENT_ID        = '185114707171-tto1teeec25d9sgkeobme666ndpdip7k.apps.goo
 const REDIRECT_URI     = 'https://lebrongoku-prog.github.io/health-dashboard/';
 const HEALTH_SHEET_ID  = '1eZ47hJUc7yX_o-eH0p9JL3Wi34wWMQ8gSEI1a46VRKM';
 const WORKOUT_SHEET_ID = '1YJ3ke8Z2jS1KdJlKOnukUStMgvqqppnktAb8UVHDdgk';
+// Zusatzangaben zum Import, als Schluessel/Wert-Paare in einem eigenen Blatt der
+// Health-Tabelle. Bisher steht dort eine Zeile: `letzterExport` – wann Health Auto
+// Export die neueste uebernommene Datei geschrieben hat. Das Apps Script legt das
+// Blatt beim Import selbst an; fehlt es (Skript noch nicht eingespielt), faellt die
+// App auf das blosse Tagesdatum zurueck.
+const META_BLATT = 'Meta';
 // Auslöser fuer den Import Drive → Sheet. Nur DAS kann die App nicht selbst: an die
 // Health-Auto-Export-Dateien in Drive kommt allein das Apps Script.
 // Ohne Passwort im Aufruf – das stand hier frueher und war damit oeffentlich. Statt-
@@ -67,6 +73,10 @@ let _datumSelbstGewaehlt = false;
 // feuert auch, wenn die App selbst scrollt (Tab-Snap beim Start).
 let _beruehrt = false;
 let _lastLoadTs = null; // Zeitpunkt des letzten erfolgreichen Sheet-Abrufs (für den Daten-Stand)
+// Zeitstempel der neuesten Health-Datei, die ins Sheet uebertragen wurde (aus dem
+// Blatt `Meta`). Beantwortet die Frage, die das blosse Tagesdatum offen laesst: wie
+// frisch sind die Werte des letzten Tages? Format {datum:'YYYY-MM-DD', zeit:'HH:MM'}.
+let _exportStempel = null;
 const charts = {};
 // Cache für allData-abhängige Auswertungen (Baselines, Tages-Empfehlung,
 // Warnsignale, Muster-Insights). Wird in loadFromAPI geleert, sobald sich
@@ -307,9 +317,13 @@ async function loadFromAPI(opt = {}) {
     // Das Workout-Blatt faengt seinen Fehler selbst ab, damit es den
     // Gesundheitsteil nicht mitreisst.
     const alsFehler = e => ({ fehler: e });
-    const [health, workout] = await Promise.all([
+    const [health, workout, meta] = await Promise.all([
       _fetchSheet(HEALTH_SHEET_ID),
-      _fetchSheet(WORKOUT_SHEET_ID).catch(alsFehler)
+      _fetchSheet(WORKOUT_SHEET_ID).catch(alsFehler),
+      // Fehlt das Blatt, liefert _fetchSheet `{fehlt:true}` statt zu scheitern – der
+      // Stempel bleibt dann einfach leer. Es faehrt in derselben Welle mit, damit es
+      // keine zusaetzliche Wartestufe kostet.
+      _fetchSheet(HEALTH_SHEET_ID, META_BLATT).catch(alsFehler)
     ]);
     if (health.authError) {
       accessToken = null; tokenExpiry = 0;
@@ -336,6 +350,10 @@ async function loadFromAPI(opt = {}) {
       // Das Workout-Sheet prüft schon immer nach demselben Muster.
     }).filter(r => r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
     if (!allData.length) throw new Error('Keine Zeile mit gültigem Datum (Format JJJJ-MM-TT) gefunden');
+    // Export-Zeitstempel. Ein Fehlschlag aendert nichts: dann bleibt der zuletzt
+    // bekannte Stempel stehen, und ohne Stempel nennt die App weiter nur den Tag.
+    const _st = (meta && !meta.fehler && !meta.authError) ? _stempelAusBlatt(meta.values) : null;
+    if (_st) _exportStempel = _st;
     allData.sort((a, b) => a.date.localeCompare(b.date));
 
     // Doppelte Datumszeilen zusammenführen.
@@ -403,6 +421,32 @@ async function loadFromAPI(opt = {}) {
   return true;
 }
 
+// ── Export-Zeitstempel aus dem Blatt `Meta` ───────────
+// Zwei Schreibweisen werden akzeptiert, weil die Sheets-API die ANGEZEIGTE
+// Zeichenkette liefert (siehe den Gotcha dazu): das Skript schreibt die Zelle als
+// Text und damit im ISO-Format, deutet Sheets sie doch als Datum, steht dort
+// "12.09.2026 07:14:33". Alles andere gilt als nicht vorhanden.
+// Durchgelassen werden nur Ziffern – der Wert kommt aus einer Sheet-Zelle und wird
+// angezeigt, taugt also nicht als Rohtext im Markup.
+function _stempelAusBlatt(werte) {
+  const zeilen = Array.isArray(werte) ? werte : [];
+  const treffer = zeilen.find(z => Array.isArray(z) && String(z[0] ?? '').trim() === 'letzterExport');
+  if (!treffer) return null;
+  const roh = String(treffer[1] ?? '').trim();
+  let m = roh.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (m) return { datum: m[1]+'-'+m[2]+'-'+m[3], zeit: m[4]+':'+m[5] };
+  m = roh.match(/^(\d{2})\.(\d{2})\.(\d{4}),?\s+(\d{1,2}):(\d{2})/);
+  if (m) return { datum: m[3]+'-'+m[2]+'-'+m[1], zeit: String(m[4]).padStart(2,'0')+':'+m[5] };
+  return null;
+}
+// Dieselbe Pruefung fuer den Zwischenspeicher: localStorage ist von aussen
+// beschreibbar und damit nicht vertrauenswuerdiger als eine Sheet-Zelle.
+function _stempelGeprueft(s) {
+  return (s && typeof s.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.datum)
+            && typeof s.zeit === 'string' && /^\d{2}:\d{2}$/.test(s.zeit))
+    ? { datum: s.datum, zeit: s.zeit } : null;
+}
+
 // ── Zwischenspeicher der Daten ────────────────────────
 // Die App wartete beim Start, bis alle Blätter geladen waren – bei abgelaufener
 // Anmeldung sah man stattdessen nur den Login. Jetzt liegt der zuletzt geladene
@@ -423,7 +467,11 @@ function datenStand() {
 
 function datenCacheSchreiben() {
   try {
-    localStorage.setItem(DATEN_KEY, '{"v":1,"ts":' + (_lastLoadTs || 0) + ',"d":' + datenStand() + '}');
+    // Der Stempel steht NEBEN dem Fingerabdruck, nicht darin: datenStand() ist die
+    // Vergleichsgrundlage fuer „hat sich etwas geaendert?" und soll sich nur aendern,
+    // wenn sich die Messwerte aendern.
+    localStorage.setItem(DATEN_KEY, '{"v":1,"ts":' + (_lastLoadTs || 0)
+      + ',"stempel":' + JSON.stringify(_exportStempel) + ',"d":' + datenStand() + '}');
   } catch(e) {
     // Voller Speicher: die Kopie ist eine Bequemlichkeit, kein Muss. Den alten
     // (womöglich noch brauchbaren) Stand aber nicht halb überschrieben stehen lassen.
@@ -451,6 +499,7 @@ function datenCacheLesen() {
   workoutSheetReady = true;
   referenceDate  = allData[allData.length - 1].date;
   _lastLoadTs    = (typeof d.ts === 'number' && d.ts > 0) ? d.ts : null;
+  _exportStempel = _stempelGeprueft(roh.stempel);
   _analyticsCache = {};
   return true;
 }
@@ -483,6 +532,17 @@ function findField(rows, ...candidates) {
 // 'heute' stand hier bis 06.09.2026 als eigener Bereich (ein einzelner Tag). Er ist
 // auf Wunsch entfallen: „Heute" ist jetzt ein Sprung auf den neuesten Ausschnitt,
 // kein Zeitraum. Diagramme zeigen damit nie mehr nur einen einzigen Tag.
+// Jahresvergleich (12.09.2026, auf Wunsch): kein Zeitraum im bisherigen Sinn, sondern
+// DERSELBE Kalendermonat in allen Jahren, die Daten haben – Sep 24, Sep 25, Sep 26
+// nebeneinander. Er laeuft als eigener Wert von `timeRange`, damit jede Stelle, die
+// den Zeitraum auswertet, ihn auch sieht; `windowDays`/`windowMonths` liefern dafuer
+// null, und `moWindow()` damit ebenfalls – ein zusammenhaengendes Fenster gibt es
+// hier nicht.
+// `_yoyVorher` merkt sich den Bereich, aus dem heraus eingeschaltet wurde: beim
+// Ausschalten steht wieder da, was vorher da war.
+function istYoY() { return timeRange === 'yoy'; }
+let _yoyVorher = '1m';
+
 function windowDays() { return {'7d':7}[timeRange] || null; }
 function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24}[timeRange] || null; }
 
@@ -518,6 +578,10 @@ function filtered() {
     const days = weekDays7();
     return allData.filter(r => r.date >= days[0] && r.date <= days[6]);
   }
+  // Jahresvergleich: derselbe Kalendermonat in JEDEM Jahr, das Daten hat. Welcher
+  // Monat gemeint ist, sagt referenceDate – die Blaetterpfeile verschieben ihn wie
+  // sonst auch um je einen Monat.
+  if (istYoY()) { const mm = referenceDate.slice(5,7); return allData.filter(r => r.date.slice(5,7) === mm); }
   const mw = moWindow();
   if (mw) return allData.filter(r => r.date >= mw.s && r.date <= mw.e);
   // fallback (no month filter active)
@@ -528,6 +592,10 @@ function filtered() {
 
 function prevPeriod() {
   if (!referenceDate || !allData.length) return [];
+  // Im Jahresvergleich gibt es keine Vorperiode: die Jahre stehen bereits
+  // nebeneinander im Diagramm. Eine erfundene Vergleichsspanne waere schlechter als
+  // keine – die Kacheln zeigen dann „—" statt einer Zahl ohne Bedeutung.
+  if (istYoY()) return [];
   if (is7D()) {
     const prevRef = addDays(referenceDate, -7);
     const mon = getWeekMonday(prevRef);
@@ -721,17 +789,22 @@ function monatsSumme(rows, field) {
 }
 function allMonths(rows) { return [...new Set(rows.map(r=>r.date.slice(0,7)))].sort(); }
 function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])); return mos.map(m2=>m[m2]??null); }
-// Stunden als "7h 25m". Die aufgerundete Minute muss dabei ueberlaufen koennen:
-// 7.996 h ergaebe sonst "7h 60m" – dieselbe Falle, die fmtPace bei 5'60" abfaengt.
-// Beschriftung fuer Stunden-Werte: "7h 25m", bei 24M zweizeilig ("7h" / "25m").
-// Dort stehen bis zu 24 Balken nebeneinander, und der einzeilige Text waere breiter
-// als die Spalte – umgebrochen passt er, weil er nur halb so breit wird.
-// Ein fuehrendes "0h " faellt weg: bei einem Training von 38 Minuten sagt "0h 38m"
-// nichts, was "38m" nicht auch sagt.
+// Dauer-Beschriftung in den Diagrammen: "1:37" (Stunden:Minuten, Minuten immer
+// zweistellig) und "28'" fuer alles unter einer Stunde – auf Wunsch, 12.09.2026;
+// vorher "1h 37m" bzw. "38m".
+// Die aufgerundete Minute muss dabei ueberlaufen koennen: 7.996 h ergaebe sonst
+// "7:60" – dieselbe Falle, die fmtPace bei 5'60" abfaengt.
+// Das Zeichen fuer "nur Minuten" ist dasselbe wie in fmtPace ('), damit Pace und
+// Dauer dieselbe Sprache sprechen.
+// Der Zeilenumbruch bei 24M ist damit entfallen (auf Wunsch): das Format ist rund
+// 40 % schmaler als "7h 25m" und passt auch neben 24 Nachbarn in eine Zeile.
+// alsStdMin() bleibt daneben bestehen – Tooltips, Fusszeilen und Kacheln schreiben
+// weiter "7h 25m", wo genug Platz ist und der Text fuer sich stehen muss.
 function stdMinLabel(stunden) {
-  let t = alsStdMin(stunden);
-  if (t.startsWith('0h ')) t = t.slice(3);
-  return timeRange === '24m' ? t.replace(' ', '\n') : t;
+  if (stunden == null) return '';
+  let st = Math.floor(stunden), mi = Math.round((stunden % 1) * 60);
+  if (mi === 60) { st++; mi = 0; }
+  return st ? st + ':' + String(mi).padStart(2, '0') : mi + "'";
 }
 
 function alsStdMin(h) {
@@ -1050,10 +1123,10 @@ const _beschriftung = {};
 function beschriftungStandard(chart) {
   if (!chart.$werteFmt) return false;
   if (chart.$werteAus) return false;   // Schlafphasen: nur auf Wunsch
-  // Querformat immer; Hochformat nur bei 7T. Dort stehen hoechstens sieben Saeulen
-  // nebeneinander, da ist auch auf der halben Breite Platz. Ab 1M waeren es 30+.
+  // Querformat immer; im Hochformat nur, wo wenige Saeulen nebeneinander stehen:
+  // bei 7T hoechstens sieben, im Jahresvergleich eine je Jahr. Ab 1M waeren es 30+.
   if (window.innerWidth > window.innerHeight) return true;
-  return timeRange === '7d' && !chart.$nurQuer;
+  return (timeRange === '7d' || istYoY()) && !chart.$nurQuer;
 }
 function beschriftungAn(chart) {
   const w = _beschriftung[chart.canvas && chart.canvas.id];
@@ -1777,7 +1850,17 @@ function datenStandZeilen() {
     const zeit = d.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
     loaded = toLocalDateStr(d) === toLocalDateStr(new Date()) ? zeit : fmtDayShort(toLocalDateStr(d)) + ', ' + zeit;
   }
-  return statZeile('Daten bis', fmtDayShort(newest)+ageTxt, stale ? '#F59E0B' : null)
+  // „Daten bis" nennt seit 12.09.2026 den Zeitstempel der neuesten uebertragenen
+  // Health-Datei statt nur ihren Tag: ein Tag ist auch um 00:05 Uhr schon „heute",
+  // und erst die Uhrzeit sagt, wie frisch die Werte wirklich sind. Der Stempel kommt
+  // aus dem Blatt `Meta` (siehe META_BLATT).
+  // Die Pruefung `>= newest` ist die Sicherung gegen einen stehengebliebenen Stempel:
+  // waere er aelter als der neueste Tag im Sheet, beschriebe er nicht diesen Stand —
+  // dann lieber nur das Datum nennen als eine falsche Uhrzeit.
+  const bisTxt = (_exportStempel && _exportStempel.datum >= newest)
+    ? fmtDayShort(_exportStempel.datum) + ', ' + _exportStempel.zeit + ' Uhr'
+    : fmtDayShort(newest);
+  return statZeile('Daten bis', bisTxt+ageTxt, stale ? '#F59E0B' : null)
        + statZeile('Zuletzt geladen', loaded)
        // Stand der Anmeldung: eine Zeile, drei moegliche Werte. Der Text kommt aus
        // anmeldeStand() – frueher stand hier eine zweite, eigene Pruefung auf
@@ -2573,7 +2656,10 @@ function pgSchlaf() {
         // jeweiligen Segments und damit mitten im Balken – das las sich nicht als
         // Wert, sondern als Stoerung. Deshalb standardmaessig AUS; der Titel-Tipp
         // holt sie bei Bedarf trotzdem hervor.
-        __werteFmt:v=>v>=0.5?zahl(v,1):'',
+        // Dieselbe Schreibweise wie in Schlafdauer und Trainingszeit (12.09.2026,
+        // auf Wunsch): vorher standen hier Dezimalstunden ("1.5") – zwei Einheiten
+        // fuer dieselbe Groesse in benachbarten Diagrammen.
+        __werteFmt:v=>v>=0.5?stdMinLabel(v):'',
         __werteAusStandard:true,
         type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
@@ -2783,9 +2869,10 @@ async function pgTraining() {
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
       // Dasselbe Format wie beim Schlaf – die Werte liegen hier in Minuten.
-      // Bei 24M ganze Stunden (auf Wunsch): 24 Monatsbalken nebeneinander, da ist
-      // die Minute weder lesbar noch aussagekraeftig.
-      __werteFmt:v=>v?(timeRange==='24m'?Math.round(v/60)+'h':stdMinLabel(v/60)):'',
+      // Seit dem schmaleren Format (12.09.2026) ohne Sonderfall bei 24M: dort stand
+      // vorher nur die ganze Stunde ("10h"), weil "10h 12m" neben 24 Nachbarn nicht
+      // mehr lesbar war. "10:12" ist schmal genug.
+      __werteFmt:v=>v?stdMinLabel(v/60):'',
       type:'bar',data:{labels:_lZeitLbls,datasets:[
       {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
       ...oeDatensatz('c-tot-zeit|oe', mittelArr(_lZeitData), '#F97316', _lZeitLbls.length)
@@ -2805,9 +2892,10 @@ async function pgTraining() {
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
     zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
-      // Ganze Kilometer mit Einheit: ueber dem Balken zaehlt der schnelle Blick,
-      // die Nachkommastelle steht im Tooltip.
-      __werteFmt:v=>v?Math.round(v)+'km':'',
+      // Ganze Kilometer, OHNE Einheit (auf Wunsch, 12.09.2026): ueber dem Balken
+      // zaehlt der schnelle Blick, und "km" steht bereits an der Achse. Die
+      // Nachkommastelle steht im Tooltip und in der Fusszeile.
+      __werteFmt:v=>v?String(Math.round(v)):'',
       type:'bar',data:{labels:_lStrLbls,datasets:[
       {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
       ...oeDatensatz('c-tot-strecke|oe', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
@@ -2971,6 +3059,14 @@ function zeitraumText() {
     const tage = weekDays7();
     return tage.length ? 'KW ' + isoKW(tage[0]) : '';
   }
+  // Jahresvergleich: der verglichene Monat, dazu wie viele Jahre Daten dafuer haben.
+  // Die Jahreszahlen selbst stehen auf der Zeitachse ("Sep 24", "Sep 25", …).
+  if (istYoY()) {
+    if (!referenceDate) return '';
+    const mm = referenceDate.slice(5,7);
+    const jahre = new Set(allData.filter(r => r.date.slice(5,7) === mm).map(r => r.date.slice(0,4)));
+    return MONAT_KURZ[+mm - 1] + (jahre.size > 1 ? ' · ' + jahre.size + ' Jahre' : '');
+  }
   const mw = moWindow();
   if (!mw) return '';
   const monat = ds => MONAT_KURZ[+ds.slice(5,7) - 1];
@@ -3023,15 +3119,24 @@ function zeitleisteBauen() {
   // Aus _RANGE_OPTS erzeugt — die Liste der Zeiträume bleibt damit an einer Stelle.
   const opts = _RANGE_OPTS.map(([k,lbl]) =>
     `<button class="zl-opt" data-range="${k}">${lbl}</button>`).join('');
-  // „Heute" steht in derselben Leiste, ist aber KEIN Bereich, sondern ein Sprung auf
-  // den neuesten Ausschnitt — der Bereich bleibt, wie er ist. Deshalb ohne
-  // `data-range`, mit eigener Klasse und durch einen Strich abgesetzt: sonst sähe es
-  // aus wie eine siebte Auswahl und man erwartete eine Tagesansicht.
-  const heute = `<button class="zl-heute">Heute</button><span class="zl-trenner" aria-hidden="true"></span>`;
+  // „Heute" und „YoY" sind KEINE Bereiche, sondern Befehle: „Heute" schiebt den
+  // Ausschnitt ans Ende (der Bereich bleibt), „YoY" schaltet den Jahresvergleich ein
+  // und aus. Deshalb ohne `data-range`, mit eigener Klasse und in einer EIGENEN
+  // Zeile ueber den Bereichs-Chips — sonst saehen sie aus wie weitere Auswahlen und
+  // man erwartete eine Tagesansicht.
+  // Die eigene Zeile ist zugleich eine Platzfrage: die Chips belegten bei 375 px
+  // schon mit „Heute" 332 von 332 px (siehe Messnotiz im CSS). „YoY" haette die
+  // Zeile umbrechen lassen — an einer beliebigen Stelle statt an der, die zur
+  // Bedeutung passt. Der frueher noetige senkrechte `.zl-trenner` ist damit weg.
+  const aktionen = `<button class="zl-heute">Heute</button>`
+    + `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
   el.innerHTML = `<button class="zl-ausklapp" hidden></button>`
-    + `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">${heute}${opts}</div>`
+    + `<div class="zl-optionen" hidden role="group" aria-label="Zeitraum">`
+    +   `<div class="zl-zeile">${aktionen}</div>`
+    +   `<div class="zl-zeile">${opts}</div>`
+    + `</div>`
     + `<div class="zl-reihe">`
     + `<button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>`
     + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
@@ -3066,7 +3171,14 @@ function zeitleisteAktualisieren() {
   if (!el) return;
   const treffer = _RANGE_OPTS.find(([k]) => k === timeRange);
   const pille = el.querySelector('.zl-pille');
-  if (pille) pille.textContent = treffer ? treffer[1] : timeRange;
+  // Im Jahresvergleich gehoert keiner der sechs Bereiche zum Zustand – dann nennt
+  // die Pille den Modus statt einen Zeitraum.
+  if (pille) pille.textContent = istYoY() ? 'YoY' : (treffer ? treffer[1] : timeRange);
+  const yoy = el.querySelector('.zl-yoy');
+  if (yoy) {
+    yoy.classList.toggle('aktiv', istYoY());
+    yoy.setAttribute('aria-pressed', istYoY() ? 'true' : 'false');
+  }
   // Die Pfeile sind immer da. Frueher verschwanden sie beim Bereich „Heute" — den
   // gibt es nicht mehr, und jeder verbliebene Bereich laesst sich blaettern.
   // Ob ein Schritt moeglich ist, sagt weiterhin `updateNavUI()` ueber `disabled`.
@@ -3478,15 +3590,28 @@ document.body.addEventListener('click', (e) => {
     const _cv = _titel.closest('.chart-card').querySelector('canvas');
     const _ch = _cv && Chart.getChart(_cv);
     if (_ch && _ch.$werteFmt) {
-      _beschriftung[_cv.id] = !beschriftungAn(_ch);
-      _ch.draw();   // nur neu zeichnen – die Daten aendern sich nicht
+      const _an = !beschriftungAn(_ch);
+      // Im Training-Tab gilt der Tipp fuer ALLE Diagramme des Tabs (auf Wunsch,
+      // 12.09.2026): dort vergleicht man Strecke, Zeit, Pace und VO2max miteinander,
+      // und vier Titel nacheinander anzutippen ist derselbe Wunsch in vier Schritten.
+      // In den uebrigen Tabs bleibt es beim einzelnen Diagramm.
+      // Welcher Tab es ist, sagt das DOM und NICHT `currentScreen`: alle vier Screens
+      // liegen gleichzeitig im Dokument, und waehrend eines Wischs hinkt
+      // `currentScreen` dem sichtbaren Tab hinterher.
+      const _screen = _titel.closest('.screen');
+      const _tabDia = (_screen && _screen.id === 'screen-training')
+        ? (tabCharts.training || []).map(id => charts[id]).filter(c => c && c.$werteFmt)
+        : [];
+      const _ziele = _tabDia.indexOf(_ch) >= 0 ? _tabDia : [_ch];
+      // Nur neu zeichnen – die Daten aendern sich nicht.
+      _ziele.forEach(c => { _beschriftung[c.canvas.id] = _an; c.draw(); });
       return;
     }
   }
 
   // Passiver Modus: ein Tipp auf Pille oder Pfeil holt die Leiste zurueck, ein Tipp
   // irgendwo daneben schickt sie zurueck. Ein Tipp auf einen Eintrag der offenen
-  // Auswahl (`.zl-opt`, `.zl-heute`) laesst den Zustand, wie er ist — er gehoert zum
+  // Auswahl (`.zl-opt`, `.zl-heute`, `.zl-yoy`) laesst den Zustand, wie er ist — er gehoert zum
   // Bedienen der Leiste, liegt aber nicht in der Reihe.
   // BEWUSST ohne `return`: der Tipp soll danach noch das tun, wofuer er gedacht war.
   if (t.closest('.zl-reihe') || t.closest('.zl-ausklapp')) zeitleistePassiv(false);
@@ -3507,6 +3632,16 @@ document.body.addEventListener('click', (e) => {
     aufHeuteSpringen();
     updateNavUI();
     _refreshAfterStateChange();
+    return;
+  }
+  // Jahresvergleich ein/aus. Beim Einschalten wird der bisherige Bereich gemerkt,
+  // beim Ausschalten steht er wieder da — sonst landete man nach dem Vergleich in
+  // einem Bereich, den man nie gewaehlt hat.
+  if (t.closest('.zl-yoy')) {
+    zeitleisteAuswahl(false);
+    blickAnkerMerken(t);
+    if (istYoY()) { setR(_yoyVorher); }
+    else { _yoyVorher = timeRange; setR('yoy'); }
     return;
   }
   const zlOpt = t.closest('.zl-opt');
