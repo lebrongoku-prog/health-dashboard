@@ -703,6 +703,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Deshalb braucht es keine Sonderregel je Zeitraum: bei 7T steht über jedem Balken
   eine Zahl, bei 24M im Pace-Diagramm über 16 von 48 Punkten, in „Ruhepuls & HRV"
   über 13 von 14.
+  **Die Zahl steht IMMER über dem Balken, nie darin** (auf Wunsch, 12.09.2026).
+  Dafür sorgen zwei Dinge zusammen:
+  1. **`LABEL_LUFT` (= `ZEILE_H + 6`, 17 px)** wird in `zeichneDiagramm()` als
+     `layout.padding.top` gesetzt — an **einer** Stelle für jedes Diagramm mit
+     `__werteFmt`, sonst vergisst es das nächste neue Diagramm wieder. Sie gilt
+     **immer**, auch wenn die Zahlen gerade aus sind: sonst spränge die Zeichenfläche
+     beim Titel-Tipp. Kein Diagramm setzt `layout` selbst.
+  2. Geklemmt wird erst am oberen Rand des **Canvas** (`Math.max(punkt.y - 4, hoehe)`),
+     nicht an dem der Zeichenfläche. Vorher stand dort `flaeche.top + hoehe`, und
+     genau das schob die Zahl des höchsten Balkens nach **unten in ihn hinein**:
+     erreicht ein Balken den obersten Achsenwert, liegt seine Oberkante auf
+     `chartArea.top` und darüber war im Diagramm nichts mehr. Gesehen bei „2:00" auf
+     120 von 120 min. Nachgemessen im erzwungenen Grenzfall (Achsenmaximum = höchster
+     Wert): Balkenoberkante 17, Beschriftung bei 13 — die alte Formel hätte 28
+     geliefert, also 11 px im Balken.
+  **Die einzige Ausnahme ist der Schlafphasen-Verlauf**, und zwar unvermeidlich: dort
+  beschriftet jede Zahl ihr eigenes **Segment**, und Segmente liegen nun einmal im
+  Balken. Nur die oberste Zahl steht frei. Das ist der Grund, warum dieses Diagramm
+  als einziges `__werteAusStandard: true` trägt.
   **Hilfslinien bleiben unbeschriftet**: dieselbe Regel wie im Tooltip
   (`nurMesswerte`, Label beginnt mit `Ø` oder `Ziel`) — beide müssen dasselbe unter
   „Messwert" verstehen. `__werteFmt` bestimmt zugleich das Format; gibt es `''`

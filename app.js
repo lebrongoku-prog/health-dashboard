@@ -1136,6 +1136,14 @@ function beschriftungAn(chart) {
 // Zeilenhoehe der Beschriftungen – auch die Grundlage fuer die Ueberlappungspruefung
 // und den Abstand mehrzeiliger Texte. Eine Quelle, damit beides zusammenpasst.
 const ZEILE_H = 11;
+// Luft ueber der Zeichenflaeche, damit die Zahl des HOECHSTEN Balkens ueber ihm Platz
+// hat (12.09.2026). Ohne sie klemmte das Plugin sie nach unten IN den Balken: erreicht
+// ein Balken genau den obersten Achsenwert (gesehen bei „2:00" auf 120 von 120 min),
+// liegt seine Oberkante auf `chartArea.top` und darueber ist im Diagramm nichts mehr.
+// Die Luft wird in `zeichneDiagramm` als `layout.padding.top` gesetzt — sie gilt
+// IMMER, wenn ein Diagramm ueberhaupt beschriftet werden kann, nicht nur wenn die
+// Zahlen gerade sichtbar sind: sonst spraenge die Zeichenflaeche beim Titel-Tipp.
+const LABEL_LUFT = ZEILE_H + 6;
 const werteLabelPlugin = {
   id: 'werteLabel',
   afterDatasetsDraw(chart) {
@@ -1176,9 +1184,12 @@ const werteLabelPlugin = {
         const zeilen = String(txt).split('\n');
         const halb = Math.max(...zeilen.map(z => ctx.measureText(z).width)) / 2 + 3;
         const hoehe = zeilen.length * ZEILE_H;
-        // Nicht ueber den oberen Rand der Zeichenflaeche hinausschreiben – bei zwei
-        // Zeilen braucht es entsprechend mehr Luft.
-        const y = Math.max(punkt.y - 4, flaeche.top + hoehe);
+        // Die Zahl steht IMMER ueber dem Balken, nie darin (auf Wunsch, 12.09.2026).
+        // Geklemmt wird deshalb erst am oberen Rand des CANVAS, nicht an dem der
+        // Zeichenflaeche: darueber liegt die Luft aus `LABEL_LUFT`, und die gehoert
+        // der Beschriftung. Vorher schob `flaeche.top + hoehe` die Zahl des hoechsten
+        // Balkens nach unten in ihn hinein.
+        const y = Math.max(punkt.y - 4, hoehe);
         const x1 = punkt.x - halb, x2 = punkt.x + halb, y1 = y - hoehe, y2 = y + 2;
         if (!frei(x1, y1, x2, y2)) return;
         // textBaseline ist 'bottom': die LETZTE Zeile sitzt auf y, die uebrigen
@@ -1204,6 +1215,14 @@ function zeichneDiagramm(id, cfg) {
   // Während einer Pfeil-Navigation die Aufbau-Animation abschalten – die seitliche
   // Wisch-Bewegung übernimmt _animNavSlide (sonst zwei konkurrierende Animationen).
   if (_navSliding) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
+  // Platz fuer die Datenbeschriftungen ueber dem hoechsten Balken (siehe LABEL_LUFT).
+  // An EINER Stelle fuer alle Diagramme: jedes einzeln zu bedenken hiesse, dass das
+  // naechste neue Diagramm es wieder vergisst. Kein Diagramm setzt `layout` selbst.
+  if (cfg.__werteFmt) {
+    cfg.options = cfg.options || {};
+    cfg.options.layout = cfg.options.layout || {};
+    cfg.options.layout.padding = Object.assign({ top: LABEL_LUFT }, cfg.options.layout.padding);
+  }
   charts[id] = new Chart(el, cfg);
   // Zeitraum-Schlüssel am Chart hinterlegen (siehe Kern-Block oben) und den Tipp
   // verkabeln. Ohne __keys bleibt ein Diagramm von Wochenend-Tönung und Markierung
