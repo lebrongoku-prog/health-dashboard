@@ -590,8 +590,14 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 /* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
    Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
    sondern zu hoch FUER SEINE BREITE. Deshalb hier knapp ein Drittel flacher; im
-   Querformat bleibt die volle Hoehe. Ein Faktor, eine Stelle: hier drehen. */
-@media (orientation: portrait) {
+   Querformat bleibt die volle Hoehe. Ein Faktor, eine Stelle: hier drehen.
+   `max-width: 767px` gehoert seit dem Wegfall des 600-px-Deckels (13.09.2026) dazu:
+   Die Begruendung ist die schmale KARTE, nicht das Hochformat an sich. Solange die
+   App am Desktop in einem 600-px-Kasten sass, war das dasselbe. Jetzt fuellt sie die
+   Breite — auf einem iPad im Hochformat ist die Karte 720 px breit, und die 70 %
+   machten daraus ein flaches Band (4.9:1 gemessen). Ohne die Bedingung waere der
+   Faktor dort schaedlich statt hilfreich. */
+@media (orientation: portrait) and (max-width: 767px) {
   .chart-wrap{height:calc(var(--h,200px) * .7)}
 }
 
@@ -1046,46 +1052,71 @@ h5,
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Desktop / wide viewports (≥ 768 px UND ≥ 600 px hoch):
-   FitTrack-Layout beibehalten, aber Inhalt auf 600px cappen
-   und mittig zentrieren. Min-height verhindert, dass die Regel
-   auf Landscape-iPhones (~375–430 px hoch) greift und dort den
-   600-px-Cap zerstörerisch aktiviert.
-   ═══════════════════════════════════════════════════════════ */
-@media (min-width: 768px) and (min-height: 600px) {
-  /* Body bleibt transparent: die "Wings" links/rechts zeigen den vollflächigen
-     Crossfade-Gradient (sonst würde ein deckender Body die Layer verdecken und
-     die weiße Banner-Schrift stünde auf hellem Grau). */
+   Desktop ab 1024 px: die App fuellt die Flaeche (auf Wunsch, 13.09.2026)
+   ═══════════════════════════════════════════════════════════
+   Bis dahin stand hier das Gegenteil: ein Block, der `#app` auf 600 px kappte und
+   mittig stellte, mit Rahmen links und rechts — die beiden senkrechten Linien, die
+   am Desktop eine Handy-Ansicht andeuteten. Tableiste, Zeitleiste und die
+   Einstellungen-Seite waren an denselben Kasten geheftet. Ersatzlos entfallen; alle
+   vier tragen von Haus aus `left:0; right:0` bzw. `inset:0` und fuellen damit wieder
+   die volle Breite.
 
-  #app {
-    max-width: 600px;
-    width: 100%;
-    margin: 0 auto;
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    box-shadow: 0 0 24px rgba(0,0,0,.06);
+   Der Deckel hatte aber einen Grund, und der gilt weiter: eine Diagrammkarte ueber
+   1416 px ergibt einen Canvas von 1392 x 210 px — ein Verhaeltnis von 6.6:1, in dem
+   zwei Balken verloren stehen. Statt die Breite zu begrenzen, wird sie jetzt
+   AUFGETEILT, wie es FitTrack ab 1024 px macht: zweispaltige Raster je Tab. Gemessen
+   bei 1440 px: Canvas 678 x 284 statt 1392 x 210.
+
+   `minmax(0, 1fr)` statt `1fr` ist dabei PFLICHT. `.screen` ist ein Flex-Element im
+   Tab-Scroller; mit `1fr` bemessen sich die Spalten an ihrem Inhalt statt am
+   Container, und beide wurden 1416 px breit — zusammen 2844 px, die seitlich aus dem
+   Bild liefen.
+
+   Die 1024 px sind bewusst nicht dieselbe Schwelle wie beim alten Deckel (768 px):
+   ein iPad im Hochformat (768 px) bekommt eine Spalte ueber die volle Breite, zwei
+   waeren dort zu schmal. Eine `min-height`-Bedingung braucht es nicht mehr — kein
+   Handy im Querformat ist 1024 px breit, und die Regel richtet ohne Deckel ohnehin
+   keinen Schaden an. */
+@media (min-width: 1024px) {
+  #screen-training, #screen-herz, #screen-schlaf {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: .7rem;
+    /* Ohne `align-content:start` verteilt das Raster die uebrige Bildschirmhoehe auf
+       die Zeilen und reisst Luecken zwischen die Karten; ohne `align-items:start`
+       zieht es die kuerzere Karte einer Zeile auf die Hoehe der laengeren. */
+    align-content: start;
+    align-items: start;
   }
-  body.dark #app { border-color: #334155; }
-
-  #bottom-nav {
-    left: 50%;
-    right: auto;
-    width: 600px;
-    max-width: 600px;
-    transform: translateX(-50%);
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
+  #screen-training > .pg-banner,
+  #screen-herz > .pg-banner,
+  #screen-schlaf > .pg-banner { grid-column: 1 / -1; }
+  /* Herz und Schlaf haben ueber dem Aufklapp-Bereich nur ihr Hauptdiagramm (beim
+     Schlaf zusaetzlich die Score-Kachel). Allein in einer Spalte liesse es die zweite
+     leer stehen — es spannt deshalb ueber beide und traegt die Seite als Kopfzeile,
+     darunter das Raster. Training hat vier gleichrangige Diagramme und braucht das
+     nicht: die stehen als 2x2. */
+  #screen-herz > .chart-card,
+  #screen-schlaf > .chart-card,
+  #screen-schlaf > .kpi-grid { grid-column: 1 / -1; }
+  .weitere-inhalt {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: .7rem;
+    align-content: start;
+    align-items: start;
   }
-  body.dark #bottom-nav { border-left-color: #334155; border-right-color: #334155; }
-  #bottom-nav.nav-hidden { transform: translateX(-50%) translateY(110%); }
-
-  /* Zeitleiste folgt der Tableiste in die Mitte, sonst schwebte sie im Querformat
-     ueber der ganzen Fensterbreite statt ueber der App. */
-  #zeitleiste { left: 50%; right: auto; width: 600px; max-width: 600px; transform: translateX(-50%); }
-  /* Die Einstellungen-Seite folgt demselben 600-px-Kasten. Zentriert ueber
-     `margin-left`, NICHT ueber `translateX(-50%)`: das transform gehoert hier der
-     Ein-/Ausblend-Animation und wuerde sonst um die halbe Breite danebenliegen. */
-  .unterseite { left: 50%; right: auto; width: 600px; max-width: 600px; margin-left: -300px; }
+  /* Diese beiden bringen ihre eigene Aufteilung mit bzw. sind Fliesstext — sie
+     wuerden sonst ein zweites Mal geteilt (vier Spalten) oder liessen die Nachbar-
+     spalte leer. */
+  .weitere-inhalt > .two-col-eq,
+  .weitere-inhalt > .rec-card { grid-column: 1 / -1; }
+  /* Auf halber Fensterbreite ist die Karte rund doppelt so breit wie am Handy — mit
+     der Hoehe des Handys waere das Diagramm ein flaches Band. Ein Faktor, eine
+     Stelle, wie schon beim Hochformat-Faktor weiter oben; diese Regel steht spaeter
+     im Stylesheet und gewinnt deshalb gegen ihn. */
+  .chart-wrap { height: calc(var(--h, 200px) * 1.35); }
 }
 
 /* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf

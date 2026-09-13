@@ -438,12 +438,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Bottom-Nav und Zeitleiste sind währenddessen ausgeblendet** — über die eigene
   Klasse `body.einst-offen`, NICHT über `nav-hidden`: der Zustand der Tableiste soll
   erhalten bleiben und beim Schliessen genau so zurückkommen.
-  **Drei Fallen, die dort stecken:**
+  **Zwei Fallen, die dort stecken:**
   1. `.unterseite[hidden]{display:none}` ist Pflicht — siehe den `hidden`-Gotcha.
-  2. Im 600-px-Kasten (`min-width:768px and min-height:600px`) wird die Seite über
-     **`margin-left:-300px`** zentriert, nicht über `translateX(-50%)`: das `transform`
-     gehört der Ein-/Ausblend-Animation und läge sonst um die halbe Breite daneben.
-  3. Der **Render-Prüfstand hat eine eigene Kopie der Shell**. `#seite-einstellungen`
+     (Eine dritte Falle ist am 13.09.2026 entfallen: Im früheren 600-px-Kasten musste
+     die Seite über `margin-left:-300px` zentriert werden statt über
+     `translateX(-50%)`, weil das `transform` der Ein-/Ausblend-Animation gehört.
+     Ohne Deckel liegt sie wieder schlicht auf `inset: 0`.)
+  2. Der **Render-Prüfstand hat eine eigene Kopie der Shell**. `#seite-einstellungen`
      musste dort mit aufgenommen werden, sonst findet `pgEinstellungen()` nichts und
      tut still gar nichts — die Seite wäre lokal nicht prüfbar, ohne dass es auffiele.
   **Folge:** Daten-Stand, Anmeldestatus und beide Update-Knöpfe stehen nur noch hier.
@@ -784,11 +785,46 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nach Nacht 3 oder 15 px, wodurch die Kante von Balken zu Balken anders aussah.
   Die Hilfslinien brauchen weiterhin **eigene Stapelnamen** (`ziel`, `ziel-avg`),
   sonst addiert Chart.js sie auf den Balken.
+- **Desktop ab 1024 px: die App füllt die Fläche** (auf Wunsch, 13.09.2026). Vorher
+  kappte ein Block `#app` auf **600 px** und stellte ihn mittig, mit Rahmen links und
+  rechts — das waren die beiden senkrechten Linien, die am Desktop eine Handy-Ansicht
+  andeuteten; Tableiste, Zeitleiste und Einstellungen-Seite waren an denselben Kasten
+  geheftet. Ersatzlos entfallen: alle vier tragen von Haus aus `left:0; right:0` bzw.
+  `inset:0`.
+  **Der Deckel hatte aber einen Grund, und der gilt weiter.** Eine Diagrammkarte über
+  die volle Breite ergibt bei 1440 px einen Canvas von **1392 × 210 px — 6.6:1**, in
+  dem zwei Balken verloren stehen. Statt die Breite zu begrenzen, wird sie jetzt
+  **aufgeteilt**, wie es FitTrack ab 1024 px macht (dort: Karten-Deckel von 520 px
+  wieder aufgehoben plus `display:grid` je Screen). Gemessen bei 1440 px: **678 × 283
+  statt 1392 × 210**.
+  Vier Dinge, die man dabei wissen muss:
+  1. **`minmax(0, 1fr)` statt `1fr` ist Pflicht.** `.screen` ist ein Flex-Element im
+     Tab-Scroller; mit `1fr` bemessen sich die Spalten an ihrem **Inhalt** statt am
+     Container. Gemessen: beide Spalten wurden 1416 px breit, zusammen 2844 px, und
+     liefen seitlich aus dem Bild.
+  2. **Was über beide Spalten spannt:** der Tab-Banner, der Aufklapp-Bereich
+     (`.weitere-inhalt`, der darin selbst zweispaltig wird) und in Herz und Schlaf das
+     **Hauptdiagramm** über dem Aufklapp-Bereich. Das ist dort das einzige Element und
+     liesse sonst die zweite Spalte leer; es trägt die Seite jetzt als Kopfzeile.
+     Training hat vier gleichrangige Diagramme und steht als 2 × 2.
+  3. **Innerhalb von `.weitere-inhalt` spannen `.two-col-eq` und `.rec-card`** —
+     Ersteres bringt seine eigene Zweiteilung mit (sonst vier Spalten), Letzteres ist
+     Fliesstext.
+  4. **Die Schwelle ist 1024 px, nicht 768 wie beim alten Deckel.** Ein iPad im
+     Hochformat bekommt eine Spalte über die volle Breite; zwei wären dort zu schmal.
+     Eine `min-height`-Bedingung braucht es nicht mehr — kein Handy im Querformat ist
+     1024 px breit.
+  **Unverändert geblieben sind beide Handy-Grössen** (nachgemessen: 375 × 812 →
+  Canvas 327 × 147, 812 × 375 → 764 × 210, beide wie vorher): der alte Block verlangte
+  `min-height: 600px` und griff dort ohnehin nie.
 - **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
-  Das CSS staffelt sie nach Orientierung: im Querformat die volle Höhe, im Hochformat
-  **70 %**. Grund ist das Seitenverhältnis, nicht die Höhe an sich — im Hochformat ist
-  die Karte nur halb so breit, dieselbe Höhe lässt das Diagramm fast quadratisch
-  wirken. Der Faktor steht an **einer** Stelle (`@media (orientation: portrait)`).
+  Das CSS staffelt sie in **drei** Stufen, jede an genau einer Stelle:
+  **Hochformat unter 768 px → 70 %**, Querformat → 100 %, **ab 1024 px → 135 %**.
+  Massgeblich ist nie das Format an sich, sondern die **Breite der Karte**: dieselbe
+  Höhe wirkt auf einer halb so breiten Karte fast quadratisch und auf einer doppelt so
+  breiten wie ein flaches Band. Deshalb trägt die Hochformat-Regel seit 13.09.2026
+  `and (max-width: 767px)` — auf einem iPad im Hochformat ist die Karte 720 px breit,
+  und die 70 % machten daraus gemessen ein 4.9:1-Band.
   Alle Diagramm-Karten stehen einzeln untereinander — das frühere dreispaltige
   Raster im Training-Tab (`three-col`) und die Klasse `.chart-wrap-flex` sind mit
   der Neusortierung entfallen.
