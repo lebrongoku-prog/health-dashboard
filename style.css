@@ -759,7 +759,7 @@ body.dark .scope-badge{background:#0F172A}
    von selbst; ueber zwei Zeilen bemisst jede Zeile sonst ihre eigene Hoehe, und die
    obere wurde 34 px hoeher, weil „Ruhepuls" mit dem ⓘ umbricht und „Schlaf" nicht.
    (Bei unbestimmter Gesamthoehe zieht `1fr` alle Zeilen auf die groesste.) */
-.ti-metrics{--kachel:2;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:.5rem}
+.ti-metrics{--kachel:1.6;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:.5rem}
 /* Alle Inhalte mittig – waagrecht wie senkrecht. Die Kacheln sind Grid-Zellen und
    damit ohnehin alle gleich hoch; der Inhalt sitzt jetzt zentriert darin statt oben
    links zu kleben. overflow:visible ist nötig, damit der Erklärungskasten des ⓘ
@@ -1013,9 +1013,9 @@ h5,
      erlaubt den Zellen, unter ihre Inhaltshoehe zu gehen. */
   /* Im Querformat gilt ein KLEINERER Massstab als die 2 aus dem Grundzustand: die
      Kacheln teilen sich hier die Zeile mit „Ziele", und diese Karte gibt die Hoehe
-     vor (siehe oben). In den 94 px je Kachelzeile hat die doppelte Schrift keinen
-     Platz — nachgemessen ragte der Inhalt 20 px heraus und wurde abgeschnitten
-     (oben die Beschriftung, unten die Abweichungszeile).
+     vor (siehe oben). In den 94 px je Kachelzeile hat der Massstab des Hochformats
+     keinen Platz — mit 2 ragte der Inhalt nachgemessen 20 px heraus und wurde
+     abgeschnitten (oben die Beschriftung, unten die Abweichungszeile).
      Grenzwert gemessen: bei 1.3 passt es gerade noch, bei 1.4 ragt der Inhalt wieder
      heraus. 1.2 laesst rund 5 px Luft — genug, damit eine andere Schrift oder ein
      laengerer Wert nicht sofort anstoesst.
