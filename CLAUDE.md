@@ -818,8 +818,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Canvas 327 × 147, 812 × 375 → 764 × 210, beide wie vorher): der alte Block verlangte
   `min-height: 600px` und griff dort ohnehin nie.
 - **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
-  Das CSS staffelt sie in **drei** Stufen, jede an genau einer Stelle:
-  **Hochformat unter 768 px → 70 %**, Querformat → 100 %, **ab 1024 px → 135 %**.
+  Das CSS staffelt sie in **vier** Stufen, jede an genau einer Stelle:
+  **Hochformat unter 768 px → 70 %**, **Querformat unter 1024 px → 80 %**,
+  dazwischen (iPad im Hochformat) → 100 %, **ab 1024 px → 135 %**.
+  Die 80 % im Handy-Querformat (auf Wunsch, 13.09.2026) sind der einzige Fall, in dem
+  nicht die Kartenbreite den Ausschlag gibt, sondern die **Fensterhöhe**: quer hat ein
+  iPhone nur 375–440 px, und davon gehen Banner, Kartentitel, Legende und Fusszeilen
+  ab. Die Obergrenze von 1023 px hält die Regel aus dem Desktop-Bereich heraus, wo der
+  Faktor 1.35 gilt.
   Massgeblich ist nie das Format an sich, sondern die **Breite der Karte**: dieselbe
   Höhe wirkt auf einer halb so breiten Karte fast quadratisch und auf einer doppelt so
   breiten wie ein flaches Band. Deshalb trägt die Hochformat-Regel seit 13.09.2026

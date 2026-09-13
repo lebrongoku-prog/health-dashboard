@@ -600,6 +600,15 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 @media (orientation: portrait) and (max-width: 767px) {
   .chart-wrap{height:calc(var(--h,200px) * .7)}
 }
+/* Handy im Querformat: 20 % flacher (auf Wunsch, 13.09.2026). Dort ist nicht die
+   Breite knapp, sondern die HOEHE — ein iPhone quer hat 375 bis 440 px, und davon
+   gehen Banner, Kartentitel, Legende und Fusszeilen ab. Die volle `--h` liess vom
+   naechsten Diagramm nichts mehr sehen.
+   Obergrenze 1023 px, damit die Regel nicht in den Desktop-Bereich hineinreicht: dort
+   gilt der Faktor 1.35, und die beiden wuerden sich sonst widersprechen. */
+@media (orientation: landscape) and (max-width: 1023px) {
+  .chart-wrap{height:calc(var(--h,200px) * .8)}
+}
 
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}

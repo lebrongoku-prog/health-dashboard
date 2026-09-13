@@ -2971,22 +2971,15 @@ function vo2Abschnitt(D, P) {
   const v2r=D.filter(r=>r.vo2max!=null);
   const v2D=mittel(v2r,'vo2max'), v2P=mittel(P.filter(r=>r.vo2max!=null),'vo2max');
   const v2Trend=v2D&&v2P?prozentDiff(v2D,v2P):null;
-  const _vo2Cat=(v)=>{
-    if(v==null)return['Keine Daten','#94A3B8'];
-    if(v>=55)return['Exzellent','#2563EB'];
-    if(v>=47)return['Überdurchschnittlich','#10B981'];
-    if(v>=42)return['Durchschnittlich','#84CC16'];
-    if(v>=35)return['Unterdurchschnittlich','#F97316'];
-    return['Niedrig','#EF4444'];
-  };
-  const [v2cat,v2catColor]=_vo2Cat(v2D);
   const {labels:_v2tL,align:_v2tA,hasData:_v2tHD,keys:_v2Keys,keyTyp:_v2KeyTyp}=timeDim(D,true,true);
   const v2MaFull=_v2tA('vo2max');
 
   // Die frühere Karte "Fitness-Einordnung" ist aufgelöst: ihr farbiger Skalenbalken ist
-  // entfallen, ihre Werte stehen als Fusszeile unter dem Verlauf – wie bei den
-  // Schlafphasen. Die Einordnung selbst ("Durchschnittlich") ist als erste Zeile
-  // mitgewandert, sonst ginge sie mit dem Balken verloren.
+  // entfallen, ihre Werte standen danach als Fusszeile unter dem Verlauf.
+  // Seit 13.09.2026 sind davon auf Wunsch nur noch zwei Zeilen übrig: „Ø VO₂max" und
+  // „Veränderung". Mit „Einordnung", „Trend" und „Messungen" ist auch die Stufenskala
+  // `_vo2Cat` (Exzellent … Niedrig) ersatzlos entfallen — sie hatte keinen zweiten
+  // Leser. Wer sie zurückholt, findet sie in der Git-Historie.
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
@@ -2994,10 +2987,7 @@ function vo2Abschnitt(D, P) {
       <div class="chart-wrap" style="--h:300px"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
-        ${statZeile(`Einordnung`, `${v2cat}`, `${v2catColor}`)}
-        ${statZeile(`Trend`, `${v2Trend!=null?(v2Trend>0?'↑ Steigend':'↓ Sinkend'):'Stabil'}`, `${v2Trend!=null&&v2Trend>0?'#10B981':v2Trend!=null&&v2Trend<0?'#EF4444':null}`)}
         ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}
-        ${statZeile(`Messungen`, `${v2r.length}`)}
       </div>
     </div>`;
 
