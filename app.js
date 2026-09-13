@@ -3163,6 +3163,18 @@ function zeitleisteBauen() {
     + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
     + `<button class="nav-arrow nav-next" aria-label="Vor">›</button>`
     + `</div>`;
+  // Die Leiste startet PASSIV (auf Wunsch, 13.09.2026) – wie die Bottom-Nav
+  // eingeklappt startet. Beim ersten Blick auf die App geht es um die Zahlen, nicht
+  // um das Bedienelement; ein Tipp auf Pille, Pfeil oder Ausklappknopf weckt sie.
+  //
+  // Bewusst HIER und nicht ueber `zeitleistePassiv(true)` nach dem Einsetzen:
+  // `.zl-reihe` traegt eine 0.2-s-Ueberblendung auf `transform` und `opacity`. Wird
+  // die Klasse erst gesetzt, nachdem das Element im Dokument steht, kann der Browser
+  // dazwischen den Stil berechnen – und die Leiste schrumpft bei JEDEM App-Start
+  // sichtbar zusammen. Am noch nicht eingesetzten Element gesetzt, ist `passiv` der
+  // Anfangszustand: es gibt nichts zu ueberblenden.
+  el.classList.add('passiv');
+  _zlPassiv = true;
   document.body.appendChild(el);
   zeitleisteAktualisieren();
 }

@@ -349,6 +349,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      **70 %** und geht auf **50 % Deckkraft**, sobald man scrollt (in **beide**
      Richtungen, Schwelle 2 px gegen iOS' Nachfedern), **auf einen anderen Tab wischt**
      (seit 08.09.2026) oder irgendwo neben die Leiste tippt.
+     **Sie STARTET passiv** (auf Wunsch, 13.09.2026) — dieselbe Überlegung wie bei der
+     eingeklappt startenden Bottom-Nav: beim ersten Blick auf die App geht es um die
+     Zahlen, nicht um das Bedienelement. Gesetzt wird das in `zeitleisteBauen()` am
+     **noch nicht eingesetzten** Element (`el.classList.add('passiv')` plus
+     `_zlPassiv = true`), NICHT über `zeitleistePassiv(true)` nach dem Einsetzen:
+     `.zl-reihe` trägt eine 0.2-s-Überblendung auf `transform` und `opacity`, und
+     sobald der Browser zwischen Einsetzen und Klasse einmal den Stil berechnet,
+     schrumpft die Leiste bei **jedem** App-Start sichtbar zusammen. Am losgelösten
+     Element gesetzt, ist `passiv` schlicht der Anfangszustand.
      Der Wisch braucht einen **eigenen** Auslöser im Scroll-Handler des
      `#tab-container`, weil er keinen Klick erzeugt. Beim Tabwechsel per **Knopf** greift
      dagegen längst die Regel „Tipp neben die Leiste" — die Bottom-Nav liegt ausserhalb
