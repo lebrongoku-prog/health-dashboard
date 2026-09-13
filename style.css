@@ -747,25 +747,43 @@ body.dark .scope-badge{background:#0F172A}
 /* Kein margin-top mehr: das war der Abstand zur frueheren Empfehlungs-Kachel, die
    ueber den Minikacheln sass. Seit sie weg ist, sind die Kacheln der einzige Inhalt
    der Karte – der Rest war ungenutzter Raum. */
-.ti-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
+/* Doppelte Groesse und zwei Zeilen (auf Wunsch, 13.09.2026): vorher standen die vier
+   Kacheln in EINER Reihe und waren entsprechend schmal — der Wert musste sich die
+   Breite mit drei Nachbarn teilen.
+   `--kachel` ist der Massstab fuer ALLES an der Kachel: Schrift, Polster, Abstaende,
+   Rundung und das Symbol. Nur so bleibt sie beim Vergroessern proportional; einzelne
+   Werte zu verdoppeln hiesse, beim naechsten Mal wieder jeden davon zu suchen.
+   Er steht hier und nicht an `.ti-metric`, damit ihn der Querformat-Block weiter
+   unten fuer den engeren Platz neben der Ziele-Karte ueberschreiben kann. */
+/* `grid-auto-rows:1fr` haelt BEIDE Zeilen gleich hoch. In einer Reihe ergab sich das
+   von selbst; ueber zwei Zeilen bemisst jede Zeile sonst ihre eigene Hoehe, und die
+   obere wurde 34 px hoeher, weil „Ruhepuls" mit dem ⓘ umbricht und „Schlaf" nicht.
+   (Bei unbestimmter Gesamthoehe zieht `1fr` alle Zeilen auf die groesste.) */
+.ti-metrics{--kachel:2;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:.5rem}
 /* Alle Inhalte mittig – waagrecht wie senkrecht. Die Kacheln sind Grid-Zellen und
    damit ohnehin alle gleich hoch; der Inhalt sitzt jetzt zentriert darin statt oben
    links zu kleben. overflow:visible ist nötig, damit der Erklärungskasten des ⓘ
    nicht beschnitten wird. */
-.ti-metric{padding:.55rem .25rem .65rem;border-radius:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0;position:relative;overflow:visible}
+.ti-metric{padding:calc(var(--kachel,1)*.55rem) calc(var(--kachel,1)*.2rem) calc(var(--kachel,1)*.65rem);border-radius:calc(var(--kachel,1)*10px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0;position:relative;overflow:visible}
 /* ⓘ steht wieder im Textfluss hinter der Beschriftung. Frueher sass es absolut in der
    Ecke, weil es auf den schmalen Kacheln eine zweite Zeile erzwang und sie
    unterschiedlich hoch machte – seit die Kacheln im Grid gleich hoch sind, spielt das
    keine Rolle mehr. Absolut positioniert liesse sich der Inhalt nicht zentrieren:
    die Abweichungszeile brauchte einen einseitigen Rand als Ausgleich. */
-.ti-metric .info-i{width:13px;height:13px}
-.ti-metric-lbl{font-size:.73rem;font-weight:600;color:rgba(255,255,255,.78);margin-bottom:.35rem;display:flex;align-items:center;justify-content:center;gap:.25rem;flex-wrap:wrap}
-.ti-metric-val{font-size:1.18rem;font-weight:800;color:#fff;line-height:1.2}
+/* Das Symbol waechst mit, aber mit KLEINEREM Faktor als die Schrift (9 statt 13 px
+   je Massstab-Schritt). Grund ist die laengste Beschriftung: „❤️ Ruhepuls" braucht bei
+   doppelter Schrift 126 px, und mit einem ebenfalls verdoppelten 26-px-Kreis kam die
+   Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist. Das ⓘ rutschte dann
+   allein auf eine zweite Zeile, waehrend die drei Nachbarn einzeilig blieben.
+   Mit 18 px bleiben 8 px Luft. Als Tippflaeche ist es trotzdem groesser als vorher. */
+.ti-metric .info-i{width:calc(var(--kachel,1)*9px);height:calc(var(--kachel,1)*9px)}
+.ti-metric-lbl{font-weight:600;color:rgba(255,255,255,.78);margin-bottom:calc(var(--kachel,1)*.35rem);display:flex;align-items:center;justify-content:center;gap:calc(var(--kachel,1)*.2rem);flex-wrap:wrap}
+.ti-metric-val{font-weight:800;color:#fff;line-height:1.2}
 /* Bezugsangabe direkt am Wert („3 / 7 Tage"): kleiner und leichter, damit die Zahl
    die Kachel traegt. Die uebrigen Kacheln zeigen den letzten Tag und brauchen das
    nicht – diese hier fasst ein Fenster zusammen und muss es sagen. */
 .ti-metric-einheit{font-size:.62em;font-weight:600;color:rgba(255,255,255,.78)}
-.ti-metric-delta{font-size:.74rem;font-weight:500;margin-top:.25rem}
+.ti-metric-delta{font-weight:500;margin-top:calc(var(--kachel,1)*.25rem)}
 .ti-metric-delta.pos{color:#10B981}
 .ti-metric-delta.neg{color:#EF4444}
 /* Nur das neutrale Grau wird weiss. Gruen und Rot sind Signalfarben und bleiben —
@@ -846,11 +864,6 @@ body.dark .field-hint { background: #0F172A; }
 body.dark .no-data { background: var(--card); }
 body.dark .debt-bar-bg { background: #334155; }
 
-/* Very narrow (< 360px) – tighter */
-@media (max-width: 360px) {
-  .ti-metrics { grid-template-columns: 1fr 1fr; }
-}
-
 /* ═══════════════════════════════════════════════════════════
    Type Scale
    Klare Hierarchie statt einer einheitlichen Größe:
@@ -875,11 +888,23 @@ body.dark .debt-bar-bg { background: #334155; }
   letter-spacing: -.02em !important;
 }
 
-/* Display M – Mini-Werte, Banner-Titel, Score-Kategorie */
-.ti-metric-val,
+/* Display M – Banner-Titel, Score-Kategorie */
 .pg-banner-title{
   font-size: 1.32rem !important;
   line-height: 1.2;
+}
+/* Die Minikacheln tragen dieselben Stufen, aber mit `--kachel` malgenommen (siehe
+   dort). Sie stehen deshalb hier einzeln statt in den Gruppen darueber — sonst
+   zoege eine Vergroesserung der Kacheln Banner-Titel und jedes andere Mini-Label
+   mit. Ohne `--kachel` (Fallback 1) ergeben beide wieder die alte Groesse. */
+.ti-metric-val{
+  font-size: calc(var(--kachel,1) * 1.32rem) !important;
+  line-height: 1.2;
+}
+.ti-metric-lbl,
+.ti-metric-delta{
+  font-size: calc(var(--kachel,1) * .72rem) !important;
+  line-height: 1.4;
 }
 
 /* Title – Card-Titel und H3 in den Sections */
@@ -925,8 +950,6 @@ h5,
 
 /* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
 .kpi-lbl,
-.ti-metric-lbl,
-.ti-metric-delta,
 .pi-conf,
 .cl-item,
 .field-hint,
@@ -988,7 +1011,16 @@ h5,
      und Training. Die Reihenfolge kommt aus dem Markup und gilt in beiden Lagen.
      Zwei gleich hohe Zeilen, die den vorgegebenen Platz ausfuellen; `min-height:0`
      erlaubt den Zellen, unter ihre Inhaltshoehe zu gehen. */
-  .ov-oben .ti-metrics{height:100%;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  /* Im Querformat gilt ein KLEINERER Massstab als die 2 aus dem Grundzustand: die
+     Kacheln teilen sich hier die Zeile mit „Ziele", und diese Karte gibt die Hoehe
+     vor (siehe oben). In den 94 px je Kachelzeile hat die doppelte Schrift keinen
+     Platz — nachgemessen ragte der Inhalt 20 px heraus und wurde abgeschnitten
+     (oben die Beschriftung, unten die Abweichungszeile).
+     Grenzwert gemessen: bei 1.3 passt es gerade noch, bei 1.4 ragt der Inhalt wieder
+     heraus. 1.2 laesst rund 5 px Luft — genug, damit eine andere Schrift oder ein
+     laengerer Wert nicht sofort anstoesst.
+     Wer hier 2 haben will, muss die Kacheln aus der Zeile mit „Ziele" herausnehmen. */
+  .ov-oben .ti-metrics{--kachel:1.2;height:100%;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
   .ov-oben .ti-metric{min-height:0}
 }
 

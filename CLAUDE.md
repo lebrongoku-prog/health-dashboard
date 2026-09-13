@@ -801,9 +801,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Der Kartenabstand sitzt am **Container** (`.ov-oben{margin-bottom:.7rem}`), nicht an
   den Karten: im Raster verfälschte er die Zeilenhöhe, und ohne ihn stiess die
   Verlauf-Karte direkt an — Schatten an Schatten, was wie eine Überlappung aussah.
-  Die vier Minikacheln stehen darin **zweizeilig**. Reihenfolge
+  Die vier Minikacheln stehen darin **zweizeilig** — seit 13.09.2026 in jeder
+  Ausrichtung (siehe dort). Reihenfolge
   überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
-  im Querformat also oben Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
+  also oben die Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
   **über** dem Paar; zwischen zwei nebeneinanderliegenden Karten wäre kein Platz.
 - **Minikacheln der Übersicht (`.ti-metric`): ohne Kartenhintergrund** (auf Wunsch,
   08.09.2026). `.ov-combo-card` trägt weder Fläche noch Schatten noch Polster mehr —
@@ -819,8 +820,39 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Trainingskachel auf 7 %, ohne dass das je jemand entschieden hätte.
   Inhalte waagrecht **und** senkrecht zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
   Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
-  einseitigen Rand als Ausgleich bräuchte. Dass es dabei auf eine zweite Zeile
-  rutschen kann, ist unkritisch: die Kacheln sind Grid-Zellen und ohnehin gleich hoch.
+  einseitigen Rand als Ausgleich bräuchte.
+  **Doppelte Grösse, zwei Zeilen** (auf Wunsch, 13.09.2026): vier Kacheln in einer
+  Reihe waren 83 px breit, jetzt sind es zwei Reihen à 171 px (bei 375 px Fenster).
+  Reihenfolge unverändert **Ruhepuls, HRV / Schlaf, Training** — sie kommt aus dem
+  Markup, das Raster macht daraus von selbst zwei Zeilen.
+  1. **`--kachel` ist der Massstab für ALLES an der Kachel** — Schrift, Polster,
+     Abstände, Rundung, Symbol. Er steht auf `.ti-metrics` und wird überall
+     multipliziert (`calc(var(--kachel,1) * …)`). Einzelne Werte zu verdoppeln hiesse,
+     beim nächsten Mal wieder jeden davon zu suchen. Fallback 1 ergibt die alte Grösse.
+  2. **Die Schriftgrössen stehen deshalb einzeln im Type Scale**, nicht mehr in den
+     Gruppen „Display M" und „Caption": sonst zöge eine Vergrösserung der Kacheln den
+     Banner-Titel und jedes andere Mini-Label mit.
+  3. **Im Querformat gilt `--kachel: 1.2`, nicht 2.** Dort teilen sich die Kacheln die
+     Zeile mit „Ziele", und diese Karte gibt die Höhe vor (siehe `.ov-oben`). In den
+     94 px je Kachelzeile hat die doppelte Schrift keinen Platz — gemessen ragte der
+     Inhalt 20 px heraus und wurde abgeschnitten. Grenzwert: 1.3 passt gerade noch,
+     1.4 ragt heraus; 1.2 lässt rund 5 px Luft. Wer dort 2 will, muss die Kacheln aus
+     der Zeile mit „Ziele" herausnehmen.
+  4. **Das ⓘ wächst mit kleinerem Faktor** (9 px je Schritt statt 13): „❤️ Ruhepuls"
+     braucht bei doppelter Schrift 126 px, mit einem verdoppelten 26-px-Kreis kam die
+     Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist, und das ⓘ rutschte
+     allein auf eine zweite Zeile. Mit 18 px bleiben 8.5 px Luft.
+  5. **`grid-auto-rows: 1fr` hält beide Zeilen gleich hoch.** In einer Reihe ergab sich
+     das von selbst; über zwei Zeilen bemisst jede ihre eigene Höhe.
+  Gemessen bei 375 px: Breite 82.9 → **171.5 px** (2.07×), Wert-Schrift 21.1 →
+  **42.2 px** (2.00×), Fläche 2.76×. Die **Höhe** wächst nur von 131.7 auf 175.8 px
+  (1.33×) — die alte Höhe kam nicht vom Inhalt, sondern vom Umbruch in der schmalen
+  Kachel. Eine erzwungene Höhe von 263 px wurde ausprobiert und verworfen: die Kachel
+  ist dann halb leer, und die zweite Zeile liegt unter dem Bildschirmrand.
+  **Ab 375 px passt jeder Wert einzeilig**; darunter (360 px) bricht „53 bpm" um. Das
+  ist hingenommen — kein iPhone ist 360 px breit, und die Kacheln bleiben dank
+  `grid-auto-rows` gleich hoch. Die frühere Sonderregel `@media (max-width:360px)`
+  (dort zweispaltig) ist entfallen: zweispaltig ist jetzt der Normalfall.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
