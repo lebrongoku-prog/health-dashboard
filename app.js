@@ -1453,7 +1453,9 @@ function zielUebersichtHTML() {
     return statZeile(z.label, `${z.fmt(v)}${zielTxt}`, ok ? '#10B981' : '#F59E0B');
   }).join('');
 
-  return `<div class="chart-card">
+  // `ziel-karte` traegt nur den Massstab (siehe style.css) – sonst ist es eine
+  // gewoehnliche Diagrammkarte.
+  return `<div class="chart-card ziel-karte">
     <div class="chart-head"><h3>Ziele</h3>${scopeBadge('letzter Tag')}</div>
     <div class="stats-list">${zeilen}</div>
   </div>`;

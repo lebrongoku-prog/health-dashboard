@@ -732,6 +732,27 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
    Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
+/* ── Ziele-Karte: eigener Massstab (auf Wunsch 20 % groesser, 13.09.2026) ──────
+   Dieselbe Mechanik wie `--kachel` bei den Minikacheln: EINE Zahl, mit der Schrift,
+   Polster, Zeilenabstand und Badge gemeinsam wachsen. Einzeln gesetzt waere beim
+   naechsten Mal wieder jeder Wert zu suchen, und Titel und Zeilen liefen ausein-
+   ander.
+   Die BREITE steckt nicht darin – die Karte ist im Hochformat ohnehin so breit wie
+   der Bildschirm und im Querformat eine halbe Rasterspalte. „20 % groesser" heisst
+   hier also: 20 % mehr Schrift und 20 % mehr Hoehe.
+   Die Selektoren sind bewusst zweistufig (`.chart-card.ziel-karte`, `.ziel-karte
+   .stat-lbl`): Die Schriftgroessen kommen aus dem Type Scale mit `!important`, und
+   nur eine hoehere Spezifitaet gewinnt dagegen – unabhaengig davon, wo im Stylesheet
+   dieser Block steht. */
+.chart-card.ziel-karte{--ziel:1.2;padding:calc(var(--ziel)*.7rem) calc(var(--ziel)*.75rem)}
+.ziel-karte .chart-head{gap:calc(var(--ziel)*.4rem);margin-bottom:calc(var(--ziel)*.4rem)}
+.chart-card.ziel-karte h3{font-size:calc(var(--ziel)*1.1rem)!important}
+.ziel-karte .scope-badge{font-size:calc(var(--ziel)*.64rem);padding:calc(var(--ziel)*.14rem) calc(var(--ziel)*.45rem)}
+.ziel-karte .stats-list{gap:calc(var(--ziel)*.2rem)}
+.ziel-karte .stat-row{padding:calc(var(--ziel)*.22rem) 0}
+.ziel-karte .stat-lbl,
+.ziel-karte .stat-val{font-size:calc(var(--ziel)*.83rem)!important}
+
 /* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
    die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
 /* Die Kacheln sitzen seit 08.09.2026 OHNE Karte direkt auf dem Tab-Verlauf (auf

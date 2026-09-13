@@ -575,7 +575,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
   „Ziele" + `scopeBadge`) und darunter eine
   `stats-list` mit einer Zeile je Ziel: `Wert · Ziel X`, wobei der Zielteil in
-  `--txt3` zurücktritt. Trägt ein Ziel eine Einheit, die im Messwert schon steht,
+  `--txt3` zurücktritt.
+  **Sie trägt einen eigenen Massstab `--ziel` (1.2, auf Wunsch 13.09.2026 um 20 %
+  vergrössert)** — dieselbe Mechanik wie `--kachel` bei den Minikacheln: eine Zahl,
+  mit der Schrift, Polster, Zeilenabstand und Badge gemeinsam wachsen. Getragen wird
+  sie von der zusätzlichen Klasse `.ziel-karte` am Kartenelement; sonst ist es eine
+  gewöhnliche `.chart-card`.
+  Zwei Dinge muss man dabei wissen:
+  1. **Die Selektoren sind zweistufig** (`.chart-card.ziel-karte h3`, `.ziel-karte
+     .stat-lbl`). Die Schriftgrössen kommen aus dem Type Scale mit `!important`;
+     dagegen gewinnt nur höhere Spezifität. Ein einstufiges `.ziel-karte h3` wäre
+     gleich spezifisch wie `.chart-card h3` und hinge davon ab, welcher Block weiter
+     unten im Stylesheet steht.
+  2. **Die Breite steckt nicht im Massstab** — im Hochformat ist die Karte so breit
+     wie der Bildschirm, im Querformat eine halbe Rasterspalte. „20 % grösser" heisst
+     hier 20 % mehr Schrift und 20 % mehr Höhe (gemessen 196.6 → 235.1 px).
+  **Im Querformat zieht sie die Kachel-Spalte mit**, weil sie dort die Zeilenhöhe
+  vorgibt: deren Kasten wuchs von 197 auf 235 px, jede Kachel von 94 auf 113.5 px.
+  Das ist der Grund, warum die Grenze für `--kachel` im Querformat neu zu messen ist
+  (siehe dort). Trägt ein Ziel eine Einheit, die im Messwert schon steht,
   kürzt `ZIELE[key].fmtZiel` sie im Zielteil weg (`4 / Woche · Ziel 3`). **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein
   Wert** — die Farbe IST hier die Bewertung. Die frühere eigene Optik
   (`.ziel-status` mit farbiger Kante, `.zs-*`-Pillen) ist entfallen.
@@ -841,11 +859,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Gruppen „Display M" und „Caption": sonst zöge eine Vergrösserung der Kacheln den
      Banner-Titel und jedes andere Mini-Label mit.
   3. **Im Querformat gilt `--kachel: 1.2`.** Dort teilen sich die Kacheln die
-     Zeile mit „Ziele", und diese Karte gibt die Höhe vor (siehe `.ov-oben`). In den
-     94 px je Kachelzeile hat der Massstab des Hochformats keinen Platz — mit 2
-     ragte der Inhalt gemessen 20 px heraus und wurde abgeschnitten. Grenzwert: 1.3
-     passt gerade noch, 1.4 ragt heraus; 1.2 lässt rund 5 px Luft. Wer dort mehr will,
-     muss die Kacheln aus der Zeile mit „Ziele" herausnehmen.
+     Zeile mit „Ziele", und diese Karte gibt die Höhe vor (siehe `.ov-oben`). Als der
+     Wert festgelegt wurde, blieben 94 px je Kachelzeile: Massstab 2 ragte 20 px
+     heraus und wurde abgeschnitten, 1.3 passte gerade noch, 1.4 nicht mehr.
+     **Diese Grenze hängt an der Höhe der Ziele-Karte und ist mit ihr gewandert:**
+     seit die Karte 20 % grösser ist (siehe `--ziel`), sind es 113.5 px je Zeile, und
+     nachgemessen passt dort jetzt bis **1.7**. Die 1.2 stehen also nicht mehr am
+     Anschlag — wer sie anhebt, misst neu, statt sich auf eine Zahl von gestern zu
+     verlassen. Erst wer mehr will, als die Zeile hergibt, muss die Kacheln aus der
+     Zeile mit „Ziele" herausnehmen.
   4. **Das ⓘ wächst mit kleinerem Faktor** (9 px je Schritt statt 13): „❤️ Ruhepuls"
      braucht bei doppelter Schrift 126 px, mit einem verdoppelten 26-px-Kreis kam die
      Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist, und das ⓘ rutschte
