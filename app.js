@@ -2026,14 +2026,14 @@ function pgOverview() {
     <!-- Zeile 2: Verlauf. Seit 08.09.2026 Teil des Ausklapp-Bereichs (auf Wunsch) –
          dieselbe Bedingung wie das Muster-Raster darunter. -->
     <div class="chart-card" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
-      <h3 style="margin-bottom:.35rem">Verlauf</h3>
-      <div class="chart-legend" style="margin-bottom:.3rem">
+      <h3>Verlauf</h3>
+      <div class="chart-legend">
         <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf</div>
         <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Puls</div>
         <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV</div>
         <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Training':'Schritte'}</div>
       </div>
-      <div class="chart-wrap" style="--h:360px"><canvas id="c-woche"></canvas></div>
+      <div class="chart-wrap"><canvas id="c-woche"></canvas></div>
     </div>
 
     <!-- Pattern Insights -->
@@ -2196,7 +2196,7 @@ function pgHerz() {
         <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
         ${hlLegende('c-herz|oe','Ø','#94A3B8')}
       </div>
-      <div class="chart-wrap" style="--h:315px"><canvas id="c-herz"></canvas></div>
+      <div class="chart-wrap"><canvas id="c-herz"></canvas></div>
       <!-- Beide Reihen pro Zeile, immer in der Reihenfolge der Legende: erst Puls,
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
@@ -2526,13 +2526,13 @@ function pgSchlaf() {
 
       <div class="chart-card">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
-        <div class="chart-legend" style="margin-bottom:.3rem">
+        <div class="chart-legend">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
           ${hlLegende('c-sl-dur|ziel','Ziel','#10B981',false)}
           ${hlLegende('c-sl-dur|oe','Ø','rgba(124,58,237,.85)')}
         </div>
-        <div class="chart-wrap" style="--h:279px"><canvas id="c-sl-dur"></canvas></div>
+        <div class="chart-wrap"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
@@ -2594,7 +2594,7 @@ function pgSchlaf() {
         <div class="cl-item"><span class="cl-dot" style="background:#2186E8"></span>Leicht</div>
         <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tief</div>
       </div>
-      <div class="chart-wrap" style="--h:270px"><canvas id="c-sl-phases"></canvas></div>
+      <div class="chart-wrap"><canvas id="c-sl-phases"></canvas></div>
       ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
         ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
         ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
@@ -2604,7 +2604,7 @@ function pgSchlaf() {
     </div>`:''}
 
 
-    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-wrap" style="--h:225px"><canvas id="c-sl-score"></canvas></div></div>`:''}
+    ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-legend" aria-hidden="true"></div><div class="chart-wrap"><canvas id="c-sl-score"></canvas></div></div>`:''}
     </div>`;
 
 
@@ -2838,7 +2838,7 @@ async function pgTraining() {
       <div class="chart-card">
         <h3>Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-strecke|oe','Ø','#FB923C')}</div>
-        <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-strecke"></canvas></div>
+        <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
@@ -2851,7 +2851,7 @@ async function pgTraining() {
       <div class="chart-card">
         <h3>Trainingszeit</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-zeit|oe','Ø','#F97316')}</div>
-        <div class="chart-wrap" style="--h:210px"><canvas id="c-tot-zeit"></canvas></div>
+        <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
@@ -2864,7 +2864,7 @@ async function pgTraining() {
     <div class="chart-card">
       <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#7C3AED')}</div>
-      <div class="chart-wrap" style="--h:300px"><canvas id="c-tr-pace"></canvas></div>
+      <div class="chart-wrap"><canvas id="c-tr-pace"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
         ${paceWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`)}`:''}
@@ -2984,7 +2984,7 @@ function vo2Abschnitt(D, P) {
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${hlLegende('c-vo2|ziel','Ziel','rgba(100,116,139,.55)')}${hlLegende('c-vo2|oe','Ø','#D97706')}</div>
-      <div class="chart-wrap" style="--h:300px"><canvas id="c-vo2"></canvas></div>
+      <div class="chart-wrap"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
         ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}

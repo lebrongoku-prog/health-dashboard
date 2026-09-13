@@ -817,10 +817,40 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Unverändert geblieben sind beide Handy-Grössen** (nachgemessen: 375 × 812 →
   Canvas 327 × 147, 812 × 375 → 764 × 210, beide wie vorher): der alte Block verlangte
   `min-height: 600px` und griff dort ohnehin nie.
-- **Diagrammhöhen:** stehen als `--h` am `.chart-wrap` (nicht als feste `height`).
-  Das CSS staffelt sie in **vier** Stufen, jede an genau einer Stelle:
-  **Hochformat unter 768 px → 70 %**, **Querformat unter 1024 px → 80 %**,
-  dazwischen (iPad im Hochformat) → 100 %, **ab 1024 px → 135 %**.
+- **Alle Diagramme sind oberhalb der Fusszeile gleich hoch** (auf Wunsch,
+  13.09.2026): Kopfbereich (Titel + Legende) und Diagrammfläche haben in **jeder**
+  Karte dieselbe Höhe, die Fusszeile beginnt überall auf derselben Höhe, und die
+  Karten unterscheiden sich nur noch in der Zahl ihrer Fusszeilen. Leonard hat die
+  Referenzen festgelegt: **Hochformat = „Ruhepuls & HRV"**, **Querformat =
+  „Laufstrecke"**. Nachgemessen, jeweils ein einziger Wert für alle neun Diagramme:
+  | Fenster | Kopf | Diagramm | Fusszeile ab |
+  |---|---|---|---|
+  | 375 × 812 (und 360 × 780) | 63.8 | 220.5 | 292.3 |
+  | 812 × 375 | 63.8 | 168 | 239.8 |
+  | 768 × 1024 | 63.8 | 315 | 386.8 |
+  | 1440 × 900 | 63.8 | 283.5 | 355.3 |
+  Drei Dinge waren dafür nötig — und müssen so bleiben:
+  1. **Kein Diagramm trägt mehr ein eigenes `--h`.** Vorher streuten die Werte von
+     210 bis 360 px. Es gibt nur noch `--diagramm-hoch` (315 px) und `--diagramm-quer`
+     (210 px) auf `:root`. **Ein neues Diagramm bekommt keine Höhenangabe** — jede
+     eigene bricht die Gleichheit wieder auf.
+  2. **Keine Inline-Abstände an Titel oder Legende.** Verlauf (`h3` .35rem, Legende
+     .3rem) und Schlafdauer (Legende .3rem) wichen genau dadurch um 2.4 bzw. 3.2 px ab.
+  3. **Eine Legendenzeile ist immer da.** `.chart-legend` hat `min-height:
+     calc(.72rem * 1.4)` (eine Zeile aus dem Type Scale), und der Schlaf-Score, der
+     keine Legende braucht, trägt eine **leere** `.chart-legend aria-hidden`. Ohne sie
+     begann seine Diagrammfläche 23 px weiter oben.
+  **Folge, die man sehen wird:** Laufstrecke und Trainingszeit sind im Hochformat
+  deutlich höher als vorher (147 → 220.5), Ruhepuls & HRV, Pace, VO₂max und der
+  Verlauf im Querformat deutlich flacher (bis zu 288 → 168). Eine Legende, die auf
+  zwei Zeilen umbricht, würde die Gleichheit wieder aufheben — bei 360 px bricht
+  derzeit keine um; neue Legendeneinträge deshalb kurz halten.
+- **Diagrammhöhen:** kommen aus `--diagramm-hoch` / `--diagramm-quer` (siehe oben),
+  nicht mehr aus einem `--h` je Diagramm. Das CSS staffelt sie in **vier** Stufen,
+  jede an genau einer Stelle:
+  **Hochformat unter 768 px → 70 % von `--diagramm-hoch`**, **Querformat unter
+  1024 px → 80 % von `--diagramm-quer`**, dazwischen (iPad im Hochformat) → 100 % von
+  `--diagramm-hoch`, **ab 1024 px → 135 % von `--diagramm-quer`**.
   Die 80 % im Handy-Querformat (auf Wunsch, 13.09.2026) sind der einzige Fall, in dem
   nicht die Kartenbreite den Ausschlag gibt, sondern die **Fensterhöhe**: quer hat ein
   iPhone nur 375–440 px, und davon gehen Banner, Kartentitel, Legende und Fusszeilen

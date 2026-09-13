@@ -561,7 +561,11 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .chart-card{background:var(--card);border-radius:var(--r);padding:.7rem .75rem;box-shadow:var(--shadow);margin-bottom:.7rem}
 .chart-card h3{font-size:.94rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;min-width:0;cursor:pointer}
 .chart-card h3>.filter-titel .nav-arrow,.chart-card h3>.filter-titel .zeitraum-text{font-weight:600}
-.chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem}
+/* `min-height` = eine Legendenzeile (Schriftgroesse .72rem x Zeilenhoehe 1.4 aus dem
+   Type Scale). Sie haelt den Kopfbereich auch dort gleich hoch, wo ein Diagramm
+   keine Legende braucht: der Schlaf-Score traegt dafuer eine LEERE `.chart-legend`.
+   Ohne sie begann seine Diagrammflaeche 23 px weiter oben als in allen anderen. */
+.chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem;min-height:calc(.72rem * 1.4)}
 
 /* "Heute" + Zeitraum rechts in der Titelzeile. Der Titel selbst ist bereits ein
    Flex-Container; min-width:0 lässt ihn schrumpfen, statt die Knöpfe hinauszudrücken. */
@@ -586,7 +590,19 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 /* Ausgeschaltet tritt auch der Marker zurueck – `background` fuer durchgezogene,
    `color` fuer gestrichelte Linien (die lesen ihre Farbe ueber currentColor). */
 .hl-schalter.aus .cl-line{color:var(--txt3) !important;background:var(--txt3) !important}
-.chart-wrap{position:relative;overflow:hidden;height:var(--h,200px)}
+/* ── EINE Diagrammhoehe fuer alle Diagramme (auf Wunsch, 13.09.2026) ──────────
+   Vorher trug jedes Diagramm sein eigenes `--h` (210 bis 360 px). Dadurch begann
+   die Fusszeile in jeder Karte auf einer anderen Hoehe, und zwei Karten
+   nebeneinander (Desktop-Raster) liefen unten auseinander. Jetzt gilt:
+   Kopfbereich und Diagrammflaeche sind in JEDER Karte gleich hoch; die Karten
+   unterscheiden sich nur noch in der Zahl ihrer Fusszeilen.
+   Die beiden Referenzen hat Leonard festgelegt:
+   - Hochformat → die Hoehe von „Ruhepuls & HRV" (315 px Grundwert),
+   - Querformat → die Hoehe von „Laufstrecke" (210 px Grundwert).
+   Die Faktoren je Stufe bleiben wie gehabt. Ein neues Diagramm braucht deshalb
+   KEINE Hoehenangabe mehr — gibt es eine, bricht es die Gleichheit wieder auf. */
+:root{--diagramm-hoch:315px;--diagramm-quer:210px}
+.chart-wrap{position:relative;overflow:hidden;height:var(--diagramm-hoch)}
 /* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
    Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
    sondern zu hoch FUER SEINE BREITE. Deshalb hier knapp ein Drittel flacher; im
@@ -598,16 +614,16 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    machten daraus ein flaches Band (4.9:1 gemessen). Ohne die Bedingung waere der
    Faktor dort schaedlich statt hilfreich. */
 @media (orientation: portrait) and (max-width: 767px) {
-  .chart-wrap{height:calc(var(--h,200px) * .7)}
+  .chart-wrap{height:calc(var(--diagramm-hoch) * .7)}
 }
 /* Handy im Querformat: 20 % flacher (auf Wunsch, 13.09.2026). Dort ist nicht die
    Breite knapp, sondern die HOEHE — ein iPhone quer hat 375 bis 440 px, und davon
-   gehen Banner, Kartentitel, Legende und Fusszeilen ab. Die volle `--h` liess vom
-   naechsten Diagramm nichts mehr sehen.
+   gehen Banner, Kartentitel, Legende und Fusszeilen ab. Die volle Grundhoehe liess
+   vom naechsten Diagramm nichts mehr sehen.
    Obergrenze 1023 px, damit die Regel nicht in den Desktop-Bereich hineinreicht: dort
    gilt der Faktor 1.35, und die beiden wuerden sich sonst widersprechen. */
 @media (orientation: landscape) and (max-width: 1023px) {
-  .chart-wrap{height:calc(var(--h,200px) * .8)}
+  .chart-wrap{height:calc(var(--diagramm-quer) * .8)}
 }
 
 /* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
@@ -1125,7 +1141,7 @@ h5,
      der Hoehe des Handys waere das Diagramm ein flaches Band. Ein Faktor, eine
      Stelle, wie schon beim Hochformat-Faktor weiter oben; diese Regel steht spaeter
      im Stylesheet und gewinnt deshalb gegen ihn. */
-  .chart-wrap { height: calc(var(--h, 200px) * 1.35); }
+  .chart-wrap { height: calc(var(--diagramm-quer) * 1.35); }
 }
 
 /* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf
