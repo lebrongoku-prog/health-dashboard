@@ -1917,6 +1917,15 @@ const KACHEL_SCHLEIER = .24;
 function kachelStil(farbe, rgb) {
   return `border-top:3px solid ${farbe};background:rgba(${rgb},${KACHEL_SCHLEIER})`;
 }
+// Minikacheln fuehren per Tipp in ihren Tab (auf Wunsch, 13.09.2026): Ruhepuls und
+// HRV nach „Herz", Schlaf nach „Schlaf", Training nach „Training". Das Ziel steht als
+// `data-ziel-tab` an der Kachel; `role`/`tabindex` machen sie fuer Tastatur und
+// Screenreader zu einem Knopf. Leere Kacheln (kein Messwert) bekommen es NICHT –
+// ein Tipp auf eine leere Flaeche soll nicht ueberraschend den Tab wechseln.
+function kachelZiel(tab, titel) {
+  return `data-ziel-tab="${tab}" role="button" tabindex="0" aria-label="${titel} – zum Tab ${TAB_TITEL[tab]}"`;
+}
+const TAB_TITEL = { overview: 'Übersicht', herz: 'Herz', schlaf: 'Schlaf', training: 'Training' };
 
 function pgOverview() {
   // Last day + 7-day window for mini-cards
@@ -1980,17 +1989,17 @@ function pgOverview() {
         <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
              Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
         <div class="ti-metrics">
-          ${hrLast!=null?`<div class="ti-metric" style="${kachelStil('#EF4444','239,68,68')}">
+          ${hrLast!=null?`<div class="ti-metric" ${kachelZiel('herz','Ruhepuls')} style="${kachelStil('#EF4444','239,68,68')}">
             <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
             <div class="ti-metric-val">${Math.round(hrLast)} bpm</div>
             ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
-          ${hvLast!=null?`<div class="ti-metric" style="${kachelStil('#2563EB','37,99,235')}">
+          ${hvLast!=null?`<div class="ti-metric" ${kachelZiel('herz','HRV')} style="${kachelStil('#2563EB','37,99,235')}">
             <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
             <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
-          ${slLast!=null?`<div class="ti-metric" style="${kachelStil('#2186E8','33,134,232')}">
+          ${slLast!=null?`<div class="ti-metric" ${kachelZiel('schlaf','Schlaf')} style="${kachelStil('#2186E8','33,134,232')}">
             <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
             <div class="ti-metric-val">${alsStdMin(slLast)}</div>
             ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
@@ -1998,7 +2007,7 @@ function pgOverview() {
           ${(()=>{
             const trMin=workoutData[lastDay.date]?.durationMin??null;
             const trAvg=(()=>{const v=priorDays.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
-            if(trMin!=null){return`<div class="ti-metric" style="${kachelStil('#F97316','249,115,22')}">
+            if(trMin!=null){return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Training ${infoMini('training')}</div>
               <div class="ti-metric-val">${Math.round(trMin)} min</div>
               ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
@@ -2012,7 +2021,7 @@ function pgOverview() {
             const zaehl   = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
             const nWoche  = zaehl(tage7);
             const nVor    = tage7v.length >= 7 ? zaehl(tage7v) : null;
-            return`<div class="ti-metric" style="${kachelStil('#F97316','249,115,22')}">
+            return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Trainings ${infoMini('trainWoche')}</div>
               <div class="ti-metric-val">${nWoche}<span class="ti-metric-einheit"> / 7 Tage</span></div>
               ${nVor!=null?`<div class="ti-metric-delta ${nWoche-nVor>0?'pos':nWoche-nVor<0?'neg':'neu'}">${(()=>{const d=nWoche-nVor;return(d>=0?'+':'')+d+' vs. Vorwoche';})()}</div>`:''}
@@ -3447,6 +3456,72 @@ function showScreen(name) {
   _applyTabState(name);
 }
 
+// Tabwechsel MIT Wisch-Animation (Tipp auf eine Minikachel, 13.09.2026).
+// Bewegt wird `scrollLeft` des Tab-Scrollers — also genau das, was auch der Finger
+// beim Wischen bewegt. Deshalb laeuft der Rest ueber den vorhandenen Scroll-Sync und
+// sieht aus wie ein Wisch: Hintergrund-Verlauf folgt dem Fortschritt, Tabfarbe und
+// Tableisten-Markierung wechseln unterwegs, die Zeitleiste wird passiv, und 90 ms nach
+// dem letzten Schritt setzt der Settle-Timer `currentScreen` und ruft `_applyTabState`.
+// `showScreen()` bleibt fuer die Tableiste bewusst sprunghaft.
+//
+// Zwei Dinge sind noetig, damit es zuverlaessig laeuft:
+// 1. `scroll-snap-type` ist WAEHREND der Animation aus. Mit `x mandatory` rastet
+//    Safari jeden einzelnen Zwischenschritt wieder auf den naechsten Tab ein, und die
+//    Bewegung ruckelt oder bleibt stehen. Am Ende steht `scrollLeft` exakt auf dem
+//    Ziel, das Wiedereinschalten verschiebt also nichts.
+// 2. Eine Beruehrung bricht ab. Wer mitten in der Animation den Finger auflegt,
+//    uebernimmt — dann gilt wieder das native Einrasten.
+// Ein noch nicht gebauter Ziel-Tab wird VOR dem Start gebaut, sonst wischte eine leere
+// Seite herein und fuellte sich erst am Ende.
+let _tabWischRAF = null;
+function zuTabWischen(name) {
+  if (!TAB_ORDER.includes(name) || name === currentScreen) return;
+  const container = document.getElementById('tab-container');
+  const w = container ? container.clientWidth : 0;
+  const ruhig = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!w || ruhig) { showScreen(name); return; }
+  if (!_renderedTabs.has(name)) { _renderTab(name); _renderedTabs.add(name); }
+  if (_tabWischRAF) cancelAnimationFrame(_tabWischRAF);
+  const start = container.scrollLeft;
+  const ziel  = TAB_ORDER.indexOf(name) * w;
+  // Ein Tab weit 380 ms, jeder weitere 110 ms dazu – ueber drei Tabs 600 ms. Linear
+  // mit der Strecke waere das zu lang, fest zu hektisch.
+  const dauer = 380 + 110 * Math.max(0, Math.round(Math.abs(ziel - start) / w) - 1);
+  const ease  = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;   // easeInOutCubic
+  container.style.scrollSnapType = 'none';
+  // `fertig` = die Animation ist bis zum Ziel gelaufen. Nur dann wird der Endzustand
+  // ausdruecklich gesetzt. Bei einem Abbruch durch Beruehrung entscheidet das native
+  // Einrasten, wo man landet – dort einen Tab zu erzwingen, waere falsch.
+  // Warum ueberhaupt ausdruecklich: der Scroll-Sync zieht den Zustand nur ueber
+  // `scroll`-Events nach. Die feuern auf dem Geraet zuverlaessig, im verdeckten
+  // Vorschau-Pane aber gar nicht – dort blieben Tabfarbe und Markierung auf dem
+  // Ausgangstab stehen. Mit gesetztem `currentScreen` ueberspringt der Settle-Timer des
+  // Syncs seinen eigenen Aufruf, doppelt laeuft also nichts.
+  const ende = fertig => {
+    if (_tabWischRAF) cancelAnimationFrame(_tabWischRAF);
+    _tabWischRAF = null;
+    container.style.scrollSnapType = '';
+    container.removeEventListener('touchstart', abbruch);
+    container.removeEventListener('pointerdown', abbruch);
+    if (fertig === true && currentScreen !== name) {
+      currentScreen = name;
+      setTabBackgroundInstant(name);
+      _applyTabState(name);
+    }
+  };
+  const abbruch = () => ende(false);
+  container.addEventListener('touchstart', abbruch, { passive: true });
+  container.addEventListener('pointerdown', abbruch, { passive: true });
+  const t0 = performance.now();
+  const schritt = now => {
+    const t = Math.min(1, (now - t0) / dauer);
+    container.scrollLeft = start + (ziel - start) * ease(t);
+    if (t < 1) _tabWischRAF = requestAnimationFrame(schritt);
+    else ende(true);
+  };
+  _tabWischRAF = requestAnimationFrame(schritt);
+}
+
 // State-Change (Filter, Datum, Refresh, Dark-Mode) → alle Tabs invalidieren + aktuellen neu rendern
 function _refreshAfterStateChange() {
   // Alle Charts zerstören (Theme- oder Datenwechsel)
@@ -3567,7 +3642,7 @@ function initScrollHideNav() {
     // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
     // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
     // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-tt], [data-lauftag], ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-tt], [data-lauftag], [data-ziel-tab], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
@@ -3606,6 +3681,10 @@ document.body.addEventListener('click', (e) => {
 // weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
 document.body.addEventListener('click', (e) => {
   const t = e.target;
+  // Tipp auf eine Minikachel: Wisch in ihren Tab. Das ⓘ darin bleibt ausgenommen –
+  // es oeffnet weiterhin seine Erklaerung, statt den Tab zu wechseln.
+  const _kachel = t.closest('.ti-metric[data-ziel-tab]');
+  if (_kachel && !t.closest(TT_TAP_SELECTOR)) { zuTabWischen(_kachel.dataset.zielTab); return; }
   // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
   // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
   // ist dort null und der Zweig greift gar nicht.
@@ -3703,6 +3782,15 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
     }
     showScreen(tab);
   });
+});
+
+// Minikacheln sind per `role="button"` Knoepfe – dann gehoeren Enter und Leertaste dazu.
+document.body.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const k = e.target.closest && e.target.closest('.ti-metric[data-ziel-tab]');
+  if (!k || e.target !== k) return;
+  e.preventDefault();
+  zuTabWischen(k.dataset.zielTab);
 });
 
 // ── Dark Mode ──────────────────────────────────────────

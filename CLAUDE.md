@@ -221,7 +221,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
-  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`
+  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`/
+  `.ti-metric[data-ziel-tab]` (Kachel → Tab, dazu `keydown` für Enter/Leertaste)
   (alle click — der frühere
   `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
   → `_refreshAfterStateChange()`.
@@ -966,6 +967,39 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „53 bpm" um. Für die längste Beschriftung („❤️ Ruhepuls" samt ⓘ) bleiben bei 375 px
   jetzt 39 px Luft statt 8.5. Die frühere Sonderregel `@media (max-width:360px)`
   (dort zweispaltig) ist entfallen: zweispaltig ist jetzt der Normalfall.
+- **Minikacheln führen per Tipp in ihren Tab** (auf Wunsch, 13.09.2026): Ruhepuls und
+  HRV → Herz, Schlaf → Schlaf, Training → Training — **mit Wisch-Animation**, nicht als
+  Sprung. Das Ziel steht als `data-ziel-tab` an der Kachel (`kachelZiel()`, dazu
+  `role="button"`, `tabindex="0"`, `aria-label`); **leere Kacheln bekommen es nicht**.
+  `zuTabWischen(name)` animiert `scrollLeft` des Tab-Scrollers — also genau das, was
+  auch der Finger bewegt. Hintergrund-Verlauf, Tabfarbe, Tableisten-Markierung und
+  passive Zeitleiste laufen dadurch über den vorhandenen Scroll-Sync mit und sehen
+  aus wie ein Wisch. Die Tableiste wechselt über `showScreen()` weiterhin sprunghaft.
+  Dauer 380 ms für einen Tab, +110 ms je weiteren (Übersicht → Training 600 ms),
+  easeInOutCubic; bei `prefers-reduced-motion` Sprung.
+  **Fünf Dinge, die daran hängen:**
+  1. **`scroll-snap-type` ist während der Animation aus** (Inline-Stil `none`, danach
+     wieder leer). Mit `x mandatory` rastet Safari jeden Zwischenschritt auf den
+     nächsten Tab ein. Am Ende steht `scrollLeft` exakt auf dem Ziel.
+  2. **Der Endzustand wird ausdrücklich gesetzt** (`currentScreen`,
+     `setTabBackgroundInstant`, `_applyTabState`) — nur wenn die Animation bis zum
+     Ende lief. Der Scroll-Sync allein reicht nicht als Beleg: der verdeckte
+     Vorschau-Pane feuert keine `scroll`-Events, und dort blieben Tabfarbe und
+     Markierung auf „Übersicht" stehen, obwohl die Seite schon auf „Herz" stand. Mit
+     gesetztem `currentScreen` überspringt der Settle-Timer des Syncs seinen Aufruf.
+     Geprüft mit **und** ohne simulierte Scroll-Events: beide Wege enden gleich.
+  3. **Eine Berührung bricht ab** (`touchstart`/`pointerdown` am Container) — dann gilt
+     das native Einrasten, und kein Tab wird erzwungen. Gemessen: Abbruch bei 0.31 →
+     rastet zurück auf die Übersicht.
+  4. **Das ⓘ in der Kachel bleibt ausgenommen** (`!t.closest(TT_TAP_SELECTOR)`) und
+     öffnet weiter seine Erklärung; `[data-ziel-tab]` steht in der Ausnahmeliste des
+     Hintergrund-Tipps, sonst schaltete derselbe Tipp zusätzlich die Tableiste um.
+  5. **Druck-Rückmeldung NUR über Deckkraft** (`:active{opacity:.75}`), ohne
+     `transform` wie bei Knöpfen: die Kacheln liegen im waagrecht und senkrecht
+     scrollenden Bereich, und ein transform während `:active` bricht auf iOS die
+     Wischgeste ab (siehe „Tipp-Animation").
+  Ein noch nicht gebauter Ziel-Tab wird **vor** dem Start gebaut, sonst wischte eine
+  leere Seite herein.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,

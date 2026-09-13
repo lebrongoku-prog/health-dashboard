@@ -828,6 +828,15 @@ body.dark .scope-badge{background:#0F172A}
    Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist. Das ⓘ rutschte dann
    allein auf eine zweite Zeile, waehrend die drei Nachbarn einzeilig blieben.
    Mit 18 px bleiben 8 px Luft. Als Tippflaeche ist es trotzdem groesser als vorher. */
+/* Antippbare Kachel (fuehrt in ihren Tab). Rueckmeldung beim Druecken NUR ueber die
+   Deckkraft, ohne `transform: scale(...)` wie bei Knoepfen: die Kacheln liegen mitten
+   im senkrecht UND waagrecht scrollenden Bereich, und ein transform waehrend `:active`
+   bricht auf iOS die laufende Wischgeste ab (in FitTrack liess sich das Jahresraster
+   dadurch gar nicht mehr scrollen). Wer auf einer Kachel zu scrollen beginnt, soll
+   scrollen koennen. */
+.ti-metric[data-ziel-tab]{cursor:pointer;transition:opacity .15s}
+.ti-metric[data-ziel-tab]:active{opacity:.75}
+.ti-metric[data-ziel-tab]:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:2px}
 .ti-metric .info-i{width:calc(var(--kachel,1)*9px);height:calc(var(--kachel,1)*9px)}
 .ti-metric-lbl{font-weight:600;color:rgba(255,255,255,.78);margin-bottom:calc(var(--kachel,1)*.35rem);display:flex;align-items:center;justify-content:center;gap:calc(var(--kachel,1)*.2rem);flex-wrap:wrap}
 .ti-metric-val{font-weight:800;color:#fff;line-height:1.2}
