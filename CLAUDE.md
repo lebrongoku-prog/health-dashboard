@@ -914,8 +914,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Grün und Rot der Abweichungszeile bleiben — sie tragen die Bewertung, nicht die
   Lesbarkeit. Farbige Oberkante und Farbschleier jeder Kachel bleiben ebenfalls: sie
   sind das Einzige, was die Kacheln ohne Karte noch voneinander abgrenzt. Der
-  Schleier steht deshalb auf **24 %** (`KACHEL_SCHLEIER`, zweimal auf Wunsch
-  angehoben: 5/7 % → 16 % am 08.09.2026 → 24 % am 13.09.2026, „50 % deckender") —
+  Schleier steht deshalb auf **43 %** (`KACHEL_SCHLEIER`, dreimal auf Wunsch
+  angehoben: 5/7 % → 16 % am 08.09.2026 → 24 % („50 % deckender") → 43 % („80 %
+  deckender", 24 × 1.8), beide am 13.09.2026; „X % deckender" wird als relative
+  Steigerung gelesen). Bei 43 % tritt das Grün und Rot der Abweichungszeile auf der
+  roten bzw. blauen Kachel sichtbar zurück — wer weiter anhebt, prüft deren Lesbarkeit —
   die früheren 5 % waren auf dem dunklen Verlauf praktisch unsichtbar. **Eine
   Quelle für alle vier**: vorher standen drei Kacheln auf 5 % und die
   Trainingskachel auf 7 %, ohne dass das je jemand entschieden hätte.

@@ -1912,8 +1912,9 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
 // Tab-Verlauf sitzen (08.09.2026), war der frühere Schleier praktisch unsichtbar —
 // auf Wunsch kraeftiger. EINE Stelle fuer alle vier: vorher standen drei Kacheln auf
 // 5 % und die Trainingskachel auf 7 %, ohne dass das je jemand entschieden haette.
-// Stand: 5/7 % → 16 % (08.09.2026) → 24 % (13.09.2026, „50 % deckender": 16 × 1.5).
-const KACHEL_SCHLEIER = .24;
+// Stand: 5/7 % → 16 % (08.09.2026) → 24 % (13.09.2026, „50 % deckender": 16 × 1.5)
+// → 43 % (13.09.2026, „80 % deckender": 24 × 1.8 = 43.2, auf ganze Prozent gerundet).
+const KACHEL_SCHLEIER = .43;
 function kachelStil(farbe, rgb) {
   return `border-top:3px solid ${farbe};background:rgba(${rgb},${KACHEL_SCHLEIER})`;
 }
