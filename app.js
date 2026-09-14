@@ -2035,7 +2035,7 @@ function pgOverview() {
     </div>
     <!-- Zeile 2: Verlauf. Seit 08.09.2026 Teil des Ausklapp-Bereichs (auf Wunsch) –
          dieselbe Bedingung wie das Muster-Raster darunter. -->
-    <div class="chart-card" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
+    <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
       <h3>Verlauf</h3>
       <div class="chart-legend">
         <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf</div>
@@ -2048,7 +2048,7 @@ function pgOverview() {
 
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
-    <div class="pi-grid" style="${_weitereOffen.overview?'':'display:none'}">
+    <div class="pi-grid ausklapp-teil" style="${_weitereOffen.overview?'':'display:none'}">
       ${patternIns.map(p=>{
         let txt=p.text;
         if(p.hl)p.hl.forEach(h=>{txt=txt.replace(h.phrase,`<span style="color:${h.c};font-weight:700">${h.phrase}</span>`);});
@@ -2212,9 +2212,9 @@ function pgHerz() {
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
       <div class="stats-list diagramm-fuss">
         ${statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)}
-        ${statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`)}
-        ${statZeile(`Differenz`, `${hrWeek!=null&&hrWknd!=null?(hrWknd<hrWeek?'':'+')+zahl(hrWknd-hrWeek,0)+' bpm':'—'} | ${hvWeek!=null&&hvWknd!=null?(hvWknd>hvWeek?'+':'')+zahl(hvWknd-hvWeek,0)+' ms':'—'}`)}
+        ${fussMehr('herz',
+          statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
+        + statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`))}
       </div>
     </div>
 
@@ -2327,14 +2327,25 @@ function pgHerz() {
 // Ausklapp-Zustand je Tab. Alle drei starten ZU. `overview` hiess bis 08.09.2026
 // `_musterOffen` und deckte nur das Muster-Raster ab; seit der Verlauf dazugehoert,
 // passt der eigene Name nicht mehr – jetzt fuehren alle drei Tabs denselben Weg.
-const _weitereOffen = { overview:false, herz:false, schlaf:false };
+const _weitereOffen = { overview:false, herz:false, schlaf:false, training:false };
+// Fusszeilen „Ø Wochentag" / „Ø Wochenende" (auf Wunsch, 14.09.2026): sie gehoeren zum
+// Ausklapp-Zustand ihres Tabs und sind damit standardmaessig zu. Eine eigene Huelle
+// statt einzeln markierter Zeilen, damit die Klapp-Animation EINEN Block bewegt – mit
+// einzelnen Zeilen spraenge der `gap` der Liste zweimal um 3 px.
+// Die Huelle steht in jeder Fusszeile ZULETZT. Darauf verlaesst sich die Trennlinie:
+// `.stat-row:last-child` hat keine, und die Zeile davor verliert ihre nur, wenn die
+// Huelle fehlt – also genau dann, wenn sie tatsaechlich die letzte ist.
+function fussMehr(tab, zeilen) {
+  if (!_weitereOffen[tab] || !zeilen || !zeilen.trim()) return '';
+  return `<div class="fuss-mehr ausklapp-teil">${zeilen}</div>`;
+}
 // Knopf + oeffnendes <div>. Der schliessende Tag steht im Markup, damit die Karten
 // dazwischen unveraendert bleiben – ein String-Parameter haette die Template-Literale
 // der Karten verschachtelt und war nicht sauber zu escapen.
 // Nur noch das oeffnende <div>; der Schalter sitzt seit 03.09.2026 als Knopf in der
 // Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
 function weitereAuf(tab) {
-  return `<div class="weitere-inhalt"${_weitereOffen[tab] ? '' : ' hidden'}>`;
+  return `<div class="weitere-inhalt ausklapp-teil"${_weitereOffen[tab] ? '' : ' hidden'}>`;
 }
 
 // ── Einstellungen: eigene Seite statt Karte in der Uebersicht ────────────────
@@ -2442,7 +2453,11 @@ const AUSKLAPP = {
   herz:     { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.herz,
               um: () => { _weitereOffen.herz = !_weitereOffen.herz; } },
   schlaf:   { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.schlaf,
-              um: () => { _weitereOffen.schlaf = !_weitereOffen.schlaf; } }
+              um: () => { _weitereOffen.schlaf = !_weitereOffen.schlaf; } },
+  // Seit 14.09.2026 auch im Training-Tab: dort klappt der Knopf die Fusszeilen
+  // „Ø Wochentag" / „Ø Wochenende" aller vier Diagramme auf einmal.
+  training: { titel: 'Wochentag und Wochenende', offen: () => _weitereOffen.training,
+              um: () => { _weitereOffen.training = !_weitereOffen.training; } }
 };
 
 // ── Schlaf ─────────────────────────────────────────────
@@ -2546,10 +2561,9 @@ function pgSchlaf() {
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
-          ${statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek)+'':'—'}`)}
-          ${statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd)+'':'—'}`)}
-          ${slWeek!=null&&slWknd!=null?`${statZeile(`Differenz`, `${(()=>{const d=slWknd-slWeek,a=Math.abs(d),s=d>=0?'+':'−',m=Math.round(a*60);return m<60?s+m+' min':s+Math.floor(a)+'h'+(Math.round((a%1)*60)>0?' '+Math.round((a%1)*60)+'min':'');})()}`)}
-`:``}
+          ${fussMehr('schlaf',
+            statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
+          + statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd):'—'}`))}
         </div>`:''}
       </div>
 
@@ -2852,9 +2866,9 @@ async function pgTraining() {
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
-        ${distWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`)}`:''}
-          ${distWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`)}`:''}
-          ${distWkdAvg!=null&&distWkndAvg!=null?`${statZeile(`Differenz`, `${distWkndAvg>distWkdAvg?'+':''}${zahl(distWkndAvg-distWkdAvg,1)} km`)}`:''}
+          ${fussMehr('training',
+            (distWkdAvg!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`) : '')
+          + (distWkndAvg!=null ? statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`) : ''))}
         </div>
       </div>
 
@@ -2865,9 +2879,9 @@ async function pgTraining() {
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
-          ${minWeek!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`)}`:''}
-          ${minWknd!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`)}`:''}
-          ${minWeek!=null&&minWknd!=null?`${statZeile(`Differenz`, `${minWknd>minWeek?'+':''}${fmtMin(minWknd-minWeek)}`)}`:''}
+          ${fussMehr('training',
+            (minWeek!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`) : '')
+          + (minWknd!=null ? statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`) : ''))}
         </div>
       </div>
 
@@ -2875,10 +2889,13 @@ async function pgTraining() {
       <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#7C3AED')}</div>
       <div class="chart-wrap"><canvas id="c-tr-pace"></canvas></div>
-      <div class="stats-list diagramm-fuss">
-        ${paceWkdAvg!=null?`${statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`)}`:''}
-        ${paceWkndAvg!=null?`${statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`)}`:''}
-      </div>
+      <!-- Die Pace-Fusszeile besteht NUR aus Wochentag/Wochenende. Zugeklappt gaebe es
+           sonst eine leere Fusszeile mit Trennlinie – deshalb klappt hier die ganze
+           Fusszeile, nicht nur ihr Inhalt. -->
+      ${_weitereOffen.training && (paceWkdAvg!=null || paceWkndAvg!=null) ? `<div class="stats-list diagramm-fuss ausklapp-teil">
+        ${paceWkdAvg!=null?statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`):''}
+        ${paceWkndAvg!=null?statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`):''}
+      </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
     ${vo2.html}`;
@@ -3654,17 +3671,91 @@ function initScrollHideNav() {
 document.body.addEventListener('click', (e) => {
   const knopf = e.target.closest('[data-ausklapp]');
   if (!knopf) return;
-  const tab = knopf.dataset.ausklapp;
-  const k = AUSKLAPP[tab];
-  if (!k) return;
-  k.um();
-  // Neu aufbauen statt nur ein-/ausblenden: Diagramme im verborgenen Bereich werden
-  // ohne sichtbare Flaeche gezeichnet und behalten Breite 0. Aus diesem Zustand holt
-  // sie weder resize() noch update() zurueck – nur ein Neuaufbau bei sichtbarem
-  // Container. Der Nutzer oeffnet hier einen ganzen Abschnitt, ein Neuaufbau faellt
-  // dabei nicht ins Gewicht.
-  _renderTab(tab);
+  ausklappUmschalten(knopf.dataset.ausklapp);
 });
+
+// ── Aus- und Einklappen, animiert (auf Wunsch, 14.09.2026) ──────────────────
+// Neu aufgebaut wird weiterhin statt nur ein-/ausgeblendet: Diagramme im verborgenen
+// Bereich werden ohne sichtbare Flaeche gezeichnet und behalten Breite 0; aus diesem
+// Zustand holt sie weder resize() noch update() zurueck. Die Animation legt sich
+// deshalb um den Neuaufbau herum:
+//   AUF: erst Zustand + Neuaufbau (die Teile stehen in voller Groesse da), dann wachsen
+//        sie von 0 auf ihre Hoehe. Die Diagramme haben dabei schon ihre echte Breite –
+//        animiert wird nur die Hoehe des Rahmens, `overflow:hidden` schneidet zu.
+//   ZU:  erst schrumpfen die vorhandenen Teile auf 0, DANN Zustand-Neuaufbau.
+// Wer etwas Neues hinter den Knopf legt, gibt ihm die Klasse `ausklapp-teil` – mehr
+// braucht es nicht.
+const AUSKLAPP_DAUER = 280;
+let _ausklappLaeuft = false;
+
+// Nur die aeussersten, sichtbaren Teile: ein Teil in einem Teil wuerde doppelt bewegt.
+function _ausklappTeile(tab) {
+  const screen = document.getElementById('screen-' + tab);
+  if (!screen) return [];
+  return [...screen.querySelectorAll('.ausklapp-teil')].filter(el =>
+    !(el.parentElement && el.parentElement.closest('.ausklapp-teil')) &&
+    getComputedStyle(el).display !== 'none');
+}
+
+// Hoehe, Deckkraft und die senkrechten Abstaende gemeinsam – nur die Hoehe allein
+// liesse `margin-top` und `padding` der Fusszeile am Ende auf einen Schlag erscheinen.
+// Das Ende kommt aus `onfinish` ODER aus dem Zeitgeber, je nachdem was zuerst eintritt:
+// ein Tab, der gerade nicht gezeichnet wird, laesst die Animationszeit stillstehen, und
+// ohne Rueckfall bliebe `_ausklappLaeuft` fuer immer gesetzt – der Knopf waere tot.
+function _ausklappAnimieren(el, auf) {
+  return new Promise(fertig => {
+    let erledigt = false, a = null;
+    // `finish()` ist Pflicht, nicht nur Aufraeumen: endet der Vorgang ueber den
+    // Zeitgeber, weil die Animationszeit stand, haelt die Animation sonst ihr ERSTES
+    // Bild fest – beim Aufklappen also Hoehe 0. Genau das zeigte der Pruefstand: der
+    // Knopf meldete „offen", die Fusszeilen blieben unsichtbar.
+    const ende = () => {
+      if (erledigt) return; erledigt = true;
+      try { if (a && a.playState !== 'finished') a.finish(); } catch (_) {}
+      el.style.overflow = ''; fertig();
+    };
+    try {
+      const cs = getComputedStyle(el);
+      el.style.overflow = 'hidden';   // VOR dem Messen: sonst zaehlt der Aussenabstand des letzten Kinds mit
+      const voll = { height: el.getBoundingClientRect().height + 'px', opacity: 1,
+        marginTop: cs.marginTop, marginBottom: cs.marginBottom,
+        paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom };
+      const leer = { height: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px',
+        paddingTop: '0px', paddingBottom: '0px' };
+      a = el.animate(auf ? [leer, voll] : [voll, leer], {
+        duration: AUSKLAPP_DAUER, easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        // Beim Zuklappen auf 0 stehen bleiben, bis der Neuaufbau das Element entfernt –
+        // sonst blitzte es fuer einen Frame in voller Hoehe auf.
+        fill: auf ? 'none' : 'forwards' });
+      a.onfinish = ende;
+    } catch (_) { ende(); return; }
+    setTimeout(ende, AUSKLAPP_DAUER + 80);
+  });
+}
+
+function ausklappUmschalten(tab) {
+  const k = AUSKLAPP[tab];
+  if (!k || _ausklappLaeuft) return;
+  const ruhig = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (k.offen()) {
+    k.um();
+    zeitleisteAusklapp();              // Chevron sofort umdrehen, nicht erst nach 280 ms
+    const teile = ruhig ? [] : _ausklappTeile(tab);
+    _ausklappLaeuft = true;
+    Promise.all(teile.map(el => _ausklappAnimieren(el, false))).then(() => {
+      _ausklappLaeuft = false;
+      _renderTab(tab);
+    });
+    return;
+  }
+  k.um();
+  const r = _renderTab(tab);           // Training baut asynchron – erst danach messen
+  if (ruhig) return;
+  _ausklappLaeuft = true;
+  Promise.resolve(r)
+    .then(() => Promise.all(_ausklappTeile(tab).map(el => _ausklappAnimieren(el, true))))
+    .then(() => { _ausklappLaeuft = false; }, () => { _ausklappLaeuft = false; });
+}
 
 // Ø-Linien der Training-Diagramme ein-/ausschalten. Neu aufgebaut wird der ganze
 // Tab: die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.

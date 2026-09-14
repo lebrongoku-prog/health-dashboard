@@ -1039,7 +1039,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   gleich knapp — gemessen bleiben bei 375 px auf beiden Seiten 11 px Luft.
   **Sein Inhalt hängt am Tab, nicht an der Leiste.** `zeitleisteAusklapp()` liest
   `AUSKLAPP[currentScreen]` und setzt Chevron, Titel und `data-ausklapp`; Tabs ohne
-  Eintrag (Training) blenden ihn aus. Aufgerufen wird es aus
+  Eintrag blenden ihn aus (seit 14.09.2026 hat **jeder** Tab einen — Training klappt
+  damit die Wochentag/Wochenende-Fusszeilen). Aufgerufen wird es aus
   `zeitleisteAktualisieren()` **und** aus `_applyTabState` — beim Wechsel auf einen
   bereits gerenderten Tab läuft kein `_renderTab`, der Knopf zeigte sonst den
   vorherigen Tab an. `.zl-ausklapp[hidden]{display:none}` ist Pflicht (siehe
@@ -1071,7 +1072,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
   nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
   ihn: „Weitere Auswertungen" in **allen drei** Tabs — **alle starten zu**
-  (`_weitereOffen = {overview, herz, schlaf}`). In der Übersicht steckt seit
+  (`_weitereOffen = {overview, herz, schlaf, training}`; `training` seit 14.09.2026). In der Übersicht steckt seit
   08.09.2026 auch das **Verlaufs-Diagramm** dahinter, nicht mehr nur das
   Muster-Raster; deshalb heisst der Zustand nicht mehr `_musterOffen` und der
   Knopf nicht mehr „Muster & Zusammenhänge". Die frühere vierte Stelle, die
@@ -1087,6 +1088,53 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Das Umschalten ruft `_renderTab` — **nicht** nur ein-/ausblenden: Diagramme, die im
   verborgenen Bereich gezeichnet wurden, behalten Breite 0, und weder `resize()` noch
   `update()` holen sie da heraus. Nur ein Neuaufbau bei sichtbarem Container hilft.
+  Seit 14.09.2026 legt sich eine **Animation** um diesen Neuaufbau (siehe nächster
+  Abschnitt).
+- **Wochentag/Wochenende-Fusszeilen hängen am Ausklapp-Knopf; alles Ausklappbare ist
+  animiert** (auf Wunsch, 14.09.2026).
+  **Die Fusszeile „Differenz" ist aus allen Diagrammen entfallen** (Ruhepuls & HRV,
+  Schlafdauer, Laufstrecke, Trainingszeit). Die Zeilen **„Ø Wochentag (Mo–Fr)" und
+  „Ø Wochenende (Sa–So)"** stehen nur noch bei **offenem** Ausklapp-Zustand ihres Tabs,
+  also standardmässig nicht. Betroffen: Ruhepuls & HRV, Schlafdauer, Laufstrecke,
+  Trainingszeit, Pace. In Herz und Schlaf klappt **derselbe** Knopf „Weitere
+  Auswertungen" und die Wochenzeilen gemeinsam — ein Zustand je Tab, kein zweiter
+  Schalter. Training hat dafür einen eigenen `AUSKLAPP`-Eintrag bekommen.
+  **Aufbau:**
+  1. `fussMehr(tab, zeilen)` liefert die Zeilen in einer Hülle `.fuss-mehr` — oder
+     `''`, wenn zu oder leer. EINE Hülle statt einzeln markierter Zeilen, damit die
+     Animation einen Block bewegt (mit einzelnen Zeilen spränge der `gap` der Liste).
+     Die Hülle steht in jeder Fusszeile **zuletzt**; darauf verlässt sich die
+     Trennlinie (`.stat-row:last-child`).
+  2. **Pace ist der Sonderfall:** seine Fusszeile besteht NUR aus diesen zwei Zeilen.
+     Dort klappt die **ganze** `.diagramm-fuss` (sie trägt selbst `ausklapp-teil`) —
+     sonst bliebe zugeklappt eine leere Fusszeile mit Trennlinie stehen.
+  3. **Alles, was der Knopf zeigt, trägt die Klasse `ausklapp-teil`** — `.weitere-inhalt`,
+     der Verlauf und das Muster-Raster der Übersicht, die Fusszeilen-Hüllen. Wer etwas
+     Neues hinter den Knopf legt, gibt ihm diese Klasse, mehr braucht es nicht.
+  **Animation (`ausklappUmschalten`, `_ausklappAnimieren`, 280 ms):**
+  - **AUF:** erst Zustand + `_renderTab` (bei Training auf dessen Promise warten), dann
+    wachsen die Teile von 0 auf ihre Höhe. Die Diagramme haben dabei schon ihre echte
+    Breite; animiert wird nur der Rahmen, `overflow:hidden` schneidet zu.
+  - **ZU:** Chevron sofort umdrehen, die vorhandenen Teile schrumpfen auf 0
+    (`fill: forwards`), **danach** `_renderTab`.
+  - Animiert werden Höhe, Deckkraft **und** `margin`/`padding` oben und unten — mit der
+    Höhe allein erschienen Abstand und Innenrand der Pace-Fusszeile am Ende auf einen
+    Schlag. `overflow:hidden` wird **vor** dem Messen gesetzt, sonst zählt der
+    Aussenabstand des letzten Kinds mit.
+  - Nur die **äussersten sichtbaren** Teile; ein Teil in einem Teil liefe doppelt.
+  - Ein zweiter Tipp während der Animation wird verworfen (`_ausklappLaeuft`).
+  - `prefers-reduced-motion` → ohne Animation.
+  **Die Falle, die der Prüfstand gezeigt hat:** Das Ende kommt aus `onfinish` ODER aus
+  einem Zeitgeber (+80 ms) — ein Tab, der nicht gezeichnet wird, lässt die
+  Animationszeit stehen, und ohne Rückfall bliebe der Knopf für immer gesperrt. Der
+  Zeitgeber allein reichte aber nicht: die stehengebliebene Animation hielt ihr
+  **erstes Bild** fest, beim Aufklappen also **Höhe 0** — der Knopf meldete „offen",
+  die Fusszeilen blieben unsichtbar. Deshalb ruft `ende()` ausdrücklich `a.finish()`.
+  Nachgemessen durch Vorspulen (`currentTime`): Höhe 0 → 13 → 43 → 53 → 55.4 px bei
+  0/70/140/210/279 ms, Deckkraft 0 → 1, danach keine Animation mehr am Element.
+  **Im Prüfstand beachten:** bei 7T fehlt „Ø Wochenende" in den Trainings-Diagrammen,
+  wenn die erfundene Woche kein Wochenendtraining hat — das ist die Datenlage, nicht
+  der Klapp-Mechanismus. Bei 1M erscheinen beide.
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
   **Herz** Ruhepuls & HRV → (Weitere Auswertungen) Ruhepuls-Einordnung →
   HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →

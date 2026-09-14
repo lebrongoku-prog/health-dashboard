@@ -713,6 +713,10 @@ body.dark .scope-badge{background:#0F172A}
    (gruen/rot/orange ueber statZeile): sie tragen ein style-Attribut und bleiben
    deshalb farbig und fett – genau daran erkennt man sie. */
 .stats-list.diagramm-fuss{margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem}
+/* Huelle der ausklappbaren Fusszeilen (Wochentag/Wochenende). Sie verhaelt sich wie
+   die Liste selbst – derselbe Zeilenabstand –, damit aufgeklappt nichts anders aussieht
+   als vorher, als die Zeilen direkt in der Liste standen. */
+.fuss-mehr{display:flex;flex-direction:column;gap:.2rem}
 .stats-list.diagramm-fuss .stat-val:not([style]){color:var(--txt2);font-weight:400}
 
 /* Goal rows (Athlet/Sehr gut/etc) */
