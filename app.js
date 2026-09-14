@@ -571,6 +571,8 @@ function yoyWerte(D, wertVon, art) {
 }
 
 // Eine Zeile je Jahr ab dem zweiten: prozentuale Veraenderung zum Vorjahr.
+// Das NEUESTE Jahr steht oben (auf Wunsch, 14.09.2026): 2026 vs. 2025, dann
+// 2025 vs. 2024 – die Frage ist fast immer „wie steht das laufende Jahr da?".
 // `reihen`: [{ werte, richtung: 'hoch'|'tief'|null, vor: 'REM ' }] – mehrere Reihen
 // stehen in EINER Zeile, getrennt wie im uebrigen Fuss („+2% | −5%").
 // Farbe NUR, wo `ZIELE` eine Richtung kennt (Farbe = Bewertung, nie Richtung).
@@ -584,7 +586,7 @@ function yoyZeilen(reihen, summe) {
     return mos.length ? statZeile(`${jahr(mos[0])} vs. ${+jahr(mos[0]) - 1}`, '—') : '';
   }
   let html = '';
-  for (let i = 1; i < mos.length; i++) {
+  for (let i = mos.length - 1; i >= 1; i--) {
     const teile = reihen.map(r => {
       const p = prozentDiff(r.werte[i].v, r.werte[i - 1].v);
       if (p == null) return { txt: (r.vor || '') + '—', farbe: null };
@@ -2910,6 +2912,13 @@ async function pgTraining() {
   // Einheiten – die Trainingszeit summiert auch Intervalltrainings ohne Strecke.
   const laeufeGesamt    = summe('_woLaeufe');
   const einheitenGesamt = summe('_woAnzahl');
+  // Dieselben Zaehler je Monat – fuer „Ø / Lauf" im Tooltip eines Monatsbalkens.
+  const _proMonat = {};
+  woRows.forEach(r => {
+    const m = _proMonat[r.date.slice(0, 7)] = _proMonat[r.date.slice(0, 7)] || { laeufe: 0, einheiten: 0 };
+    m.laeufe += r._woLaeufe || 0;
+    m.einheiten += r._woAnzahl || 0;
+  });
   const minSm_wo=tASwo('_woDurMin');
   const distSm_wo=tASwo('_woDistKm');
 
@@ -3023,10 +3032,17 @@ async function pgTraining() {
         label:ctx=>{
           if(ctx.raw==null)return null;
           const t=fmtMin(ctx.raw);
-          if(!_monatsModus)return t;
-          // Zweite Zeile: derselbe Monat auf eine Woche gerechnet.
-          const w=wochenImMonat(_lZeitKeys[ctx.dataIndex]);
-          return w?[t,`Ø ${fmtMin(ctx.raw/w)} / Woche`]:t;
+          // Monatsbalken (auf Wunsch, 14.09.2026, auch im Jahresvergleich): unter der
+          // Summe „Ø / Lauf", darunter wie bisher „Ø / Woche". Die Zeit teilt durch ALLE
+          // Einheiten – dieselbe Rechnung wie die Fusszeile „Ø pro Lauf".
+          if(_lKeyTyp!=='monat')return t;
+          const mo=_lZeitKeys[ctx.dataIndex], zeilen=[t];
+          const n=_proMonat[mo]?.einheiten;
+          if(n)zeilen.push(`Ø ${fmtMin(ctx.raw/n)} / Lauf`);
+          // Woche nur, wo es ein Fenster gibt (_monatsModus) – im Jahresvergleich nicht.
+          const w=_monatsModus?wochenImMonat(mo):null;
+          if(w)zeilen.push(`Ø ${fmtMin(ctx.raw/w)} / Woche`);
+          return zeilen.length>1?zeilen:t;
         }}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
@@ -3044,9 +3060,14 @@ async function pgTraining() {
         label:ctx=>{
           if(ctx.raw==null)return null;
           const t=`${zahl(ctx.raw,1)} km`;
-          if(!_monatsModus)return t;
-          const w=wochenImMonat(_lZeitKeys[ctx.dataIndex]);
-          return w?[t,`Ø ${zahl(ctx.raw/w,1)} km / Woche`]:t;
+          // Wie bei der Trainingszeit; die Strecke teilt durch die Einheiten MIT Strecke.
+          if(_lKeyTyp!=='monat')return t;
+          const mo=_lZeitKeys[ctx.dataIndex], zeilen=[t];
+          const n=_proMonat[mo]?.laeufe;
+          if(n)zeilen.push(`Ø ${zahl(ctx.raw/n,1)} km / Lauf`);
+          const w=_monatsModus?wochenImMonat(mo):null;
+          if(w)zeilen.push(`Ø ${zahl(ctx.raw/w,1)} km / Woche`);
+          return zeilen.length>1?zeilen:t;
         }}}},
       scales:{x:_xTot,y:{...gy,
         ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});

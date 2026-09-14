@@ -438,6 +438,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   bei VO₂max: sie misst gegen die Vorperiode, und die ist hier `[]`. An ihre Stelle
   treten **eine Zeile je Jahr ab dem zweiten** mit der prozentualen Veränderung zum
   Vorjahr: `2025 vs. 2024 · +12.3%`. „Total" und „Schlafziel erreicht" bleiben.
+  **Das neueste Jahr steht oben** (auf Wunsch, 14.09.2026): `2026 vs. 2025`, darunter
+  `2025 vs. 2024` — die Schleife in `yoyZeilen` läuft rückwärts.
   - `yoyWerte(D, wertVon, art)` gruppiert D nach `YYYY-MM` — je Jahr genau ein Wert,
     **derselbe, den der Balken zeigt**: `summe` für Strecke und Zeit, `mittel` für alles
     andere. Die Jahre kommen aus `allMonths(D)`, damit ein Jahr ohne Wert als „—"
@@ -916,6 +918,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   ohne Strecke. Das Label heisst in beiden „Ø pro Lauf", obwohl die Zeit genau
   genommen je Training rechnet. Nachgerechnet (Sep 26 im Prüfstand): 6 Einheiten,
   5 mit Strecke → 48.1 km ÷ 5 = 9.6 km, 299 min ÷ 6 = 50 min.
+  **Auch im Tooltip jedes Monatsbalkens** (auf Wunsch, 14.09.2026): Summe → `Ø … / Lauf`
+  → `Ø … / Woche`. Die Zähler je Monat liegen in `_proMonat` (aus `woRows`, dieselbe
+  Rechnung wie die Fusszeile). Bedingung ist der **Balkentyp** (`_lKeyTyp === 'monat'`),
+  nicht `_monatsModus`: „/ Lauf" erscheint deshalb auch im Jahresvergleich, „/ Woche"
+  weiterhin nur, wo es ein Fenster gibt. Tagesbalken (7T, 1M) bleiben einzeilig.
 - **Schlaf-Tab im Querformat: Schlafqualität und Schlafschuld untereinander neben dem
   Schlafphasen-Verlauf** (auf Wunsch, 14.09.2026). Die drei stecken in
   `.schlaf-block.mit-phasen` (Raster `minmax(0,1fr) minmax(0,1fr)`): links das Paar
