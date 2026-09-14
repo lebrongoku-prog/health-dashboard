@@ -160,6 +160,10 @@ function _parseWorkoutRows(rows) {
       typeRaw:  arten.join(' · '),
       typeLabel: esc(arten.join(' · ') || 'Workout'),
       anzahl:      e.length,
+      // Einheiten MIT Strecke – die Grundlage fuer „Ø pro Lauf" in der Laufstrecke.
+      // `anzahl` taugt dafuer nicht: ein Intervalltraining am selben Tag zaehlt dort
+      // mit, hat aber keine Strecke und haette den Schnitt je Lauf gedrueckt.
+      laeufe:      e.filter(x => x.strecke != null && x.strecke > 0).length,
       durationMin: summe(e, 'dauer'),
       distanceKm:  summe(e, 'strecke'),
       avgHR:       gewichtet(e, 'puls'),
@@ -455,7 +459,9 @@ function _stempelGeprueft(s) {
 // Die Versionsnummer im Schlüssel verwirft alte Stände automatisch, falls sich
 // später ändert, WIE die Daten eingelesen werden – lieber einmal warten als
 // einen alten Stand falsch deuten.
-const DATEN_KEY = 'hcc_daten_v1';
+// v2 seit 14.09.2026: `workoutData` traegt `laeufe`. Ein v1-Stand haette das Feld
+// nicht, und „Ø pro Lauf" bliebe bis zum Nachladen leer – deshalb verwirft er sich.
+const DATEN_KEY = 'hcc_daten_v2';
 
 // Der Inhalt OHNE Zeitstempel – dient zugleich als Fingerabdruck: der Hintergrund-
 // Abruf vergleicht ihn vorher und nachher und zeichnet nur neu, wenn sich wirklich
@@ -466,11 +472,12 @@ function datenStand() {
 }
 
 function datenCacheSchreiben() {
+  try { localStorage.removeItem('hcc_daten_v1'); } catch(_) {}   // Vorgaenger-Stand aufraeumen
   try {
     // Der Stempel steht NEBEN dem Fingerabdruck, nicht darin: datenStand() ist die
     // Vergleichsgrundlage fuer „hat sich etwas geaendert?" und soll sich nur aendern,
     // wenn sich die Messwerte aendern.
-    localStorage.setItem(DATEN_KEY, '{"v":1,"ts":' + (_lastLoadTs || 0)
+    localStorage.setItem(DATEN_KEY, '{"v":2,"ts":' + (_lastLoadTs || 0)
       + ',"stempel":' + JSON.stringify(_exportStempel) + ',"d":' + datenStand() + '}');
   } catch(e) {
     // Voller Speicher: die Kopie ist eine Bequemlichkeit, kein Muss. Den alten
@@ -485,7 +492,7 @@ function datenCacheSchreiben() {
 function datenCacheLesen() {
   let roh, d;
   try { roh = JSON.parse(localStorage.getItem(DATEN_KEY) || 'null'); } catch(_) { return false; }
-  if (!roh || roh.v !== 1 || !roh.d) return false;
+  if (!roh || roh.v !== 2 || !roh.d) return false;
   d = roh.d; d.ts = roh.ts;
   if (!Array.isArray(d.allData) || !d.allData.length) return false;
   // Dieselbe Datumsprüfung wie beim Einlesen aus dem Sheet: der Zwischenspeicher ist
@@ -541,6 +548,65 @@ function findField(rows, ...candidates) {
 // `_yoyVorher` merkt sich den Bereich, aus dem heraus eingeschaltet wurde: beim
 // Ausschalten steht wieder da, was vorher da war.
 function istYoY() { return timeRange === 'yoy'; }
+
+// ── Jahresvergleich: Fusszeilen „2025 vs. 2024" (auf Wunsch, 14.09.2026) ──────
+// Im Jahresvergleich enthaelt D nur EINEN Kalendermonat, verteilt auf mehrere Jahre.
+// Nach `YYYY-MM` gruppiert ergibt das je Jahr genau einen Wert – denselben, den der
+// Balken zeigt: Summe (Strecke, Zeit) oder Mittel (alles andere). Die Jahre kommen
+// aus `allMonths(D)`, damit ein Jahr ohne Messwert als „—" sichtbar bleibt statt
+// stillschweigend zu fehlen.
+function yoyWerte(D, wertVon, art) {
+  const b = {};
+  D.forEach(r => {
+    const v = wertVon(r);
+    if (v == null || isNaN(v)) return;
+    (b[r.date.slice(0, 7)] = b[r.date.slice(0, 7)] || []).push(v);
+  });
+  return allMonths(D).map(mo => {
+    const l = b[mo];
+    if (!l) return { mo, v: null };
+    const s = l.reduce((a, x) => a + x, 0);
+    return { mo, v: art === 'summe' ? s : s / l.length };
+  });
+}
+
+// Eine Zeile je Jahr ab dem zweiten: prozentuale Veraenderung zum Vorjahr.
+// `reihen`: [{ werte, richtung: 'hoch'|'tief'|null, vor: 'REM ' }] – mehrere Reihen
+// stehen in EINER Zeile, getrennt wie im uebrigen Fuss („+2% | −5%").
+// Farbe NUR, wo `ZIELE` eine Richtung kennt (Farbe = Bewertung, nie Richtung).
+// `summe`: bei Summen ist ein angebrochener Monat nicht vergleichbar – ein halber
+// September hat halb so viele Kilometer. Die Zeile nennt dann, bis wann gezaehlt ist.
+function yoyZeilen(reihen, summe) {
+  const mos = reihen[0].werte.map(x => x.mo);
+  const letzter = allData.length ? allData[allData.length - 1].date : null;
+  const jahr = mo => mo.slice(0, 4);
+  if (mos.length < 2) {
+    return mos.length ? statZeile(`${jahr(mos[0])} vs. ${+jahr(mos[0]) - 1}`, '—') : '';
+  }
+  let html = '';
+  for (let i = 1; i < mos.length; i++) {
+    const teile = reihen.map(r => {
+      const p = prozentDiff(r.werte[i].v, r.werte[i - 1].v);
+      if (p == null) return { txt: (r.vor || '') + '—', farbe: null };
+      const gerundet = Number(p.toFixed(1));
+      const txt = (r.vor || '') + (gerundet > 0 ? '+' : '') + zahl(gerundet, 1) + '%';
+      const farbe = r.richtung && gerundet !== 0
+        ? ((gerundet > 0) === (r.richtung === 'hoch') ? '#10B981' : '#EF4444') : null;
+      return { txt, farbe };
+    });
+    let label = `${jahr(mos[i])} vs. ${jahr(mos[i - 1])}`;
+    if (summe && letzter && letzter.slice(0, 7) === mos[i] && letzter !== moLast(letzter)) {
+      label += ` (bis ${letzter.slice(8, 10)}.${letzter.slice(5, 7)}.)`;
+    }
+    if (teile.length === 1) {
+      html += statZeile(label, teile[0].txt, teile[0].farbe);
+    } else {
+      html += statZeile(label, teile.map(t => t.farbe
+        ? `<span style="color:${t.farbe};font-weight:700">${t.txt}</span>` : t.txt).join(' | '));
+    }
+  }
+  return html;
+}
 let _yoyVorher = '1m';
 
 function windowDays() { return {'7d':7}[timeRange] || null; }
@@ -2211,8 +2277,11 @@ function pgHerz() {
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
       <div class="stats-list diagramm-fuss">
-        ${statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
-        ${fussMehr('herz',
+        ${istYoY() ? yoyZeilen([
+            { werte: yoyWerte(D, r => r.restHR, 'mittel'), richtung: ZIELE.restHR.richtung },
+            { werte: yoyWerte(D, r => r.hrv,    'mittel'), richtung: ZIELE.hrv.richtung }]) : ''}
+        ${istYoY() ? '' : statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
+        ${istYoY() ? '' : fussMehr('herz',
           statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
         + statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`))}
       </div>
@@ -2457,7 +2526,9 @@ const AUSKLAPP = {
   // Seit 14.09.2026 auch im Training-Tab: dort klappt der Knopf die Fusszeilen
   // „Ø Wochentag" / „Ø Wochenende" aller vier Diagramme auf einmal.
   training: { titel: 'Wochentag und Wochenende', offen: () => _weitereOffen.training,
-              um: () => { _weitereOffen.training = !_weitereOffen.training; } }
+              um: () => { _weitereOffen.training = !_weitereOffen.training; },
+              // Im Jahresvergleich gibt es keine Wochenzeilen – der Knopf klappte nichts.
+              sichtbar: () => !istYoY() }
 };
 
 // ── Schlaf ─────────────────────────────────────────────
@@ -2560,14 +2631,19 @@ function pgSchlaf() {
         <div class="chart-wrap"><canvas id="c-sl-dur"></canvas></div>
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
-          ${statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
-          ${fussMehr('schlaf',
+          ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => r.sleepTotal, 'mittel'), richtung: ZIELE.sleepTotal.richtung }]) : ''}
+          ${istYoY() ? '' : statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
+          ${istYoY() ? '' : fussMehr('schlaf',
             statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
           + statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd):'—'}`))}
         </div>`:''}
       </div>
 
       ${weitereAuf('schlaf')}
+      <!-- Querformat: Schlafqualitaet und Schlafschuld untereinander NEBEN dem
+           Schlafphasen-Verlauf (auf Wunsch, 14.09.2026). Die Klasse "mit-phasen" nur,
+           wenn es das Diagramm gibt – sonst stuende das Paar in einer halben Spalte. -->
+      <div class="schlaf-block${hasPhases?' mit-phasen':''}">
       <div class="two-col-eq">
       <div class="chart-card split2">
         <h3>Schlafqualität-Verteilung</h3>
@@ -2619,13 +2695,17 @@ function pgSchlaf() {
         <div class="cl-item"><span class="cl-dot" style="background:#1E1B6E"></span>Tief</div>
       </div>
       <div class="chart-wrap"><canvas id="c-sl-phases"></canvas></div>
-      ${awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
+      ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([
+          { werte: yoyWerte(D, r => r.sleepRem ?? r.remSleep ?? null, 'mittel'), vor: 'REM ' },
+          { werte: yoyWerte(D, r => r.sleepDeep ?? r.deepSleep ?? null, 'mittel'), vor: 'Tief ' }])}</div>`
+      : awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
         ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
         ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
         ${lD!=null?`${statZeile(`Ø Leichtschlaf`, `${alsStdMin(lD)} – ${lPct}%`)}`:''}
         ${dpD!=null?`${statZeile(`Ø Tiefschlaf`, `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
       </div>`:''}
     </div>`:''}
+      </div>
 
 
     ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-legend" aria-hidden="true"></div><div class="chart-wrap"><canvas id="c-sl-score"></canvas></div></div>`:''}
@@ -2816,7 +2896,8 @@ async function pgTraining() {
       return kmh!=null?paceFromSpeed(kmh):null;})(),
     // Zaehlt die EINHEITEN je Zeitraum – gebraucht fuer "Oe pro Training". Vorher
     // stand hier 1 je Tag; an Tagen mit zwei Einheiten fiel der Schnitt dadurch zu hoch aus.
-    _woAnzahl:workoutData[r.date]?(workoutData[r.date].anzahl||1):null}));
+    _woAnzahl:workoutData[r.date]?(workoutData[r.date].anzahl||1):null,
+    _woLaeufe:workoutData[r.date]?.laeufe??null}));
   const {align:tAvgWo,alignSum:tASwo}=timeDim(woRows);
   // Gesamtwerte des dargestellten Zeitraums – Summe ueber alle Tage des Fensters,
   // unabhaengig von der gewaehlten Aggregation (Tag/Woche/Monat).
@@ -2824,6 +2905,11 @@ async function pgTraining() {
     return v.length ? v.reduce((a,b)=>a+b,0) : null; };
   const minGesamt  = summe('_woDurMin');
   const distGesamt = summe('_woDistKm');
+  // „Ø pro Lauf" (auf Wunsch, 14.09.2026). Jede Zahl teilt durch das, was ihr Total
+  // enthaelt: die Strecke durch die Einheiten MIT Strecke, die Zeit durch ALLE
+  // Einheiten – die Trainingszeit summiert auch Intervalltrainings ohne Strecke.
+  const laeufeGesamt    = summe('_woLaeufe');
+  const einheitenGesamt = summe('_woAnzahl');
   const minSm_wo=tASwo('_woDurMin');
   const distSm_wo=tASwo('_woDistKm');
 
@@ -2865,8 +2951,10 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
+          ${!istYoY()&&distGesamt!=null&&laeufeGesamt?statZeile(`Ø pro Lauf`, `${zahl(distGesamt/laeufeGesamt,1)} km`):''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
-          ${fussMehr('training',
+          ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.distanceKm ?? null, 'summe') }], true) : ''}
+          ${istYoY() ? '' : fussMehr('training',
             (distWkdAvg!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`) : '')
           + (distWkndAvg!=null ? statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`) : ''))}
         </div>
@@ -2878,8 +2966,10 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
+          ${!istYoY()&&minGesamt!=null&&einheitenGesamt?statZeile(`Ø pro Lauf`, `${fmtMin(minGesamt/einheitenGesamt)}`):''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
-          ${fussMehr('training',
+          ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.durationMin ?? null, 'summe') }], true) : ''}
+          ${istYoY() ? '' : fussMehr('training',
             (minWeek!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtMin(minWeek)}`) : '')
           + (minWknd!=null ? statZeile(`Ø Wochenende (Sa–So)`, `${fmtMin(minWknd)}`) : ''))}
         </div>
@@ -2892,7 +2982,8 @@ async function pgTraining() {
       <!-- Die Pace-Fusszeile besteht NUR aus Wochentag/Wochenende. Zugeklappt gaebe es
            sonst eine leere Fusszeile mit Trennlinie – deshalb klappt hier die ganze
            Fusszeile, nicht nur ihr Inhalt. -->
-      ${_weitereOffen.training && (paceWkdAvg!=null || paceWkndAvg!=null) ? `<div class="stats-list diagramm-fuss ausklapp-teil">
+      ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>` : ''}
+      ${!istYoY() && _weitereOffen.training && (paceWkdAvg!=null || paceWkndAvg!=null) ? `<div class="stats-list diagramm-fuss ausklapp-teil">
         ${paceWkdAvg!=null?statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`):''}
         ${paceWkndAvg!=null?statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`):''}
       </div>` : ''}
@@ -3013,8 +3104,12 @@ function vo2Abschnitt(D, P) {
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${hlLegende('c-vo2|ziel','Ziel','rgba(100,116,139,.55)')}${hlLegende('c-vo2|oe','Ø','#D97706')}</div>
       <div class="chart-wrap"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
-        ${statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
-        ${statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}
+        ${istYoY()
+          // „Veränderung" misst gegen die Vorperiode – die gibt es im Jahresvergleich
+          // nicht (prevPeriod() liefert []), die Zeile stuende dort nur als „—".
+          ? yoyZeilen([{ werte: yoyWerte(D, r => r.vo2max, 'mittel'), richtung: ZIELE.vo2max.richtung }])
+          : statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)
+          + statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}
       </div>
     </div>`;
 
@@ -3203,7 +3298,8 @@ function zeitleisteBauen() {
 function zeitleisteAusklapp() {
   const knopf = document.querySelector('#zeitleiste .zl-ausklapp');
   if (!knopf) return;
-  const k = AUSKLAPP[currentScreen];
+  const _k = AUSKLAPP[currentScreen];
+  const k = _k && (!_k.sichtbar || _k.sichtbar()) ? _k : null;
   knopf.hidden = !k;
   if (!k) { knopf.removeAttribute('data-ausklapp'); return; }
   knopf.dataset.ausklapp = currentScreen;

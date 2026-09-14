@@ -150,10 +150,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     32.9 min Intervall → Pace 5.92, also unverändert die des Laufs.
   - `anzahl` hält die Zahl der Einheiten. `_woAnzahl` zählt damit **Einheiten statt
     Tage**, sonst fiele „Ø pro Training" an solchen Tagen zu hoch aus.
+  - `laeufe` (seit 14.09.2026) hält die Zahl der Einheiten **mit Strecke** — die
+    Grundlage für „Ø pro Lauf" in der Laufstrecke. `anzahl` taugt dafür nicht: ein
+    Intervalltraining am selben Tag zählt dort mit, hat aber keine Strecke.
 - **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
   auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
   Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
-  1. `datenCacheLesen()` füllt `allData` und `workoutData` aus `hcc_daten_v1` —
+  1. `datenCacheLesen()` füllt `allData` und `workoutData` aus `hcc_daten_v2` —
      die App ist nach ~30 ms bedienbar.
   2. `hintergrundLaden()` holt danach den frischen Stand. Ist er **identisch**
      (Fingerabdruck `datenStand()` vorher/nachher), passiert **nichts** — sonst
@@ -167,7 +170,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      den Schutz wieder.
   **Das Sheet bleibt die Quelle** — der Zwischenspeicher ist nur eine Kopie und wird
   nach jedem erfolgreichen Laden überschrieben. Der Schlüssel trägt eine
-  Versionsnummer (`hcc_daten_v1`): ändert sich, WIE eingelesen wird, hochzählen, dann
+  Versionsnummer (`hcc_daten_v2`, seit 14.09.2026 — v1 hatte kein `laeufe` und
+  räumt sich beim nächsten Schreiben selbst weg): ändert sich, WIE eingelesen wird, hochzählen, dann
   verwerfen alte Stände sich selbst. Beim Lesen gilt dieselbe Datumsprüfung wie beim
   Sheet — `localStorage` ist von aussen beschreibbar, also nicht vertrauenswürdiger
   als eine Sheet-Zelle; alles andere fängt `esc()` beim Rendern ab.
@@ -428,6 +432,29 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Nicht verwechseln:** Der Modus vergleicht **Monate**, nicht Jahre als Ganzes.
   „Total" in den Trainings-Fusszeilen ist deshalb die Summe über alle gezeigten
   Septembers zusammen.
+  **Fusszeilen im Jahresvergleich** (auf Wunsch, 14.09.2026): **alle Durchschnitts-
+  Zeilen entfallen** — „Durchschnitt", „Ø Schlafdauer", die vier Schlafphasen-Zeilen,
+  „Ø pro Lauf", „Ø VO₂max" und die Wochentag/Wochenende-Zeilen. Dazu „Veränderung"
+  bei VO₂max: sie misst gegen die Vorperiode, und die ist hier `[]`. An ihre Stelle
+  treten **eine Zeile je Jahr ab dem zweiten** mit der prozentualen Veränderung zum
+  Vorjahr: `2025 vs. 2024 · +12.3%`. „Total" und „Schlafziel erreicht" bleiben.
+  - `yoyWerte(D, wertVon, art)` gruppiert D nach `YYYY-MM` — je Jahr genau ein Wert,
+    **derselbe, den der Balken zeigt**: `summe` für Strecke und Zeit, `mittel` für alles
+    andere. Die Jahre kommen aus `allMonths(D)`, damit ein Jahr ohne Wert als „—"
+    erscheint statt still zu fehlen.
+  - `yoyZeilen(reihen, summe)` baut die Zeilen. Mehrere Reihen stehen in EINER Zeile
+    (Herz: `Puls | HRV`, Schlafphasen: `REM … | Tief …`). **Farbe nur, wo `ZIELE` eine
+    Richtung kennt** — Ruhepuls, HRV, Schlafdauer, VO₂max; Strecke, Zeit, Pace und
+    Phasen bleiben neutral.
+  - **Angebrochene Monate bei Summen:** ein halber September hat halb so viele
+    Kilometer. Liegt der neueste Datentag im Vergleichsmonat und ist nicht dessen
+    letzter Tag, trägt die Zeile `(bis 14.09.)`. Bei Mittelwerten nicht — die sind
+    auch über einen halben Monat vergleichbar.
+  - Pace hat im Jahresvergleich eine **feste** Fusszeile (sonst nur ausklappbar), und
+    der Ausklapp-Knopf des Training-Tabs ist ausgeblendet: es gäbe nichts zu klappen.
+    Dafür kennt `AUSKLAPP` ein optionales `sichtbar()`, das `zeitleisteAusklapp()` prüft.
+  Nachgerechnet aus den Rohdaten des Prüfstands (`?tage=900`): Laufstrecke 88.9 /
+  156.2 / 48.1 km → `+75.7%` / `−69.2%`, Ruhepuls → `+9.1%` / `+6.6%` — identisch.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
@@ -881,6 +908,22 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **„Ø pro Lauf" in Laufstrecke und Trainingszeit** (auf Wunsch, 14.09.2026): direkt
+  nach „Total", **immer sichtbar** (nicht hinter dem Ausklapp-Knopf), im
+  Jahresvergleich entfällt sie mit den übrigen Ø-Zeilen. Jede Zahl teilt durch das,
+  was ihr Total enthält: **Strecke ÷ Einheiten mit Strecke** (`laeufe`), **Zeit ÷
+  alle Einheiten** (`anzahl`) — die Trainingszeit summiert auch Intervalltrainings
+  ohne Strecke. Das Label heisst in beiden „Ø pro Lauf", obwohl die Zeit genau
+  genommen je Training rechnet. Nachgerechnet (Sep 26 im Prüfstand): 6 Einheiten,
+  5 mit Strecke → 48.1 km ÷ 5 = 9.6 km, 299 min ÷ 6 = 50 min.
+- **Schlaf-Tab im Querformat: Schlafqualität und Schlafschuld untereinander neben dem
+  Schlafphasen-Verlauf** (auf Wunsch, 14.09.2026). Die drei stecken in
+  `.schlaf-block.mit-phasen` (Raster `minmax(0,1fr) minmax(0,1fr)`): links das Paar
+  (`.two-col-eq`, hier einspaltig), rechts das Diagramm — Reihenfolge aus dem Markup,
+  also wie im Hochformat erst die Karten. `mit-phasen` nur, wenn es das Diagramm gibt,
+  sonst stünde das Paar in einer halben Spalte. Am Desktop spannt der Block über beide
+  Spalten von `.weitere-inhalt`. Gemessen bei 812 × 375: Qualität x 12/y 20, Schuld
+  x 12/y 164, Phasen x 412/y 20, je 388 px breit. Hochformat unverändert einspaltig.
 - **Zweispaltig im Querformat** (08.09.2026): `.pi-grid` (alle Karten unter
   „Muster & Zusammenhänge") und `.two-col-eq` (die Paare „Ruhepuls-/HRV-Einordnung"
   und „Schlafqualität-Verteilung/Schlafschuld") bekommen dort
@@ -1248,7 +1291,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   geschlossenen Zustand. Ein Zustandsflag zu prüfen heisst, den eigenen Code zu
   befragen statt den Browser.
 - **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
-  **Programmdateien**; `hcc_daten_v1` im `localStorage` hält die **Messdaten**. Der
+  **Programmdateien**; `hcc_daten_v2` im `localStorage` hält die **Messdaten**. Der
   Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen
   leert, sucht lange.
 - **NIE `toISOString()` für Datums-Strings.** Es rechnet nach UTC um; in der Schweiz

@@ -1050,6 +1050,17 @@ h5,
      beide tragen denselben Rahmen). */
   .pi-grid,
   .two-col-eq { grid-template-columns: 1fr 1fr; }
+  /* Schlaf-Tab: Schlafqualitaet und Schlafschuld stehen UNTEREINANDER links, der
+     Schlafphasen-Verlauf rechts daneben (auf Wunsch, 14.09.2026). Reihenfolge aus dem
+     Markup, also wie im Hochformat erst die Karten, dann das Diagramm.
+     Das Paar ist hier einspaltig – die allgemeine Regel darueber machte es zweispaltig;
+     `.schlaf-block.mit-phasen > .two-col-eq` gewinnt ueber die Spezifitaet.
+     `align-items:start`: die beiden Spalten sind verschieden hoch und sollen es bleiben,
+     sonst zoege das Raster die kuerzere Seite in die Laenge. */
+  .schlaf-block.mit-phasen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: .7rem; align-items: start; margin-bottom: .7rem; }
+  .schlaf-block.mit-phasen > * { margin-bottom: 0; }
+  .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
   /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
      Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
@@ -1148,6 +1159,7 @@ h5,
   /* Diese beiden bringen ihre eigene Aufteilung mit bzw. sind Fliesstext — sie
      wuerden sonst ein zweites Mal geteilt (vier Spalten) oder liessen die Nachbar-
      spalte leer. */
+  .weitere-inhalt > .schlaf-block,
   .weitere-inhalt > .two-col-eq,
   .weitere-inhalt > .rec-card { grid-column: 1 / -1; }
   /* Auf halber Fensterbreite ist die Karte rund doppelt so breit wie am Handy — mit
