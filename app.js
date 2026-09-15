@@ -2460,10 +2460,45 @@ function pgEinstellungen() {
   versionAnzeigen();   // asynchron, füllt .app-version nach
 }
 
+// ── Verlaufs-Wache (15.09.2026) ─────────────────────────────────────────────
+// Nach der Google-Anmeldung liegt die Google-Seite im Browserverlauf DIREKT hinter
+// der App. iOS erlaubt in Homescreen-Apps den Wisch vom linken Rand als „Zurueck".
+// Gewann diese Systemgeste gegen `einstellungenWischen()`, landete man auf „Bei
+// Google anmelden" – genau beim Wisch, der zurueck zur Uebersicht fuehren sollte.
+// Einen fremden Eintrag im Verlauf kann die App nicht loeschen. Sie legt deshalb
+// eigene Eintraege DAVOR, damit „Zurueck" nie ueber die App hinausreicht:
+//   basis  ← der Eintrag, mit dem die App geladen wurde (replaceState)
+//   app    ← darueber; „Zurueck" von hier landet auf basis und wird sofort erneuert
+//   einst  ← solange die Einstellungen offen sind; „Zurueck" schliesst sie
+// Folge am Desktop: die Zurueck-Taste des Browsers verlaesst die App nicht mehr
+// mit einem Klick. Fuer eine Homescreen-App ist das der gewollte Zustand.
+function verlaufsWacheStarten() {
+  if (!window.history || !history.pushState) return;
+  const url = location.pathname + location.search;
+  try {
+    history.replaceState({ hcc: 'basis' }, '', url);
+    history.pushState({ hcc: 'app' }, '', url);
+  } catch (_) { return; }
+  window.addEventListener('popstate', (e) => {
+    const s = e.state && e.state.hcc;
+    // Jeder Schritt zurueck innerhalb der App schliesst zuerst die Einstellungen –
+    // egal ob er von „einst" auf „app" oder (doppelt ausgeloest) bis „basis" ging.
+    if (_einstOffen) einstellungenSchliessen(true);
+    if (s === 'basis') {
+      try { history.pushState({ hcc: 'app' }, '', url); } catch (_) {}
+    } else if (s === 'einst') {
+      // Vorwaerts-Geste zurueck auf einen alten Einstellungen-Eintrag: nicht wieder
+      // oeffnen, nur den Eintrag entschaerfen.
+      try { history.replaceState({ hcc: 'app' }, '', url); } catch (_) {}
+    }
+  });
+}
+
 function einstellungenOeffnen() {
   const el = document.getElementById('seite-einstellungen');
   if (!el || _einstOffen) return;
   _einstOffen = true;
+  try { history.pushState({ hcc: 'einst' }, '', location.pathname + location.search); } catch (_) {}
   pgEinstellungen();
   el.hidden = false;
   // Layout erzwingen, BEVOR die Klasse kommt: sonst setzt der Browser Ausgangs- und
@@ -2473,10 +2508,16 @@ function einstellungenOeffnen() {
   document.body.classList.add('einst-offen');
 }
 
-function einstellungenSchliessen() {
+// `ausVerlauf`: der Aufruf kommt aus `popstate` – dann ist der Verlaufseintrag schon
+// weg. Kommt er vom Knopf oder vom eigenen Wisch, wird der „einst"-Eintrag hier
+// abgebaut; sonst stuende er noch da, und das naechste „Zurueck" taete nichts.
+function einstellungenSchliessen(ausVerlauf) {
   const el = document.getElementById('seite-einstellungen');
   if (!el || !_einstOffen) return;
   _einstOffen = false;
+  if (ausVerlauf !== true && history.state && history.state.hcc === 'einst') {
+    try { history.back(); } catch (_) {}
+  }
   el.style.transform = '';       // eine laufende Wischgeste zuruecksetzen
   el.classList.remove('offen');
   document.body.classList.remove('einst-offen');
@@ -2489,7 +2530,15 @@ function einstellungenSchliessen() {
 function einstellungenWischen() {
   const el = document.getElementById('seite-einstellungen');
   if (!el) return;
-  let startX = 0, dx = 0, aktiv = false;
+  let startX = 0, dx = 0, aktiv = false, klickSperreBis = 0;
+  // Zweite Sicherung: Beginnt die Geste am Rand ueber einem Knopf und bewegt sich nur
+  // wenig, erzeugt iOS nach dem Loslassen einen Klick – der Rand liegt keine 28 px
+  // vom Knopf „Mit Google anmelden" entfernt. Nach jeder echten Wischbewegung wird
+  // der naechste Klick auf der Seite deshalb verworfen (Capture-Phase, also bevor
+  // die Delegation am body ihn sieht).
+  el.addEventListener('click', (e) => {
+    if (Date.now() < klickSperreBis) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
   el.addEventListener('touchstart', (e) => {
     if (!_einstOffen || e.touches.length !== 1) return;
     const x = e.touches[0].clientX;
@@ -2506,6 +2555,7 @@ function einstellungenWischen() {
     if (!aktiv) return;
     aktiv = false;
     el.style.transition = '';
+    if (dx > 8) klickSperreBis = Date.now() + 450;
     // Ab einem Drittel der Breite gilt die Geste als „zurueck", sonst schnappt die
     // Seite zurueck – dieselbe Schwelle wie in iOS.
     if (dx > el.getBoundingClientRect().width * 0.3) einstellungenSchliessen();
@@ -4260,6 +4310,9 @@ einstellungenWischen();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');
+// Nach dem ersten Tab: `_checkHashToken` hat den Anmelde-Hash bis hier bereits
+// entfernt, und der Verlaufseintrag hinter der App zeigt die fertige Uebersicht.
+verlaufsWacheStarten();
 // Übrige Tabs direkt danach im Hintergrund vorrendern (deferred, einer pro Frame),
 // damit beim Wischen kein leeres Panel mehr erscheint.
 _prerenderTabs(TAB_ORDER);

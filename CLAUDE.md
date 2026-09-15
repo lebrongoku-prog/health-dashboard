@@ -478,6 +478,28 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      musste dort mit aufgenommen werden, sonst findet `pgEinstellungen()` nichts und
      tut still gar nichts — die Seite wäre lokal nicht prüfbar, ohne dass es auffiele.
   **Folge:** Daten-Stand, Anmeldestatus und beide Update-Knöpfe stehen nur noch hier.
+  **Verlaufs-Wache — der Wisch zurück führt IMMER in die Übersicht** (15.09.2026, nach
+  Meldung): Nach der Google-Anmeldung liegt die Google-Seite im Browserverlauf direkt
+  hinter der App, und iOS erlaubt in Homescreen-Apps den Rand-Wisch als „Zurück".
+  Gewann diese Systemgeste gegen `einstellungenWischen()`, landete man auf „Bei Google
+  anmelden". Einen fremden Verlaufseintrag kann die App nicht löschen — sie legt
+  deshalb eigene davor (`verlaufsWacheStarten()`, einmal nach dem ersten `showScreen`):
+  `basis` (der Ladeeintrag, per `replaceState`) → `app` → solange die Einstellungen
+  offen sind zusätzlich `einst`. Der `popstate`-Handler schliesst offene Einstellungen
+  und legt bei `basis` sofort wieder `app` darüber — „Zurück" reicht damit nie über die
+  App hinaus. `einstellungenSchliessen(ausVerlauf)` baut beim Schliessen per Knopf oder
+  eigenem Wisch den `einst`-Eintrag über `history.back()` ab; kommt der Aufruf selbst
+  aus `popstate` (`true`), ist er schon weg.
+  **Zweite Sicherung:** Nach einer echten Wischbewegung (> 8 px) verwirft ein
+  Capture-Listener an der Seite 450 ms lang jeden Klick — eine kurze Randgeste über
+  „Mit Google anmelden" löste sonst auf iOS einen Klick auf den Knopf aus.
+  **Folge am Desktop:** die Zurück-Taste des Browsers verlässt die App nicht mehr mit
+  einem Klick. Ohne Daten (Anmeldebildschirm) läuft die Wache nicht — dort gibt es
+  auch nichts, wovon man zurückwischen könnte.
+  Geprüft im Prüfstand mit vorgeschalteter fremder Seite: Einstellungen offen →
+  `history.back()` schliesst sie; danach zweimal `back()` im Tab → URL bleibt die App;
+  Knopf „Zurück" → Zustand `app`; kurzer Rand-Wisch + Klick → Klick kommt nicht an,
+  normaler Tipp danach schon; langer Wisch schliesst.
 - **„Daten bis" nennt den Zeitstempel des Exports, nicht nur den Tag** (12.09.2026,
   auf Wunsch): `12.09.26, 07:14 Uhr` statt `12.09.26`. Ein Tag ist auch um 00:05 Uhr
   schon „heute" — erst die Uhrzeit sagt, wie frisch die Gesundheitswerte sind.
