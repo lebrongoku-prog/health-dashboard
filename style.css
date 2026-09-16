@@ -602,7 +602,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    Die Faktoren je Stufe bleiben wie gehabt. Ein neues Diagramm braucht deshalb
    KEINE Hoehenangabe mehr — gibt es eine, bricht es die Gleichheit wieder auf. */
 :root{--diagramm-hoch:315px;--diagramm-quer:210px}
-.chart-wrap{position:relative;overflow:hidden;height:var(--diagramm-hoch)}
+/* `touch-action: pan-y` gibt der Diagrammflaeche nur die SENKRECHTE Bewegung frei.
+   Ohne sie verarbeitet der Tab-Scroller jede waagrechte Geste selbst und wechselt den
+   Tab, bevor `diagrammWischen()` ueberhaupt ein `touchmove` sieht (16.09.2026).
+   Scrollen in der Seite bleibt moeglich; ein Tabwechsel per Wisch beginnt seither
+   neben einem Diagramm. */
+.chart-wrap{position:relative;overflow:hidden;height:var(--diagramm-hoch);touch-action:pan-y}
 /* Im Hochformat ist die Karte nur etwa halb so breit wie im Querformat. Dieselbe
    Hoehe laesst das Diagramm dort fast quadratisch wirken - es ist nicht zu hoch,
    sondern zu hoch FUER SEINE BREITE. Deshalb hier knapp ein Drittel flacher; im

@@ -2525,6 +2525,67 @@ function einstellungenSchliessen(ausVerlauf) {
   setTimeout(() => { if (!_einstOffen) el.hidden = true; }, 300);
 }
 
+// ── Waagrecht wischen IM Diagramm blaettert den Zeitraum (auf Wunsch, 16.09.2026)
+// Dieselbe Bewegung wie die Pfeile `‹ ›` der Zeitleiste: nach links = vorwaerts,
+// nach rechts = zurueck, ein Schritt je Geste, begrenzt durch den Datenbestand.
+// Es ruft `navNext`/`navPrev` auf — damit gelten Schrittweite (7 Tage bzw. ein Monat),
+// die Wisch-Animation der Datenflaeche und `_datumSelbstGewaehlt` unveraendert.
+//
+// **Der eigentliche Punkt ist der Zielkonflikt:** waagrechte Wische gehoerten bisher
+// dem Tab-Scroller. Ohne `touch-action: pan-y` auf `.chart-wrap` (siehe style.css)
+// wechselt der Browser den Tab, bevor ein `touchmove` hier ankommt — die Angabe gibt
+// der Diagrammflaeche nur noch die senkrechte Bewegung frei. **Folge:** Ein Tabwechsel
+// per Wisch muss neben einem Diagramm beginnen (Kartenrand, Fusszeile, Hintergrund).
+//
+// Schwelle 45 px UND waagrecht deutlicher als senkrecht (Faktor 1.5), sonst blaettert
+// schon ein leicht schraeges Scrollen.
+let _diaWisch = null;
+let _diaKlickSperreBis = 0;
+function diagrammWischen() {
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { _diaWisch = null; return; }
+    const flaeche = e.target.closest && e.target.closest('.chart-wrap');
+    if (!flaeche) { _diaWisch = null; return; }
+    _diaWisch = { x: e.touches[0].clientX, y: e.touches[0].clientY,
+                  karte: flaeche.closest('.chart-card'), richtung: 0 };
+  }, { passive: true });
+
+  // Waehrend der Bewegung wird nur GEMERKT, ob die Geste als Blaettern zaehlt.
+  document.addEventListener('touchmove', (e) => {
+    const z = _diaWisch;
+    if (!z || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - z.x, dy = e.touches[0].clientY - z.y;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) { z.richtung = 0; return; }
+    z.richtung = dx < 0 ? 1 : -1;
+  }, { passive: true });
+
+  // Geblaettert wird beim LOSLASSEN — wie ein Tipp auf den Pfeil, der auch erst beim
+  // Abheben ausloest. Das ist nicht nur Geschmack: navigiert man mitten in der Geste,
+  // baut `_refreshAfterStateChange` die Karte unter dem Finger neu auf. Die weiteren
+  // `touchmove`/`touchend` gehen dann an ein Element, das nicht mehr im Dokument
+  // haengt, und erreichen diese Listener nie — die Klick-Sperre unten bliebe bei einem
+  // langsamen Wisch ungesetzt, und ein Streuklick markierte eine Saeule.
+  const ende = () => {
+    const z = _diaWisch;
+    _diaWisch = null;
+    if (!z || !z.richtung) return;
+    _diaKlickSperreBis = Date.now() + 450;
+    // Denselben Blickanker setzen wie ein Pfeil-Tipp: der Neuaufbau aendert die
+    // Gesamthoehe, und ohne Anker spraenge die Ansicht unter dem Finger weg.
+    blickAnkerMerken(z.karte);
+    if (z.richtung > 0) navNext(); else navPrev();
+  };
+  document.addEventListener('touchend', ende, { passive: true });
+  document.addEventListener('touchcancel', () => { _diaWisch = null; }, { passive: true });
+
+  // Nach dem Blaettern folgt auf iOS noch ein Klick. Der darf weder eine Saeule
+  // markieren noch (ueber den Kartentitel) die Datenbeschriftungen umschalten.
+  document.addEventListener('click', (e) => {
+    if (Date.now() < _diaKlickSperreBis && e.target.closest && e.target.closest('.chart-card')) {
+      e.preventDefault(); e.stopPropagation();
+    }
+  }, true);
+}
 // Wisch vom linken Bildschirmrand = zurueck, wie in iOS. Bewusst nur vom Rand aus
 // (<= 28 px): weiter innen gehoert die waagrechte Bewegung dem Inhalt.
 function einstellungenWischen() {
@@ -4307,6 +4368,7 @@ zeitleisteBauen();
 // showScreen stehen, damit die Zeitleiste gleich auf der richtigen Hoehe sitzt.
 navAusblenden(document.getElementById('bottom-nav'), true);
 einstellungenWischen();
+diagrammWischen();
 initScrollHideNav();
 // Initial render des ersten Tabs
 showScreen('overview');

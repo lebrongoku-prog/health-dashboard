@@ -827,6 +827,31 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
   Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
+- **Waagrecht wischen IM Diagramm blättert den Zeitraum** (auf Wunsch, 16.09.2026,
+  `diagrammWischen()`): nach links = vorwärts, nach rechts = zurück, **ein Schritt je
+  Geste**. Es ruft `navNext()`/`navPrev()` — damit gelten Schrittweite (7 Tage bzw. ein
+  Monat), Grenzen des Datenbestands, `_datumSelbstGewaehlt` und die `navslide`-Animation
+  unverändert. Vier Dinge hängen daran:
+  1. **`touch-action: pan-y` auf `.chart-wrap` ist die Voraussetzung.** Waagrechte
+     Gesten gehörten dem Tab-Scroller; ohne die Angabe wechselt der Browser den Tab,
+     bevor ein `touchmove` im Handler ankommt. **Folge: ein Tabwechsel per Wisch muss
+     neben einem Diagramm beginnen** (Kartenrand, Fusszeile, Hintergrund) — der Rest
+     der Karte (`.chart-card`) behält `manipulation`.
+  2. **Ausgelöst wird beim LOSLASSEN**, nicht mitten in der Bewegung. Navigiert man im
+     `touchmove`, baut `_refreshAfterStateChange` die Karte **unter dem Finger** neu
+     auf; die weiteren `touchmove`/`touchend` gehen dann an ein Element, das nicht mehr
+     im Dokument hängt, und erreichen die Listener auf `document` nie. Gemessen: bei
+     einem langsamen Wisch blieb dadurch die Klick-Sperre ungesetzt.
+  3. **Schwelle 45 px UND waagrecht deutlicher als senkrecht** (Faktor 1.5), sonst
+     blättert schon ein leicht schräges Scrollen.
+  4. **Nach dem Blättern verwirft ein Capture-Listener 450 ms lang Klicks in der Karte**
+     — sonst markiert der von iOS nachgeschobene Klick eine Säule oder schaltet über
+     den Kartentitel die Datenbeschriftungen um.
+  `blickAnkerMerken(karte)` läuft wie beim Pfeil-Tipp, sonst spränge die Ansicht.
+  Geprüft im Prüfstand (simulierte Touch-Ereignisse, alle vier Tabs): schneller und
+  langsamer Wisch blättern je einen Schritt und schlucken den Folgeklick; senkrechter
+  und zu kurzer Wisch ändern nichts und lassen den Tipp durch; der Tab bleibt stehen;
+  die Pfeile der Zeitleiste arbeiten unverändert.
 - **Balkenrundung: `BALKEN_RADIUS` (3) ist die einzige Quelle.** Vorher standen 5, 4,
   3 und (im 1M-Fenster) 2 nebeneinander — dieselbe obere Kante sah je nach Diagramm
   anders aus. Klein gehalten: kräftige Kappen lassen kurze Balken abgeschnitten wirken.
