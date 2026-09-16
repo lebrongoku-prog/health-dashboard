@@ -726,10 +726,19 @@ function updateNavUI() {
   document.querySelectorAll('.nav-next').forEach(b => setzeInaktiv(b, nextDis));
 }
 
+// Wohin fuehrt ein Schritt in diese Richtung — oder `null`, wenn der Datenbestand
+// dort endet? EINE Quelle fuer Pfeile, Wischgeste und deren Gummiband-Verhalten.
+function _navZiel(richtung) {
+  if (!referenceDate || !allData.length) return null;
+  const nr = is7D() ? addDays(referenceDate, richtung * 7) : addMonths(referenceDate, richtung);
+  if (richtung < 0 && nr < allData[0].date) return null;
+  if (richtung > 0 && nr > allData[allData.length - 1].date) return null;
+  return nr;
+}
+
 function navPrev() {
-  if (!referenceDate || !allData.length) return;
-  const nr = is7D() ? addDays(referenceDate, -7) : addMonths(referenceDate, -1);
-  if (nr < allData[0].date) return;
+  const nr = _navZiel(-1);
+  if (!nr) return;
   referenceDate = nr; _datumSelbstGewaehlt = true;
   updateNavUI();
   _navSliding = true;
@@ -739,10 +748,8 @@ function navPrev() {
 }
 
 function navNext() {
-  if (!referenceDate || !allData.length) return;
-  const maxDate = allData[allData.length-1].date;
-  const nr = is7D() ? addDays(referenceDate, 7) : addMonths(referenceDate, 1);
-  if (nr > maxDate) return;
+  const nr = _navZiel(1);
+  if (!nr) return;
   referenceDate = nr; _datumSelbstGewaehlt = true;
   updateNavUI();
   _navSliding = true;
@@ -2541,42 +2548,123 @@ function einstellungenSchliessen(ausVerlauf) {
 // schon ein leicht schraeges Scrollen.
 let _diaWisch = null;
 let _diaKlickSperreBis = 0;
+
+// Die Diagramme des sichtbaren Tabs, die schon eine Zeichenflaeche haben.
+function _wischCharts() {
+  return (tabCharts[currentScreen] || []).map(id => charts[id]).filter(c => c && c.chartArea);
+}
+// Wie weit darf die Datenflaeche hoechstens ausschlagen? Derselbe Weg, den auch
+// `_animNavSlide` beim Hereinkommen nutzt — sonst haette die Geste ein anderes Mass
+// als ihre eigene Abschlussanimation.
+function _wischWeg(c) {
+  const w = c.chartArea.right - c.chartArea.left;
+  return Math.min(w * 0.42, 110);
+}
+// Stand der Datenflaeche waehrend der Geste. Gedaempft, damit der Ausschlag begrenzt
+// bleibt; am Rand des Datenbestands staerker — das Gummiband sagt „hier ist Schluss",
+// ohne dass eine Meldung noetig waere.
+// Die SCHWELLE wird abgezogen: sonst spraenge die Flaeche im Moment der Erkennung
+// sofort um 31 px (45 x 0.7) — die Bewegung soll bei null beginnen und dem Finger
+// von dort folgen.
+const WISCH_SCHWELLE = 45;
+function _wischZeichnen(z) {
+  const daempfung = z.moeglich ? 0.9 : 0.25;
+  z.charts.forEach(c => {
+    if (!c.chartArea) return;
+    const weg = _wischWeg(c);
+    const ueber = Math.max(0, Math.abs(z.dx) - WISCH_SCHWELLE);
+    const off = Math.sign(z.dx) * Math.min(ueber * daempfung, weg);
+    c.$navslide = { offset: off, alpha: 1 - 0.45 * (Math.abs(off) / weg) };
+    try { c.draw(); } catch (_) {}
+  });
+}
+// Gemeinsamer Ablauf fuer „hinausgleiten" und „zurueckfedern": beide bewegen
+// dieselbe Groesse und teilen sich `_navSlideRAF` mit `_animNavSlide`, damit nie zwei
+// Animationen gleichzeitig an denselben Diagrammen ziehen.
+function _wischAnimieren(charts, dauer, proSchritt, fertig) {
+  if (_navSlideRAF) { cancelAnimationFrame(_navSlideRAF); _navSlideRAF = null; }
+  const start = performance.now();
+  const schritt = (jetzt) => {
+    const t = Math.min(1, (jetzt - start) / dauer);
+    const e = 1 - Math.pow(1 - t, 3);            // easeOutCubic, wie beim Hereinkommen
+    charts.forEach(c => { if (!c.chartArea) return; proSchritt(c, e); try { c.draw(); } catch (_) {} });
+    if (t < 1) { _navSlideRAF = requestAnimationFrame(schritt); }
+    else { _navSlideRAF = null; if (fertig) fertig(); }
+  };
+  _navSlideRAF = requestAnimationFrame(schritt);
+}
+function _wischZurueckfedern(charts) {
+  const von = charts.map(c => (c.$navslide ? c.$navslide.offset : 0));
+  _wischAnimieren(charts, 220,
+    (c, e) => { const i = charts.indexOf(c), off = von[i] * (1 - e);
+                c.$navslide = { offset: off, alpha: 1 - 0.45 * Math.abs(off) / _wischWeg(c) }; },
+    () => charts.forEach(c => { delete c.$navslide; try { c.draw(); } catch (_) {} }));
+}
+// Der alte Stand gleitet in Wischrichtung aus dem Bild; erst DANACH wird geblaettert,
+// und `_animNavSlide` holt den neuen von der anderen Seite herein.
+function _wischHinaus(charts, richtung, fertig) {
+  const von = charts.map(c => (c.$navslide ? c.$navslide.offset : 0));
+  _wischAnimieren(charts, 150,
+    (c, e) => { const i = charts.indexOf(c);
+                const ziel = -richtung * (c.chartArea.right - c.chartArea.left);
+                c.$navslide = { offset: von[i] + (ziel - von[i]) * e, alpha: (1 - e) * 0.9 }; },
+    fertig);
+}
+
 function diagrammWischen() {
+  const ruhig = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { _diaWisch = null; return; }
     const flaeche = e.target.closest && e.target.closest('.chart-wrap');
     if (!flaeche) { _diaWisch = null; return; }
     _diaWisch = { x: e.touches[0].clientX, y: e.touches[0].clientY,
-                  karte: flaeche.closest('.chart-card'), richtung: 0 };
+                  karte: flaeche.closest('.chart-card'), richtung: 0, dx: 0,
+                  charts: _wischCharts(), moeglich: true, frameOffen: false };
   }, { passive: true });
 
-  // Waehrend der Bewegung wird nur GEMERKT, ob die Geste als Blaettern zaehlt.
   document.addEventListener('touchmove', (e) => {
     const z = _diaWisch;
     if (!z || e.touches.length !== 1) return;
     const dx = e.touches[0].clientX - z.x, dy = e.touches[0].clientY - z.y;
-    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.5) { z.richtung = 0; return; }
+    if (Math.abs(dx) < WISCH_SCHWELLE || Math.abs(dx) < Math.abs(dy) * 1.5) { z.richtung = 0; return; }
     z.richtung = dx < 0 ? 1 : -1;
+    z.dx = dx;
+    z.moeglich = !!_navZiel(z.richtung);
+    if (ruhig() || z.frameOffen) return;
+    // Hoechstens eine Zeichnung je Bild: `touchmove` feuert oefter als der Bildschirm
+    // sich auffrischt, und jedes `draw()` zeichnet alle Diagramme des Tabs neu.
+    z.frameOffen = true;
+    requestAnimationFrame(() => { z.frameOffen = false; if (_diaWisch === z) _wischZeichnen(z); });
   }, { passive: true });
 
   // Geblaettert wird beim LOSLASSEN — wie ein Tipp auf den Pfeil, der auch erst beim
-  // Abheben ausloest. Das ist nicht nur Geschmack: navigiert man mitten in der Geste,
-  // baut `_refreshAfterStateChange` die Karte unter dem Finger neu auf. Die weiteren
+  // Abheben ausloest. Das ist nicht nur Geschmack: navigiert man im `touchmove`, baut
+  // `_refreshAfterStateChange` die Karte UNTER DEM FINGER neu auf; die weiteren
   // `touchmove`/`touchend` gehen dann an ein Element, das nicht mehr im Dokument
-  // haengt, und erreichen diese Listener nie — die Klick-Sperre unten bliebe bei einem
-  // langsamen Wisch ungesetzt, und ein Streuklick markierte eine Saeule.
+  // haengt, und erreichen diese Listener nie.
   const ende = () => {
     const z = _diaWisch;
     _diaWisch = null;
     if (!z || !z.richtung) return;
     _diaKlickSperreBis = Date.now() + 450;
-    // Denselben Blickanker setzen wie ein Pfeil-Tipp: der Neuaufbau aendert die
-    // Gesamthoehe, und ohne Anker spraenge die Ansicht unter dem Finger weg.
-    blickAnkerMerken(z.karte);
-    if (z.richtung > 0) navNext(); else navPrev();
+    // Am Rand des Datenbestands federt die Flaeche nur zurueck — wie ein Pfeil, der
+    // dort nichts tut.
+    if (!z.moeglich) { if (!ruhig()) _wischZurueckfedern(z.charts); return; }
+    const blaettern = () => {
+      // Denselben Blickanker setzen wie ein Pfeil-Tipp: der Neuaufbau aendert die
+      // Gesamthoehe, und ohne Anker spraenge die Ansicht unter dem Finger weg.
+      blickAnkerMerken(z.karte);
+      if (z.richtung > 0) navNext(); else navPrev();
+    };
+    if (ruhig()) { blaettern(); return; }
+    _wischHinaus(z.charts, z.richtung, blaettern);
   };
   document.addEventListener('touchend', ende, { passive: true });
-  document.addEventListener('touchcancel', () => { _diaWisch = null; }, { passive: true });
+  document.addEventListener('touchcancel', () => {
+    const z = _diaWisch; _diaWisch = null;
+    if (z && z.richtung && !ruhig()) _wischZurueckfedern(z.charts);
+  }, { passive: true });
 
   // Nach dem Blaettern folgt auf iOS noch ein Klick. Der darf weder eine Saeule
   // markieren noch (ueber den Kartentitel) die Datenbeschriftungen umschalten.

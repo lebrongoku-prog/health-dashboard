@@ -844,6 +844,27 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      einem langsamen Wisch blieb dadurch die Klick-Sperre ungesetzt.
   3. **Schwelle 45 px UND waagrecht deutlicher als senkrecht** (Faktor 1.5), sonst
      blättert schon ein leicht schräges Scrollen.
+  5. **Die Datenfläche zieht mit dem Finger mit** (auf Wunsch, 16.09.2026) — drei
+     Phasen, alle über dasselbe `navslide`-Plugin, das schon die Pfeil-Animation
+     verschiebt (Achsen und Gitter bleiben deshalb stehen):
+     **Ziehen** (`_wischZeichnen`): Ausschlag `(|dx| − Schwelle) × 0.9`, gedeckelt auf
+     denselben Weg, den `_animNavSlide` beim Hereinkommen nutzt (`_wischWeg`, 42 % der
+     Zeichenfläche, höchstens 110 px); dazu blasser bis 55 %. **Die Schwelle wird
+     abgezogen**, sonst spränge die Fläche im Moment der Erkennung um 31 px.
+     **Hinausgleiten** (`_wischHinaus`, 150 ms) bis über den Rand, **danach** wird
+     geblättert und `_animNavSlide` holt den neuen Stand von der anderen Seite herein.
+     **Zurückfedern** (`_wischZurueckfedern`, 220 ms), wenn die Geste nicht zählt.
+     Am **Rand des Datenbestands** zieht die Fläche nur mit Dämpfung 0.25 mit und
+     federt zurück — das Gummiband sagt „hier ist Schluss", ohne Meldung. Was möglich
+     ist, sagt `_navZiel(richtung)`: **eine** Quelle für Pfeile, Geste und Gummiband.
+     Alle Animationen teilen sich `_navSlideRAF` mit `_animNavSlide`, damit nie zwei
+     gleichzeitig an denselben Diagrammen ziehen; `touchmove` zeichnet höchstens
+     **einmal je Bild** (rAF-Drossel) — es feuert öfter als der Bildschirm sich
+     auffrischt, und jedes `draw()` zeichnet alle Diagramme des Tabs.
+     Gemessen (Prüfstand, Zeichenfläche 282 px): 46 px Geste → 0.9 px Versatz,
+     100 → 49.5, 300 → 110 (gedeckelt, Deckkraft 0.55); beim Loslassen 270 px bei
+     Deckkraft 0.06, danach `$navslide` wieder entfernt. Am Rand: 150 px → −26.3
+     statt −94.
   4. **Nach dem Blättern verwirft ein Capture-Listener 450 ms lang Klicks in der Karte**
      — sonst markiert der von iOS nachgeschobene Klick eine Säule oder schaltet über
      den Kartentitel die Datenbeschriftungen um.
