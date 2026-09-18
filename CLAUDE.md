@@ -838,7 +838,70 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Layout, und in einer nicht gezeichneten Seite feuert `requestAnimationFrame` nie.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
 - **Wisch-Animation:** `navslide`-Chart.js-Plugin verschiebt beim Datums-Navigieren nur die
-  Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix.
+  Datenfläche (auf `chartArea` geclippt) — Achsen bleiben fix. **Gilt seit 18.09.2026 nur
+  noch für 7T, 1M und den Jahresvergleich**, wo ein Schritt tatsächlich das ganze
+  Fenster austauscht. Bei Monatsbalken siehe den nächsten Punkt.
+  Die **Flächen unter Linien** (fill) zeichnet Chart.js' Filler-Plugin selbst, in 4.5 je
+  Datensatz in `beforeDatasetDraw` und VOR allen Plugins dieser Datei. Keine
+  Verschiebung erreichte sie — im Pixelvergleich stand die HRV-Fläche am Endplatz, die
+  Linie noch am alten. `fuellungMitziehen()` legt deshalb `$spalten`/`$navslide` um die
+  drei Zeichen-Haken des Fillers. Bei der alten Schiebe-Animation hatte das Ausblenden
+  den Fehler verdeckt.
+- **Monatsbalken rücken weiter** (auf Wunsch, 18.09.2026). Ab 3M blättert ein Schritt
+  EINEN Monat, das Fenster umfasst aber 3 bis 24. Die Schiebe-Animation schob trotzdem
+  die ganze Fläche weg und blendete sie aus — es sah aus, als wechsle das ganze
+  Fenster, obwohl fünf von sechs Balken dieselben blieben. Umgesetzt (Vorschläge 1–4;
+  Punkt 5, mehrere Monate je Wisch, wurde nicht gewählt):
+  1. **Weiterrücken um die tatsächlich verschobenen Spalten.** `_navSchritt()` hält vor
+     dem Neuaufbau jedes Diagramm des Tabs fest (`_spaltenMerken`: `$keys`,
+     Pixelpositionen, y-Bereiche, Ø-Werte, **Momentaufnahme des Canvas**). Danach
+     beginnt das neue Diagramm genau dort, wo das alte stand, und rückt in 420 ms
+     (`SPALTEN_DAUER`) an seinen Platz. Der Versatz kommt aus den gemeinsamen
+     Zeitraum-Schlüsseln, in **Pixeln** gemessen — stimmt also auch, wenn sich die
+     Breite der y-Achse ändert. Der ausscheidende Monat ist im neuen Diagramm nicht
+     mehr enthalten; er fährt als Ausschnitt der Momentaufnahme hinaus (`streifen`,
+     unter den neuen Daten gezeichnet), sonst stünde am Rand eine leere Spalte.
+  2. **Monatsnamen, Zahlen über den Balken, Markierung und Tooltip wandern mit.**
+     Die Monatsnamen über ein am Objekt überschriebenes `drawLabels` der x-Achse
+     (Chart.js ruft es über `this.drawLabels`, die Achse bleibt bei `update()`
+     dieselbe Instanz). Links sichtbar nur so weit, wie der erste Name im Endstand
+     übersteht (`_labelLinks`) — sonst stand ein hereinkommender Name schon unten in
+     der Ecke neben der y-Achse.
+  3. **Die y-Achse gleitet**: `min`/`max` je Bild auf dem **frisch geholten**
+     `c.config.options.scales[id]` (die Objekte werden bei jedem `update()` neu
+     zusammengesetzt — eine gemerkte Referenz wirkt ab dem zweiten Bild nicht mehr),
+     dazu `update('none')`. `ticks.includeBounds` ist währenddessen aus, sonst stünde
+     oben eine krumme Zwischenzahl. Am Ende wird alles zurückgesetzt.
+  4. **Ø-Linien gleiten senkrecht** auf ihren neuen Wert und rücken NICHT seitlich mit
+     (`spaltenPlugin.beforeDatasetDraw` lässt Hilfslinien aus); Ziellinien stehen.
+  **Zwei Arten** (`_spaltenPlan`): SPALTEN für Monats- und Wochenspalten mit
+  gemeinsamen Zeiträumen; ausgerichtet an einem stehenbleibenden Rand (Anfang/Ende des
+  Datenbestands), sonst an der **mittleren** gemeinsamen Spalte — bei Wochen (3M:
+  Ruhepuls & HRV, VO₂max, Score) hat ein Fenster mal 13, mal 14 Spalten, eine Spalte
+  Unterschied ist erlaubt. GLEITEN für alles andere, vor allem den **Pace** (Punkte je
+  Training): um die Breite eines Monats, ohne Ausblenden und ohne Streifen, aber mit
+  gleitender Achse, Ø-Linie und Beschriftungen.
+  **Wischen:** Bei Monatsbalken folgt die Fläche dem Finger höchstens **einen Monat**
+  weit (`_wischWeg`: Breite ÷ Monate im Fenster) und bleibt voll deckend
+  (`_wischAlpha`). Beim Loslassen gleitet sie nicht erst hinaus — der Schritt setzt
+  genau am gezogenen Stand fort (`zug`, begrenzt über `_zwischen`). Bei 24M ist ein
+  Monat nur rund 15 px breit: der Finger zieht dort also weit, die Fläche rückt eine
+  Spalte. Das ist gewollt — ein Wisch ist ein Monat.
+  **Erstes Bild sofort:** `_spaltenStarten` und `_animNavSlide` (bei Monatsbereichen)
+  setzen den Anfangszustand noch in derselben Aufgabe; vorher stand für ein Bild der
+  Endstand da. Training baut dafür synchron genug — `pgTraining` wartet nur, solange die
+  Workout-Daten fehlen.
+  **Nachgemessen** (Prüfstand, Pixelvergleich altes Bild ↔ erstes Bild nach dem
+  Schritt): Laufstrecke 6M 1.4–1.7 %, Ruhepuls & HRV 12M 1.2 %, VO₂max 3M (Wochen)
+  1.1 % abweichende Pixel — Kantenglättung von Text und Linien an Bruchteil-Positionen.
+  Vor der Füllungs-Korrektur waren es 4.6 bzw. 8.5 %. Positionsabweichung gemeinsamer
+  Spalten im ersten Bild: Monatsbalken ≤ 1.1 px, Wochen mit ungleicher Spaltenzahl bis
+  10 px am Rand. Laufende Bewegungen bricht ein neuer Schritt oder eine neue Geste über
+  `_spaltenAbbrechen()` ab (Endstand setzen), es bleibt nichts hängen.
+  **Bekannte Kleinigkeiten:** bei 12M/24M überspringt Chart.js Monatsnamen
+  (`autoSkip`); nach einem Schritt trifft das andere Monate, die Namen wechseln im
+  ersten Bild. Die Momentaufnahme bringt die alte Ø-Linie im hinausfahrenden Streifen
+  mit, die neue gleitet daneben auf ihren Wert.
 - **Waagrecht wischen IM Diagramm blättert den Zeitraum** (auf Wunsch, 16.09.2026,
   `diagrammWischen()`): nach links = vorwärts, nach rechts = zurück, **ein Schritt je
   Geste**. Es ruft `navNext()`/`navPrev()` — damit gelten Schrittweite (7 Tage bzw. ein
@@ -861,7 +924,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      verschiebt (Achsen und Gitter bleiben deshalb stehen):
      **Ziehen** (`_wischZeichnen`): Ausschlag `(|dx| − Schwelle) × 0.9`, gedeckelt auf
      denselben Weg, den `_animNavSlide` beim Hereinkommen nutzt (`_wischWeg`, 42 % der
-     Zeichenfläche, höchstens 110 px); dazu blasser bis 55 %. **Die Schwelle wird
+     Zeichenfläche, höchstens 110 px); dazu blasser bis 55 %. **Bei Monatsbalken
+     anders** (seit 18.09.2026): höchstens ein Monat, voll deckend, kein Hinausgleiten
+     — siehe „Monatsbalken rücken weiter". **Die Schwelle wird
      abgezogen**, sonst spränge die Fläche im Moment der Erkennung um 31 px.
      **Hinausgleiten** (`_wischHinaus`, 150 ms) bis über den Rand, **danach** wird
      geblättert und `_animNavSlide` holt den neuen Stand von der anderen Seite herein.

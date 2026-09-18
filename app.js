@@ -740,27 +740,26 @@ function _navZiel(richtung) {
   return nr;
 }
 
-function navPrev() {
-  const nr = _navZiel(-1);
+// Ein Schritt in eine Richtung – fuer Pfeile und Wischgeste. Bei Monatsbalken
+// (`_spaltenBereich`) wird VOR dem Neuaufbau festgehalten, wie jedes Diagramm gerade
+// aussieht, damit der neue Stand genau dort beginnen und um die tatsaechlich
+// verschobenen Spalten weiterruecken kann (siehe „Monatsbalken ruecken weiter").
+function _navSchritt(richtung) {
+  const nr = _navZiel(richtung);
   if (!nr) return;
+  _spaltenAbbrechen();
+  const spalten = _spaltenBereich() && !bewegungAus();
+  const vorher = spalten ? _spaltenMerken() : null;
   referenceDate = nr; _datumSelbstGewaehlt = true;
   updateNavUI();
   _navSliding = true;
   _refreshAfterStateChange();
   _navSliding = false;
-  _animNavSlide(-1); // zurück: Daten wischen nach rechts
+  const erledigt = spalten ? _spaltenStarten(vorher, richtung) : null;
+  _animNavSlide(richtung, erledigt, vorher);
 }
-
-function navNext() {
-  const nr = _navZiel(1);
-  if (!nr) return;
-  referenceDate = nr; _datumSelbstGewaehlt = true;
-  updateNavUI();
-  _navSliding = true;
-  _refreshAfterStateChange();
-  _navSliding = false;
-  _animNavSlide(1); // vor: Daten wischen nach links
-}
+function navPrev() { _navSchritt(-1); }   // zurück: Daten wischen nach rechts
+function navNext() { _navSchritt(1); }    // vor: Daten wischen nach links
 
 // Wisch-Animation beim Pfeil-Navigator. Verschiebt via navslide-Plugin NUR die
 // Datenfläche jedes Charts (Achsen/Gitter bleiben stehen). dir=-1 (zurück) →
@@ -800,31 +799,50 @@ function uebergang(dauer, proSchritt, fertig) {
   raf = requestAnimationFrame(schritt);
   return () => { vorbei = true; if (raf) cancelAnimationFrame(raf); clearTimeout(zg); };
 }
-function _animNavSlide(dir) {
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+//
+// Seit 18.09.2026 zwei Faelle:
+//  - 7T, 1M, Jahresvergleich: ein Schritt tauscht das GANZE Fenster → wie bisher
+//    weiter Weg (42 %, hoechstens 110 px) mit Einblenden.
+//  - Monatsbalken (`_spaltenBereich`): die meisten Diagramme ruecken um ihre Spalten
+//    weiter (`_spaltenStarten`, als `ausnahmen` uebergeben). Was bleibt – der Pace mit
+//    seinen Punkten je Training –, gleitet nur um die Breite EINES Monats und ohne
+//    Ausblenden; ein Wisch-Versatz aus `vorher` wird dabei fortgesetzt.
+// Das erste Bild wird sofort gesetzt: vorher stand fuer ein Bild der Endstand da,
+// bevor die Bewegung einsetzte.
+function _animNavSlide(dir, ausnahmen, vorher) {
+  if (bewegungAus()) return;
   if (_navSlideRAF) { cancelAnimationFrame(_navSlideRAF); _navSlideRAF = null; }
-  requestAnimationFrame(() => {
+  const monat = _spaltenBereich();
+  const los = () => {
     const list = (tabCharts[currentScreen] || [])
-      .map(id => charts[id]).filter(c => c && c.chartArea);
+      .map(id => charts[id]).filter(c => c && c.chartArea && !(ausnahmen && ausnahmen.has(c)));
     if (!list.length) return;
-    const dur = 560;                          // sanfter: länger
+    const dur = monat ? SPALTEN_DAUER : 560;
     const ease = t => 1 - Math.pow(1 - t, 3); // easeOutCubic – weiches Auslaufen
+    const weg = c => { const w = c.chartArea.right - c.chartArea.left;
+                       return monat ? w / windowMonths() : Math.min(w * 0.42, 110); };
+    const anfang = new Map(list.map(c => {
+      const ziel = dir * weg(c);
+      const zug = vorher && vorher[c.canvas.id] ? vorher[c.canvas.id].zug : 0;
+      return [c, _zwischen(ziel + zug, ziel)];
+    }));
+    const setze = e => list.forEach(c => {
+      if (!c.chartArea) return;
+      c.$navslide = { offset: anfang.get(c) * (1 - e), alpha: monat ? 1 : 0.25 + 0.75 * e };
+      try { c.draw(); } catch (_) {}
+    });
+    setze(0);
     const start = performance.now();
     const step = (now) => {
       const t = Math.min(1, (now - start) / dur);
-      const e = ease(t);
-      list.forEach(c => {
-        if (!c.chartArea) return;
-        const w = c.chartArea.right - c.chartArea.left;
-        const dist = Math.min(w * 0.42, 110);
-        c.$navslide = { offset: dir * dist * (1 - e), alpha: 0.25 + 0.75 * e };
-        try { c.draw(); } catch (_) {}
-      });
-      if (t < 1) { _navSlideRAF = requestAnimationFrame(step); }
+      if (t < 1) { setze(ease(t)); _navSlideRAF = requestAnimationFrame(step); }
       else { list.forEach(c => { delete c.$navslide; try { c.draw(); } catch (_) {} }); _navSlideRAF = null; }
     };
     _navSlideRAF = requestAnimationFrame(step);
-  });
+  };
+  // Monatsbereiche: die Diagramme stehen schon (auch Training baut synchron, sobald
+  // die Workout-Daten da sind). Sonst wie bisher ein Bild abwarten.
+  if (monat) los(); else requestAnimationFrame(los);
 }
 
 function setR(r) {
@@ -1126,9 +1144,10 @@ const markierungPlugin = {
     const i = _markIndex(chart, _markierung || _markVerblasst);
     if (i < 0 || _markAlpha <= 0) return;
     const a = chart.chartArea; if (!a) return;
-    const sp = _spalte(chart, i), ctx = chart.ctx;
+    const sp = _markSpalte(chart, i), ctx = chart.ctx;
     // Die Markierung besteht ausschliesslich aus der getoenten Spaltenflaeche –
     // keine senkrechten Randlinien mehr.
+    if (sp.rechts <= sp.links) return;
     ctx.save();
     ctx.fillStyle = _cssFarbe('--tab-color', '#0891B2');
     ctx.globalAlpha = 0.13 * _markAlpha;
@@ -1143,7 +1162,7 @@ const markierungPlugin = {
     const i = _markIndex(chart, _markierung || _markVerblasst);
     if (i < 0 || _markAlpha <= 0) return;
     const a = chart.chartArea; if (!a) return;
-    const sp = _spalte(chart, i), ctx = chart.ctx;
+    const sp = _markSpalte(chart, i), ctx = chart.ctx;
     ctx.save();
     ctx.globalAlpha = _markAlpha;
     ctx.fillStyle = document.body.classList.contains('dark')
@@ -1153,6 +1172,15 @@ const markierungPlugin = {
     ctx.restore();
   }
 };
+
+// Die Spalte der Markierung – waehrend Monatsbalken weiterruecken um deren Versatz
+// verschoben und auf die Zeichenflaeche begrenzt (siehe `_spaltenStarten`).
+function _markSpalte(chart, i) {
+  const sp = _spalte(chart, i), a = chart.chartArea;
+  const off = chart.$spalten ? chart.$spalten.off : 0;
+  const klemme = x => Math.max(a.left, Math.min(a.right, x));
+  return { links: klemme(sp.links + off), rechts: klemme(sp.rechts + off) };
+}
 
 // Tooltip des markierten Punkts dauerhaft einblenden – in JEDEM Diagramm, das
 // diesen Tag enthält. Ohne das müsste man jedes Diagramm einzeln antippen, um die
@@ -1298,6 +1326,14 @@ const werteLabelPlugin = {
     const ctx = chart.ctx;
     ctx.save();
     if (blende) ctx.globalAlpha = blende.alpha;
+    // Ruecken Monatsbalken weiter, wandern die Zahlen mit ihren Balken (18.09.2026) –
+    // geschnitten an der Zeichenflaeche, die Luft darueber eingeschlossen.
+    const versatz = chart.$spalten ? chart.$spalten.off : 0;
+    if (versatz) {
+      ctx.beginPath();
+      ctx.rect(flaeche.left, 0, flaeche.right - flaeche.left, flaeche.bottom);
+      ctx.clip();
+    }
     ctx.font = '600 10px ' + (Chart.defaults.font.family || 'sans-serif');
     ctx.fillStyle = _cssFarbe('--txt2', '#64748B');
     ctx.textAlign = 'center';
@@ -1332,11 +1368,12 @@ const werteLabelPlugin = {
         // der Beschriftung. Vorher schob `flaeche.top + hoehe` die Zahl des hoechsten
         // Balkens nach unten in ihn hinein.
         const y = Math.max(punkt.y - 4, hoehe);
-        const x1 = punkt.x - halb, x2 = punkt.x + halb, y1 = y - hoehe, y2 = y + 2;
+        const px = punkt.x + versatz;
+        const x1 = px - halb, x2 = px + halb, y1 = y - hoehe, y2 = y + 2;
         if (!frei(x1, y1, x2, y2)) return;
         // textBaseline ist 'bottom': die LETZTE Zeile sitzt auf y, die uebrigen
         // darueber.
-        zeilen.forEach((z, k) => ctx.fillText(z, punkt.x, y - (zeilen.length - 1 - k) * ZEILE_H));
+        zeilen.forEach((z, k) => ctx.fillText(z, px, y - (zeilen.length - 1 - k) * ZEILE_H));
         belegt.push({ x1, y1, x2, y2 });
       });
     });
@@ -1420,7 +1457,343 @@ function _ruhigRendern(tab) {
   return r;
 }
 
-Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslinienBlende);
+// ── Monatsbalken ruecken weiter (auf Wunsch, 18.09.2026) ─────────────────────
+// Ab 3M blaettert ein Schritt EINEN Monat, das Fenster umfasst aber drei bis 24. Die
+// alte Animation schob die ganze Datenflaeche weg und blendete sie aus – es sah aus,
+// als wechsle das ganze Fenster, obwohl fuenf von sechs Balken dieselben blieben.
+// Jetzt:
+//  1. Das neue Diagramm beginnt GENAU dort, wo das alte stand, und rueckt um die
+//     Spalten weiter, die tatsaechlich dazukommen bzw. wegfallen. Der Versatz kommt aus
+//     den Zeitraum-Schluesseln (`$keys`) vorher und nachher, in Pixeln gemessen – so
+//     stimmt er auch, wenn sich die Breite der y-Achse aendert, und bei VO2max, das bei
+//     3M in Wochen aufloest (ein Monat = vier bis fuenf Spalten).
+//     Der ausscheidende Monat ist im neuen Diagramm nicht mehr enthalten. Er faehrt als
+//     Ausschnitt einer Momentaufnahme des alten Canvas hinaus (`streifen`), sonst stuende
+//     am Rand fuer die Dauer der Bewegung eine leere Spalte.
+//  2. Monatsnamen (`drawLabels` der x-Achse), Zahlen ueber den Balken, Markierung und
+//     Tooltip wandern mit ihren Balken.
+//  3. Die y-Achse gleitet vom alten auf den neuen Bereich: `min`/`max` werden je Bild
+//     gesetzt und das Diagramm mit `update('none')` neu berechnet – Gitter, Achsen-
+//     beschriftung und Balkenhoehen bleiben dadurch stimmig. `includeBounds` ist dabei
+//     aus, sonst stuende oben eine krumme Zwischenzahl an der Achse.
+//  4. Ø-Linien gleiten senkrecht auf ihren neuen Wert und ruecken NICHT seitlich mit;
+//     Ziellinien bleiben stehen.
+// Exaktes Weiterruecken gibt es fuer Monats- und Wochenspalten; der Pace (Punkte je
+// Training) GLEITET einen Monat weit, mit denselben Punkten 2–4 (siehe `_spaltenPlan`).
+// 7T, 1M und der Jahresvergleich bleiben ganz beim alten Weg (`_animNavSlide`): dort
+// tauscht ein Schritt tatsaechlich das ganze Fenster.
+const SPALTEN_DAUER = 420;
+let _spaltenLauf = null;
+function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY(); }
+// Startversatz auf [0, ziel] begrenzen – ein Wisch darf nicht ueber das Ziel hinaus
+// oder in die Gegenrichtung zeigen.
+function _zwischen(wert, ziel) {
+  return ziel > 0 ? Math.min(ziel, Math.max(0, wert)) : Math.max(ziel, Math.min(0, wert));
+}
+const _istHilfslinienLabel = l => /^(Ø|Ziel)/.test(l || '');
+
+// Vor dem Neuaufbau: wie sieht jedes Diagramm des sichtbaren Tabs gerade aus?
+function _spaltenMerken() {
+  const m = {};
+  (tabCharts[currentScreen] || []).forEach(id => {
+    const c = charts[id];
+    if (!c || !c.chartArea || !c.canvas) return;
+    // Ein laufender Wisch-Versatz ist der Startpunkt der Bewegung – das Bild selbst
+    // muss aber OHNE ihn aufgenommen werden, sonst saesse der Streifen verschoben.
+    const zug = c.$navslide ? c.$navslide.offset : 0;
+    if (c.$navslide) { delete c.$navslide; try { c.draw(); } catch (_) {} }
+    const v = { zug, keys: c.$keys ? c.$keys.slice() : null, keyTyp: c.$keyTyp,
+                links: c.chartArea.left, rechts: c.chartArea.right, skalen: {}, hl: [] };
+    const x = c.scales.x;
+    if (v.keys && x) {
+      v.xpos = v.keys.map((_, i) => x.getPixelForValue(i));
+      v.balken = !!(x.options && x.options.offset);
+      v.spalte = v.xpos.length > 1 ? v.xpos[1] - v.xpos[0] : (v.rechts - v.links);
+    }
+    Object.values(c.scales).forEach(s => { if (s.axis === 'y') v.skalen[s.id] = { min: s.min, max: s.max }; });
+    c.data.datasets.forEach(ds => {
+      if (_istHilfslinienLabel(ds.label)) v.hl.push({ label: ds.label, wert: ds.data.find(w => w != null) });
+    });
+    try {
+      const b = document.createElement('canvas');
+      b.width = c.canvas.width; b.height = c.canvas.height;
+      b.getContext('2d').drawImage(c.canvas, 0, 0);
+      v.bild = b; v.faktor = c.canvas.width / c.width;
+    } catch (_) {}
+    m[id] = v;
+  });
+  return m;
+}
+
+// Zwei Arten:
+//  - SPALTEN: Monats- oder Wochenspalten mit gemeinsamen Zeitraeumen vorher und
+//    nachher. Ausgerichtet wird an der MITTLEREN gemeinsamen Spalte: bei Wochen hat ein
+//    Fenster mal 13, mal 14 Spalten (Ruhepuls & HRV, VO2max bei 3M), dann sind die
+//    Spalten minimal verschieden breit – so verteilt sich die Abweichung auf beide
+//    Raender statt sich an einem zu sammeln. Mehr als eine Spalte Unterschied → GLEITEN.
+//  - GLEITEN: alles andere, vor allem der Pace (Punkte je Training, deren Abstand sich
+//    mit der Zahl der Trainings aendert). Der neue Stand kommt um die Breite EINES
+//    Monats versetzt herein, ohne Ausblenden und ohne Streifen – y-Achse, Ø-Linie und
+//    Beschriftungen gleiten aber genauso.
+function _spaltenPlan(c, v, richtung) {
+  if (!c.scales.x) return null;
+  const neu = c.$keys;
+  let versatz = null;
+  const streifen = [];
+  if (v.keys && v.xpos && neu && (c.$keyTyp === 'monat' || c.$keyTyp === 'woche') &&
+      c.$keyTyp === v.keyTyp && neu.length >= 2 && Math.abs(neu.length - v.keys.length) <= 1) {
+    const geteilt = [];
+    v.keys.forEach((k, i) => { const j = neu.indexOf(k); if (j >= 0) geteilt.push([i, j]); });
+    if (geteilt.length) {
+      // Bleibt ein Rand stehen (am Anfang oder Ende des Datenbestands waechst bzw.
+      // schrumpft das Fenster nur auf einer Seite), wird an ihm ausgerichtet – sonst an
+      // der Mitte.
+      const n = geteilt.length;
+      const anker = v.keys[0] === neu[0] ? 0
+        : v.keys[v.keys.length - 1] === neu[neu.length - 1] ? n - 1
+        : Math.floor(n / 2);
+      const [im, jm] = geteilt[anker];
+      versatz = v.xpos[im] - c.scales.x.getPixelForValue(jm);
+      // Der Rand des Streifens: bei Balken die Mitte zwischen zwei Spalten, bei Linien
+      // GENAU der erste bleibende Punkt – dort endet die Flaeche des neuen Diagramms.
+      // Mit 4 px Abstand stand dort im Pixelvergleich eine weisse Haarlinie ohne Flaeche.
+      const i0 = geteilt[0][0], i1 = geteilt[geteilt.length - 1][0];
+      const rand = v.balken ? v.spalte / 2 : 0;
+      if (i0 > 0) streifen.push([v.links, v.xpos[i0] - rand]);
+      if (i1 < v.keys.length - 1) streifen.push([v.xpos[i1] + rand, v.rechts]);
+    }
+  }
+  if (versatz == null) versatz = richtung * (c.chartArea.right - c.chartArea.left) / windowMonths();
+  const skalen = [];
+  Object.values(c.scales).forEach(s => {
+    if (s.axis !== 'y' || !v.skalen[s.id]) return;
+    const von = v.skalen[s.id], nach = { min: s.min, max: s.max };
+    if (Math.abs(von.min - nach.min) < 1e-9 && Math.abs(von.max - nach.max) < 1e-9) return;
+    const raw = c.config.options.scales[s.id];
+    if (!raw) return;
+    skalen.push({ id: s.id, von, nach,
+      hatMin: 'min' in raw, min: raw.min, hatMax: 'max' in raw, max: raw.max,
+      hatIb: !!(raw.ticks && 'includeBounds' in raw.ticks), ib: raw.ticks && raw.ticks.includeBounds });
+  });
+  const linien = [];
+  c.data.datasets.forEach(ds => {
+    if (!/^Ø/.test(ds.label || '')) return;
+    const alt = v.hl.find(h => h.label === ds.label);
+    const nach = ds.data.find(w => w != null);
+    if (!alt || alt.wert == null || nach == null || alt.wert === nach) return;
+    linien.push({ ds, von: alt.wert, nach, daten: ds.data });
+  });
+  if (Math.abs(versatz) < 0.5 && !skalen.length && !linien.length) return null;
+  return { c, versatz, start: _zwischen(versatz + v.zug, versatz), streifen, skalen, linien,
+           bild: v.bild, faktor: v.faktor };
+}
+
+// Ein Bild der Bewegung, e = 0 … 1.
+function _spaltenSchritt(p, e) {
+  const c = p.c;
+  if (!c.$spalten || !c.canvas || !c.canvas.isConnected) return;
+  c.$spalten.off = p.start * (1 - e);
+  c.$spalten.delta = c.$spalten.off - p.versatz;
+  if (!p.skalen.length && !p.linien.length) { try { c.draw(); } catch (_) {} return; }
+  // Die Skalen-Objekte der Konfiguration werden bei JEDEM update() neu zusammengesetzt –
+  // deshalb je Bild frisch holen, nicht einmal merken.
+  p.skalen.forEach(s => {
+    const raw = c.config.options.scales[s.id];
+    if (!raw) return;
+    raw.min = s.von.min + (s.nach.min - s.von.min) * e;
+    raw.max = s.von.max + (s.nach.max - s.von.max) * e;
+    if (raw.ticks) raw.ticks.includeBounds = false;
+  });
+  p.linien.forEach(l => { const w = l.von + (l.nach - l.von) * e; l.ds.data = l.daten.map(x => x == null ? x : w); });
+  try { c.update('none'); } catch (_) {}
+}
+
+function _spaltenEnde(p) {
+  const c = p.c;
+  delete c.$spalten;
+  if (!c.canvas || !c.canvas.isConnected) return;
+  if (p.skalen.length || p.linien.length) {
+    p.skalen.forEach(s => {
+      const raw = c.config.options.scales[s.id];
+      if (!raw) return;
+      if (s.hatMin) raw.min = s.min; else delete raw.min;
+      if (s.hatMax) raw.max = s.max; else delete raw.max;
+      if (raw.ticks) { if (s.hatIb) raw.ticks.includeBounds = s.ib; else delete raw.ticks.includeBounds; }
+    });
+    p.linien.forEach(l => { l.ds.data = l.daten; });
+    try { c.update('none'); } catch (_) {}
+  } else { try { c.draw(); } catch (_) {} }
+  if (_markierung) { try { _tooltipAnMarkierung(c); c.draw(); } catch (_) {} }
+}
+
+// Wie weit ragt der erste Monatsname im ENDSTAND links ueber die Zeichenflaeche? Bis
+// dorthin duerfen die wandernden Namen sichtbar sein – weiter links nicht, sonst stuende
+// ein hereinkommender Name schon unten in der Ecke neben der y-Achse, bevor sein Balken
+// da ist. Schraege Beschriftungen (Wochen, Pace) ragen um ihre Breite × cos(Winkel).
+function _labelLinks(c) {
+  const x = c.scales.x, a = c.chartArea;
+  try {
+    const t = x.ticks && x.ticks[0];
+    if (!t) return a.left;
+    const ctx = c.ctx;
+    ctx.save();
+    ctx.font = '10px ' + (Chart.defaults.font.family || 'sans-serif');
+    const w = Math.max(...[].concat(t.label).map(z => ctx.measureText(String(z)).width));
+    ctx.restore();
+    const px = x.getPixelForTick(0), rot = (x.labelRotation || 0) * Math.PI / 180;
+    const links = rot ? px - w * Math.cos(rot) : px - w / 2;
+    return Math.min(a.left, links - 2);
+  } catch (_) { return a.left; }
+}
+
+// Die Monatsnamen wandern mit: `drawLabels` der x-Achse wird am Objekt ueberschrieben
+// (Chart.js ruft es ueber `this.drawLabels`), die Achse bleibt bei jedem update()
+// dieselbe Instanz. Ohne laufende Bewegung reicht es unveraendert durch.
+function _xBeschriftungMitziehen(c) {
+  const x = c.scales.x;
+  if (!x || x.$spaltenHaken) return;
+  const orig = x.drawLabels;
+  x.drawLabels = function (bereich) {
+    const s = c.$spalten;
+    if (!s || !s.off) return orig.call(this, bereich);
+    const ctx = c.ctx, a = c.chartArea;
+    ctx.save();
+    ctx.beginPath();
+    const links = s.labelLinks != null ? s.labelLinks : a.left;
+    ctx.rect(links, a.bottom, c.width - links, c.height - a.bottom);
+    ctx.clip();
+    ctx.translate(s.off, 0);
+    orig.call(this, bereich);
+    ctx.restore();
+  };
+  x.$spaltenHaken = true;
+}
+
+// Nach dem Neuaufbau: fuer jedes passende Diagramm die Bewegung anlegen, das erste Bild
+// SOFORT zeichnen (sonst stuende fuer ein Bild der Endstand da) und dann laufen lassen.
+// Rueckgabe: die Diagramme, um die sich `_animNavSlide` nicht mehr kuemmern soll.
+function _spaltenStarten(vorher, richtung) {
+  const plaene = [];
+  (tabCharts[currentScreen] || []).forEach(id => {
+    const c = charts[id], v = vorher && vorher[id];
+    if (!c || !v || !c.chartArea) return;
+    const p = _spaltenPlan(c, v, richtung);
+    if (p) plaene.push(p);
+  });
+  if (!plaene.length) return new Set();
+  plaene.forEach(p => {
+    _xBeschriftungMitziehen(p.c);
+    p.c.$spalten = { off: p.start, delta: p.start - p.versatz, streifen: p.streifen, bild: p.bild, faktor: p.faktor,
+                     labelLinks: _labelLinks(p.c) };
+    _spaltenSchritt(p, 0);
+  });
+  const fertig = () => plaene.forEach(_spaltenEnde);
+  const lauf = { fertig };
+  lauf.stopp = uebergang(SPALTEN_DAUER, e => plaene.forEach(p => _spaltenSchritt(p, e)),
+    () => { if (_spaltenLauf === lauf) _spaltenLauf = null; fertig(); });
+  _spaltenLauf = lauf;
+  return new Set(plaene.map(p => p.c));
+}
+// Eine laufende Bewegung sofort beenden (neuer Schritt, neue Geste): Endstand setzen.
+function _spaltenAbbrechen() {
+  const l = _spaltenLauf;
+  if (!l) return;
+  _spaltenLauf = null;
+  l.stopp();
+  l.fertig();
+}
+
+const spaltenPlugin = {
+  id: 'spalten',
+  // Messwerte ruecken seitlich, Hilfslinien (Ø, Ziel) nicht – sie gleiten senkrecht.
+  beforeDatasetDraw(chart, args) {
+    const s = chart.$spalten;
+    if (!s || !s.off) return;
+    const ds = chart.data.datasets[args.index];
+    if (!ds || _istHilfslinienLabel(ds.label)) return;
+    const a = chart.chartArea, ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(a.left - 5, 0, a.right - a.left + 10, a.bottom + 5);   // Randpunkte nicht halbieren
+    ctx.clip();
+    ctx.translate(s.off, 0);
+    chart.$spaltenOffen = args.index;
+  },
+  afterDatasetDraw(chart, args) {
+    if (chart.$spaltenOffen !== args.index) return;
+    chart.$spaltenOffen = null;
+    chart.ctx.restore();
+  },
+  // Der ausscheidende Monat als Ausschnitt des alten Bilds, samt Zahl und Monatsname.
+  // UNTER den neuen Daten (vor den Datensaetzen): bei Linien beginnt der Streifen genau
+  // am ersten bleibenden Punkt, dessen Kreis und Linienanschluss das neue Diagramm
+  // darueber zeichnet.
+  beforeDatasetsDraw(chart) {
+    const s = chart.$spalten;
+    if (!s || !s.bild || !s.streifen || !s.streifen.length) return;
+    const a = chart.chartArea, ctx = chart.ctx, r = s.faktor || 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(a.left, 0, a.right - a.left, chart.height);
+    ctx.clip();
+    s.streifen.forEach(([x1, x2]) => {
+      if (x2 - x1 < 0.5) return;
+      try { ctx.drawImage(s.bild, x1 * r, 0, (x2 - x1) * r, s.bild.height, x1 + s.delta, 0, x2 - x1, s.bild.height / r); } catch (_) {}
+    });
+    ctx.restore();
+  },
+  beforeTooltipDraw(chart) {
+    const s = chart.$spalten;
+    if (!s || !s.off) return;
+    chart.ctx.save();
+    chart.ctx.translate(s.off, 0);
+    chart.$spaltenTooltip = true;
+  },
+  afterTooltipDraw(chart) {
+    if (!chart.$spaltenTooltip) return;
+    chart.$spaltenTooltip = false;
+    chart.ctx.restore();
+  }
+};
+
+Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslinienBlende, spaltenPlugin);
+
+// Die FLAECHEN unter Linien (fill: true – HRV, Ruhepuls, Pace, VO2max, Score) zeichnet
+// Chart.js' eingebautes Filler-Plugin selbst, in Chart.js 4.5 je Datensatz in seinem
+// `beforeDatasetDraw` (drawTime-Standard) – und zwar VOR jedem Plugin dieser Datei,
+// weil es zuerst registriert ist. Keine der Verschiebungen (`$spalten`, `$navslide`)
+// erreichte sie deshalb: im ersten Bild stand die Flaeche schon am Endplatz, die Linie
+// noch am alten (gesehen im Pixelvergleich, 18.09.2026). Bei der alten
+// Schiebe-Animation verdeckte das Ausblenden den Fehler. Der Haken legt dieselbe
+// Verschiebung um alle drei Zeichen-Zeitpunkte des Fillers – welcher greift, haengt an
+// `drawTime`.
+(function fuellungMitziehen() {
+  const filler = Chart.registry && Chart.registry.getPlugin && Chart.registry.getPlugin('filler');
+  if (!filler) return;
+  ['beforeDraw', 'beforeDatasetsDraw', 'beforeDatasetDraw'].forEach(haken => {
+    const orig = filler[haken];
+    if (typeof orig !== 'function') return;
+    filler[haken] = function (chart, args, opts) {
+      const sp = chart.$spalten, ns = chart.$navslide;
+      const off = sp ? sp.off : ns ? ns.offset : 0;
+      if (!off && !(ns && ns.alpha < 1)) return orig.call(this, chart, args, opts);
+      // Hilfslinien ruecken bei Monatsbalken nicht seitlich – ihre Flaeche (falls je
+      // eine) auch nicht.
+      if (sp && haken === 'beforeDatasetDraw' && args && args.meta) {
+        const ds = chart.data.datasets[args.meta.index];
+        if (ds && _istHilfslinienLabel(ds.label)) return orig.call(this, chart, args, opts);
+      }
+      const a = chart.chartArea, ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(a.left, a.top, a.right - a.left, a.bottom - a.top);
+      ctx.clip();
+      ctx.translate(off, 0);
+      if (!sp && ns) ctx.globalAlpha = ns.alpha;
+      try { return orig.call(this, chart, args, opts); } finally { ctx.restore(); }
+    };
+  });
+})();
 
 function killCharts() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -2751,9 +3124,17 @@ function _wischCharts() {
 // Wie weit darf die Datenflaeche hoechstens ausschlagen? Derselbe Weg, den auch
 // `_animNavSlide` beim Hereinkommen nutzt — sonst haette die Geste ein anderes Mass
 // als ihre eigene Abschlussanimation.
+// Bei Monatsbalken (18.09.2026) hoechstens die Breite EINES Monats: ein Wisch blaettert
+// genau einen Monat weiter, und die Flaeche soll nicht weiter mitgehen, als sie danach
+// tatsaechlich rueckt. Beim Loslassen setzt `_spaltenStarten` genau hier fort.
 function _wischWeg(c) {
   const w = c.chartArea.right - c.chartArea.left;
-  return Math.min(w * 0.42, 110);
+  return _spaltenBereich() ? w / windowMonths() : Math.min(w * 0.42, 110);
+}
+// Deckkraft waehrend der Geste. Bei Monatsbalken bleibt die Flaeche voll deckend –
+// die meisten Balken bleiben ja dieselben.
+function _wischAlpha(c, off) {
+  return _spaltenBereich() ? 1 : 1 - 0.45 * (Math.abs(off) / _wischWeg(c));
 }
 // Stand der Datenflaeche waehrend der Geste. Gedaempft, damit der Ausschlag begrenzt
 // bleibt; am Rand des Datenbestands staerker — das Gummiband sagt „hier ist Schluss",
@@ -2769,7 +3150,7 @@ function _wischZeichnen(z) {
     const weg = _wischWeg(c);
     const ueber = Math.max(0, Math.abs(z.dx) - WISCH_SCHWELLE);
     const off = Math.sign(z.dx) * Math.min(ueber * daempfung, weg);
-    c.$navslide = { offset: off, alpha: 1 - 0.45 * (Math.abs(off) / weg) };
+    c.$navslide = { offset: off, alpha: _wischAlpha(c, off) };
     try { c.draw(); } catch (_) {}
   });
 }
@@ -2792,7 +3173,7 @@ function _wischZurueckfedern(charts) {
   const von = charts.map(c => (c.$navslide ? c.$navslide.offset : 0));
   _wischAnimieren(charts, 220,
     (c, e) => { const i = charts.indexOf(c), off = von[i] * (1 - e);
-                c.$navslide = { offset: off, alpha: 1 - 0.45 * Math.abs(off) / _wischWeg(c) }; },
+                c.$navslide = { offset: off, alpha: _wischAlpha(c, off) }; },
     () => charts.forEach(c => { delete c.$navslide; try { c.draw(); } catch (_) {} }));
 }
 // Der alte Stand gleitet in Wischrichtung aus dem Bild; erst DANACH wird geblaettert,
@@ -2813,6 +3194,7 @@ function diagrammWischen() {
     if (e.touches.length !== 1) { _diaWisch = null; return; }
     const flaeche = e.target.closest && e.target.closest('.chart-wrap');
     if (!flaeche) { _diaWisch = null; return; }
+    _spaltenAbbrechen();   // eine noch laufende Spalten-Bewegung zuerst beenden
     _diaWisch = { x: e.touches[0].clientX, y: e.touches[0].clientY,
                   karte: flaeche.closest('.chart-card'), richtung: 0, dx: 0,
                   charts: _wischCharts(), moeglich: true, frameOffen: false };
@@ -2852,7 +3234,9 @@ function diagrammWischen() {
       blickAnkerMerken(z.karte);
       if (z.richtung > 0) navNext(); else navPrev();
     };
-    if (ruhig()) { blaettern(); return; }
+    // Monatsbalken: nicht erst hinausgleiten – der Schritt setzt die Bewegung des
+    // Fingers direkt fort (`_spaltenMerken` liest den Versatz als `zug`).
+    if (ruhig() || _spaltenBereich()) { blaettern(); return; }
     _wischHinaus(z.charts, z.richtung, blaettern);
   };
   document.addEventListener('touchend', ende, { passive: true });
