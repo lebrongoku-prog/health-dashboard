@@ -349,12 +349,30 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    links geschoben und rechts gegen den Ausklapp-Knopf gedrueckt – dort sind bei 375 px
    nur 11 px Luft. Als Kind der Reihe macht er deren passiven Modus (scale .7, halbe
    Deckkraft) und deren Weck-Tipp von selbst mit.
-   Breite 50 px: bei 360 px beginnt die Reihe bei x = 64, der Knopf also bei 6 px vom
-   Rand. Wer ihn breiter macht, misst bei 360 px nach. */
-.zl-reihe { position: relative; }
+   IN DER FORM DER PILLE (auf Wunsch, 18.09.2026): gleiche Schrift (1.14rem, fett,
+   .01em), gleiche Kapsel – so breit, wie das Geraet es hergibt. Vorher 50 px mit
+   .78rem, gerechnet fuer das schmalste iPhone; auf allen breiteren blieb Platz liegen.
+   Drei Groessen haengen an der Fensterbreite, alle in CSS:
+   - `--heute-b`: Breite. Die ganze Zeile braucht 6 (Rand) + Knopf + 8 + Reihe 232 +
+     8 + Ausklapp 53 + 8 (Rand) = Knopf + 315 px. Volle Pillenbreite (96 px = Text
+     52.6 + Polster 2 x 21) also ab 411 px; darunter so breit, wie Platz ist, aber
+     nie unter 50 px (dem alten Mass).
+   - Schrift: die der Pille, solange rund 7 px Polster je Seite bleiben; nur darunter
+     kleiner (Textbreite = 2.885 x Schriftgroesse bei „Heute", fett).
+   - `--zl-versatz`: die Reihe bleibt mittig, solange links genug Platz ist; sonst
+     rueckt sie gerade so weit nach rechts, dass der Knopf 6 px vom Rand bleibt. Die
+     Auswahl ueber der Reihe rueckt mit, sonst wuechse sie neben der Pille auf.
+   Gemessen: siehe CLAUDE.md (Zeitleiste, Punkt 6). Wer Pfeile, Pille oder
+   Ausklapp-Knopf breiter macht, muss die 315 und die 329 hier nachziehen. */
+#zeitleiste {
+  --heute-b: clamp(50px, calc(100vw - 315px - var(--safe-l) - var(--safe-r)), 96px);
+  --zl-versatz: max(0px, calc(var(--safe-l) + 14px + var(--heute-b) + 116px - 50vw));
+}
+.zl-reihe { position: relative; left: var(--zl-versatz); }
+.zl-optionen { position: relative; left: var(--zl-versatz); }
 .zl-heute {
   position: absolute; bottom: 0; right: calc(100% + 8px);
-  width: 50px; height: var(--zeit-h);
+  width: var(--heute-b); height: var(--zeit-h);
   padding: 0;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--card) 78%, transparent);
@@ -363,7 +381,9 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   border-radius: 999px;
   box-shadow: var(--shadow);
   color: var(--txt);
-  font-family: inherit; font-size: .78rem; font-weight: 700;
+  font-family: inherit; font-weight: 700; letter-spacing: .01em;
+  font-size: clamp(.78rem, calc((100vw - 329px - var(--safe-l) - var(--safe-r)) / 2.885), 1.14rem);
+  white-space: nowrap;
   cursor: pointer;
 }
 /* Verblasst wie die Pfeile am Rand, wenn man schon am neuesten Tag steht. */

@@ -349,15 +349,31 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      `position: relative`): im Fluss hätte er die zentrierte Reihe um die halbe
      Knopfbreite nach links geschoben und rechts gegen den Ausklapp-Knopf gedrückt, wo
      bei 375 px nur 11 px Luft sind. Als Kind der Reihe schrumpft er im passiven Modus
-     mit und weckt sie per Tipp, ohne eigene Regeln. Optik wie Pfeile und Pille
-     (durchscheinende Fläche), 50 × 53 px, Schrift .78rem.
+     mit und weckt sie per Tipp, ohne eigene Regeln.
      Er **verblasst** (`.inaktiv`, wie die Pfeile — kein `disabled`), wenn
      `referenceDate` schon der neueste Tag ist. Bewusst nicht „wenn › inaktiv ist": bei
      7T kann › schon verblasst sein, während der neueste Tag in der nächsten Woche liegt.
-     Gemessen: 375 px → Knopf x 13.5–63.5, 8 px bis ‹, rechts unverändert 10.5 px zum
-     Ausklapp-Knopf; 360 px → x 6–56; 812 px quer → direkt 8 px neben ‹. Passiv
-     dieselbe Unterkante wie die Pille (746 px). **Wer ihn breiter macht, misst bei
-     360 px nach** — dort bleiben links 6 px.
+     **In der Form der Pille** (auf Wunsch, 18.09.2026): gleiche Schrift (1.14rem,
+     fett), gleiche Kapsel, so breit, wie das Gerät es hergibt. Zuerst stand er als
+     50-px-Kreis mit .78rem da — gerechnet für das schmalste iPhone und mit exakt
+     zentrierter Reihe. Das war zu eng gedacht: auf jedem breiteren Gerät blieb Platz
+     liegen (Leonard auf seinem iPhone: „mehr als genug Platz"). Jetzt drei
+     CSS-Grössen aus der Fensterbreite, ohne JavaScript (`#zeitleiste`):
+     - `--heute-b` = `clamp(50px, 100vw − 315px − Safe-Areas, 96px)`. Die 315 sind
+       6 (Rand) + 8 + Reihe 232 + 8 + Ausklapp 53 + 8 (Rand). Volle Pillenbreite (96 =
+       Text 52.6 + Polster 2 × 21) ab 411 px.
+     - Schrift = die der Pille, solange ≥ 7 px Polster je Seite bleiben
+       (`(100vw − 329px) / 2.885`, 2.885 = Textbreite von „Heute" je px Schrift).
+     - `--zl-versatz`: Reihe **und** Auswahl rücken nur so weit nach rechts, dass der
+       Knopf 6 px vom Rand bleibt (`left` an `.zl-reihe` und `.zl-optionen`). Die
+       Pille „7T" ist dadurch auf Handys bis zu 16 px rechts der Mitte; die Auswahl
+       wächst trotzdem genau über ihr auf.
+     Gemessen (aktiv, Knopf / Schrift / Rand links / Luft rechts zum Ausklapp):
+     360 px → 50 / 12.5 / 6 / 3 (wie vorher), 375 → 60 / 15.9 / 6 / 8,
+     393 → 78 / 18.24 / 6 / 8, 402 → 87 / 18.24 / 6 / 8, 430 → 96 / 18.24 / 6 / 27,
+     852 quer → 96 / 18.24, Reihe exakt mittig. Auswahl- und Pillenmitte bei 393 px
+     beide 208. Passiv dieselbe Unterkante wie die Pille. **Wer Pfeile, Pille oder
+     Ausklapp-Knopf breiter macht, zieht die 315 und die 329 im CSS nach.**
   8. **Die Auswahl hat zwei Zeilen** (seit 12.09.2026): oben die **Befehle**
      (seit 18.09.2026 nur noch „YoY" — „Heute" steht neben ‹, siehe Punkt 6), darunter
      die sechs **Bereiche** — beide als `.zl-zeile`
