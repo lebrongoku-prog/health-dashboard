@@ -170,6 +170,8 @@ body.dark .dark-toggle { color: #FBBF24; }
   padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--zeit-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
+  /* Der Platz fuer die Hinweisleiste waechst und schrumpft mit ihr (hinweisZeigen). */
+  transition: padding-top .28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Tab-Gradient: zwei vollflächige, fixierte Layer hinter dem App-Inhalt.
@@ -421,6 +423,8 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    etwas mehr vom Inhalt. */
 .zl-optionen {
   pointer-events: auto;
+  /* Waechst beim Aufklappen aus der Pille (zeitleisteAuswahl) – Ursprung unten. */
+  transform-origin: bottom center;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   max-width: 100%;
   padding: 6px;
@@ -646,6 +650,10 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   border:none;border-radius:10px;cursor:pointer;
 }
 .update-btn:disabled{opacity:.55;cursor:default}
+/* „Aktualisiert ✓" nach erfolgreichem Laden (refreshBestaetigen). Die Ueberblendung
+   fuehrt opacity/transform mit, sonst sprang der Druckpunkt aus der button-Regel. */
+.update-btn{transition:background-color .25s ease, opacity .15s, transform .1s}
+.update-btn.ok{background:#10B981}
 .app-hinweis{font-size:.6rem;color:var(--txt3);line-height:1.45;margin-top:.4rem}
 
 /* Bezugszeitraum-Etikett: markiert Kacheln, deren Zahlen NICHT dem Zeitfilter folgen.
@@ -1228,3 +1236,14 @@ body.hinweis-an .screen{
      bereits darin. Sie hier noch einmal zu addieren, ergaebe einen doppelten Rand. */
   padding-top:calc(var(--hinweis-h, 60px) + 8px);
 }
+
+/* ── Hell/Dunkel-Ueberblendung (18.09.2026) ─────────────────────────────────
+   Der Tipp auf 🌙/☀️ laeuft ueber `document.startViewTransition` (Safari ab iOS 18):
+   alter und neuer Zustand blenden als Ganzes ineinander. Ohne die API schaltet die
+   App wie bisher in einem Bild um. */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: .28s; }
+
+/* Kachel-Zahlen zaehlen hoch (kachelnHochzaehlen). Gleich breite Ziffern, sonst
+   wackelt der zentrierte Wert waehrend des Zaehlens seitlich hin und her. */
+.ti-zahl { font-variant-numeric: tabular-nums; }

@@ -205,6 +205,10 @@ Chart.defaults.datasets.bar.maxBarThickness    = 26;
 // mit Animator entstehen sie erst über mehrere Frames, was ein programmgesteuertes
 // Einblenden unzuverlässig macht.
 Chart.defaults.plugins.tooltip.animation = false;
+// Aufbau-Animation (Balken und Linien wachsen von der Grundlinie) 450 statt 1000 ms
+// (auf Wunsch, 18.09.2026) – eine Sekunde wirkte bei jedem Bereichswechsel traege.
+// Wo sich die Daten NICHT aendern, waechst gar nichts neu: siehe `_ruhigRendern`.
+Chart.defaults.animation.duration = 450;
 // Chart.js soll selbst auf KEIN Ereignis reagieren. Das Tooltip haengt damit
 // ausschliesslich an der Markierung: Tipp auf eine Saeule blendet es ein, erneuter
 // Tipp auf dieselbe blendet es aus. Vorher aktivierte Chart.js sein Tooltip beim
@@ -764,6 +768,38 @@ function navNext() {
 // Sanftes, etwas längeres Ease-Out + Einblendung. Respektiert reduce-motion.
 let _navSliding = false;
 let _navSlideRAF = null;
+
+// ── Kurze Uebergaenge (18.09.2026) ──────────────────────────────────────────
+// EIN Helfer fuer die kleinen Zeichen-Animationen (Markierung, Beschriftungen,
+// Hilfslinien, Kachel-Zaehler): ruft `proSchritt(e)` je Bild mit dem geglaetteten
+// Fortschritt 0..1 (easeOutCubic) und am Ende `fertig()`.
+// Der Zeitgeber ist derselbe Rueckfall wie bei `_ausklappAnimieren`: eine Seite, die
+// nicht gezeichnet wird, liefert kein requestAnimationFrame – ohne ihn bliebe der
+// Zustand auf dem ersten Bild stehen (Beschriftung unsichtbar, Kachel auf 0).
+// Rueckgabe: eine Funktion, die abbricht, OHNE `fertig` aufzurufen.
+function bewegungAus() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function uebergang(dauer, proSchritt, fertig) {
+  const start = performance.now();
+  let raf = null, vorbei = false, zg = null;
+  const ende = () => {
+    if (vorbei) return; vorbei = true;
+    if (raf) cancelAnimationFrame(raf); clearTimeout(zg);
+    try { proSchritt(1); } catch (_) {}
+    if (fertig) fertig();
+  };
+  const schritt = now => {
+    if (vorbei) return;
+    const t = Math.min(1, (now - start) / dauer);
+    if (t >= 1) { ende(); return; }
+    try { proSchritt(1 - Math.pow(1 - t, 3)); } catch (_) {}
+    raf = requestAnimationFrame(schritt);
+  };
+  zg = setTimeout(ende, dauer + 120);
+  raf = requestAnimationFrame(schritt);
+  return () => { vorbei = true; if (raf) cancelAnimationFrame(raf); clearTimeout(zg); };
+}
 function _animNavSlide(dir) {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (_navSlideRAF) { cancelAnimationFrame(_navSlideRAF); _navSlideRAF = null; }
@@ -1029,9 +1065,9 @@ function timeDim(rows, granular=false, keepAggregated=false) {
 let _markierung = null;   // 'YYYY-MM-DD' oder null
 
 // Index der Säule, die in diesem Diagramm den markierten Tag enthält.
-function _markIndex(chart) {
-  if (!_markierung || !chart.$keys) return -1;
-  const d = _markierung;
+function _markIndex(chart, datum = _markierung) {
+  if (!datum || !chart.$keys) return -1;
+  const d = datum;
   if (chart.$keyTyp === 'monat') return chart.$keys.indexOf(d.slice(0,7));
   if (chart.$keyTyp === 'woche') return chart.$keys.indexOf(getWeekMonday(d));
   return chart.$keys.indexOf(d);
@@ -1085,15 +1121,17 @@ const wochentrennerPlugin = {
 const markierungPlugin = {
   id: 'markierung',
   beforeDatasetsDraw(chart) {
-    const i = _markIndex(chart);
-    if (i < 0) return;
+    // Waehrend des Ausblendens zeichnet sie den eben abgeschalteten Tag weiter –
+    // mit abnehmender Deckkraft (`_markAlpha`, siehe setMarkierung).
+    const i = _markIndex(chart, _markierung || _markVerblasst);
+    if (i < 0 || _markAlpha <= 0) return;
     const a = chart.chartArea; if (!a) return;
     const sp = _spalte(chart, i), ctx = chart.ctx;
     // Die Markierung besteht ausschliesslich aus der getoenten Spaltenflaeche –
     // keine senkrechten Randlinien mehr.
     ctx.save();
     ctx.fillStyle = _cssFarbe('--tab-color', '#0891B2');
-    ctx.globalAlpha = 0.13;
+    ctx.globalAlpha = 0.13 * _markAlpha;
     ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
     ctx.restore();
   },
@@ -1102,11 +1140,12 @@ const markierungPlugin = {
   // wirkt dadurch auch auf Linien und Flächen und kommt ohne Eingriff in die
   // zwölf unterschiedlich aufgebauten Diagramme aus.
   afterDatasetsDraw(chart) {
-    const i = _markIndex(chart);
-    if (i < 0) return;
+    const i = _markIndex(chart, _markierung || _markVerblasst);
+    if (i < 0 || _markAlpha <= 0) return;
     const a = chart.chartArea; if (!a) return;
     const sp = _spalte(chart, i), ctx = chart.ctx;
     ctx.save();
+    ctx.globalAlpha = _markAlpha;
     ctx.fillStyle = document.body.classList.contains('dark')
       ? 'rgba(30,41,59,.72)' : 'rgba(255,255,255,.72)';
     ctx.fillRect(a.left, a.top, Math.max(0, sp.links - a.left), a.bottom - a.top);
@@ -1147,11 +1186,35 @@ function _tooltipAnMarkierung(chart) {
 
 // Markierung setzen und ALLE Diagramme der App neu zeichnen – auch die der
 // anderen Tabs, die im DOM bereits vorgerendert sind.
+//
+// Ein- und Ausschalten BLENDEN (150 ms, auf Wunsch 18.09.2026): Toenung und Schleier
+// laufen ueber `_markAlpha`. Der Wechsel von einer Saeule zur naechsten springt
+// weiterhin – dort steht der Schleier ja schon, nur die Luecke wandert.
+// Der Tooltip blendet NICHT: seine Animation ist aus gutem Grund abgeschaltet (siehe
+// `Chart.defaults.plugins.tooltip.animation`). Er erscheint mit dem ersten Bild und
+// verschwindet beim Abschalten sofort, waehrend der Schleier noch ausklingt.
+// Waehrend der Blende werden nur die Diagramme des sichtbaren Tabs neu gezeichnet;
+// am Ende alle, damit kein vorgerenderter Tab auf einem Zwischenstand stehen bleibt.
+const MARK_DAUER = 150;
+let _markAlpha = 1;          // Deckkraft von Toenung und Schleier, 0..1
+let _markVerblasst = null;   // Tag, dessen Markierung gerade ausklingt
+let _markStopp = null;
 function setMarkierung(datum) {
+  const vorher = _markierung;
   _markierung = datum;
+  if (_markStopp) { _markStopp(); _markStopp = null; }
+  const blenden = !bewegungAus() && !vorher !== !datum;   // genau eines von beiden gesetzt
+  _markVerblasst = blenden && !datum ? vorher : null;
+  _markAlpha = blenden && datum ? 0 : 1;
   Object.values(charts).forEach(c => {
     try { c.update('none'); _tooltipAnMarkierung(c); c.draw(); } catch(_) {}
   });
+  if (!blenden) return;
+  const zeichnen = liste => liste.forEach(c => { try { c.draw(); } catch(_) {} });
+  _markStopp = uebergang(MARK_DAUER,
+    e => { _markAlpha = datum ? e : 1 - e;
+           zeichnen((tabCharts[currentScreen] || []).map(id => charts[id]).filter(Boolean)); },
+    () => { _markStopp = null; _markVerblasst = null; _markAlpha = 1; zeichnen(Object.values(charts)); });
 }
 
 // Tipp auf ein Diagramm: Säule bestimmen, Tag ableiten, umschalten.
@@ -1227,10 +1290,14 @@ const werteLabelPlugin = {
     // Ob gezeichnet wird, entscheidet beschriftungAn(): Wunsch des Nutzers, sonst
     // Standard. Die Entscheidung faellt hier beim ZEICHNEN, damit sie beim Drehen
     // des Geraets von selbst nachzieht.
-    if (!beschriftungAn(chart)) return;
+    // `$werteBlende` haelt die Zahlen waehrend des Aus-Blendens noch sichtbar
+    // (siehe `_werteBlenden`) – `beschriftungAn` ist dann schon false.
+    const blende = chart.$werteBlende;
+    if (!beschriftungAn(chart) && !(blende && blende.aus)) return;
     const flaeche = chart.chartArea; if (!flaeche) return;
     const ctx = chart.ctx;
     ctx.save();
+    if (blende) ctx.globalAlpha = blende.alpha;
     ctx.font = '600 10px ' + (Chart.defaults.font.family || 'sans-serif');
     ctx.fillStyle = _cssFarbe('--txt2', '#64748B');
     ctx.textAlign = 'center';
@@ -1277,7 +1344,83 @@ const werteLabelPlugin = {
   }
 };
 
-Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin);
+// Titel-Tipp: die Zahlen blenden in 180 ms ein bzw. aus (auf Wunsch, 18.09.2026),
+// statt auf einen Schlag zu erscheinen. Der Zustand (`_beschriftung`) ist beim Aufruf
+// schon gesetzt; `$werteBlende.aus` haelt die Zahlen waehrend des Ausblendens noch im
+// Bild. Ein zweiter Tipp waehrend der Blende bricht die laufende ab und startet neu.
+const WERTE_DAUER = 180;
+function _werteBlenden(liste, an) {
+  liste.forEach(c => { if (c.$werteStopp) c.$werteStopp(); });
+  const zeichnen = () => liste.forEach(c => { try { c.draw(); } catch(_) {} });
+  if (bewegungAus()) { zeichnen(); return; }
+  liste.forEach(c => { c.$werteBlende = { alpha: an ? 0 : 1, aus: !an }; });
+  const aufraeumen = () => liste.forEach(c => { delete c.$werteBlende; delete c.$werteStopp; });
+  const stopp = uebergang(WERTE_DAUER,
+    e => { liste.forEach(c => { if (c.$werteBlende) c.$werteBlende.alpha = an ? e : 1 - e; }); zeichnen(); },
+    () => { aufraeumen(); zeichnen(); });
+  liste.forEach(c => { c.$werteStopp = () => { stopp(); aufraeumen(); }; });
+}
+
+// ── Hilfslinien ein-/ausblenden (5, auf Wunsch 18.09.2026) ──────────────────
+// Die Linie ist ein Datensatz; ein Tipp auf den Legenden-Schalter baut den Tab neu
+// auf. Vorher wuchsen dabei ALLE Diagramme eine Sekunde lang neu von der Grundlinie,
+// obwohl sich an den Daten nichts geaendert hatte. Jetzt: Neuaufbau ohne Wachsen
+// (`_ruhigRendern`), und nur die Linie blendet – vor dem Neuaufbau aus, danach ein.
+// `$hlBlende` = { art: 'oe'|'ziel', alpha } wirkt auf jeden Datensatz dieser Art;
+// in Ruhepuls & HRV schaltet ein Schalter beide Ø-Linien, beide blenden gemeinsam.
+const HL_DAUER = 220;
+function _istHilfslinie(ds, art) { return (art === 'ziel' ? /^Ziel/ : /^Ø/).test(ds.label || ''); }
+const hilfslinienBlende = {
+  id: 'hilfslinienBlende',
+  beforeDatasetDraw(chart, args) {
+    const b = chart.$hlBlende;
+    if (!b) return;
+    const ds = chart.data.datasets[args.index];
+    if (!ds || !_istHilfslinie(ds, b.art)) return;
+    chart.ctx.save();
+    chart.ctx.globalAlpha *= b.alpha;
+    chart.$hlOffen = args.index;
+  },
+  afterDatasetDraw(chart, args) {
+    if (chart.$hlOffen !== args.index) return;
+    chart.$hlOffen = null;
+    chart.ctx.restore();
+  }
+};
+// Einblenden einer frisch aufgebauten Linie. Aufgerufen aus `zeichneDiagramm`, sobald
+// das Diagramm steht – bei Training erst nach dem asynchronen Aufbau. Das erste
+// (volle) Bild zeichnet Chart.js noch im Konstruktor, das `draw()` hier ersetzt es in
+// derselben Aufgabe, bevor der Browser malt: es blitzt nichts auf.
+let _hlPlan = null;          // { id, art } – welche Linie beim naechsten Aufbau einblendet
+function _hlEinblenden(c, art) {
+  c.$hlBlende = { art, alpha: 0 };
+  try { c.draw(); } catch(_) {}
+  uebergang(HL_DAUER,
+    e => { if (c.$hlBlende) { c.$hlBlende.alpha = e; try { c.draw(); } catch(_) {} } },
+    () => { delete c.$hlBlende; try { c.draw(); } catch(_) {} });
+}
+
+// Neuaufbau OHNE Aufbau-Animation fuer alle Diagramme, die vorher schon SICHTBAR
+// waren – ueberall dort, wo sich die Daten nicht aendern: Hilfslinie umschalten und
+// Aus-/Einklappen. Diagramme, die dabei erst ins Bild kommen (etwa beim Aufklappen),
+// wachsen wie gewohnt herein. „Sichtbar" statt „vorhanden": die Diagramme im
+// zugeklappten Bereich existieren bereits, nur ohne Flaeche (`display:none`) – als
+// blosse Existenz gezaehlt, erschienen Schlafphasen- und Score-Verlauf beim Aufklappen
+// fertig gezeichnet statt hereinzuwachsen. Bei Training entstehen die Diagramme
+// asynchron; die Liste bleibt deshalb stehen, bis dessen Promise erfuellt ist.
+let _ruhigeIds = null;
+function _ruhigRendern(tab) {
+  const ids = new Set((tabCharts[tab] || []).filter(id =>
+    charts[id] && charts[id].canvas && charts[id].canvas.getClientRects().length));
+  _ruhigeIds = ids;
+  const weg = () => { if (_ruhigeIds === ids) _ruhigeIds = null; };
+  let r;
+  try { r = _renderTab(tab); } catch (e) { weg(); throw e; }
+  if (r && typeof r.then === 'function') r.then(weg, weg); else weg();
+  return r;
+}
+
+Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslinienBlende);
 
 function killCharts() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -1290,6 +1433,8 @@ function zeichneDiagramm(id, cfg) {
   // Während einer Pfeil-Navigation die Aufbau-Animation abschalten – die seitliche
   // Wisch-Bewegung übernimmt _animNavSlide (sonst zwei konkurrierende Animationen).
   if (_navSliding) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
+  // Dasselbe, wo sich die Daten nicht aendern (Hilfslinie, Ausklappen): siehe _ruhigRendern.
+  if (_ruhigeIds && _ruhigeIds.has(id)) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
   // Platz fuer die Datenbeschriftungen ueber dem hoechsten Balken (siehe LABEL_LUFT).
   // An EINER Stelle fuer alle Diagramme: jedes einzeln zu bedenken hiesse, dass das
   // naechste neue Diagramm es wieder vergisst. Kein Diagramm setzt `layout` selbst.
@@ -1316,6 +1461,8 @@ function zeichneDiagramm(id, cfg) {
     // Tooltip wieder herstellen – sonst verschwände sie beim ersten Re-Render.
     if (_markierung) { try { _tooltipAnMarkierung(charts[id]); charts[id].draw(); } catch(_) {} }
   }
+  // Frisch eingeschaltete Hilfslinie einblenden (siehe _hlEinblenden).
+  if (_hlPlan && _hlPlan.id === id) { const plan = _hlPlan; _hlPlan = null; _hlEinblenden(charts[id], plan.art); }
   // Track chart per tab (for per-tab destroy on re-render)
   if (_currentRenderingTab && tabCharts[_currentRenderingTab]) {
     tabCharts[_currentRenderingTab].push(id);
@@ -2003,6 +2150,47 @@ function kachelZiel(tab, titel) {
 }
 const TAB_TITEL = { overview: 'Übersicht', herz: 'Herz', schlaf: 'Schlaf', training: 'Training' };
 
+// ── Kachel-Zahlen zaehlen hoch (auf Wunsch, 18.09.2026) ──────────────────────
+// Beim App-Start von 0 auf den Wert, bei neuen Daten vom zuletzt gezeigten Wert auf
+// den neuen – in 450 ms. NICHT bei jedem Aufbau der Uebersicht (Bereichswechsel,
+// Blaettern, Ausklappen): dort aendern sich die Tageswerte nicht, und eine Zahl, die
+// jedes Mal neu hochzaehlt, nervt. Ausgeloest wird es ueber `_kachelnZaehlen`: true
+// beim Start, gesetzt von den drei Wegen, auf denen neue Daten ankommen (stilles
+// Nachladen, „Anzeigen" in der Hinweisleiste, „Daten aktualisieren"); verbraucht vom
+// naechsten Aufbau der Uebersicht.
+// Die endgueltige Zahl steht bereits im HTML; die Animation setzt sie erst im selben
+// Schritt auf den Startwert zurueck. Der Zeitgeber in `uebergang` sorgt dafuer, dass
+// sie auch ohne gezeichnete Seite am Ziel ankommt.
+// `data-wert` ist eine Zahl aus der Einlese-Pruefung, kein Fremdtext.
+const KACHEL_ZAEHL_DAUER = 450;
+let _kachelnZaehlen = true;
+const _kachelZuletzt = {};
+function kachelZahl(feld, wert, form = 'ganz') {
+  const txt = form === 'std' ? alsStdMin(wert) : String(Math.round(wert));
+  return `<span class="ti-zahl" data-feld="${feld}" data-form="${form}" data-wert="${Number(wert)}">${txt}</span>`;
+}
+function kachelnHochzaehlen() {
+  const felder = [...document.querySelectorAll('#screen-overview .ti-zahl')];
+  if (!felder.length) return;          // noch keine Daten: das Hochzaehlen aufheben
+  const zaehlen = _kachelnZaehlen;
+  _kachelnZaehlen = false;
+  const laeufe = [];
+  felder.forEach(el => {
+    const feld = el.dataset.feld, form = el.dataset.form, ziel = Number(el.dataset.wert);
+    const von = _kachelZuletzt[feld] != null ? _kachelZuletzt[feld] : 0;
+    _kachelZuletzt[feld] = ziel;
+    if (!zaehlen || bewegungAus() || !isFinite(ziel) || von === ziel) return;
+    // Die Stunden-Form zaehlt in Minuten, sonst sprangen die Minuten ungleichmaessig.
+    const fmt = v => form === 'std' ? alsStdMin(Math.round(v * 60) / 60) : String(Math.round(v));
+    laeufe.push({ el, von, ziel, fmt });
+    el.textContent = fmt(von);
+  });
+  if (!laeufe.length) return;
+  uebergang(KACHEL_ZAEHL_DAUER, e => laeufe.forEach(l => {
+    if (l.el.isConnected) l.el.textContent = l.fmt(l.von + (l.ziel - l.von) * e);
+  }));
+}
+
 function pgOverview() {
   // Last day + 7-day window for mini-cards
   const lastDay = allData[allData.length-1] || {};
@@ -2067,17 +2255,17 @@ function pgOverview() {
         <div class="ti-metrics">
           ${hrLast!=null?`<div class="ti-metric" ${kachelZiel('herz','Ruhepuls')} style="${kachelStil('#EF4444','239,68,68')}">
             <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
-            <div class="ti-metric-val">${Math.round(hrLast)} bpm</div>
+            <div class="ti-metric-val">${kachelZahl('hr', hrLast)} bpm</div>
             ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${hvLast!=null?`<div class="ti-metric" ${kachelZiel('herz','HRV')} style="${kachelStil('#2563EB','37,99,235')}">
             <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
-            <div class="ti-metric-val">${Math.round(hvLast)} ms</div>
+            <div class="ti-metric-val">${kachelZahl('hv', hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${slLast!=null?`<div class="ti-metric" ${kachelZiel('schlaf','Schlaf')} style="${kachelStil('#2186E8','33,134,232')}">
             <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
-            <div class="ti-metric-val">${alsStdMin(slLast)}</div>
+            <div class="ti-metric-val">${kachelZahl('sl', slLast, 'std')}</div>
             ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
           ${(()=>{
@@ -2085,7 +2273,7 @@ function pgOverview() {
             const trAvg=(()=>{const v=priorDays.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
             if(trMin!=null){return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Training ${infoMini('training')}</div>
-              <div class="ti-metric-val">${Math.round(trMin)} min</div>
+              <div class="ti-metric-val">${kachelZahl('tr', trMin)} min</div>
               ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
             </div>`;}
             // Kein Training an diesem Tag: statt der Tagesdauer die Anzahl der
@@ -2099,7 +2287,7 @@ function pgOverview() {
             const nVor    = tage7v.length >= 7 ? zaehl(tage7v) : null;
             return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
               <div class="ti-metric-lbl">🏃 Trainings ${infoMini('trainWoche')}</div>
-              <div class="ti-metric-val">${nWoche}<span class="ti-metric-einheit"> / 7 Tage</span></div>
+              <div class="ti-metric-val">${kachelZahl('tage', nWoche)}<span class="ti-metric-einheit"> / 7 Tage</span></div>
               ${nVor!=null?`<div class="ti-metric-delta ${nWoche-nVor>0?'pos':nWoche-nVor<0?'neg':'neu'}">${(()=>{const d=nWoche-nVor;return(d>=0?'+':'')+d+' vs. Vorwoche';})()}</div>`:''}
             </div>`;
           })()}
@@ -3575,14 +3763,51 @@ function zeitleistePassiv(ja) {
   if (_zlPassiv) zeitleisteAuswahl(false);
 }
 
+// Auf- und Zuklappen ist animiert (auf Wunsch, 18.09.2026): die Auswahl waechst aus
+// der Pille nach oben (190 ms, Deckkraft + leichte Vergroesserung, Ursprung an der
+// Unterkante) und schrumpft beim Schliessen dorthin zurueck (150 ms).
+// Drei Dinge dabei:
+//  - `hidden` bleibt der Zustand. Beim Schliessen wird es erst NACH der Animation
+//    gesetzt; die Box nimmt waehrenddessen keine Tipps mehr an.
+//  - Das Ende kommt aus `onfinish` ODER aus dem Zeitgeber – ohne gezeichnete Seite
+//    bliebe die Auswahl sonst unsichtbar offen stehen (vgl. `_ausklappAnimieren`).
+//  - Gleicher Zustand wie vorher → nichts tun; eine laufende Animation laeuft weiter.
+let _zlAnim = null;
 function zeitleisteAuswahl(offen) {
   const el = document.getElementById('zeitleiste');
   if (!el) return;
+  const war = _zlOffen;
   _zlOffen = !!offen;
-  const box = el.querySelector('.zl-optionen');
-  if (box) box.hidden = !_zlOffen;
   const pille = el.querySelector('.zl-pille');
   if (pille) pille.setAttribute('aria-expanded', _zlOffen ? 'true' : 'false');
+  const box = el.querySelector('.zl-optionen');
+  if (!box || war === _zlOffen) return;
+  if (_zlAnim) { _zlAnim.cancel(); _zlAnim = null; }
+  box.style.pointerEvents = '';
+  if (bewegungAus() || !box.animate) { box.hidden = !_zlOffen; return; }
+  const zu  = { opacity: 0, transform: 'translateY(10px) scale(.92)' };
+  const auf = { opacity: 1, transform: 'none' };
+  if (_zlOffen) {
+    box.hidden = false;
+    const a = _zlAnim = box.animate([zu, auf], { duration: 190, easing: 'cubic-bezier(0, 0, 0.2, 1)' });
+    // `finish()` auch hier ueber den Zeitgeber: steht die Animationszeit, hielte die
+    // Auswahl sonst ihr erstes Bild fest – offen, aber unsichtbar.
+    const fertig = () => { if (_zlAnim !== a) return; _zlAnim = null; try { a.finish(); } catch (_) {} };
+    a.onfinish = fertig;
+    setTimeout(fertig, 190 + 80);
+    return;
+  }
+  box.style.pointerEvents = 'none';
+  const a = _zlAnim = box.animate([auf, zu], { duration: 150, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' });
+  const ende = () => {
+    if (_zlAnim !== a) return;
+    _zlAnim = null;
+    box.hidden = true;
+    box.style.pointerEvents = '';
+    a.cancel();
+  };
+  a.onfinish = ende;
+  setTimeout(ende, 150 + 80);
 }
 // Zeitfilter EINMAL pro Tab, direkt unter dem Banner.
 //
@@ -3615,10 +3840,42 @@ function _injectTopbar(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
   _injectChartFilters(name); // Filter-Controls in die Diagramm-Karten setzen
+  balkenFuellen(name);
+  if (name === 'overview') kachelnHochzaehlen();
   // Disable-State der Pfeile + Label gleich nach Inject korrekt setzen
   updateNavUI();
   // Erst hier steht die endgueltige Hoehe fest – die Filterleisten sind gesetzt.
   if (name === currentScreen) blickAnkerWiederherstellen();
+}
+
+// ── Balken der Einordnungs-Karten fuellen sich (auf Wunsch, 18.09.2026) ──────
+// `.goal-bar-fill` und `.debt-bar-fill` trugen schon immer `transition: width .5s`,
+// wurden aber per innerHTML gleich in voller Breite eingesetzt – zu sehen war davon
+// nie etwas. Jetzt startet jeder Balken bei seiner LETZTEN Breite und laeuft auf die
+// neue: beim ersten Erscheinen (Aufklappen) von 0, beim Blaettern vom alten Wert.
+// Gemerkt wird je Tab und Position. Nur SICHTBARE Balken zaehlen – im zugeklappten
+// Bereich (`display:none`) laeuft keine Ueberblendung; sie werden vergessen und
+// wachsen beim naechsten Aufklappen wieder von 0.
+const _balkenStand = {};     // Tab → { Position: letzte Breite }
+function balkenFuellen(tab) {
+  const screen = document.getElementById('screen-' + tab);
+  if (!screen) return;
+  const alt = _balkenStand[tab] || {};
+  const neu = {};
+  const ruhig = bewegungAus();
+  screen.querySelectorAll('.goal-bar-fill, .debt-bar-fill').forEach((el, i) => {
+    if (!el.getClientRects().length) return;          // zugeklappt: nicht merken
+    const ziel = el.style.width;
+    neu[i] = ziel;
+    const von = alt[i] != null ? alt[i] : '0%';
+    if (ruhig || von === ziel) return;
+    el.style.transition = 'none';
+    el.style.width = von;
+    void el.offsetWidth;                              // Startbreite festschreiben
+    el.style.transition = '';
+    el.style.width = ziel;
+  });
+  _balkenStand[tab] = neu;
 }
 
 // Render einen Tab (oder gibt zurück, wenn schon gerendert)
@@ -4060,12 +4317,14 @@ function ausklappUmschalten(tab) {
     _ausklappLaeuft = true;
     Promise.all(teile.map(el => _ausklappAnimieren(el, false))).then(() => {
       _ausklappLaeuft = false;
-      _renderTab(tab);
+      _ruhigRendern(tab);
     });
     return;
   }
   k.um();
-  const r = _renderTab(tab);           // Training baut asynchron – erst danach messen
+  // Ohne Wachsen fuer die Diagramme, die schon da waren; die neu aufgeklappten
+  // wachsen herein (siehe _ruhigRendern).
+  const r = _ruhigRendern(tab);        // Training baut asynchron – erst danach messen
   if (ruhig) return;
   _ausklappLaeuft = true;
   Promise.resolve(r)
@@ -4075,13 +4334,34 @@ function ausklappUmschalten(tab) {
 
 // Ø-Linien der Training-Diagramme ein-/ausschalten. Neu aufgebaut wird der ganze
 // Tab: die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
+// Seit 18.09.2026 ohne erneutes Wachsen aller Diagramme; nur die Linie blendet
+// (siehe _ruhigRendern / hilfslinienBlende). Waehrend eine Linie ausblendet, sind
+// weitere Tipps gesperrt – der Neuaufbau am Ende muss den dann gueltigen Zustand sehen.
+let _hlLaeuft = false;
 document.body.addEventListener('click', (e) => {
   const sch = e.target.closest('.hl-schalter');
-  if (!sch) return;
-  _hilfslinie[sch.dataset.hl] = !hlAn(sch.dataset.hl);
+  if (!sch || _hlLaeuft) return;
+  const schluessel = sch.dataset.hl;
+  const an = !hlAn(schluessel);
+  const [id, art] = schluessel.split('|');
+  const alt = charts[id];
   // Den AKTUELLEN Tab neu aufbauen – die Schalter stehen inzwischen in Herz, Schlaf
   // und Training. Die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
-  _renderTab(currentScreen);
+  const neuAufbauen = () => {
+    _hilfslinie[schluessel] = an;
+    _hlPlan = an && !bewegungAus() ? { id, art } : null;
+    _ruhigRendern(currentScreen);
+  };
+  if (an || !alt || bewegungAus()) { neuAufbauen(); return; }
+  // Ausschalten: erst die Linie ausblenden, dann ohne sie neu aufbauen. Der Schalter
+  // zeigt den neuen Zustand sofort, nicht erst nach der Blende.
+  sch.classList.add('aus');
+  sch.setAttribute('aria-pressed', 'false');
+  _hlLaeuft = true;
+  alt.$hlBlende = { art, alpha: 1 };
+  uebergang(HL_DAUER,
+    x => { if (alt.$hlBlende) { alt.$hlBlende.alpha = 1 - x; try { alt.draw(); } catch(_) {} } },
+    () => { _hlLaeuft = false; neuAufbauen(); });
 });
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────
@@ -4114,8 +4394,9 @@ document.body.addEventListener('click', (e) => {
         ? (tabCharts.training || []).map(id => charts[id]).filter(c => c && c.$werteFmt)
         : [];
       const _ziele = _tabDia.indexOf(_ch) >= 0 ? _tabDia : [_ch];
-      // Nur neu zeichnen – die Daten aendern sich nicht.
-      _ziele.forEach(c => { _beschriftung[c.canvas.id] = _an; c.draw(); });
+      // Nur neu zeichnen – die Daten aendern sich nicht. Seit 18.09.2026 geblendet.
+      _ziele.forEach(c => { _beschriftung[c.canvas.id] = _an; });
+      _werteBlenden(_ziele, _an);
       return;
     }
   }
@@ -4171,7 +4452,18 @@ document.body.addEventListener('click', (e) => {
   if (t.closest('.refresh-btn')) { refreshData(); return; }
   if (t.closest('.appver-btn'))  { jetztAktualisieren(); return; }
   if (t.closest('.dark-toggle')) {
-    setDarkMode(!document.body.classList.contains('dark'));
+    // Sanft ueberblenden statt in einem Bild umschlagen (auf Wunsch, 18.09.2026):
+    // die View Transitions API haelt den alten Zustand als Bild fest und blendet ihn
+    // in den neuen (Dauer im CSS unter `::view-transition-*`). Safari kann das ab
+    // iOS 18; aeltere Geraete schalten wie bisher ohne Uebergang um.
+    // Wird der Uebergang uebersprungen (zweiter Tipp waehrend der Blende, Seite gerade
+    // nicht gezeichnet), lehnt `ready` ab – umgeschaltet ist trotzdem, der Rueckruf
+    // laeuft in jedem Fall. Abfangen, sonst steht die Ablehnung in der Konsole.
+    const _dunkel = !document.body.classList.contains('dark');
+    if (document.startViewTransition && !bewegungAus()) {
+      const _vt = document.startViewTransition(() => setDarkMode(_dunkel));
+      if (_vt && _vt.ready) _vt.ready.catch(() => {});
+    } else setDarkMode(_dunkel);
     return;
   }
   const pill = t.closest('.tbtn[data-range]');
@@ -4322,26 +4614,56 @@ function blickAnkerWiederherstellen() {
 // der Google-Anmeldung ist auf Wunsch in die App-Karte gewandert (anmeldeStand()):
 // er verlangt keine sofortige Antwort und muss deshalb nicht ueber allen Tabs stehen.
 // Ohne Zustand verschwindet die Leiste und gibt den Platz wieder frei.
+//
+// Seit 18.09.2026 gleitet die Leiste von oben herein und wieder hinaus (280/220 ms);
+// der Platz darueber waechst und schrumpft ueber eine CSS-Ueberblendung auf
+// `padding-top` der `.screen` mit. `hidden` wird beim Ausblenden erst nach der
+// Animation gesetzt – mit Zeitgeber als Rueckfall, wie bei der Zeitleisten-Auswahl.
+// Der Weg nach oben ist die eigene Hoehe PLUS 14 px: sonst bliebe der Schatten am
+// oberen Rand als grauer Streifen stehen.
 let _hinweisZustand = null;
+let _hinweisAnim = null;
+const HINWEIS_WEG = 'translateY(calc(-100% - 14px))';
 function hinweisZeigen(zustand, text, knopf) {
   const el = document.getElementById('hinweis-oben');
   if (!el) return;
   _hinweisZustand = zustand;
   el.querySelector('.hinweis-txt').textContent = text;
   el.querySelector('.hinweis-akt').textContent = knopf;
+  if (_hinweisAnim) { _hinweisAnim.cancel(); _hinweisAnim = null; }
+  const war = !el.hidden && document.body.classList.contains('hinweis-an');
   el.hidden = false;
   document.body.classList.add('hinweis-an');
   // Hoehe messen und weitergeben: sie haengt an der Safe-Area und daran, ob der
   // Text umbricht. Ein fester Wert liesse die Leiste je nach Geraet den Tab-Titel
   // ueberdecken oder eine Luecke stehen.
   document.body.style.setProperty('--hinweis-h', el.offsetHeight + 'px');
+  if (war || bewegungAus() || !el.animate) return;
+  const a = _hinweisAnim = el.animate([{ transform: HINWEIS_WEG }, { transform: 'none' }],
+    { duration: 280, easing: 'cubic-bezier(0, 0, 0.2, 1)' });
+  const fertig = () => { if (_hinweisAnim !== a) return; _hinweisAnim = null; try { a.finish(); } catch (_) {} };
+  a.onfinish = fertig;
+  setTimeout(fertig, 280 + 80);
 }
 function hinweisAus() {
   const el = document.getElementById('hinweis-oben');
   _hinweisZustand = null;
-  if (el) el.hidden = true;
+  const war = document.body.classList.contains('hinweis-an');
   document.body.classList.remove('hinweis-an');
   document.body.style.removeProperty('--hinweis-h');
+  if (!el) return;
+  if (!war || el.hidden || bewegungAus() || !el.animate) { el.hidden = true; return; }
+  if (_hinweisAnim) _hinweisAnim.cancel();
+  const a = _hinweisAnim = el.animate([{ transform: 'none' }, { transform: HINWEIS_WEG }],
+    { duration: 220, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' });
+  const ende = () => {
+    if (_hinweisAnim !== a) return;
+    _hinweisAnim = null;
+    el.hidden = true;
+    a.cancel();
+  };
+  a.onfinish = ende;
+  setTimeout(ende, 220 + 80);
 }
 // Der Stand der Google-Anmeldung steht NICHT mehr als Leiste ueber allen Tabs,
 // sondern als Zeile „Google-Anmeldung" in der App-Karte der Einstellungen – dort, wo
@@ -4364,7 +4686,7 @@ function appKarteAuffrischen() {
 }
 document.body.addEventListener('click', (e) => {
   if (!e.target.closest('.hinweis-akt')) return;
-  if (_hinweisZustand === 'neu') { hinweisAus(); _refreshAfterStateChange(); }
+  if (_hinweisZustand === 'neu') { hinweisAus(); _kachelnZaehlen = true; _refreshAfterStateChange(); }
 });
 
 // ── Erste Berührung merken ─────────────────────────────
@@ -4393,6 +4715,7 @@ async function hintergrundLaden() {
     hinweisZeigen('neu', 'Neue Daten geladen', 'Anzeigen');
   } else {
     updateNavUI();
+    _kachelnZaehlen = true;
     _refreshAfterStateChange();
   }
 }
@@ -4437,8 +4760,26 @@ async function refreshData() {
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
   appKarteAuffrischen();
+  if (ergebnis === true) { refreshBestaetigen(); _kachelnZaehlen = true; }
   updateNavUI();
   _refreshAfterStateChange();
+}
+// Rueckmeldung nach erfolgreichem Laden (auf Wunsch, 18.09.2026): der Knopf zeigt
+// 1.8 s lang „Aktualisiert ✓" auf Gruen, dann wieder seinen Text. Vorher sprang er
+// von „Lädt…" kommentarlos zurueck – ob das Laden geklappt hatte, sah man nicht.
+// Erst NACH `appKarteAuffrischen()` aufrufen: die baut die Einstellungen-Seite neu
+// und ersetzt dabei den Knopf. Nur bei `true` – ein Netzfehler ist kein Erfolg.
+function refreshBestaetigen() {
+  document.querySelectorAll('.refresh-btn').forEach(b => {
+    const alt = b.textContent;
+    b.textContent = 'Aktualisiert ✓';
+    b.classList.add('ok');
+    setTimeout(() => {
+      if (!b.isConnected) return;
+      b.classList.remove('ok');
+      if (b.textContent === 'Aktualisiert ✓') b.textContent = alt;
+    }, 1800);
+  });
 }
 // Orientation: keine Lock mehr – App darf in beide Richtungen gedreht werden.
 // Im Manifest steht "any". Tab-Snap-Sync reagiert via resize-Listener auf den Wechsel.

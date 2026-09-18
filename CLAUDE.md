@@ -593,7 +593,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   3. `oeDatensatz()` liefert ein **Array** (leer, wenn abgeschaltet), damit der
      Aufrufer es mit `...` einsetzen kann und kein `null` im Datensatz-Array landet.
   Die Linie ist ein **Datensatz**, kein Sichtbarkeits-Schalter — deshalb der
-  Neuaufbau statt eines `hidden`-Flags.
+  Neuaufbau statt eines `hidden`-Flags. Seit 18.09.2026 läuft dieser Neuaufbau
+  **ohne** Aufbau-Animation, nur die Linie selbst blendet (siehe „Weitere
+  Animationen", Punkt 5).
 - **Zeitraum-Schlüssel:** jedes Diagramm meldet über `cfg.__keys` + `cfg.__keyTyp`
   (`tag`/`woche`/`monat`), welcher Zeitraum hinter welcher Säule steckt. Ohne das
   funktionieren Wochentrenner und Markierung nicht. `timeDim` liefert beides mit;
@@ -606,7 +608,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   hinweg bestehen bleiben. Das Zurücktreten der übrigen Säulen ist ein Schleier ÜBER
   den Daten (`markierungPlugin.afterDatasetsDraw`), kein Eingriff in die Farben der
   zwölf unterschiedlich gebauten Diagramme. Die Markierung selbst ist **nur** die
-  getönte Spaltenfläche — keine senkrechten Randlinien. Zusätzlich wird der **Tooltip** des
+  getönte Spaltenfläche — keine senkrechten Randlinien. Ein- und Ausschalten
+  **blenden** seit 18.09.2026 (siehe „Weitere Animationen", Punkt 6). Zusätzlich wird der **Tooltip** des
   markierten Punkts in allen Diagrammen dauerhaft eingeblendet
   (`_tooltipAnMarkierung`) — mit **allen** Datensätzen der Säule, sonst zeigt der
   Modus `index` nur eine Zeile. Dafür ist `Chart.defaults.plugins.tooltip.animation`
@@ -759,7 +762,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   auch gegen `__werteNurQuer` und gegen die Hochformat-Regel. Der Zustand liegt
   ausserhalb der Seitenfunktionen und übersteht Zeitraum-, Tab- und Formatwechsel.
   Umgeschaltet wird mit `chart.draw()`, nicht mit `_renderTab`: die Daten ändern sich
-  nicht, nur was darüber steht.
+  nicht, nur was darüber steht. Seit 18.09.2026 **blenden** die Zahlen dabei in 180 ms
+  ein bzw. aus (`_werteBlenden`, siehe „Weitere Animationen").
   **Im Training-Tab gilt der Tipp für ALLE Diagramme des Tabs** (auf Wunsch,
   12.09.2026) — dort vergleicht man Strecke, Zeit, Pace und VO₂max miteinander, und
   vier Titel nacheinander anzutippen wäre derselbe Wunsch in vier Schritten. In Herz
@@ -1253,6 +1257,86 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Im Prüfstand beachten:** bei 7T fehlt „Ø Wochenende" in den Trainings-Diagrammen,
   wenn die erfundene Woche kein Wochenendtraining hat — das ist die Datenlage, nicht
   der Klapp-Mechanismus. Bei 1M erscheinen beide.
+- **Weitere Animationen** (auf Wunsch, 18.09.2026 — Vorschläge 1 und 3–10; Punkt 2,
+  die Tableiste per Wisch statt Sprung, wurde **nicht** gewählt). Alle kurz
+  (150–450 ms), alle ohne Bewegung bei `prefers-reduced-motion` (`bewegungAus()`).
+  Die Zeichen-Animationen im Canvas laufen über **einen** Helfer, `uebergang(dauer,
+  proSchritt, fertig)` (rAF, easeOutCubic, **Zeitgeber als Rückfall** — ohne ihn bliebe
+  in einer nicht gezeichneten Seite jeder Zustand auf dem ersten Bild stehen). Die
+  DOM-Animationen (WAAPI) tragen denselben Rückfall und rufen darin `finish()` —
+  dieselbe Falle wie bei `_ausklappAnimieren`, und der Prüfstand hat sie hier ein
+  zweites Mal gezeigt: die Zeitleisten-Auswahl stand offen, aber mit Deckkraft 0.
+  1. **Zeitleisten-Auswahl** (`zeitleisteAuswahl`): wächst aus der Pille nach oben
+     (190 ms, Deckkraft + `scale(.92)`, `transform-origin: bottom center`) und
+     schrumpft beim Schliessen zurück (150 ms). `hidden` bleibt der Zustand, wird beim
+     Schliessen aber erst **nach** der Animation gesetzt; währenddessen nimmt die Box
+     keine Tipps an. Gleicher Zustand wie vorher → nichts tun (eine laufende Animation
+     läuft weiter). Geprüft: auf/zu/auf in 40 ms endet offen und sichtbar.
+  3. **Hinweisleiste** (`hinweisZeigen`/`hinweisAus`): gleitet von oben herein (280 ms)
+     und hinaus (220 ms), um die eigene Höhe **plus 14 px** — sonst bliebe ihr Schatten
+     als Streifen am oberen Rand. Der Platz darüber wächst über
+     `.screen{transition: padding-top .28s}` mit. Gemessen: −56.4 → −9.1 → 0 px bei
+     0/140/279 ms, Innenabstand 8 → 40.6 → 50 px.
+  4. **Balken der Einordnungs-Karten** (`balkenFuellen`, aus `_injectTopbar`):
+     `.goal-bar-fill`/`.debt-bar-fill` trugen schon immer `transition: width .5s`, kamen
+     per innerHTML aber in voller Breite an — zu sehen war davon nie etwas. Jetzt
+     startet jeder Balken bei seiner **letzten** Breite (je Tab und Position gemerkt):
+     beim Aufklappen von 0, beim Blättern vom alten Wert (gemessen 60 % → 100 %,
+     40 % → 0 %). Nur **sichtbare** Balken zählen; die im zugeklappten Bereich
+     (`display:none`) werden vergessen und wachsen beim nächsten Aufklappen wieder von 0.
+  5. **Aufbau-Animation der Diagramme**: 450 statt 1000 ms
+     (`Chart.defaults.animation.duration`). Und **wo sich die Daten nicht ändern,
+     wächst nichts neu**: `_ruhigRendern(tab)` baut den Tab ohne Aufbau-Animation für
+     alle Diagramme, die vorher **sichtbar** waren. Benutzt beim Umschalten einer
+     Hilfslinie und beim Aus-/Einklappen. „Sichtbar", nicht „vorhanden": die Diagramme
+     im zugeklappten Bereich existieren schon (ohne Fläche) — als vorhanden gezählt,
+     erschienen Schlafphasen- und Score-Verlauf beim Aufklappen fertig statt
+     hereinzuwachsen. Bei Training (asynchron) bleibt die Liste bis zum Ende des
+     Aufbaus stehen.
+     Die **Hilfslinie selbst blendet** (`hilfslinienBlende`-Plugin, `$hlBlende =
+     {art, alpha}`, 220 ms): beim Ausschalten erst aus, dann Neuaufbau ohne sie; beim
+     Einschalten Neuaufbau, dann ein. Eingeblendet wird aus `zeichneDiagramm` heraus
+     (`_hlPlan`), weil Training seine Diagramme erst nach dem Aufruf baut. Chart.js
+     zeichnet das erste, volle Bild schon im Konstruktor; das `draw()` mit Deckkraft 0
+     ersetzt es in derselben Aufgabe, bevor der Browser malt — es blitzt nichts auf.
+     Während eine Linie ausblendet, sind weitere Schalter-Tipps gesperrt
+     (`_hlLaeuft`). Unverändert mit Aufbau-Animation: Bereichswechsel, Jahresvergleich,
+     neue Daten. Beim Blättern gilt weiterhin die `navslide`-Animation.
+  6. **Markierung** (`setMarkierung`, 150 ms): Tönung und Schleier laufen über
+     `_markAlpha`; beim Ausschalten zeichnet das Plugin den eben abgeschalteten Tag
+     (`_markVerblasst`) weiter, bis er ausgeklungen ist. `_markIndex(chart, datum)`
+     nimmt dafür ein optionales Datum. Der Wechsel von Säule zu Säule **springt**
+     weiterhin (der Schleier steht dort schon). Der **Tooltip blendet nicht** — seine
+     Animation bleibt aus (siehe „Markierung"); er verschwindet sofort, während der
+     Schleier noch ausklingt. Während der Blende zeichnen nur die Diagramme des
+     sichtbaren Tabs, am Ende alle. Gemessen: Tönung 0 → 33/255 (= 0.13) und zurück.
+  7. **Datenbeschriftungen** per Titel-Tipp (`_werteBlenden`, 180 ms): `$werteBlende
+     = {alpha, aus}`; `aus` hält die Zahlen beim Ausblenden noch im Bild, obwohl
+     `beschriftungAn` schon false liefert. Im Training-Tab blenden alle vier Diagramme
+     gemeinsam.
+  8. **Hell/Dunkel** über `document.startViewTransition` (Safari ab iOS 18): alter
+     und neuer Zustand blenden als Ganzes ineinander, Dauer 0.28 s in
+     `::view-transition-old/new(root)`. Ohne die API wie bisher ein Umschlag in einem
+     Bild. Der Rückruf läuft **asynchron** (direkt nach dem Tipp ist `body.dark` noch
+     der alte Stand) und auch dann, wenn der Übergang übersprungen wird — `ready` lehnt
+     dann ab und wird abgefangen, sonst stünde die Ablehnung in der Konsole (im
+     Vorschau-Pane bei jedem Tipp).
+  9. **Kachel-Zahlen zählen hoch** (`kachelZahl`, `kachelnHochzaehlen`, 450 ms): beim
+     Start von 0, bei neuen Daten vom zuletzt gezeigten Wert auf den neuen. **Nicht**
+     bei jedem Aufbau der Übersicht — ausgelöst über `_kachelnZaehlen`: true beim
+     Start, gesetzt von den drei Wegen, auf denen neue Daten ankommen (stilles
+     Nachladen, „Anzeigen" in der Hinweisleiste, „Daten aktualisieren"), verbraucht vom
+     nächsten Aufbau der Übersicht, der Kacheln hat. Die Schlafdauer zählt in Minuten.
+     Die Zahl sitzt in `.ti-zahl` mit `tabular-nums`, sonst wackelte der zentrierte
+     Wert beim Zählen seitlich. Die Endzahl steht bereits im HTML; der Rückfall-Zeitgeber
+     bringt sie auch ohne gezeichnete Seite ans Ziel. Gemessen: 0 → 55/64/8h 22m/2 in
+     440 ms; nach neuen Daten 55 → 53, 64 → 60, 8h 22m → 7h 22m; Bereichswechsel lässt
+     die Zahlen stehen.
+  10. **„Daten aktualisieren" bestätigt den Erfolg** (`refreshBestaetigen`): 1.8 s lang
+     „Aktualisiert ✓" auf Grün (`.update-btn.ok`), dann wieder der alte Text. Nur bei
+     `ergebnis === true`, und erst **nach** `appKarteAuffrischen()` — die baut die
+     Einstellungen-Seite neu und ersetzt dabei den Knopf. `.update-btn` führt in seiner
+     `transition` `opacity`/`transform` mit (siehe „Tipp-Animation").
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
   **Herz** Ruhepuls & HRV → (Weitere Auswertungen) Ruhepuls-Einordnung →
   HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →
@@ -1360,6 +1444,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `.unterseite[hidden]`.
   Bei der letzten fehlte sie: die Auswahl der Zeitleiste stand dauerhaft offen und
   liess sich nicht zuklappen, obwohl das Attribut korrekt gesetzt wurde.
+  Seit 18.09.2026 setzen `.zl-optionen` und `#hinweis-oben` ihr `hidden` beim
+  Schliessen erst **nach** der Ausblend-Animation — direkt nach dem Tipp steht dort
+  also noch `hidden = false`, und das ist richtig so.
   **Die eigentliche Lehre betrifft das Prüfen:** Ich hatte `el.hidden` abgefragt — die
   Eigenschaft war richtig, nur eben wirkungslos. Ob etwas verschwindet, beweist allein
   das Ergebnis: `getComputedStyle(el).display`, die gemessene Höhe oder ein Bild im
