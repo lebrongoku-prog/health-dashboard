@@ -439,10 +439,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „Total" in den Trainings-Fusszeilen ist deshalb die Summe über alle gezeigten
   Septembers zusammen.
   **Fusszeilen im Jahresvergleich** (auf Wunsch, 14.09.2026): **alle Durchschnitts-
-  Zeilen entfallen** — „Durchschnitt" (seit 18.09.2026 auch die in Laufstrecke,
-  Trainingszeit und Pace), „Ø Schlafdauer", die vier Schlafphasen-Zeilen,
-  „Ø pro Lauf", „Durchschnitt" bei VO₂max und die Wochentag/Wochenende-Zeilen. Dazu „Veränderung"
-  bei VO₂max: sie misst gegen die Vorperiode, und die ist hier `[]`. An ihre Stelle
+  Zeilen entfallen** — die Durchschnittszeilen („Ø 1M" usw., siehe „Durchschnittszeile";
+  in Ruhepuls & HRV, Schlafdauer, den vier Schlafphasen, Laufstrecke, Trainingszeit,
+  Pace und VO₂max), „Ø pro Lauf" und die Wochentag/Wochenende-Zeilen. „Veränderung"
+  bei VO₂max entfiel hier schon immer (sie mass gegen die Vorperiode, und die ist hier
+  `[]`); seit 18.09.2026 gibt es sie gar nicht mehr. An ihre Stelle
   treten **eine Zeile je Jahr ab dem zweiten** mit der prozentualen Veränderung zum
   Vorjahr: `2025 vs. 2024 · +12.3%`. „Total" und „Schlafziel erreicht" bleiben.
   **Das neueste Jahr steht oben** (auf Wunsch, 14.09.2026): `2026 vs. 2025`, darunter
@@ -994,25 +995,36 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
-- **Fusszeilen des Training-Tabs, zugeklappt** (auf Wunsch, 18.09.2026):
-  **Laufstrecke und Trainingszeit** `Total` → `Durchschnitt` → `Ø pro Lauf` →
-  `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt");
-  **Pace und VO₂max** nur `Durchschnitt`. Aufgeklappt kommen Wochentag/Wochenende
-  dazu, bei VO₂max „Veränderung" (vorher immer sichtbar).
-  **„Durchschnitt" ist der Wert der gestrichelten Ø-Linie** — der Mittelwert der
+- **Durchschnittszeile heisst „Ø 7T", „Ø 1M" … — in JEDEM Diagramm** (auf Wunsch,
+  18.09.2026). Das Zeitfenster steht so da wie in der Pille der Zeitleiste; vorher
+  hiess die Zeile „Durchschnitt" bzw. „Ø Schlafdauer". Eine Quelle: `oeLabel(zusatz)`
+  (aus `_RANGE_OPTS`). Betroffen: Ruhepuls & HRV, Schlafdauer, Schlafphasen-Verlauf
+  (vier Zeilen, dort mit Zusatz: `Ø 1M · REM-Schlaf`), Laufstrecke, Trainingszeit,
+  Pace, VO₂max. **Nicht** betroffen sind Durchschnitte mit eigener Bezugsgrösse:
+  „Ø pro Lauf", „Ø pro Woche", „Ø Wochentag/Wochenende" und „Ø pro Nacht" der
+  Schlafschuld (die folgt nicht dem Zeitfilter, sondern den letzten 14 Nächten).
+  Im Jahresvergleich entfallen die Zeilen weiterhin ganz.
+- **Fusszeilen des Training-Tabs** (auf Wunsch, 18.09.2026):
+  **Laufstrecke und Trainingszeit** `Total` → `Ø 1M` → `Ø pro Lauf` →
+  `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt"); aufgeklappt
+  kommen Wochentag/Wochenende dazu. **Pace und VO₂max** tragen nur die
+  Durchschnittszeile — auch aufgeklappt: Wochentag/Wochenende beim Pace und
+  „Veränderung" bei VO₂max sind **ganz entfallen** (auf Wunsch). Mit „Veränderung"
+  ging auch der Vorperioden-Vergleich (`prevPeriod()`) aus dem Training-Tab;
+  `vo2Abschnitt(D)` nimmt kein `P` mehr.
+  **Die Durchschnittszeile ist der Wert der gestrichelten Ø-Linie** — der Mittelwert der
   Balken, also je Tag (7T, 1M) bzw. je Monat (ab 3M), passend zur Legende „pro Tag"/
   „pro Monat". Tage ohne Einheit stehen als `null` in der Reihe und zählen nicht mit.
   Die Balkenreihen (`_balkenZeit`, `_balkenStr`) werden deshalb **vor** dem Markup
   bestimmt und von Fusszeile und Linie gemeinsam gelesen. Folge: bei 7T und 1M ist
-  „Durchschnitt" in der Laufstrecke praktisch „Ø pro Lauf" (je Trainingstag statt je
+  „Ø 1M" in der Laufstrecke praktisch „Ø pro Lauf" (je Trainingstag statt je
   Einheit — gleich, solange es keinen Tag mit zwei Läufen gibt); ab 3M ist es der
   Monatsschnitt. Pace: Mittel über die Einheiten (`mittelArr(trendPace)`), ebenfalls
-  der Linienwert. VO₂max zeigt wie bisher den Mittelwert der Messtage (`v2D`) — die
-  Zeile hiess vorher „Ø VO₂max".
+  der Linienwert. VO₂max zeigt wie bisher den Mittelwert der Messtage (`v2D`).
   Nachgemessen (Prüfstand, Sep 26): 1M Linie 10.66 km / 67.46 min / 5.62 → Fusszeile
   10.7 km / 1h 7min / 5'37"; 3M 100.16 km / 611.93 min → 100.2 km / 10h 12min.
 - **„Ø pro Lauf" in Laufstrecke und Trainingszeit** (auf Wunsch, 14.09.2026): direkt
-  nach „Durchschnitt" (vorher direkt nach „Total"), **immer sichtbar** (nicht hinter dem Ausklapp-Knopf), im
+  nach der Durchschnittszeile (vorher direkt nach „Total"), **immer sichtbar** (nicht hinter dem Ausklapp-Knopf), im
   Jahresvergleich entfällt sie mit den übrigen Ø-Zeilen. Jede Zahl teilt durch das,
   was ihr Total enthält: **Strecke ÷ Einheiten mit Strecke** (`laeufe`), **Zeit ÷
   alle Einheiten** (`anzahl`) — die Trainingszeit summiert auch Intervalltrainings
@@ -1247,7 +1259,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Schlafdauer, Laufstrecke, Trainingszeit). Die Zeilen **„Ø Wochentag (Mo–Fr)" und
   „Ø Wochenende (Sa–So)"** stehen nur noch bei **offenem** Ausklapp-Zustand ihres Tabs,
   also standardmässig nicht. Betroffen: Ruhepuls & HRV, Schlafdauer, Laufstrecke,
-  Trainingszeit, Pace. In Herz und Schlaf klappt **derselbe** Knopf „Weitere
+  Trainingszeit (beim Pace seit 18.09.2026 ganz entfallen). In Herz und Schlaf klappt **derselbe** Knopf „Weitere
   Auswertungen" und die Wochenzeilen gemeinsam — ein Zustand je Tab, kein zweiter
   Schalter. Training hat dafür einen eigenen `AUSKLAPP`-Eintrag bekommen.
   **Aufbau:**
@@ -1257,10 +1269,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Die Hülle steht in jeder Fusszeile **zuletzt**; darauf verlässt sich die
      Trennlinie (`.stat-row:last-child`).
   2. **Pace war bis 18.09.2026 der Sonderfall:** seine Fusszeile bestand NUR aus diesen
-     zwei Zeilen, deshalb klappte dort die **ganze** `.diagramm-fuss`. Seit „Durchschnitt"
-     auch zugeklappt dasteht, klappt wie überall nur die Hülle `fussMehr`. Wer eine
-     Fusszeile baut, die zugeklappt leer wäre, braucht den alten Weg wieder — sonst
-     bleibt eine leere Fusszeile mit Trennlinie stehen.
+     zwei Zeilen, deshalb klappte dort die **ganze** `.diagramm-fuss`. Heute hat Pace
+     nur noch die Durchschnittszeile und gar keine Ausklapp-Zeilen. Wer eine Fusszeile
+     baut, die zugeklappt leer wäre, braucht den alten Weg wieder (die ganze Fusszeile
+     trägt `ausklapp-teil`) — sonst bleibt eine leere Fusszeile mit Trennlinie stehen.
   3. **Alles, was der Knopf zeigt, trägt die Klasse `ausklapp-teil`** — `.weitere-inhalt`,
      der Verlauf und das Muster-Raster der Übersicht, die Fusszeilen-Hüllen. Wer etwas
      Neues hinter den Knopf legt, gibt ihm diese Klasse, mehr braucht es nicht.

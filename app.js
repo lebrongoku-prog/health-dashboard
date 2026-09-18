@@ -2484,7 +2484,7 @@ function pgHerz() {
         ${istYoY() ? yoyZeilen([
             { werte: yoyWerte(D, r => r.restHR, 'mittel'), richtung: ZIELE.restHR.richtung },
             { werte: yoyWerte(D, r => r.hrv,    'mittel'), richtung: ZIELE.hrv.richtung }]) : ''}
-        ${istYoY() ? '' : statZeile(`Durchschnitt`, `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
+        ${istYoY() ? '' : statZeile(oeLabel(), `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
         ${istYoY() ? '' : fussMehr('herz',
           statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
         + statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`))}
@@ -3028,7 +3028,7 @@ function pgSchlaf() {
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => r.sleepTotal, 'mittel'), richtung: ZIELE.sleepTotal.richtung }]) : ''}
-          ${istYoY() ? '' : statZeile(`Ø Schlafdauer`, `${slD!=null?alsStdMin(slD):'—'}`)}
+          ${istYoY() ? '' : statZeile(oeLabel(), `${slD!=null?alsStdMin(slD):'—'}`)}
           ${istYoY() ? '' : fussMehr('schlaf',
             statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
           + statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd):'—'}`))}
@@ -3095,10 +3095,10 @@ function pgSchlaf() {
           { werte: yoyWerte(D, r => r.sleepRem ?? r.remSleep ?? null, 'mittel'), vor: 'REM ' },
           { werte: yoyWerte(D, r => r.sleepDeep ?? r.deepSleep ?? null, 'mittel'), vor: 'Tief ' }])}</div>`
       : awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
-        ${awD!=null?`${statZeile(`Ø Wach`, `${alsStdMin(awD)} – ${awPct}%`)}`:''}
-        ${remD!=null?`${statZeile(`Ø REM-Schlaf`, `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
-        ${lD!=null?`${statZeile(`Ø Leichtschlaf`, `${alsStdMin(lD)} – ${lPct}%`)}`:''}
-        ${dpD!=null?`${statZeile(`Ø Tiefschlaf`, `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
+        ${awD!=null?`${statZeile(oeLabel('Wach'), `${alsStdMin(awD)} – ${awPct}%`)}`:''}
+        ${remD!=null?`${statZeile(oeLabel('REM-Schlaf'), `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
+        ${lD!=null?`${statZeile(oeLabel('Leichtschlaf'), `${alsStdMin(lD)} – ${lPct}%`)}`:''}
+        ${dpD!=null?`${statZeile(oeLabel('Tiefschlaf'), `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
       </div>`:''}
     </div>`:''}
       </div>
@@ -3203,7 +3203,7 @@ function pgSchlaf() {
 
 // ── Training ───────────────────────────────────────────
 async function pgTraining() {
-  const D=filtered(), P=prevPeriod();
+  const D=filtered();
 
   // 1) Auf den Abschluss des Workout-Ladevorgangs warten – begrenzt, damit ein
   //    fehlgeschlagener Abruf nicht in einem dauerhaften Ladezustand endet.
@@ -3254,8 +3254,6 @@ async function pgTraining() {
   const _avgNn=arr=>{const f=arr.filter(v=>v!=null);return f.length?f.reduce((a,b)=>a+b,0)/f.length:null;};
   const distWkdAvg=_avgNn(_wkdIdx.map(i=>trendDist[i]));
   const distWkndAvg=_avgNn(_wkndIdx.map(i=>trendDist[i]));
-  const paceWkdAvg=_avgNn(_wkdIdx.map(i=>trendPace[i]));
-  const paceWkndAvg=_avgNn(_wkndIdx.map(i=>trendPace[i]));
 
   // Totals for period
 
@@ -3356,7 +3354,7 @@ async function pgTraining() {
     <div class="field-hint" style="margin-top:.4rem">Quelle: <code>Workout Data</code>-Google-Sheet · erwartete Spalten: <code>Date</code> <code>Type</code> <code>Duration (min)</code> <code>Distance (km)</code> <code>Avg HR</code> <code>Speed (km/h)</code></div>
   </div>`;
 
-  const vo2 = vo2Abschnitt(D, P);
+  const vo2 = vo2Abschnitt(D);
 
   document.getElementById("screen-training").innerHTML=`
     ${pgBanner('🏃','Training')}
@@ -3366,7 +3364,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
-          ${!istYoY()&&oeStrBalken!=null?statZeile(`Durchschnitt`, `${zahl(oeStrBalken,1)} km`):''}
+          ${!istYoY()&&oeStrBalken!=null?statZeile(oeLabel(), `${zahl(oeStrBalken,1)} km`):''}
           ${!istYoY()&&distGesamt!=null&&laeufeGesamt?statZeile(`Ø pro Lauf`, `${zahl(distGesamt/laeufeGesamt,1)} km`):''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.distanceKm ?? null, 'summe') }], true) : ''}
@@ -3382,7 +3380,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
-          ${!istYoY()&&oeZeitBalken!=null?statZeile(`Durchschnitt`, `${fmtMin(oeZeitBalken)}`):''}
+          ${!istYoY()&&oeZeitBalken!=null?statZeile(oeLabel(), `${fmtMin(oeZeitBalken)}`):''}
           ${!istYoY()&&minGesamt!=null&&einheitenGesamt?statZeile(`Ø pro Lauf`, `${fmtMin(minGesamt/einheitenGesamt)}`):''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.durationMin ?? null, 'summe') }], true) : ''}
@@ -3396,16 +3394,11 @@ async function pgTraining() {
       <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#EA580C"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#EA580C')}</div>
       <div class="chart-wrap"><canvas id="c-tr-pace"></canvas></div>
-      <!-- Seit 18.09.2026 steht „Durchschnitt" auch zugeklappt da (auf Wunsch). Damit
-           ist die Pace kein Sonderfall mehr: vorher bestand ihre Fusszeile NUR aus
-           Wochentag/Wochenende, und deshalb klappte die GANZE Fusszeile. Jetzt klappt
-           wie ueberall nur die Huelle „fussMehr“. Ohne Pace-Werte keine Fusszeile. -->
+      <!-- Nur die Durchschnittszeile (18.09.2026, auf Wunsch). Wochentag/Wochenende sind
+           beim Pace ganz entfallen – auch aufgeklappt. Ohne Pace-Werte keine Fusszeile. -->
       ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>`
         : oePace != null ? `<div class="stats-list diagramm-fuss">
-        ${statZeile(`Durchschnitt`, `${fmtPace(oePace)} min/km`)}
-        ${fussMehr('training',
-          (paceWkdAvg!=null?statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`):'')
-        + (paceWkndAvg!=null?statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`):''))}
+        ${statZeile(oeLabel(), `${fmtPace(oePace)} min/km`)}
       </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
@@ -3520,19 +3513,21 @@ async function pgTraining() {
 // Workout-Sheet kommt, sondern aus r.vo2max der Health-Daten.
 // Liefert Markup und Zeichenfunktion getrennt, weil das Markup vor dem Canvas im DOM
 // stehen muss, bevor Chart.js darauf zugreifen kann.
-function vo2Abschnitt(D, P) {
+function vo2Abschnitt(D) {
   const v2r=D.filter(r=>r.vo2max!=null);
-  const v2D=mittel(v2r,'vo2max'), v2P=mittel(P.filter(r=>r.vo2max!=null),'vo2max');
-  const v2Trend=v2D&&v2P?prozentDiff(v2D,v2P):null;
+  const v2D=mittel(v2r,'vo2max');
   const {labels:_v2tL,align:_v2tA,hasData:_v2tHD,keys:_v2Keys,keyTyp:_v2KeyTyp}=timeDim(D,true,true);
   const v2MaFull=_v2tA('vo2max');
 
   // Die frühere Karte "Fitness-Einordnung" ist aufgelöst: ihr farbiger Skalenbalken ist
   // entfallen, ihre Werte standen danach als Fusszeile unter dem Verlauf.
-  // Seit 13.09.2026 sind davon auf Wunsch nur noch zwei Zeilen übrig: „Ø VO₂max" und
+  // Seit 13.09.2026 waren davon auf Wunsch nur noch zwei Zeilen übrig: „Ø VO₂max" und
   // „Veränderung". Mit „Einordnung", „Trend" und „Messungen" ist auch die Stufenskala
   // `_vo2Cat` (Exzellent … Niedrig) ersatzlos entfallen — sie hatte keinen zweiten
   // Leser. Wer sie zurückholt, findet sie in der Git-Historie.
+  // Seit 18.09.2026 (auf Wunsch) ist auch „Veränderung" weg; mit ihr der Vergleich mit
+  // der Vorperiode (`prevPeriod()`), den nur sie brauchte. Es bleibt die
+  // Durchschnittszeile („Ø 1M" …).
   const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
@@ -3540,13 +3535,8 @@ function vo2Abschnitt(D, P) {
       <div class="chart-wrap"><canvas id="c-vo2"></canvas></div>
       <div class="stats-list diagramm-fuss">
         ${istYoY()
-          // „Veränderung" misst gegen die Vorperiode – die gibt es im Jahresvergleich
-          // nicht (prevPeriod() liefert []), die Zeile stuende dort nur als „—".
           ? yoyZeilen([{ werte: yoyWerte(D, r => r.vo2max, 'mittel'), richtung: ZIELE.vo2max.richtung }])
-          // Zugeklappt nur „Durchschnitt" (auf Wunsch, 18.09.2026, vorher „Ø VO₂max");
-          // „Veränderung" liegt seither hinter dem Ausklapp-Knopf des Training-Tabs.
-          : statZeile(`Durchschnitt`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)
-          + fussMehr('training', statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`))}
+          : statZeile(oeLabel(), `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
       </div>
     </div>`;
 
@@ -3623,6 +3613,17 @@ const _RANGE_OPTS = [
   ['7d','7T'],['1m','1M'],['3m','3M'],
   ['6m','6M'],['12m','12M'],['24m','24M']
 ];
+// Label der Durchschnittszeile unter einem Diagramm (auf Wunsch, 18.09.2026):
+// „Ø 7T", „Ø 1M" … – das Zeitfenster heisst dort genau wie in der Pille der
+// Zeitleiste, damit man die Zahl ohne Nachdenken dem Filter zuordnet. Vorher stand
+// „Durchschnitt" bzw. „Ø Schlafdauer". Mit `zusatz` fuer Diagramme mit mehreren
+// Reihen je Zeile (Schlafphasen: „Ø 1M · REM-Schlaf").
+// Im Jahresvergleich entfallen alle Durchschnittszeilen – dort wird es nie gerufen.
+function oeLabel(zusatz) {
+  const t = _RANGE_OPTS.find(([k]) => k === timeRange);
+  const basis = 'Ø ' + (t ? t[1] : timeRange);
+  return zusatz ? basis + ' · ' + zusatz : basis;
+}
 // Angezeigter Zeitraum als Text – nur bei den Monatsbereichen. Bei Heute/7T steht das
 // Datum bereits auf der Zeitachse; ab 1M zeigt sie je nach Bereich nur noch Monate,
 // und aus "Jun 26" allein ist nicht ablesbar, wie weit das Fenster zurückreicht.
