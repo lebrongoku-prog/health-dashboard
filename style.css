@@ -113,7 +113,6 @@ body.theme-training   { --tab-color: #F97316; }
 .nav-arrow:disabled, .nav-arrow.inaktiv { opacity: 0.3; cursor: default; }
 /* Kein Druckpunkt, wenn nichts passiert – sonst sieht es aus, als haette es gewirkt. */
 .nav-arrow.inaktiv:active { opacity: 0.3; transform: none; }
-body.dark .dark-toggle { color: #FBBF24; }
 
 /* Filter pills (horizontal scrollable) */
 .tbtn {
@@ -1191,6 +1190,17 @@ h5,
   stroke:#fff;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;
 }
+/* Nachtmodus: Kontrast-Symbol in derselben Linienoptik wie das Zahnrad (18.09.2026,
+   vorher 🌙/☀️). Ein Symbol fuer beide Zustaende – im Dunkelmodus dreht es sich um
+   180°, die gefuellte Haelfte wandert von rechts nach links. Die Drehung sitzt am
+   SVG, nicht am Knopf: dessen `transform` gehoert dem Druckpunkt (`.pg-act:active`). */
+.pg-act.dark-toggle svg{
+  width:20px;height:20px;fill:none;
+  stroke:#fff;stroke-width:1.7;stroke-linejoin:round;
+  transition:transform .35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pg-act.dark-toggle svg .voll{fill:#fff}
+body.dark .pg-act.dark-toggle svg{transform:rotate(180deg)}
 
 /* Aufklapp-Knopf: "Weitere Auswertungen" (Herz, Schlaf) und "Muster & Zusammenhänge"
    (Übersicht) teilen sich diese Klasse – volle Kartenbreite, aber transparent, damit

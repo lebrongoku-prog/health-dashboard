@@ -2270,7 +2270,7 @@ function pgOverview() {
             <div class="ti-metric-val">${kachelZahl('hv', hvLast)} ms</div>
             ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
           </div>`:'<div class="ti-metric"></div>'}
-          ${slLast!=null?`<div class="ti-metric" ${kachelZiel('schlaf','Schlaf')} style="${kachelStil('#2186E8','33,134,232')}">
+          ${slLast!=null?`<div class="ti-metric" ${kachelZiel('schlaf','Schlaf')} style="${kachelStil('#7C3AED','124,58,237')}">
             <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
             <div class="ti-metric-val">${kachelZahl('sl', slLast, 'std')}</div>
             ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
@@ -3335,6 +3335,18 @@ async function pgTraining() {
     _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
   }
 
+  // Die Balkenreihen beider Diagramme – hier bestimmt statt erst beim Zeichnen, weil
+  // die Fusszeile „Durchschnitt" (auf Wunsch, 18.09.2026) denselben Wert zeigt wie die
+  // gestrichelte Ø-Linie: den Mittelwert der Balken, also je Tag (7T, 1M) bzw. je
+  // Monat (ab 3M) – passend zur Legende „pro Tag"/„pro Monat". Tage ohne Einheit
+  // fehlen in der Reihe (null) und zaehlen deshalb nicht mit.
+  const _balkenZeit = timeRange==='1m' ? _1mMinData  : minSmD;
+  const _balkenStr  = timeRange==='1m' ? _1mDistData : distSmD;
+  const oeZeitBalken = mittelArr(_balkenZeit);
+  const oeStrBalken  = mittelArr(_balkenStr);
+  // Ø-Pace: ebenfalls der Wert der Ø-Linie – Mittel ueber die Einheiten.
+  const oePace = mittelArr(trendPace);
+
   // hasAny stützt sich allein auf das Workout-Sheet – keine Health-CSV-Felder mehr.
   const hasAny=trainDates.length>0;
 
@@ -3354,6 +3366,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
+          ${!istYoY()&&oeStrBalken!=null?statZeile(`Durchschnitt`, `${zahl(oeStrBalken,1)} km`):''}
           ${!istYoY()&&distGesamt!=null&&laeufeGesamt?statZeile(`Ø pro Lauf`, `${zahl(distGesamt/laeufeGesamt,1)} km`):''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.distanceKm ?? null, 'summe') }], true) : ''}
@@ -3369,6 +3382,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
+          ${!istYoY()&&oeZeitBalken!=null?statZeile(`Durchschnitt`, `${fmtMin(oeZeitBalken)}`):''}
           ${!istYoY()&&minGesamt!=null&&einheitenGesamt?statZeile(`Ø pro Lauf`, `${fmtMin(minGesamt/einheitenGesamt)}`):''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.durationMin ?? null, 'summe') }], true) : ''}
@@ -3380,15 +3394,18 @@ async function pgTraining() {
 
     <div class="chart-card">
       <h3>Pace pro Training ${infoI('pace')}</h3>
-      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#7C3AED"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#7C3AED')}</div>
+      <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#EA580C"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#EA580C')}</div>
       <div class="chart-wrap"><canvas id="c-tr-pace"></canvas></div>
-      <!-- Die Pace-Fusszeile besteht NUR aus Wochentag/Wochenende. Zugeklappt gaebe es
-           sonst eine leere Fusszeile mit Trennlinie – deshalb klappt hier die ganze
-           Fusszeile, nicht nur ihr Inhalt. -->
-      ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>` : ''}
-      ${!istYoY() && _weitereOffen.training && (paceWkdAvg!=null || paceWkndAvg!=null) ? `<div class="stats-list diagramm-fuss ausklapp-teil">
-        ${paceWkdAvg!=null?statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`):''}
-        ${paceWkndAvg!=null?statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`):''}
+      <!-- Seit 18.09.2026 steht „Durchschnitt" auch zugeklappt da (auf Wunsch). Damit
+           ist die Pace kein Sonderfall mehr: vorher bestand ihre Fusszeile NUR aus
+           Wochentag/Wochenende, und deshalb klappte die GANZE Fusszeile. Jetzt klappt
+           wie ueberall nur die Huelle „fussMehr“. Ohne Pace-Werte keine Fusszeile. -->
+      ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>`
+        : oePace != null ? `<div class="stats-list diagramm-fuss">
+        ${statZeile(`Durchschnitt`, `${fmtPace(oePace)} min/km`)}
+        ${fussMehr('training',
+          (paceWkdAvg!=null?statZeile(`Ø Wochentag (Mo–Fr)`, `${fmtPace(paceWkdAvg)} min/km`):'')
+        + (paceWkndAvg!=null?statZeile(`Ø Wochenende (Sa–So)`, `${fmtPace(paceWkndAvg)} min/km`):''))}
       </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
@@ -3400,8 +3417,8 @@ async function pgTraining() {
     const _is1m=timeRange==='1m';
     const _zeitInH=timeRange!=='7d'&&timeRange!=='1m'; // 3M+ → show hours
     const _xTot=gx;
-    const _lZeitData=_is1m?_1mMinData:minSmD;
-    const _lStrData=_is1m?_1mDistData:distSmD;
+    const _lZeitData=_balkenZeit;
+    const _lStrData=_balkenStr;
     const _lZeitLbls=_is1m?_1mLabels:tL;
     const _lStrLbls=_is1m?_1mLabels:tL;
     const _lZeitKeys=_is1m?_1mKeys:tKeys;
@@ -3479,8 +3496,11 @@ async function pgTraining() {
     zeichneDiagramm('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,
       __werteFmt:v=>fmtPace(v),
       type:'line',data:{labels:_paceLabels,datasets:[
-      {label:'Pace [min/km]',data:_paceData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7C3AED',spanGaps:true},
-      ...oeDatensatz('c-tr-pace|oe', mittelArr(_paceData), '#7C3AED', _paceLabels.length)
+      // Orange wie die uebrigen Diagramme des Tabs (auf Wunsch, 18.09.2026; vorher
+      // Violett, die Farbe des Schlaf-Tabs). #EA580C ist dunkler als Trainingszeit
+      // (#F97316) und Laufstrecke (#FB923C) und roeter als VO2max (#D97706).
+      {label:'Pace [min/km]',data:_paceData,borderColor:'#EA580C',backgroundColor:'rgba(234,88,12,.08)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#EA580C',spanGaps:true},
+      ...oeDatensatz('c-tr-pace|oe', mittelArr(_paceData), '#EA580C', _paceLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>{
         if(ctx.raw==null)return null;
@@ -3523,8 +3543,10 @@ function vo2Abschnitt(D, P) {
           // „Veränderung" misst gegen die Vorperiode – die gibt es im Jahresvergleich
           // nicht (prevPeriod() liefert []), die Zeile stuende dort nur als „—".
           ? yoyZeilen([{ werte: yoyWerte(D, r => r.vo2max, 'mittel'), richtung: ZIELE.vo2max.richtung }])
-          : statZeile(`Ø VO₂max`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)
-          + statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`)}
+          // Zugeklappt nur „Durchschnitt" (auf Wunsch, 18.09.2026, vorher „Ø VO₂max");
+          // „Veränderung" liegt seither hinter dem Ausklapp-Knopf des Training-Tabs.
+          : statZeile(`Durchschnitt`, `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)
+          + fussMehr('training', statZeile(`Veränderung`, `${v2Trend!=null?(v2Trend>0?'+':'')+zahl(v2Trend,1)+'%':'—'}`))}
       </div>
     </div>`;
 
@@ -3557,12 +3579,17 @@ function vo2Abschnitt(D, P) {
 const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTraining};
 // Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
 // g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
+const DARK_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path class="voll" d="M12 3.5a8.5 8.5 0 0 1 0 17Z"/></svg>`;
 function pgBanner(icon,title){
   // Dark-Toggle sitzt rechtsbündig direkt auf der Titelzeile (keine eigene
   // Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
   // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
   // Tabnamen, der Daten-Stand steht jetzt einmal auf der Einstellungen-Seite.
-  const darkIcon = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  // Kontrast-Symbol statt 🌙/☀️ (auf Wunsch, 18.09.2026): ein Kreis mit gefuellter
+  // Haelfte, in derselben Linienoptik wie das Zahnrad daneben. Es ist EIN Symbol fuer
+  // beide Zustaende – im Dunkelmodus dreht es sich per CSS um 180° (die gefuellte
+  // Haelfte wandert nach links), deshalb tauscht `applyDarkMode` nichts mehr aus.
+  const darkIcon = DARK_SYMBOL;
   // Der Ausklapp-Schalter sass bis 07.09.2026 hier. Er steht jetzt unten links in der
   // Zeitleiste (`zeitleisteAusklapp()`) und macht dort deren passiven Modus mit.
   // Zahnrad NUR in der Uebersicht. Es traegt die durchscheinende Optik der uebrigen
@@ -3572,7 +3599,7 @@ function pgBanner(icon,title){
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Theme">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Dunkelmodus" aria-pressed="${document.body.classList.contains('dark')?'true':'false'}">${darkIcon}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -4505,9 +4532,11 @@ function applyDarkMode(isDark) {
   document.body.classList.toggle('dark', isDark);
   Chart.defaults.borderColor = ACHSEN_COLOR;
   Chart.defaults.color       = isDark ? '#94A3B8' : '#94A3B8';
-  // Dark-Toggle-Emoji in allen Topbar-Instanzen aktualisieren
+  // Das Symbol bleibt dasselbe (die Drehung macht das CSS über `body.dark`); nur der
+  // Zustand fuer Screenreader zieht nach. Vorher wurde hier 🌙/☀️ getauscht – ein
+  // `textContent` wuerde das SVG loeschen.
   document.querySelectorAll('.dark-toggle').forEach(btn => {
-    btn.textContent = isDark ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
   });
   try { localStorage.setItem('hcc_dark', isDark ? '1' : '0'); } catch(e) {}
 }

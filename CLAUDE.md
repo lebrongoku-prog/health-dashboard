@@ -240,8 +240,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
   der App-Karte auf der Einstellungen-Seite (`datenStandZeilen()`, ab 2 Tagen
   Rückstand orange).
-- **Bedienelemente:** 🌙 Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
-  (`pgBanner()`). Das
+- **Bedienelemente:** Der Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
+  (`pgBanner()`). Er trägt seit 18.09.2026 (auf Wunsch) statt 🌙/☀️ ein
+  **Kontrast-Symbol** (`DARK_SYMBOL`: Kreis mit gefüllter Hälfte) in derselben
+  Linienoptik wie das Zahnrad daneben. Ein Symbol für beide Zustände: im Dunkelmodus
+  dreht es sich per CSS um 180° (`body.dark .pg-act.dark-toggle svg`), die Drehung
+  sitzt am SVG, weil das `transform` des Knopfs dem Druckpunkt gehört.
+  `applyDarkMode` setzt nur noch `aria-pressed` — ein `textContent` wie früher würde
+  das SVG löschen. Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
   auf der Einstellungen-Seite — zusammen mit „App-Version aktualisieren" darunter,
   jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
@@ -260,8 +266,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
   die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
-  Warnzeilen tragen keine. Ausgenommen bleiben die beiden Banner-Knöpfe (🔄/🌙) — ohne
-  Symbol wären sie leer.
+  Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
+  Kontrast) statt Emojis.
 - **Ø-Werte gehören in die Fusszeile, nicht ins Diagramm.** Die gestrichelten Ø-Linien
   sind aus Ruhepuls & HRV, Schlafdauer, Schritte, Kalorien und VO₂max entfernt und
   stehen dort als erste Fusszeile (beim Schlaf als zweite, unter der Ziel-Zeile).
@@ -433,8 +439,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „Total" in den Trainings-Fusszeilen ist deshalb die Summe über alle gezeigten
   Septembers zusammen.
   **Fusszeilen im Jahresvergleich** (auf Wunsch, 14.09.2026): **alle Durchschnitts-
-  Zeilen entfallen** — „Durchschnitt", „Ø Schlafdauer", die vier Schlafphasen-Zeilen,
-  „Ø pro Lauf", „Ø VO₂max" und die Wochentag/Wochenende-Zeilen. Dazu „Veränderung"
+  Zeilen entfallen** — „Durchschnitt" (seit 18.09.2026 auch die in Laufstrecke,
+  Trainingszeit und Pace), „Ø Schlafdauer", die vier Schlafphasen-Zeilen,
+  „Ø pro Lauf", „Durchschnitt" bei VO₂max und die Wochentag/Wochenende-Zeilen. Dazu „Veränderung"
   bei VO₂max: sie misst gegen die Vorperiode, und die ist hier `[]`. An ihre Stelle
   treten **eine Zeile je Jahr ab dem zweiten** mit der prozentualen Veränderung zum
   Vorjahr: `2025 vs. 2024 · +12.3%`. „Total" und „Schlafziel erreicht" bleiben.
@@ -452,8 +459,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Kilometer. Liegt der neueste Datentag im Vergleichsmonat und ist nicht dessen
     letzter Tag, trägt die Zeile `(bis 14.09.)`. Bei Mittelwerten nicht — die sind
     auch über einen halben Monat vergleichbar.
-  - Pace hat im Jahresvergleich eine **feste** Fusszeile (sonst nur ausklappbar), und
-    der Ausklapp-Knopf des Training-Tabs ist ausgeblendet: es gäbe nichts zu klappen.
+  - Pace zeigt im Jahresvergleich nur die Vorjahres-Zeilen, und der Ausklapp-Knopf
+    des Training-Tabs ist ausgeblendet: es gäbe nichts zu klappen.
     Dafür kennt `AUSKLAPP` ein optionales `sichtbar()`, das `zeitleisteAusklapp()` prüft.
   Nachgerechnet aus den Rohdaten des Prüfstands (`?tage=900`): Laufstrecke 88.9 /
   156.2 / 48.1 km → `+75.7%` / `−69.2%`, Ruhepuls → `+9.1%` / `+6.6%` — identisch.
@@ -967,6 +974,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Raster im Training-Tab (`three-col`) und die Klasse `.chart-wrap-flex` sind mit
   der Neusortierung entfallen.
 - **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
+  Innerhalb des Training-Tabs sind **alle vier** Diagramme orange (Pace seit
+  18.09.2026, vorher Violett — die Farbe des Schlaf-Tabs): Laufstrecke `#FB923C`,
+  Trainingszeit `#F97316`, Pace `#EA580C`, VO₂max `#D97706`. Die **Schlaf-Minikachel**
+  der Übersicht trägt seit 18.09.2026 ebenfalls die Tabfarbe ihres Ziels (`#7C3AED`
+  statt Hellblau `#2186E8`, das bleibt dem Leichtschlaf im Schlafphasen-Verlauf).
 - **Tooltips:** ein zentrales System für Maus **und** Fingertipp. Neue Tooltip-Anker gehören in
   `TT_TAP_SELECTOR`; `openTooltip()`/`closeTooltips()` regeln den Rest. Reine CSS-`:hover`-
   Tooltips brauchen zusätzlich eine `.tt-open`-Regel, sonst sind sie am iPhone unerreichbar.
@@ -982,8 +994,25 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **Fusszeilen des Training-Tabs, zugeklappt** (auf Wunsch, 18.09.2026):
+  **Laufstrecke und Trainingszeit** `Total` → `Durchschnitt` → `Ø pro Lauf` →
+  `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt");
+  **Pace und VO₂max** nur `Durchschnitt`. Aufgeklappt kommen Wochentag/Wochenende
+  dazu, bei VO₂max „Veränderung" (vorher immer sichtbar).
+  **„Durchschnitt" ist der Wert der gestrichelten Ø-Linie** — der Mittelwert der
+  Balken, also je Tag (7T, 1M) bzw. je Monat (ab 3M), passend zur Legende „pro Tag"/
+  „pro Monat". Tage ohne Einheit stehen als `null` in der Reihe und zählen nicht mit.
+  Die Balkenreihen (`_balkenZeit`, `_balkenStr`) werden deshalb **vor** dem Markup
+  bestimmt und von Fusszeile und Linie gemeinsam gelesen. Folge: bei 7T und 1M ist
+  „Durchschnitt" in der Laufstrecke praktisch „Ø pro Lauf" (je Trainingstag statt je
+  Einheit — gleich, solange es keinen Tag mit zwei Läufen gibt); ab 3M ist es der
+  Monatsschnitt. Pace: Mittel über die Einheiten (`mittelArr(trendPace)`), ebenfalls
+  der Linienwert. VO₂max zeigt wie bisher den Mittelwert der Messtage (`v2D`) — die
+  Zeile hiess vorher „Ø VO₂max".
+  Nachgemessen (Prüfstand, Sep 26): 1M Linie 10.66 km / 67.46 min / 5.62 → Fusszeile
+  10.7 km / 1h 7min / 5'37"; 3M 100.16 km / 611.93 min → 100.2 km / 10h 12min.
 - **„Ø pro Lauf" in Laufstrecke und Trainingszeit** (auf Wunsch, 14.09.2026): direkt
-  nach „Total", **immer sichtbar** (nicht hinter dem Ausklapp-Knopf), im
+  nach „Durchschnitt" (vorher direkt nach „Total"), **immer sichtbar** (nicht hinter dem Ausklapp-Knopf), im
   Jahresvergleich entfällt sie mit den übrigen Ø-Zeilen. Jede Zahl teilt durch das,
   was ihr Total enthält: **Strecke ÷ Einheiten mit Strecke** (`laeufe`), **Zeit ÷
   alle Einheiten** (`anzahl`) — die Trainingszeit summiert auch Intervalltrainings
@@ -1227,9 +1256,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Animation einen Block bewegt (mit einzelnen Zeilen spränge der `gap` der Liste).
      Die Hülle steht in jeder Fusszeile **zuletzt**; darauf verlässt sich die
      Trennlinie (`.stat-row:last-child`).
-  2. **Pace ist der Sonderfall:** seine Fusszeile besteht NUR aus diesen zwei Zeilen.
-     Dort klappt die **ganze** `.diagramm-fuss` (sie trägt selbst `ausklapp-teil`) —
-     sonst bliebe zugeklappt eine leere Fusszeile mit Trennlinie stehen.
+  2. **Pace war bis 18.09.2026 der Sonderfall:** seine Fusszeile bestand NUR aus diesen
+     zwei Zeilen, deshalb klappte dort die **ganze** `.diagramm-fuss`. Seit „Durchschnitt"
+     auch zugeklappt dasteht, klappt wie überall nur die Hülle `fussMehr`. Wer eine
+     Fusszeile baut, die zugeklappt leer wäre, braucht den alten Weg wieder — sonst
+     bleibt eine leere Fusszeile mit Trennlinie stehen.
   3. **Alles, was der Knopf zeigt, trägt die Klasse `ausklapp-teil`** — `.weitere-inhalt`,
      der Verlauf und das Muster-Raster der Übersicht, die Fusszeilen-Hüllen. Wer etwas
      Neues hinter den Knopf legt, gibt ihm diese Klasse, mehr braucht es nicht.
