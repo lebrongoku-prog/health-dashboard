@@ -1800,55 +1800,39 @@ const spaltenPlugin = {
   }
 };
 
-// ── Hilfslinien (Ø, Ziel) ueber die GANZE Breite, nie seitlich verschoben ─────
-// (auf Wunsch, 18.09.2026, gemeldet am Schlafdauer-Diagramm bei 3M). Chart.js zog
-// eine Linie in Balkendiagrammen nur von der Mitte der ersten bis zur Mitte der
-// letzten Spalte. Rueckten die Balken beim Blaettern oder Wischen weiter, blieb am
-// Rand eine Luecke ohne Linie, und der hinausfahrende Streifen (ein Ausschnitt des
-// alten Bilds) brachte die alten Linienstuecke mit – die Linie wirkte abgeschnitten
-// und mitgezogen.
-// Jetzt zeichnet dieses Plugin jede Hilfslinie selbst: waagrecht von Rand zu Rand der
-// Zeichenflaeche, auf der Hoehe ihres (konstanten) Werts, im Stil des Datensatzes.
-// Chart.js zeichnet sie danach nicht mehr (`return false`). Dabei:
-//  - Die Verschiebung der Schiebe-Animation (`$navslide`, 7T/1M/YoY) wird hier
-//    zurueckgenommen, `$spalten` laesst Hilfslinien ohnehin aus – sie stehen still
-//    und gleiten nur senkrecht auf ihren neuen Wert.
-//  - `$hlBlende` (Ein-/Ausblenden per Legende) wird hier angewandt: `return false`
-//    haelt die spaeter registrierten Plugins dieses Datensatzes an, hilfslinienBlende
-//    kommt also gar nicht erst dran – und ohne dessen `before` gibt es auch kein
-//    unausgeglichenes save/restore.
-//  - `$ohneHilfslinien` blendet sie aus – fuer die Momentaufnahme in `_spaltenMerken`,
-//    damit der hinausfahrende Streifen keine alten Linienstuecke mitbringt.
-// Liniendiagramme (offset: false) reichten schon vorher von Rand zu Rand – fuer sie
-// aendert sich nichts. Bei Balken ist die Linie jetzt eine halbe Spalte je Seite laenger.
+// ── Hilfslinien (Ø, Ziel) werden nie seitlich verschoben ──────────────────────
+// (auf Wunsch, 18.09.2026, gemeldet am Schlafdauer-Diagramm bei 3M: Ziel- und
+// Ø-Linie wirkten beim Blaettern und Wischen „abgeschnitten und mitgezogen").
+// Zwei Dinge:
+//  - Die Verschiebung der Schiebe-Animation (`$navslide`, 7T/1M/YoY) wird fuer
+//    Hilfslinien zurueckgenommen – sie stehen still, waehrend die Daten gleiten.
+//    `$spalten` (Monatsbalken) laesst Hilfslinien ohnehin aus.
+//  - `$ohneHilfslinien` laesst sie ganz weg – fuer die Momentaufnahme in
+//    `_spaltenMerken`. Der hinausfahrende Streifen ist ein Ausschnitt dieses Bilds und
+//    brachte vorher die alten Linienstuecke mit.
+// Die LAENGE bleibt die von Chart.js (bei Balken von Spaltenmitte zu Spaltenmitte).
+// Eine Fassung, die die Linien von Rand zu Rand zog, gab es am 18.09.2026 kurz – auf
+// Wunsch zurueckgenommen.
+// Das `return false` bei `$ohneHilfslinien` beendet die Kette fuer diesen Datensatz:
+// spaeter registrierte Plugins (hilfslinienBlende, spaltenPlugin) kommen nicht dran,
+// und ohne deren `before` gibt es auch kein unausgeglichenes save/restore. Deshalb
+// MUSS dieses Plugin vor ihnen registriert sein.
 const hilfslinienVoll = {
   id: 'hilfslinienVoll',
   beforeDatasetDraw(chart, args) {
     const ds = chart.data.datasets[args.index];
     if (!ds || !_istHilfslinienLabel(ds.label)) return;
     if (chart.$ohneHilfslinien) return false;
-    const meta = args.meta || chart.getDatasetMeta(args.index);
-    const wert = (ds.data || []).find(v => v != null);
-    const a = chart.chartArea;
-    if (wert == null || !a || !meta || !meta.yScale) return;   // Chart.js zeichnet wie bisher
-    const y = meta.yScale.getPixelForValue(wert);
-    const ctx = chart.ctx;
-    ctx.save();
-    if (chart.$navslideOn && chart.$navslide) ctx.translate(-chart.$navslide.offset, 0);
-    ctx.beginPath();
-    ctx.rect(a.left, a.top - 2, a.right - a.left, a.bottom - a.top + 4);
-    ctx.clip();
-    const hb = chart.$hlBlende;
-    if (hb && _istHilfslinie(ds, hb.art)) ctx.globalAlpha *= hb.alpha;
-    ctx.strokeStyle = ds.borderColor || ACHSEN_COLOR;
-    ctx.lineWidth = ds.borderWidth != null ? ds.borderWidth : 1.5;
-    ctx.setLineDash(Array.isArray(ds.borderDash) ? ds.borderDash : []);
-    ctx.beginPath();
-    ctx.moveTo(a.left, y);
-    ctx.lineTo(a.right, y);
-    ctx.stroke();
-    ctx.restore();
-    return false;
+    if (chart.$navslideOn && chart.$navslide && chart.$navslide.offset) {
+      chart.ctx.save();
+      chart.ctx.translate(-chart.$navslide.offset, 0);
+      chart.$hlZurueck = args.index;
+    }
+  },
+  afterDatasetDraw(chart, args) {
+    if (chart.$hlZurueck !== args.index) return;
+    chart.$hlZurueck = null;
+    chart.ctx.restore();
   }
 };
 
