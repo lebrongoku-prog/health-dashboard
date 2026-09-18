@@ -1346,10 +1346,16 @@ const werteLabelPlugin = {
     const flaeche = chart.chartArea; if (!flaeche) return;
     const ctx = chart.ctx;
     ctx.save();
-    if (blende) ctx.globalAlpha = blende.alpha;
-    // Ruecken Monatsbalken weiter, wandern die Zahlen mit ihren Balken (18.09.2026) –
-    // geschnitten an der Zeichenflaeche, die Luft darueber eingeschlossen.
-    const versatz = chart.$spalten ? chart.$spalten.off : 0;
+    // Die Zahlen wandern mit ihren Balken – bei Monatsbalken (`$spalten`, 18.09.2026)
+    // und ebenso bei der Schiebe-Animation von 7T, 1M und Jahresvergleich (`$navslide`,
+    // auf Wunsch 18.09.2026): dort verschob das navslide-Plugin nur die Datensaetze und
+    // stellte den Zeichenzustand wieder her, BEVOR dieses Plugin zeichnet – die Zahlen
+    // blieben stehen, waehrend die Balken darunter wegglitten. Sie uebernehmen deshalb
+    // Versatz UND Deckkraft der Balken. Geschnitten an der Zeichenflaeche, die Luft
+    // darueber eingeschlossen.
+    const ns = chart.$spalten ? null : chart.$navslide;
+    ctx.globalAlpha = (blende ? blende.alpha : 1) * (ns ? ns.alpha : 1);
+    const versatz = chart.$spalten ? chart.$spalten.off : ns ? ns.offset : 0;
     if (versatz) {
       ctx.beginPath();
       ctx.rect(flaeche.left, 0, flaeche.right - flaeche.left, flaeche.bottom);

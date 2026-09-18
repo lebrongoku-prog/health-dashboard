@@ -863,6 +863,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Linie noch am alten. `fuellungMitziehen()` legt deshalb `$spalten`/`$navslide` um die
   drei Zeichen-Haken des Fillers. Bei der alten Schiebe-Animation hatte das Ausblenden
   den Fehler verdeckt.
+  **Die Zahlen über den Balken wandern mit** (auf Wunsch, 18.09.2026, gemeldet bei 7T):
+  das navslide-Plugin verschiebt nur die Datensätze und stellt den Zeichenzustand in
+  `afterDatasetsDraw` wieder her — VOR dem `werteLabelPlugin`, das erst danach zeichnet.
+  Die Zahlen blieben deshalb stehen, während die Balken darunter wegglitten. Das
+  Plugin übernimmt jetzt Versatz **und** Deckkraft von `$navslide` (bei Monatsbalken
+  schon vorher den von `$spalten`). Gilt für Pfeile und Wisch in 7T, 1M und im
+  Jahresvergleich. Gemessen (812 × 375, 7T): Versatz −55.9 px → Balken und Zahlen beide
+  bei x 38.3 / 244.4 / 347.4, Zahlen mit Deckkraft 0.6 wie die Balken.
 - **Monatsbalken rücken weiter** (auf Wunsch, 18.09.2026). Ab 3M blättert ein Schritt
   EINEN Monat, das Fenster umfasst aber 3 bis 24. Die Schiebe-Animation schob trotzdem
   die ganze Fläche weg und blendete sie aus — es sah aus, als wechsle das ganze
