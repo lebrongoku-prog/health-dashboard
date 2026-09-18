@@ -966,6 +966,14 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 .pi-icon{font-size:1.13rem;flex-shrink:0}
 .pi-conf{font-size:.7rem;font-weight:700;color:var(--txt2)}
 .pi-text{font-size:.75rem;color:var(--txt2);line-height:1.55}
+/* Trainings-Einblicke (18.09.2026): dieselben Karten wie „Muster & Zusammenhaenge",
+   in vier Abschnitten. Die Abschnittstitel stehen auf dem Tab-Verlauf – der ist in
+   beiden Themes dunkel, deshalb Weiss (wie die Minikacheln der Uebersicht). */
+.tr-insights{margin-top:.9rem}
+.tr-abschnitt{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;
+  margin:.15rem .2rem .45rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:rgba(255,255,255,.92)}
+.tr-hinweis{font-size:.64rem;font-weight:600;letter-spacing:0;text-transform:none;color:rgba(255,255,255,.72)}
 
 /* Coaching Hint */
 
@@ -1202,6 +1210,9 @@ h5,
   #screen-training > .pg-banner,
   #screen-herz > .pg-banner,
   #screen-schlaf > .pg-banner { grid-column: 1 / -1; }
+  /* Die Trainings-Einblicke spannen ueber beide Spalten – ihr eigenes Raster
+     (.pi-grid) teilt sie darin wieder in zwei. */
+  #screen-training > .tr-insights { grid-column: 1 / -1; }
   /* Herz und Schlaf haben ueber dem Aufklapp-Bereich nur ihr Hauptdiagramm (beim
      Schlaf zusaetzlich die Score-Kachel). Allein in einer Spalte liesse es die zweite
      leer stehen — es spannt deshalb ueber beide und traegt die Seite als Kopfzeile,

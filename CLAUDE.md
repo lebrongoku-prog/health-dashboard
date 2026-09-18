@@ -150,13 +150,17 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     32.9 min Intervall → Pace 5.92, also unverändert die des Laufs.
   - `anzahl` hält die Zahl der Einheiten. `_woAnzahl` zählt damit **Einheiten statt
     Tage**, sonst fiele „Ø pro Training" an solchen Tagen zu hoch aus.
+  - `einheiten` (seit 18.09.2026) hält jede Einheit des Tages **einzeln**
+    (`typ`, `dauer`, `strecke`, `puls`, `speed`) — für die Rekorde der
+    Trainings-Einblicke. Zusammengefasst zählten zwei Läufe am selben Tag als ein
+    einziger langer. `typ` ist roh und geht beim Anzeigen durch `esc()` (`artLabel`).
   - `laeufe` (seit 14.09.2026) hält die Zahl der Einheiten **mit Strecke** — die
     Grundlage für „Ø pro Lauf" in der Laufstrecke. `anzahl` taugt dafür nicht: ein
     Intervalltraining am selben Tag zählt dort mit, hat aber keine Strecke.
 - **Sofortstart aus dem Zwischenspeicher (Vorbild FitTrack):** Die App wartete früher
   auf ~10 Sheets-Anfragen in vier Wellen, bevor irgendetwas erschien; nach Ablauf des
   Tokens (~1 h) sah man statt Daten nur den Login. Jetzt:
-  1. `datenCacheLesen()` füllt `allData` und `workoutData` aus `hcc_daten_v2` —
+  1. `datenCacheLesen()` füllt `allData` und `workoutData` aus `hcc_daten_v3` —
      die App ist nach ~30 ms bedienbar.
   2. `hintergrundLaden()` holt danach den frischen Stand. Ist er **identisch**
      (Fingerabdruck `datenStand()` vorher/nachher), passiert **nichts** — sonst
@@ -170,8 +174,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      den Schutz wieder.
   **Das Sheet bleibt die Quelle** — der Zwischenspeicher ist nur eine Kopie und wird
   nach jedem erfolgreichen Laden überschrieben. Der Schlüssel trägt eine
-  Versionsnummer (`hcc_daten_v2`, seit 14.09.2026 — v1 hatte kein `laeufe` und
-  räumt sich beim nächsten Schreiben selbst weg): ändert sich, WIE eingelesen wird, hochzählen, dann
+  Versionsnummer (`hcc_daten_v3`, seit 18.09.2026 — v2 hatte keine `einheiten`, v1
+  kein `laeufe`; beide räumen sich beim nächsten Schreiben selbst weg): ändert sich, WIE eingelesen wird, hochzählen, dann
   verwerfen alte Stände sich selbst. Beim Lesen gilt dieselbe Datumsprüfung wie beim
   Sheet — `localStorage` ist von aussen beschreibbar, also nicht vertrauenswürdiger
   als eine Sheet-Zelle; alles andere fängt `esc()` beim Rendern ab.
@@ -264,8 +268,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   von 2026, nicht zur KW 53 von 2025). Das 7T-Fenster läuft ohnehin Montag bis
   Sonntag (`weekDays7()` über `getWeekMonday()`) und ist damit genau eine ISO-Woche.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
-- **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht und
-  die Karten unter „Muster & Zusammenhänge". Titel, Überschriften, Status- und
+- **Emojis nur an vier Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht,
+  die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
+  Trainings-Einblicke (seit 18.09.2026). Titel, Überschriften (auch die
+  Abschnittstitel der Einblicke), Status- und
   Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
   Kontrast) statt Emojis.
 - **Ø-Werte gehören in die Fusszeile, nicht ins Diagramm.** Die gestrichelten Ø-Linien
@@ -492,9 +498,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Kilometer. Liegt der neueste Datentag im Vergleichsmonat und ist nicht dessen
     letzter Tag, trägt die Zeile `(bis 14.09.)`. Bei Mittelwerten nicht — die sind
     auch über einen halben Monat vergleichbar.
-  - Pace zeigt im Jahresvergleich nur die Vorjahres-Zeilen, und der Ausklapp-Knopf
-    des Training-Tabs ist ausgeblendet: es gäbe nichts zu klappen.
-    Dafür kennt `AUSKLAPP` ein optionales `sichtbar()`, das `zeitleisteAusklapp()` prüft.
+  - Pace zeigt im Jahresvergleich nur die Vorjahres-Zeilen. Der Ausklapp-Knopf des
+    Training-Tabs war dort bis 18.09.2026 ausgeblendet (ohne Wochenzeilen gab es
+    nichts zu klappen); seit es die Trainings-Einblicke gibt, ist er immer da.
+    `AUSKLAPP` kennt weiterhin ein optionales `sichtbar()`, das `zeitleisteAusklapp()`
+    prüft — derzeit nutzt es kein Tab.
   Nachgerechnet aus den Rohdaten des Prüfstands (`?tage=900`): Laufstrecke 88.9 /
   156.2 / 48.1 km → `+75.7%` / `−69.2%`, Ruhepuls → `+9.1%` / `+6.6%` — identisch.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
@@ -1528,12 +1536,53 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      `ergebnis === true`, und erst **nach** `appKarteAuffrischen()` — die baut die
      Einstellungen-Seite neu und ersetzt dabei den Knopf. `.update-btn` führt in seiner
      `transition` `opacity`/`transform` mit (siehe „Tipp-Animation").
+- **Trainings-Einblicke** (auf Wunsch, 18.09.2026): 19 Karten hinter dem
+  Ausklapp-Knopf des Training-Tabs unter VO₂max, **alle über den gesamten
+  Datenbestand** — sie folgen dem Zeitfilter nicht. Dieselbe Karte wie „Muster &
+  Zusammenhänge" (`insightKarte()`, jetzt gemeinsam genutzt), in vier Abschnitten mit
+  weissen Titeln auf dem Tab-Verlauf (`.tr-abschnitt`). Berechnung in
+  `_trainingsInsightsBerechnen()`, gemerkt über `_memo('trainingsInsights')`;
+  `_parseWorkoutRows` verwirft den Eintrag selbst, weil der Analytics-Cache sonst nur
+  beim Einlesen der Gesundheitsdaten geleert wird.
+  **Begriffe:** Einheit = ein Eintrag im Workout-Blatt (`workoutData[d].einheiten`),
+  Lauf = eine Einheit mit Strecke > 0. Nächte wie in der Übersicht: `sleepTotal` am
+  Tag d ist die Nacht davor, die Folgenacht von d steht am Tag d + 1.
+  **Rekorde:** Rekordmonat (km, dazu der Monatsschnitt über alle Monate seit
+  Datenbeginn), Rekordwoche (km, KW), längster Lauf, längste Einheit (Dauer),
+  schnellster Lauf **ab 5 km** (kürzere Läufe und GPS-Ausreisser verzerrten sonst),
+  aktivster Monat (Trainingstage), längste Serie (Wochen in Folge mit ≥ 2 Einheiten;
+  die laufende Woche bricht eine Serie nicht, solange sie noch keine 2 hat),
+  VO₂max-Bestwert. **Gewohnheiten:** Lieblingstag (Anteil der Trainingstage je
+  Wochentag), typischer Lauf (Median von Strecke und Pace), Trainingsmix (bis vier
+  Arten einzeln, ab fünf „Sonstige"; Namen über `TRAININGSART_KURZ`, unbekannte roh,
+  immer `esc()`), Erholung (Ø Ruhetage, häufigster Abstand, längste Pause).
+  **Entwicklung:** Pace-Trend und Laufeffizienz (je letzte 91 Tage gegen die 91
+  davor, ab dem neuesten Datentag; Effizienz = Puls bei ähnlicher Pace, Band ±20 s/km
+  um den Median), Jahr gegen Vorjahr bis zum selben Datum (nur, wenn das Vorjahr ab
+  Januar Daten hat), Hochrechnung aufs Jahresende (ab 30 Tagen im Jahr, auf 10 km
+  gerundet), Meilenstein (Gesamt-km, nächste runde Marke, Wochen beim Tempo der
+  letzten 3 Monate). **Training und Gesundheit:** Schlaf vor den schnellsten Läufen
+  (schnellstes Viertel ab 3 km gegen die übrigen) und Schlaf nach langen Läufen (ab
+  15 km; sind es weniger als drei, das längste Viertel — die Schwelle steht dann im
+  Text).
+  **Jede Karte hat Mindestmengen** (etwa ≥ 3 Läufe je Vergleichszeitraum, ≥ 8 Läufe
+  mit Schlafdaten) und fehlt, wenn sie nicht erreicht sind — kein erfundener Wert.
+  **Farbe bedeutet Bewertung:** Rekorde und Gewohnheiten sind Tatsachen und heben die
+  Kernzahl nur fett hervor (`c: 'inherit'`); farbig sind allein Pace-Trend und
+  Effizienz (grün besser, orange schlechter) sowie die Schlafkarten (grün, wenn mehr
+  Schlaf). Jahr gegen Vorjahr bleibt neutral — mehr Kilometer sind kein Ziel der App.
+  **Nachgerechnet** (Prüfstand, `?tage=900`, aus den Rohzeilen): Rekordmonat Juni 2025
+  190.8 km, längster Lauf 17.19 km am 19.10.2025, beste Pace ab 5 km 4.800 min/km über
+  14.58 km, Gesamt 3'851.2 km aus 505 Einheiten, Mix 145/141/122/97 → 29/28/24/19 % —
+  alle identisch mit den Karten. Am Desktop spannen die Einblicke über beide Spalten
+  (`#screen-training > .tr-insights`), ihr eigenes Raster teilt sie wieder in zwei.
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
   **Herz** Ruhepuls & HRV → (Weitere Auswertungen) Ruhepuls-Einordnung →
   HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →
   Schlafdauer → (Weitere Auswertungen) Schlafqualität-Verteilung → Schlafschuld →
   Schlafphasen-Verlauf → Schlaf-Score-Verlauf.
-  **Training** Laufstrecke → Trainingszeit → Pace → VO₂max (Stand 06.09.2026).
+  **Training** Laufstrecke → Trainingszeit → Pace → VO₂max (Stand 06.09.2026) →
+  (Weitere Auswertungen) Trainings-Einblicke (seit 18.09.2026).
   Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
   dann deren Deutung. **Drei Karten sind aus dem Training-Tab entfernt** und stecken
   nur noch in der Git-Historie:
@@ -1644,7 +1693,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   geschlossenen Zustand. Ein Zustandsflag zu prüfen heisst, den eigenen Code zu
   befragen statt den Browser.
 - **Zwei verschiedene „Caches" nicht verwechseln.** `sw.js`-`CACHE` (`hcc-vNN`) hält die
-  **Programmdateien**; `hcc_daten_v2` im `localStorage` hält die **Messdaten**. Der
+  **Programmdateien**; `hcc_daten_v3` im `localStorage` hält die **Messdaten**. Der
   Knopf „App-Version aktualisieren" leert nur den ersten. Wer beim Prüfen den falschen
   leert, sucht lange.
 - **NIE `toISOString()` für Datums-Strings.** Es rechnet nach UTC um; in der Schweiz

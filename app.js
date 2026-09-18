@@ -167,9 +167,17 @@ function _parseWorkoutRows(rows) {
       durationMin: summe(e, 'dauer'),
       distanceKm:  summe(e, 'strecke'),
       avgHR:       gewichtet(e, 'puls'),
-      avgSpeedKph: gewichtet(e, 'speed')
+      avgSpeedKph: gewichtet(e, 'speed'),
+      // Die Einheiten zusaetzlich EINZELN (18.09.2026) – fuer die Rekorde der
+      // Trainings-Einblicke („laengster Lauf", „schnellster Lauf"). Zusammengefasst
+      // zaehlten zwei Laeufe am selben Tag als ein einziger langer. `typ` ist roh und
+      // geht bei der Anzeige durch esc() (artLabel).
+      einheiten: e.map(x => ({ typ: x.typeRaw, dauer: x.dauer, strecke: x.strecke, puls: x.puls, speed: x.speed }))
     };
   });
+  // Die Einblicke haengen an workoutData, der Analytics-Cache wird aber nur beim
+  // Einlesen der Gesundheitsdaten geleert – hier eigens verwerfen.
+  delete _analyticsCache.trainingsInsights;
   // workoutSheetReady wird vom Aufrufer gesetzt (auch im Fehlerfall) – siehe loadFromAPI.
 }
 
@@ -465,7 +473,9 @@ function _stempelGeprueft(s) {
 // einen alten Stand falsch deuten.
 // v2 seit 14.09.2026: `workoutData` traegt `laeufe`. Ein v1-Stand haette das Feld
 // nicht, und „Ø pro Lauf" bliebe bis zum Nachladen leer – deshalb verwirft er sich.
-const DATEN_KEY = 'hcc_daten_v2';
+// v3 seit 18.09.2026: `workoutData` traegt `einheiten` (jede Einheit einzeln, fuer die
+// Rekorde der Trainings-Einblicke).
+const DATEN_KEY = 'hcc_daten_v3';
 
 // Der Inhalt OHNE Zeitstempel – dient zugleich als Fingerabdruck: der Hintergrund-
 // Abruf vergleicht ihn vorher und nachher und zeichnet nur neu, wenn sich wirklich
@@ -476,12 +486,12 @@ function datenStand() {
 }
 
 function datenCacheSchreiben() {
-  try { localStorage.removeItem('hcc_daten_v1'); } catch(_) {}   // Vorgaenger-Stand aufraeumen
+  try { localStorage.removeItem('hcc_daten_v1'); localStorage.removeItem('hcc_daten_v2'); } catch(_) {}   // Vorgaenger-Staende aufraeumen
   try {
     // Der Stempel steht NEBEN dem Fingerabdruck, nicht darin: datenStand() ist die
     // Vergleichsgrundlage fuer „hat sich etwas geaendert?" und soll sich nur aendern,
     // wenn sich die Messwerte aendern.
-    localStorage.setItem(DATEN_KEY, '{"v":2,"ts":' + (_lastLoadTs || 0)
+    localStorage.setItem(DATEN_KEY, '{"v":3,"ts":' + (_lastLoadTs || 0)
       + ',"stempel":' + JSON.stringify(_exportStempel) + ',"d":' + datenStand() + '}');
   } catch(e) {
     // Voller Speicher: die Kopie ist eine Bequemlichkeit, kein Muss. Den alten
@@ -496,7 +506,7 @@ function datenCacheSchreiben() {
 function datenCacheLesen() {
   let roh, d;
   try { roh = JSON.parse(localStorage.getItem(DATEN_KEY) || 'null'); } catch(_) { return false; }
-  if (!roh || roh.v !== 2 || !roh.d) return false;
+  if (!roh || roh.v !== 3 || !roh.d) return false;
   d = roh.d; d.ts = roh.ts;
   if (!Array.isArray(d.allData) || !d.allData.length) return false;
   // Dieselbe Datumsprüfung wie beim Einlesen aus dem Sheet: der Zwischenspeicher ist
@@ -2223,6 +2233,20 @@ function _computeWarningSignals() {
 }
 
 // ── Pattern Insights (correlation-based text insights) ─
+// Eine Einblick-Karte – dieselbe fuer „Muster & Zusammenhaenge" (Uebersicht) und die
+// Trainings-Einblicke. `hl` hebt Teile des Texts hervor: mit Signalfarbe, wo der Wert
+// eine Bewertung traegt, mit `inherit` (nur fett), wo er bloss eine Tatsache ist –
+// „Farbe bedeutet Bewertung". Der Text ist Markup: alles, was aus dem Sheet stammt,
+// muss vorher durch esc() (in den Trainings-Einblicken: artLabel).
+function insightKarte(p) {
+  let txt = p.text;
+  if (p.hl) p.hl.forEach(h => { txt = txt.replace(h.phrase, () => `<span style="color:${h.c};font-weight:700">${h.phrase}</span>`); });
+  return `<div class="pi-card" style="border-top-color:${p.color}">
+        <div class="pi-head"><span class="pi-icon">${p.icon}</span><span class="pi-conf">${p.conf}</span></div>
+        <div class="pi-text">${txt}</div>
+      </div>`;
+}
+
 function generatePatternInsights() { return _memo('patternInsights', _computePatternInsights); }
 function _computePatternInsights() {
   const insights = [];
@@ -2721,13 +2745,7 @@ function pgOverview() {
     <!-- Pattern Insights -->
     ${patternIns.length>0?`
     <div class="pi-grid ausklapp-teil" style="${_weitereOffen.overview?'':'display:none'}">
-      ${patternIns.map(p=>{
-        let txt=p.text;
-        if(p.hl)p.hl.forEach(h=>{txt=txt.replace(h.phrase,`<span style="color:${h.c};font-weight:700">${h.phrase}</span>`);});
-        return`<div class="pi-card" style="border-top-color:${p.color}">
-        <div class="pi-head"><span class="pi-icon">${p.icon}</span><span class="pi-conf">${p.conf}</span></div>
-        <div class="pi-text">${txt}</div>
-      </div>`;}).join('')}
+      ${patternIns.map(insightKarte).join('')}
     </div>`:''}
     <!-- Die App-Karte stand hier bis 06.09.2026 hinter einem Ausklapp-Knopf. Sie
          liegt jetzt auf einer eigenen Seite „Einstellungen" (pgEinstellungen),
@@ -3423,11 +3441,12 @@ const AUSKLAPP = {
   schlaf:   { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.schlaf,
               um: () => { _weitereOffen.schlaf = !_weitereOffen.schlaf; } },
   // Seit 14.09.2026 auch im Training-Tab: dort klappt der Knopf die Fusszeilen
-  // „Ø Wochentag" / „Ø Wochenende" aller vier Diagramme auf einmal.
-  training: { titel: 'Wochentag und Wochenende', offen: () => _weitereOffen.training,
-              um: () => { _weitereOffen.training = !_weitereOffen.training; },
-              // Im Jahresvergleich gibt es keine Wochenzeilen – der Knopf klappte nichts.
-              sichtbar: () => !istYoY() }
+  // „Ø Wochentag" / „Ø Wochenende" aller vier Diagramme auf einmal – und seit
+  // 18.09.2026 zusaetzlich die Trainings-Einblicke unter VO2max. Deshalb ist er jetzt
+  // auch im Jahresvergleich sichtbar (vorher `sichtbar: () => !istYoY()`: ohne
+  // Wochenzeilen gab es dort nichts zu klappen, die Einblicke gibt es aber immer).
+  training: { titel: 'Weitere Auswertungen', offen: () => _weitereOffen.training,
+              um: () => { _weitereOffen.training = !_weitereOffen.training; } }
 };
 
 // ── Schlaf ─────────────────────────────────────────────
@@ -3905,7 +3924,8 @@ async function pgTraining() {
       </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
-    ${vo2.html}`;
+    ${vo2.html}
+    ${hasAny && _weitereOffen.training ? trainingsInsightsHTML() : ''}`;
 
 
   // ── Totale Laufzeit & Laufstrecke ──
@@ -4008,6 +4028,347 @@ async function pgTraining() {
   }
 
   vo2.zeichnen();
+}
+
+// ── Trainings-Einblicke (auf Wunsch, 18.09.2026) ─────────────────────────────
+// Karten wie „Muster & Zusammenhaenge" der Uebersicht, hinter dem Ausklapp-Knopf des
+// Training-Tabs unter VO2max. ALLE ueber den gesamten Datenbestand (auf Wunsch) – sie
+// folgen dem Zeitfilter NICHT. Die Entwicklungs-Karten vergleichen feste Zeitraeume
+// (letzte 3 Monate gegen die 3 davor, Jahr gegen Vorjahr), gerechnet ab dem neuesten
+// Datentag.
+// Vier Abschnitte, 19 Karten. Jede Karte erscheint nur, wenn genug Daten da sind –
+// sonst fehlt sie (kein erfundener Platzhalter).
+// Begriffe: EINHEIT = ein Eintrag im Workout-Blatt (`workoutData[d].einheiten`);
+// LAUF = eine Einheit mit Strecke > 0. Nacht-Zuordnung wie in der Uebersicht:
+// `sleepTotal` am Tag d ist die Nacht VOR d (Aufwachdatum), die Folgenacht von d
+// steht also am Tag d + 1.
+const MONAT_LANG = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const WOCHENTAG_LANG = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+// Anzeigenamen der Trainingsarten. Health Auto Export liefert Apples eigene, teils
+// holprig uebersetzte Namen („Outdoor Ausführen" = Lauf draussen). Unbekannte bleiben
+// wie im Sheet stehen – immer durch esc().
+const TRAININGSART_KURZ = {
+  'Outdoor Ausführen': 'Laufen draussen',
+  'Innenräume Ausführen': 'Laufen drinnen',
+  'Trail-Laufen': 'Trail',
+  'Hochintensives Intervalltraining': 'Intervall (HIIT)'
+};
+function artLabel(typ) { const t = String(typ || '').trim(); return esc(TRAININGSART_KURZ[t] || t || 'Workout'); }
+function trainingsInsights() { return _memo('trainingsInsights', _trainingsInsightsBerechnen); }
+
+function _trainingsInsightsBerechnen() {
+  const tage = Object.keys(workoutData).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (!tage.length) return [];
+  const zahlOk = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+  const einheiten = [];
+  tage.forEach(d => {
+    const w = workoutData[d] || {};
+    const liste = Array.isArray(w.einheiten) && w.einheiten.length ? w.einheiten
+      : [{ typ: w.typeRaw, dauer: w.durationMin, strecke: w.distanceKm, puls: w.avgHR, speed: w.avgSpeedKph }];
+    liste.forEach(e => einheiten.push({ datum: d, typ: String((e && e.typ) || '').trim(),
+      dauer: zahlOk(e && e.dauer), strecke: zahlOk(e && e.strecke),
+      puls: zahlOk(e && e.puls), speed: zahlOk(e && e.speed) }));
+  });
+  const laeufe = einheiten.filter(e => e.strecke > 0);
+  const mitPace = laeufe.filter(e => e.speed > 0);
+  const erster = tage[0];
+  const ende = [tage[tage.length - 1], allData.length ? allData[allData.length - 1].date : null].filter(Boolean).sort().pop();
+  const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
+
+  // Helfer
+  const F = s => ({ phrase: s, c: 'inherit' });                 // nur fett: Tatsache
+  const GUT = '#10B981', ACHTUNG = '#F97316';
+  const datumDe = ds => `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+  const tagMonat = ds => `${+ds.slice(8,10)}.${+ds.slice(5,7)}.`;
+  const monatLang = ym => `${MONAT_LANG[+ym.slice(5,7) - 1]} ${ym.slice(0,4)}`;
+  const tsd = v => Math.round(v).toLocaleString('de-CH');
+  const tageZwischen = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  const summe = (liste, f) => liste.reduce((s, e) => s + (f(e) || 0), 0);
+  const median = arr => { const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const maxEintrag = obj => Object.entries(obj).sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0];
+  const pace = e => paceFromSpeed(e.speed);
+  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
+  const letzte3 = liste => liste.filter(e => e.datum > drei);
+  const davor3  = liste => liste.filter(e => e.datum > sechs && e.datum <= drei);
+
+  const rekorde = [], gewohnheiten = [], entwicklung = [], gesundheit = [];
+  const ORANGE = '#F97316';
+
+  // ── Rekorde ──
+  // 1 Rekordmonat (km)
+  if (laeufe.length) {
+    const km = {}, n = {};
+    laeufe.forEach(e => { const m = e.datum.slice(0,7); km[m] = (km[m] || 0) + e.strecke; n[m] = (n[m] || 0) + 1; });
+    const [m, best] = maxEintrag(km);
+    const monate = (+ende.slice(0,4) - +erster.slice(0,4)) * 12 + (+ende.slice(5,7) - +erster.slice(5,7)) + 1;
+    const schnitt = summe(laeufe, e => e.strecke) / Math.max(1, monate);
+    const kern = `${monatLang(m)} mit ${zahl(best,1)} km`;
+    rekorde.push({ icon:'🗓️', color:ORANGE, conf:'Rekordmonat',
+      text:`Dein stärkster Monat war ${kern} in ${n[m]} ${n[m] === 1 ? 'Lauf' : 'Läufen'} – dein Monatsschnitt liegt bei ${zahl(schnitt,0)} km.`, hl:[F(kern)] });
+  }
+  // 2 Rekordwoche (km)
+  if (laeufe.length) {
+    const km = {};
+    laeufe.forEach(e => { const w = getWeekMonday(e.datum); km[w] = (km[w] || 0) + e.strecke; });
+    const [w, best] = maxEintrag(km);
+    const kern = `${zahl(best,1)} km`;
+    rekorde.push({ icon:'📅', color:ORANGE, conf:'Rekordwoche',
+      text:`Die meisten Kilometer in einer Woche: ${kern} in KW ${isoKW(w)} (${tagMonat(w)}–${tagMonat(addDays(w, 6))}${addDays(w, 6).slice(0,4)}).`, hl:[F(kern)] });
+  }
+  // 3 Laengster Lauf
+  if (laeufe.length) {
+    const l = laeufe.reduce((a, e) => e.strecke > a.strecke ? e : a);
+    const kern = `${zahl(l.strecke,1)} km`;
+    rekorde.push({ icon:'🛣️', color:ORANGE, conf:'Längster Lauf',
+      text:`Dein längster Lauf: ${kern} am ${datumDe(l.datum)}${l.dauer ? ` in ${fmtMin(l.dauer)}` : ''}${l.speed > 0 ? `, Pace ${fmtPace(pace(l))} min/km` : ''}.`, hl:[F(kern)] });
+  }
+  // 4 Laengste Einheit (Dauer)
+  {
+    const mitDauer = einheiten.filter(e => e.dauer > 0);
+    if (mitDauer.length) {
+      const u = mitDauer.reduce((a, e) => e.dauer > a.dauer ? e : a);
+      const kern = fmtMin(u.dauer);
+      rekorde.push({ icon:'⏱️', color:ORANGE, conf:'Längste Einheit',
+        text:`Deine längste Einheit dauerte ${kern}: ${artLabel(u.typ)} am ${datumDe(u.datum)}${u.strecke > 0 ? ` über ${zahl(u.strecke,1)} km` : ''}.`, hl:[F(kern)] });
+    }
+  }
+  // 5 Schnellster Lauf ab 5 km – kuerzere Laeufe und GPS-Ausreisser verzerrten sonst
+  {
+    const lang = mitPace.filter(e => e.strecke >= 5);
+    if (lang.length) {
+      const s = lang.reduce((a, e) => e.speed > a.speed ? e : a);
+      const kern = `${fmtPace(pace(s))} min/km`;
+      rekorde.push({ icon:'⚡', color:ORANGE, conf:'Schnellster Lauf ab 5 km',
+        text:`Deine beste Pace ab 5 km: ${kern} über ${zahl(s.strecke,1)} km am ${datumDe(s.datum)}.`, hl:[F(kern)] });
+    }
+  }
+  // 6 Aktivster Monat (Trainingstage)
+  {
+    const n = {};
+    tage.forEach(d => { const m = d.slice(0,7); n[m] = (n[m] || 0) + 1; });
+    const [m, best] = maxEintrag(n);
+    const kern = `an ${best} Tagen`;
+    rekorde.push({ icon:'🔥', color:ORANGE, conf:'Aktivster Monat',
+      text:`Im ${monatLang(m)} hast du ${kern} trainiert – so oft wie in keinem anderen Monat.`, hl:[F(kern)] });
+  }
+  // 7 Laengste Serie: Wochen in Folge mit mindestens 2 Einheiten
+  {
+    const proWoche = {};
+    einheiten.forEach(e => { const w = getWeekMonday(e.datum); proWoche[w] = (proWoche[w] || 0) + 1; });
+    const wochen = [];
+    for (let w = getWeekMonday(erster), letzte = getWeekMonday(ende); w <= letzte; w = addDays(w, 7)) wochen.push(w);
+    let lauf = 0, best = 0, start = null, bestStart = null, bestEnde = null;
+    wochen.forEach(w => {
+      if ((proWoche[w] || 0) >= 2) { if (!lauf) start = w; lauf++; if (lauf > best) { best = lauf; bestStart = start; bestEnde = w; } }
+      else lauf = 0;
+    });
+    // Aktuelle Serie: die laufende Woche zaehlt mit, sobald sie 2 Einheiten hat – vorher
+    // bricht sie die Serie nicht, sie ist ja noch nicht vorbei.
+    let aktuell = 0;
+    for (let i = wochen.length - 1; i >= 0; i--) {
+      if ((proWoche[wochen[i]] || 0) >= 2) aktuell++;
+      else if (i === wochen.length - 1) continue;
+      else break;
+    }
+    if (best >= 2) {
+      const von = fmtM(bestStart.slice(0,7)), bis = fmtM(addDays(bestEnde, 6).slice(0,7));
+      const kern = `${best} Wochen in Folge`;
+      const jetzt = aktuell >= best ? ' Du bist gerade mittendrin – das ist deine Bestserie.'
+        : aktuell >= 2 ? ` Aktuell läuft eine Serie von ${aktuell} Wochen.` : '';
+      rekorde.push({ icon:'🔗', color:ORANGE, conf:'Längste Serie',
+        text:`Deine längste Serie: ${kern} mit mindestens 2 Trainings (${von === bis ? von : von + ' bis ' + bis}).${jetzt}`, hl:[F(kern)] });
+    }
+  }
+  // 8 Hoechster VO2max
+  {
+    const v2 = allData.filter(r => r.vo2max != null);
+    if (v2.length) {
+      const b = v2.reduce((a, r) => r.vo2max > a.vo2max ? r : a), jetzt = v2[v2.length - 1];
+      const kern = `${zahl(b.vo2max,1)} ml/kg/min`;
+      rekorde.push({ icon:'🫁', color:'#D97706', conf:'VO₂max-Bestwert',
+        text:`Dein höchster VO₂max: ${kern} am ${datumDe(b.date)}` + (b.date === jetzt.date
+          ? ' – das ist zugleich dein aktueller Wert.' : `. Aktuell liegst du bei ${zahl(jetzt.vo2max,1)}.`), hl:[F(kern)] });
+    }
+  }
+
+  // ── Gewohnheiten ──
+  // 9 Lieblings-Trainingstag
+  if (tage.length >= 10) {
+    const n = [0,0,0,0,0,0,0];
+    tage.forEach(d => { n[new Date(d + 'T00:00:00').getDay()]++; });
+    const max = n.indexOf(Math.max(...n)), min = n.indexOf(Math.min(...n));
+    const pct = i => Math.round(n[i] / tage.length * 100);
+    const kern = `${WOCHENTAG_LANG[max]} (${pct(max)} %)`;
+    gewohnheiten.push({ icon:'📌', color:'#FB923C', conf:'Lieblingstag',
+      text:`Die meisten Trainingstage fallen auf den ${kern}, die wenigsten auf den ${WOCHENTAG_LANG[min]} (${pct(min)} %).`, hl:[F(kern)] });
+  }
+  // 10 Typischer Lauf (Median)
+  if (laeufe.length >= 5) {
+    const s = median(laeufe.map(e => e.strecke));
+    const p = mitPace.length >= 5 ? median(mitPace.map(pace)) : null;
+    const kern = `${zahl(s,1)} km` + (p != null ? ` in ${fmtPace(p)} min/km` : '');
+    gewohnheiten.push({ icon:'🏃', color:'#FB923C', conf:'Typischer Lauf',
+      text:`Dein typischer Lauf: ${kern} – der Median aus ${laeufe.length} Läufen.`, hl:[F(kern)] });
+  }
+  // 11 Trainingsmix
+  if (einheiten.length >= 5) {
+    const n = {};
+    einheiten.forEach(e => { const l = artLabel(e.typ); n[l] = (n[l] || 0) + 1; });
+    const sortiert = Object.entries(n).sort((a, b) => b[1] - a[1]);
+    // Bis zu vier Arten einzeln; erst ab fuenf werden die kleinsten zu „Sonstige".
+    const oben = sortiert.length <= 4 ? sortiert : sortiert.slice(0, 3);
+    const rest = sortiert.slice(oben.length).reduce((s, [, v]) => s + v, 0);
+    const teile = oben.map(([l, v]) => `${l} ${Math.round(v / einheiten.length * 100)} %`);
+    if (rest) teile.push(`Sonstige ${Math.round(rest / einheiten.length * 100)} %`);
+    gewohnheiten.push({ icon:'🧩', color:'#FB923C', conf:'Trainingsmix',
+      text:`Deine ${einheiten.length} Einheiten: ${teile.join(', ')}.`, hl:[F(teile[0])] });
+  }
+  // 12 Erholungsabstand
+  if (tage.length >= 5) {
+    const ruhe = [];
+    for (let i = 1; i < tage.length; i++) ruhe.push({ tage: tageZwischen(tage[i - 1], tage[i]) - 1, bis: tage[i] });
+    const mittelRuhe = ruhe.reduce((s, r) => s + r.tage, 0) / ruhe.length;
+    const haeufig = {}; ruhe.forEach(r => { haeufig[r.tage] = (haeufig[r.tage] || 0) + 1; });
+    const modus = +Object.entries(haeufig).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
+    const pause = ruhe.reduce((a, r) => r.tage > a.tage ? r : a);
+    const modusSatz = modus === 0 ? 'am häufigsten trainierst du an zwei Tagen hintereinander'
+      : modus === 1 ? 'am häufigsten liegt genau ein Ruhetag dazwischen' : `am häufigsten sind es ${modus}`;
+    const kern = `${zahl(mittelRuhe,1)} Ruhetage`;
+    gewohnheiten.push({ icon:'🛋️', color:'#FB923C', conf:'Erholung',
+      text:`Zwischen zwei Trainingstagen liegen im Schnitt ${kern}; ${modusSatz}. Deine längste Pause: ${pause.tage} Tage (bis ${datumDe(pause.bis)}).`, hl:[F(kern)] });
+  }
+
+  // ── Entwicklung ──
+  // 13 Pace-Trend: letzte 3 Monate gegen die 3 davor
+  {
+    const a = letzte3(mitPace), b = davor3(mitPace);
+    if (a.length >= 3 && b.length >= 3) {
+      const pa = a.reduce((s, e) => s + pace(e), 0) / a.length, pb = b.reduce((s, e) => s + pace(e), 0) / b.length;
+      const sek = Math.round((pb - pa) * 60);
+      const kern = Math.abs(sek) < 3 ? 'praktisch unverändert' : `${Math.abs(sek)} s/km ${sek > 0 ? 'schneller' : 'langsamer'}`;
+      entwicklung.push({ icon: sek >= 3 ? '🚀' : sek <= -3 ? '🐢' : '➖', color: sek >= 3 ? GUT : sek <= -3 ? ACHTUNG : '#94A3B8', conf:'Pace-Trend · 3 Monate',
+        text:`Deine Ø Pace der letzten 3 Monate: ${fmtPace(pa)} min/km – ${kern}${Math.abs(sek) < 3 ? '' : ' als in den 3 Monaten davor'} (${fmtPace(pb)}).`,
+        hl:[{ phrase: kern, c: sek >= 3 ? GUT : sek <= -3 ? ACHTUNG : 'inherit' }] });
+    }
+  }
+  // 14 Jahr gegen Vorjahr bis zum selben Datum – nur, wenn das Vorjahr ab Januar Daten hat
+  const jahr = +ende.slice(0,4), md = ende.slice(5);
+  const kmJahr = summe(laeufe.filter(e => e.datum >= `${jahr}-01-01` && e.datum <= ende), e => e.strecke);
+  {
+    const vjEnde = `${jahr - 1}-${md === '02-29' ? '02-28' : md}`;
+    if (erster <= `${jahr - 1}-01-31`) {
+      const kmVj = summe(laeufe.filter(e => e.datum >= `${jahr - 1}-01-01` && e.datum <= vjEnde), e => e.strecke);
+      if (kmVj > 0) {
+        const pct = Math.round((kmJahr - kmVj) / kmVj * 100);
+        const kern = `${tsd(kmJahr)} km`;
+        entwicklung.push({ icon:'📊', color:'#EA580C', conf:`${jahr} gegen ${jahr - 1}`,
+          text:`Seit dem 1. Januar ${jahr}: ${kern} – ${pct === 0 ? 'gleich viel wie' : `${Math.abs(pct)} % ${pct > 0 ? 'mehr' : 'weniger'} als`} im Vorjahr bis zum ${tagMonat(ende)} (${tsd(kmVj)} km).`, hl:[F(kern)] });
+      }
+    }
+  }
+  // 15 Hochrechnung aufs Jahresende – erst ab 30 Tagen im Jahr, sonst zu wacklig
+  {
+    const tagImJahr = tageZwischen(`${jahr}-01-01`, ende) + 1;
+    const tageJahr = tageZwischen(`${jahr}-01-01`, `${jahr + 1}-01-01`);
+    if (tagImJahr >= 30 && kmJahr > 0 && erster <= `${jahr}-01-31`) {
+      const hoch = Math.round(kmJahr / tagImJahr * tageJahr / 10) * 10;
+      const kmVjGanz = erster <= `${jahr - 1}-01-31` ? summe(laeufe.filter(e => e.datum.startsWith(`${jahr - 1}-`)), e => e.strecke) : 0;
+      const kern = `rund ${tsd(hoch)} km`;
+      entwicklung.push({ icon:'🔭', color:'#EA580C', conf:'Hochrechnung',
+        text:`Bei deinem bisherigen Tempo kommst du ${jahr} auf ${kern}${kmVjGanz > 0 ? ` (${jahr - 1}: ${tsd(kmVjGanz)} km)` : ''}.`, hl:[F(kern)] });
+    }
+  }
+  // 16 Laufeffizienz: Puls bei aehnlicher Pace, letzte 3 Monate gegen die 3 davor
+  {
+    const mitPuls = mitPace.filter(e => e.puls > 0);
+    const beide = [...letzte3(mitPuls), ...davor3(mitPuls)];
+    if (beide.length >= 6) {
+      const mitte = median(beide.map(pace));
+      const imBand = liste => liste.filter(e => Math.abs(pace(e) - mitte) <= 20 / 60);   // ±20 s/km
+      const a = imBand(letzte3(mitPuls)), b = imBand(davor3(mitPuls));
+      if (a.length >= 3 && b.length >= 3) {
+        const ha = a.reduce((s, e) => s + e.puls, 0) / a.length, hb = b.reduce((s, e) => s + e.puls, 0) / b.length;
+        const d = Math.round(ha - hb);
+        const kern = d === 0 ? 'praktisch gleich' : `${Math.abs(d)} bpm ${d < 0 ? 'tiefer' : 'höher'}`;
+        entwicklung.push({ icon:'💓', color: d < 0 ? GUT : d > 0 ? ACHTUNG : '#94A3B8', conf:'Laufeffizienz · 3 Monate',
+          text:`Bei ähnlicher Pace (um ${fmtPace(mitte)} min/km) war dein Puls in den letzten 3 Monaten ${kern}${d === 0 ? ' wie' : ' als'} in den 3 Monaten davor${d < 0 ? ' – dein Herz arbeitet effizienter' : ''}.`,
+          hl:[{ phrase: kern, c: d < 0 ? GUT : d > 0 ? ACHTUNG : 'inherit' }] });
+      }
+    }
+  }
+  // 17 Meilenstein
+  if (laeufe.length) {
+    const gesamt = summe(laeufe, e => e.strecke);
+    const schritt = gesamt < 500 ? 100 : gesamt < 2000 ? 250 : gesamt < 5000 ? 500 : 1000;
+    const naechster = Math.floor(gesamt / schritt + 1) * schritt;
+    const rest = naechster - gesamt;
+    const proTag = summe(letzte3(laeufe), e => e.strecke) / 91;
+    const wochen = proTag > 0 ? Math.max(1, Math.round(rest / proTag / 7)) : null;
+    const kern = `${tsd(gesamt)} km`;
+    entwicklung.push({ icon:'🏁', color:'#EA580C', conf:'Meilenstein',
+      text:`Seit ${monatLang(erster.slice(0,7))} bist du ${kern} gelaufen. Noch ${zahl(rest,1)} km bis ${tsd(naechster)} km` +
+        (wochen ? ` – beim Tempo der letzten 3 Monate in etwa ${wochen} ${wochen === 1 ? 'Woche' : 'Wochen'}.` : '.'), hl:[F(kern)] });
+  }
+
+  // ── Training und Gesundheit ──
+  // 18 Schlaf vor den schnellsten Laeufen (schnellstes Viertel, Laeufe ab 3 km)
+  {
+    const mitSchlaf = mitPace.filter(e => e.strecke >= 3 && byDate[e.datum] && byDate[e.datum].sleepTotal != null);
+    if (mitSchlaf.length >= 8) {
+      const sortiert = [...mitSchlaf].sort((a, b) => pace(a) - pace(b));
+      const k = Math.ceil(sortiert.length / 4);
+      const schnell = sortiert.slice(0, k), uebrige = sortiert.slice(k);
+      const sl = liste => liste.reduce((s, e) => s + byDate[e.datum].sleepTotal, 0) / liste.length;
+      const ss = sl(schnell), su = sl(uebrige), min = Math.round((ss - su) * 60);
+      const kern = Math.abs(min) < 5 ? 'etwa gleich lang' : `${Math.abs(min)} Minuten ${min > 0 ? 'mehr' : 'weniger'}`;
+      gesundheit.push({ icon:'🌙', color:'#7C3AED', conf:'Schlaf vor schnellen Läufen',
+        text: Math.abs(min) < 5
+          ? `Vor deinen schnellsten Läufen hast du ${kern} geschlafen wie vor den übrigen (${alsStdMin(ss)}).`
+          : `Vor deinen schnellsten Läufen (schnellstes Viertel) hast du im Schnitt ${alsStdMin(ss)} geschlafen – ${kern} als vor den übrigen.`,
+        hl:[{ phrase: kern, c: min >= 5 ? GUT : 'inherit' }] });
+    }
+  }
+  // 19 Schlaf nach langen Laeufen (ab 15 km; sind es weniger als drei, das laengste Viertel)
+  {
+    const folge = d => { const r = byDate[addDays(d, 1)]; return r && r.sleepTotal != null ? r.sleepTotal : null; };
+    const mitFolge = laeufe.filter(e => folge(e.datum) != null);
+    let lang = mitFolge.filter(e => e.strecke >= 15), schwelle = 15;
+    if (lang.length < 3 && mitFolge.length >= 8) {
+      const sortiert = [...mitFolge].sort((a, b) => b.strecke - a.strecke);
+      lang = sortiert.slice(0, Math.ceil(sortiert.length / 4));
+      schwelle = Math.floor(lang[lang.length - 1].strecke * 10) / 10;
+    }
+    if (lang.length >= 3) {
+      const langTage = new Set(lang.map(e => e.datum));
+      const sonst = allData.filter(r => !langTage.has(r.date)).map(r => folge(r.date)).filter(v => v != null);
+      if (sonst.length >= 10) {
+        const sl = lang.reduce((s, e) => s + folge(e.datum), 0) / lang.length;
+        const so = sonst.reduce((s, v) => s + v, 0) / sonst.length;
+        const min = Math.round((sl - so) * 60);
+        const kern = Math.abs(min) < 5 ? 'etwa gleich lang' : `${Math.abs(min)} Minuten ${min > 0 ? 'länger' : 'kürzer'}`;
+        gesundheit.push({ icon:'😴', color:'#7C3AED', conf:'Schlaf nach langen Läufen',
+          text:`Nach Läufen ab ${zahl(schwelle,1)} km schläfst du in der Folgenacht ${kern}${Math.abs(min) < 5 ? ' wie sonst' : ' als sonst'} (${alsStdMin(sl)} statt ${alsStdMin(so)}).`,
+          hl:[{ phrase: kern, c: min >= 5 ? GUT : 'inherit' }] });
+      }
+    }
+  }
+
+  return [
+    { titel: 'Rekorde', hinweis: `seit ${monatLang(erster.slice(0,7))}`, karten: rekorde },
+    { titel: 'Gewohnheiten', karten: gewohnheiten },
+    { titel: 'Entwicklung', karten: entwicklung },
+    { titel: 'Training und Gesundheit', karten: gesundheit }
+  ].filter(a => a.karten.length);
+}
+
+// Die Abschnitte als Markup. EINE Huelle mit `ausklapp-teil` – die Abschnitte darin
+// tragen sie nicht, sonst liefe die Ausklapp-Animation doppelt.
+function trainingsInsightsHTML() {
+  const abschnitte = trainingsInsights();
+  if (!abschnitte.length) return '';
+  return `<div class="tr-insights ausklapp-teil">` + abschnitte.map(a =>
+    `<div class="tr-abschnitt"><span>${a.titel}</span>${a.hinweis ? `<span class="tr-hinweis">${a.hinweis}</span>` : ''}</div>`
+    + `<div class="pi-grid">${a.karten.map(insightKarte).join('')}</div>`).join('') + `</div>`;
 }
 
 // ── VO₂max-Abschnitt (zuunterst im Training-Tab) ───────
