@@ -974,10 +974,30 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Spalten im ersten Bild: Monatsbalken ≤ 1.1 px, Wochen mit ungleicher Spaltenzahl bis
   10 px am Rand. Laufende Bewegungen bricht ein neuer Schritt oder eine neue Geste über
   `_spaltenAbbrechen()` ab (Endstand setzen), es bleibt nichts hängen.
-  **Bekannte Kleinigkeiten:** bei 12M/24M überspringt Chart.js Monatsnamen
+  **Bekannte Kleinigkeit:** bei 12M/24M überspringt Chart.js Monatsnamen
   (`autoSkip`); nach einem Schritt trifft das andere Monate, die Namen wechseln im
-  ersten Bild. Die Momentaufnahme bringt die alte Ø-Linie im hinausfahrenden Streifen
-  mit, die neue gleitet daneben auf ihren Wert.
+  ersten Bild.
+  **Hilfslinien laufen immer über die ganze Breite und bewegen sich nie seitlich**
+  (gemeldet 18.09.2026 am Schlafdauer-Diagramm bei 3M: Ziel- und Ø-Linie wirkten beim
+  Wischen und Blättern „abgeschnitten und mitgezogen"). Zwei Ursachen: Chart.js zog
+  die Linie in Balkendiagrammen nur von Spaltenmitte zu Spaltenmitte — rückten die
+  Balken, blieb am Rand eine Lücke —, und der hinausfahrende Streifen brachte als
+  Ausschnitt des alten Bilds die alten Linienstücke mit. Jetzt zeichnet
+  `hilfslinienVoll` jede Hilfslinie selbst, waagrecht von Rand zu Rand der
+  Zeichenfläche auf der Höhe ihres Werts (Stil aus dem Datensatz), und hält Chart.js
+  per `return false` davon ab. Es nimmt den Versatz von `$navslide` zurück (auch bei
+  7T/1M/YoY stehen die Linien still), wendet `$hlBlende` selbst an (das `false`
+  beendet die Kette, `hilfslinienBlende` kommt für Hilfslinien nicht mehr dran — kein
+  unausgeglichenes save/restore) und lässt sie bei `$ohneHilfslinien` ganz weg: so
+  nimmt `_spaltenMerken` die Momentaufnahme **ohne** Hilfslinien auf. **Die
+  Registrierungsreihenfolge ist Pflicht:** `hilfslinienVoll` vor `hilfslinienBlende`
+  und `spaltenPlugin`.
+  **Sichtbare Folge im Ruhezustand:** In Balkendiagrammen reichen Ø- und Ziellinie
+  jetzt bis an beide Ränder (vorher eine halbe Spalte kürzer); Liniendiagramme
+  reichten schon immer von Rand zu Rand. Geprüft (Prüfstand, 812 × 375, Schlafdauer
+  3M): entlang beider Linien an 41 Stellen vom linken bis zum rechten Rand Linie
+  vorhanden — in Ruhe, beim Ziehen (111 px Zug), im ersten Bild nach dem Loslassen,
+  mitten in der Bewegung, am Ende, und bei 7T mitten in der Schiebe-Animation.
 - **Waagrecht wischen IM Diagramm blättert den Zeitraum** (auf Wunsch, 16.09.2026,
   `diagrammWischen()`): nach links = vorwärts, nach rechts = zurück, **ein Schritt je
   Geste** — bei Monatsbalken seit 18.09.2026 so viele Monate, wie gezogen wurde (siehe

@@ -1539,7 +1539,11 @@ function _spaltenMerken() {
     // Ein laufender Wisch-Versatz ist der Startpunkt der Bewegung – das Bild selbst
     // muss aber OHNE ihn aufgenommen werden, sonst saesse der Streifen verschoben.
     const zug = c.$spalten && c.$spalten.zug ? c.$spalten.off : c.$navslide ? c.$navslide.offset : 0;
-    if (c.$navslide || c.$spalten) { delete c.$navslide; delete c.$spalten; try { c.draw(); } catch (_) {} }
+    // Das Bild ohne Wisch-Versatz UND ohne Hilfslinien aufnehmen: der hinausfahrende
+    // Streifen braechte sonst die alten Linienstuecke mit (hilfslinienVoll).
+    delete c.$navslide; delete c.$spalten;
+    c.$ohneHilfslinien = true;
+    try { c.draw(); } catch (_) {}
     const v = { zug, keys: c.$keys ? c.$keys.slice() : null, keyTyp: c.$keyTyp,
                 links: c.chartArea.left, rechts: c.chartArea.right, skalen: {}, hl: [] };
     const x = c.scales.x;
@@ -1558,6 +1562,7 @@ function _spaltenMerken() {
       b.getContext('2d').drawImage(c.canvas, 0, 0);
       v.bild = b; v.faktor = c.canvas.width / c.width;
     } catch (_) {}
+    delete c.$ohneHilfslinien;   // das Diagramm wird gleich ersetzt; der Merker darf nicht haengen bleiben
     m[id] = v;
   });
   return m;
@@ -1795,7 +1800,61 @@ const spaltenPlugin = {
   }
 };
 
-Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslinienBlende, spaltenPlugin);
+// ── Hilfslinien (Ø, Ziel) ueber die GANZE Breite, nie seitlich verschoben ─────
+// (auf Wunsch, 18.09.2026, gemeldet am Schlafdauer-Diagramm bei 3M). Chart.js zog
+// eine Linie in Balkendiagrammen nur von der Mitte der ersten bis zur Mitte der
+// letzten Spalte. Rueckten die Balken beim Blaettern oder Wischen weiter, blieb am
+// Rand eine Luecke ohne Linie, und der hinausfahrende Streifen (ein Ausschnitt des
+// alten Bilds) brachte die alten Linienstuecke mit – die Linie wirkte abgeschnitten
+// und mitgezogen.
+// Jetzt zeichnet dieses Plugin jede Hilfslinie selbst: waagrecht von Rand zu Rand der
+// Zeichenflaeche, auf der Hoehe ihres (konstanten) Werts, im Stil des Datensatzes.
+// Chart.js zeichnet sie danach nicht mehr (`return false`). Dabei:
+//  - Die Verschiebung der Schiebe-Animation (`$navslide`, 7T/1M/YoY) wird hier
+//    zurueckgenommen, `$spalten` laesst Hilfslinien ohnehin aus – sie stehen still
+//    und gleiten nur senkrecht auf ihren neuen Wert.
+//  - `$hlBlende` (Ein-/Ausblenden per Legende) wird hier angewandt: `return false`
+//    haelt die spaeter registrierten Plugins dieses Datensatzes an, hilfslinienBlende
+//    kommt also gar nicht erst dran – und ohne dessen `before` gibt es auch kein
+//    unausgeglichenes save/restore.
+//  - `$ohneHilfslinien` blendet sie aus – fuer die Momentaufnahme in `_spaltenMerken`,
+//    damit der hinausfahrende Streifen keine alten Linienstuecke mitbringt.
+// Liniendiagramme (offset: false) reichten schon vorher von Rand zu Rand – fuer sie
+// aendert sich nichts. Bei Balken ist die Linie jetzt eine halbe Spalte je Seite laenger.
+const hilfslinienVoll = {
+  id: 'hilfslinienVoll',
+  beforeDatasetDraw(chart, args) {
+    const ds = chart.data.datasets[args.index];
+    if (!ds || !_istHilfslinienLabel(ds.label)) return;
+    if (chart.$ohneHilfslinien) return false;
+    const meta = args.meta || chart.getDatasetMeta(args.index);
+    const wert = (ds.data || []).find(v => v != null);
+    const a = chart.chartArea;
+    if (wert == null || !a || !meta || !meta.yScale) return;   // Chart.js zeichnet wie bisher
+    const y = meta.yScale.getPixelForValue(wert);
+    const ctx = chart.ctx;
+    ctx.save();
+    if (chart.$navslideOn && chart.$navslide) ctx.translate(-chart.$navslide.offset, 0);
+    ctx.beginPath();
+    ctx.rect(a.left, a.top - 2, a.right - a.left, a.bottom - a.top + 4);
+    ctx.clip();
+    const hb = chart.$hlBlende;
+    if (hb && _istHilfslinie(ds, hb.art)) ctx.globalAlpha *= hb.alpha;
+    ctx.strokeStyle = ds.borderColor || ACHSEN_COLOR;
+    ctx.lineWidth = ds.borderWidth != null ? ds.borderWidth : 1.5;
+    ctx.setLineDash(Array.isArray(ds.borderDash) ? ds.borderDash : []);
+    ctx.beginPath();
+    ctx.moveTo(a.left, y);
+    ctx.lineTo(a.right, y);
+    ctx.stroke();
+    ctx.restore();
+    return false;
+  }
+};
+
+// Reihenfolge zaehlt: hilfslinienVoll VOR hilfslinienBlende und spaltenPlugin – sein
+// `return false` beendet die Kette fuer Hilfslinien (siehe dort).
+Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslinienVoll, hilfslinienBlende, spaltenPlugin);
 
 // Die FLAECHEN unter Linien (fill: true – HRV, Ruhepuls, Pace, VO2max, Score) zeichnet
 // Chart.js' eingebautes Filler-Plugin selbst, in Chart.js 4.5 je Datensatz in seinem
