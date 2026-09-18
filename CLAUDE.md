@@ -851,7 +851,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   EINEN Monat, das Fenster umfasst aber 3 bis 24. Die Schiebe-Animation schob trotzdem
   die ganze Fläche weg und blendete sie aus — es sah aus, als wechsle das ganze
   Fenster, obwohl fünf von sechs Balken dieselben blieben. Umgesetzt (Vorschläge 1–4;
-  Punkt 5, mehrere Monate je Wisch, wurde nicht gewählt):
+  Punkt 5, der Zeitstrahl-Wisch, folgte am selben Tag — siehe **Wischen** unten):
   1. **Weiterrücken um die tatsächlich verschobenen Spalten.** `_navSchritt()` hält vor
      dem Neuaufbau jedes Diagramm des Tabs fest (`_spaltenMerken`: `$keys`,
      Pixelpositionen, y-Bereiche, Ø-Werte, **Momentaufnahme des Canvas**). Danach
@@ -881,12 +881,40 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Unterschied ist erlaubt. GLEITEN für alles andere, vor allem den **Pace** (Punkte je
   Training): um die Breite eines Monats, ohne Ausblenden und ohne Streifen, aber mit
   gleitender Achse, Ø-Linie und Beschriftungen.
-  **Wischen:** Bei Monatsbalken folgt die Fläche dem Finger höchstens **einen Monat**
-  weit (`_wischWeg`: Breite ÷ Monate im Fenster) und bleibt voll deckend
-  (`_wischAlpha`). Beim Loslassen gleitet sie nicht erst hinaus — der Schritt setzt
-  genau am gezogenen Stand fort (`zug`, begrenzt über `_zwischen`). Bei 24M ist ein
-  Monat nur rund 15 px breit: der Finger zieht dort also weit, die Fläche rückt eine
-  Spalte. Das ist gewollt — ein Wisch ist ein Monat.
+  **Wischen wie auf einem Zeitstrahl** (Vorschlag 5, auf Wunsch 18.09.2026): Bei
+  Monatsbalken folgt die Fläche dem Finger **1:1 über beliebig viele Monate** — bis zum
+  Rand des Datenbestands (`_maxMonate`), danach Gummiband (Dämpfung 0.25, höchstens ein
+  Monat). Beim Loslassen **rastet sie auf ganze Monate ein** (gerundet, mindestens
+  einer — wie jeder Wisch vorher) und `_navSchritt(richtung, schritte)` blättert in
+  EINEM Schritt so viele Monate (`_navZielMonate`). Der Rest bis zum ganzen Monat wird
+  nachgeführt: 2.4 gezogen → 2 geblättert, die Fläche federt 0.4 zurück; 2.6 → 3, sie
+  rückt 0.4 nach (`_zwischen` mit einem halben Monat Spielraum). Wird weiter geblättert,
+  als das Fenster breit ist, gibt es keine gemeinsamen Monate mehr — das Diagramm
+  gleitet dann um die ganze Strecke.
+  Drei Dinge dabei:
+  1. **Gemessen wird in Monaten, nicht in Pixeln**: die Monatsbreite des Diagramms, in
+     dem die Geste begann, ist das Mass; jedes Diagramm rückt um denselben Bruchteil
+     SEINER Monatsbreite — so bleiben alle beim selben Monat, auch bei verschieden
+     breiten y-Achsen.
+  2. **Der Zug läuft über `$spalten` (mit `zug: true`)**, nicht mehr über `$navslide`:
+     so wandern Monatsnamen, Zahlen und Markierung schon beim Ziehen mit, Hilfslinien
+     bleiben stehen, die Fläche bleibt voll deckend. `_spaltenMerken` liest den Zug beim
+     Loslassen als Startversatz.
+  3. **Die hereinkommenden Monate sind beim Ziehen noch nicht gezeichnet** — das
+     Diagramm kennt nur sein Fenster, die Fläche dort bleibt leer bis zum Loslassen.
+     Deshalb zeigt der Zeitraum im Kartenkopf während des Ziehens den **Zielzeitraum
+     in der Tabfarbe** (`_zeitraumVorschau`, `.zeitraum-text.vorschau`); dafür wird
+     `referenceDate` nur für den Aufruf von `zeitraumText()` umgestellt. Die
+     Nachbarmonate vorab zu zeichnen hiesse, jede Seitenfunktion für ein zweites
+     Fenster laufen zu lassen, samt Fusszeilen — bewusst nicht gemacht.
+  **Nebenbei behoben:** Zog man über die Schwelle und wieder darunter zurück, blieb die
+  Fläche beim Loslassen mit dem letzten Versatz stehen (in jedem Bereich). Jetzt federt
+  sie zurück (`z.zurueck`).
+  Gemessen (Prüfstand, 6M, Monatsbreite 62.4 px): 2.4 Monate Zug → 149.7 px Versatz,
+  Kopf „Jan–Jun 26", nach dem Loslassen 2 Monate zurück, Start +24.4 px; 2.6 → 3
+  Monate, Start −25.5 px; 8 Monate (mehr als das Fenster) → 8, Start 0.7 px; am neuesten
+  Stand vorwärts 3.2 Monate Zug → −50 px Gummiband, kein Schritt; Herz 3M (Wochen)
+  2 Monate → 2 Monate, mit Streifen.
   **Erstes Bild sofort:** `_spaltenStarten` und `_animNavSlide` (bei Monatsbereichen)
   setzen den Anfangszustand noch in derselben Aufgabe; vorher stand für ein Bild der
   Endstand da. Training baut dafür synchron genug — `pgTraining` wartet nur, solange die
@@ -904,7 +932,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   mit, die neue gleitet daneben auf ihren Wert.
 - **Waagrecht wischen IM Diagramm blättert den Zeitraum** (auf Wunsch, 16.09.2026,
   `diagrammWischen()`): nach links = vorwärts, nach rechts = zurück, **ein Schritt je
-  Geste**. Es ruft `navNext()`/`navPrev()` — damit gelten Schrittweite (7 Tage bzw. ein
+  Geste** — bei Monatsbalken seit 18.09.2026 so viele Monate, wie gezogen wurde (siehe
+  „Monatsbalken rücken weiter", Zeitstrahl-Wisch). Es ruft `navNext()`/`navPrev()` — damit gelten Schrittweite (7 Tage bzw. ein
   Monat), Grenzen des Datenbestands, `_datumSelbstGewaehlt` und die `navslide`-Animation
   unverändert. Vier Dinge hängen daran:
   1. **`touch-action: pan-y` auf `.chart-wrap` ist die Voraussetzung.** Waagrechte
@@ -925,8 +954,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      **Ziehen** (`_wischZeichnen`): Ausschlag `(|dx| − Schwelle) × 0.9`, gedeckelt auf
      denselben Weg, den `_animNavSlide` beim Hereinkommen nutzt (`_wischWeg`, 42 % der
      Zeichenfläche, höchstens 110 px); dazu blasser bis 55 %. **Bei Monatsbalken
-     anders** (seit 18.09.2026): höchstens ein Monat, voll deckend, kein Hinausgleiten
-     — siehe „Monatsbalken rücken weiter". **Die Schwelle wird
+     anders** (seit 18.09.2026): Zeitstrahl — 1:1 über mehrere Monate, voll deckend,
+     kein Hinausgleiten — siehe „Monatsbalken rücken weiter". **Die Schwelle wird
      abgezogen**, sonst spränge die Fläche im Moment der Erkennung um 31 px.
      **Hinausgleiten** (`_wischHinaus`, 150 ms) bis über den Rand, **danach** wird
      geblättert und `_animNavSlide` holt den neuen Stand von der anderen Seite herein.

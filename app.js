@@ -744,8 +744,8 @@ function _navZiel(richtung) {
 // (`_spaltenBereich`) wird VOR dem Neuaufbau festgehalten, wie jedes Diagramm gerade
 // aussieht, damit der neue Stand genau dort beginnen und um die tatsaechlich
 // verschobenen Spalten weiterruecken kann (siehe „Monatsbalken ruecken weiter").
-function _navSchritt(richtung) {
-  const nr = _navZiel(richtung);
+function _navSchritt(richtung, schritte = 1) {
+  const nr = schritte > 1 ? _navZielMonate(richtung, schritte) : _navZiel(richtung);
   if (!nr) return;
   _spaltenAbbrechen();
   const spalten = _spaltenBereich() && !bewegungAus();
@@ -755,9 +755,24 @@ function _navSchritt(richtung) {
   _navSliding = true;
   _refreshAfterStateChange();
   _navSliding = false;
-  const erledigt = spalten ? _spaltenStarten(vorher, richtung) : null;
-  _animNavSlide(richtung, erledigt, vorher);
+  const erledigt = spalten ? _spaltenStarten(vorher, richtung, schritte) : null;
+  _animNavSlide(richtung, erledigt, vorher, schritte);
 }
+// Wie _navZiel, aber um `n` Monate – fuer den Zeitstrahl-Wisch bei Monatsbalken.
+function _navZielMonate(richtung, n) {
+  if (!referenceDate || !allData.length || n < 1) return null;
+  const nr = addMonths(referenceDate, richtung * n);
+  if (richtung < 0 && nr < allData[0].date) return null;
+  if (richtung > 0 && nr > allData[allData.length - 1].date) return null;
+  return nr;
+}
+// Wie viele Monate lassen sich in diese Richtung hoechstens blaettern?
+function _maxMonate(richtung) {
+  let n = 0;
+  while (n < 120 && _navZielMonate(richtung, n + 1)) n++;
+  return n;
+}
+
 function navPrev() { _navSchritt(-1); }   // zurück: Daten wischen nach rechts
 function navNext() { _navSchritt(1); }    // vor: Daten wischen nach links
 
@@ -809,7 +824,7 @@ function uebergang(dauer, proSchritt, fertig) {
 //    Ausblenden; ein Wisch-Versatz aus `vorher` wird dabei fortgesetzt.
 // Das erste Bild wird sofort gesetzt: vorher stand fuer ein Bild der Endstand da,
 // bevor die Bewegung einsetzte.
-function _animNavSlide(dir, ausnahmen, vorher) {
+function _animNavSlide(dir, ausnahmen, vorher, schritte = 1) {
   if (bewegungAus()) return;
   if (_navSlideRAF) { cancelAnimationFrame(_navSlideRAF); _navSlideRAF = null; }
   const monat = _spaltenBereich();
@@ -820,11 +835,12 @@ function _animNavSlide(dir, ausnahmen, vorher) {
     const dur = monat ? SPALTEN_DAUER : 560;
     const ease = t => 1 - Math.pow(1 - t, 3); // easeOutCubic – weiches Auslaufen
     const weg = c => { const w = c.chartArea.right - c.chartArea.left;
-                       return monat ? w / windowMonths() : Math.min(w * 0.42, 110); };
+                       return monat ? w / windowMonths() * schritte : Math.min(w * 0.42, 110); };
     const anfang = new Map(list.map(c => {
       const ziel = dir * weg(c);
       const zug = vorher && vorher[c.canvas.id] ? vorher[c.canvas.id].zug : 0;
-      return [c, _zwischen(ziel + zug, ziel)];
+      const spiel = monat ? (c.chartArea.right - c.chartArea.left) / windowMonths() / 2 : 0;
+      return [c, _zwischen(ziel + zug, ziel, spiel)];
     }));
     const setze = e => list.forEach(c => {
       if (!c.chartArea) return;
@@ -1485,10 +1501,11 @@ function _ruhigRendern(tab) {
 const SPALTEN_DAUER = 420;
 let _spaltenLauf = null;
 function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY(); }
-// Startversatz auf [0, ziel] begrenzen – ein Wisch darf nicht ueber das Ziel hinaus
-// oder in die Gegenrichtung zeigen.
-function _zwischen(wert, ziel) {
-  return ziel > 0 ? Math.min(ziel, Math.max(0, wert)) : Math.max(ziel, Math.min(0, wert));
+// Startversatz auf [0, ziel] begrenzen – plus `spiel` auf beiden Seiten. Der Spielraum
+// ist das Einrasten des Zeitstrahl-Wischs: wer 2.4 Monate zieht, blaettert 2, und die
+// Flaeche federt die 0.4 zurueck; bei 2.6 blaettert er 3 und sie rueckt 0.4 nach.
+function _zwischen(wert, ziel, spiel = 0) {
+  return Math.max(Math.min(0, ziel) - spiel, Math.min(Math.max(0, ziel) + spiel, wert));
 }
 const _istHilfslinienLabel = l => /^(Ø|Ziel)/.test(l || '');
 
@@ -1500,8 +1517,8 @@ function _spaltenMerken() {
     if (!c || !c.chartArea || !c.canvas) return;
     // Ein laufender Wisch-Versatz ist der Startpunkt der Bewegung – das Bild selbst
     // muss aber OHNE ihn aufgenommen werden, sonst saesse der Streifen verschoben.
-    const zug = c.$navslide ? c.$navslide.offset : 0;
-    if (c.$navslide) { delete c.$navslide; try { c.draw(); } catch (_) {} }
+    const zug = c.$spalten && c.$spalten.zug ? c.$spalten.off : c.$navslide ? c.$navslide.offset : 0;
+    if (c.$navslide || c.$spalten) { delete c.$navslide; delete c.$spalten; try { c.draw(); } catch (_) {} }
     const v = { zug, keys: c.$keys ? c.$keys.slice() : null, keyTyp: c.$keyTyp,
                 links: c.chartArea.left, rechts: c.chartArea.right, skalen: {}, hl: [] };
     const x = c.scales.x;
@@ -1535,7 +1552,7 @@ function _spaltenMerken() {
 //    mit der Zahl der Trainings aendert). Der neue Stand kommt um die Breite EINES
 //    Monats versetzt herein, ohne Ausblenden und ohne Streifen – y-Achse, Ø-Linie und
 //    Beschriftungen gleiten aber genauso.
-function _spaltenPlan(c, v, richtung) {
+function _spaltenPlan(c, v, richtung, schritte = 1) {
   if (!c.scales.x) return null;
   const neu = c.$keys;
   let versatz = null;
@@ -1563,7 +1580,8 @@ function _spaltenPlan(c, v, richtung) {
       if (i1 < v.keys.length - 1) streifen.push([v.xpos[i1] + rand, v.rechts]);
     }
   }
-  if (versatz == null) versatz = richtung * (c.chartArea.right - c.chartArea.left) / windowMonths();
+  const monat = (c.chartArea.right - c.chartArea.left) / windowMonths();
+  if (versatz == null) versatz = richtung * schritte * monat;
   const skalen = [];
   Object.values(c.scales).forEach(s => {
     if (s.axis !== 'y' || !v.skalen[s.id]) return;
@@ -1584,7 +1602,7 @@ function _spaltenPlan(c, v, richtung) {
     linien.push({ ds, von: alt.wert, nach, daten: ds.data });
   });
   if (Math.abs(versatz) < 0.5 && !skalen.length && !linien.length) return null;
-  return { c, versatz, start: _zwischen(versatz + v.zug, versatz), streifen, skalen, linien,
+  return { c, versatz, start: _zwischen(versatz + v.zug, versatz, monat / 2), streifen, skalen, linien,
            bild: v.bild, faktor: v.faktor };
 }
 
@@ -1672,12 +1690,12 @@ function _xBeschriftungMitziehen(c) {
 // Nach dem Neuaufbau: fuer jedes passende Diagramm die Bewegung anlegen, das erste Bild
 // SOFORT zeichnen (sonst stuende fuer ein Bild der Endstand da) und dann laufen lassen.
 // Rueckgabe: die Diagramme, um die sich `_animNavSlide` nicht mehr kuemmern soll.
-function _spaltenStarten(vorher, richtung) {
+function _spaltenStarten(vorher, richtung, schritte = 1) {
   const plaene = [];
   (tabCharts[currentScreen] || []).forEach(id => {
     const c = charts[id], v = vorher && vorher[id];
     if (!c || !v || !c.chartArea) return;
-    const p = _spaltenPlan(c, v, richtung);
+    const p = _spaltenPlan(c, v, richtung, schritte);
     if (p) plaene.push(p);
   });
   if (!plaene.length) return new Set();
@@ -3124,9 +3142,8 @@ function _wischCharts() {
 // Wie weit darf die Datenflaeche hoechstens ausschlagen? Derselbe Weg, den auch
 // `_animNavSlide` beim Hereinkommen nutzt — sonst haette die Geste ein anderes Mass
 // als ihre eigene Abschlussanimation.
-// Bei Monatsbalken (18.09.2026) hoechstens die Breite EINES Monats: ein Wisch blaettert
-// genau einen Monat weiter, und die Flaeche soll nicht weiter mitgehen, als sie danach
-// tatsaechlich rueckt. Beim Loslassen setzt `_spaltenStarten` genau hier fort.
+// Bei Monatsbalken die Breite EINES Monats – gebraucht nur noch fuer `_wischAlpha` und
+// den Monatsweg von `_animNavSlide`; der Zug selbst folgt dort dem Zeitstrahl-Wisch.
 function _wischWeg(c) {
   const w = c.chartArea.right - c.chartArea.left;
   return _spaltenBereich() ? w / windowMonths() : Math.min(w * 0.42, 110);
@@ -3143,7 +3160,79 @@ function _wischAlpha(c, off) {
 // sofort um 31 px (45 x 0.7) — die Bewegung soll bei null beginnen und dem Finger
 // von dort folgen.
 const WISCH_SCHWELLE = 45;
+
+// ── Zeitstrahl-Wisch bei Monatsbalken (auf Wunsch, 18.09.2026, Vorschlag 5) ──────
+// Die Flaeche folgt dem Finger 1:1 ueber beliebig viele Monate – bis zum Rand des
+// Datenbestands (`_maxMonate`), danach Gummiband. Beim Loslassen rastet sie auf ganze
+// Monate ein: gerundet, mindestens einer (wie jeder Wisch bisher), und `_navSchritt`
+// blaettert in EINEM Schritt so viele Monate. Monatsnamen, Zahlen und Markierung
+// wandern schon beim Ziehen mit – deshalb laeuft der Zug hier ueber `$spalten`
+// (mit `zug: true`) statt ueber `$navslide`, das nur die Datensaetze verschiebt.
+// Hilfslinien bleiben stehen.
+// Gemessen wird in MONATEN, nicht in Pixeln: die Monatsbreite des Diagramms, in dem die
+// Geste begann, ist das Mass; jedes Diagramm des Tabs rueckt um denselben Bruchteil
+// seiner eigenen Monatsbreite. So bleiben alle Diagramme beim selben Monat, auch wenn
+// ihre y-Achsen verschieden breit sind.
+// Grenze, die man kennen muss: die Monate, die hereinkommen, sind waehrend des Ziehens
+// NOCH NICHT gezeichnet – das Diagramm kennt nur sein Fenster. Die Flaeche dort bleibt
+// leer, bis losgelassen wird. Was kommt, sagt der Zeitraum im Kartenkopf
+// (`_zeitraumVorschau`), der waehrend des Ziehens den Zielzeitraum in der Tabfarbe zeigt.
+function _monatsBreite(c) { return (c.chartArea.right - c.chartArea.left) / windowMonths(); }
+function _wischMonate(z) {
+  if (!z.refBreite) {
+    const ref = z.charts.find(c => z.karte && z.karte.contains(c.canvas)) || z.charts[0];
+    z.refBreite = ref && ref.chartArea ? _monatsBreite(ref) : 60;
+  }
+  const roh = Math.max(0, Math.abs(z.dx) - WISCH_SCHWELLE) / z.refBreite;
+  const frei = (z.max && z.max[z.richtung]) || 0;
+  return roh <= frei ? roh : frei + Math.min((roh - frei) * 0.25, 1);
+}
+// Auf wie viele Monate rastet die Geste ein? 0 = gar nicht (Rand des Datenbestands).
+function _wischZiel(z) {
+  const frei = (z.max && z.max[z.richtung]) || 0;
+  return frei ? Math.max(1, Math.min(frei, Math.round(_wischMonate(z)))) : 0;
+}
+function _wischZeichnenMonate(z) {
+  const monate = _wischMonate(z), vz = Math.sign(z.dx);
+  z.charts.forEach(c => {
+    if (!c.chartArea) return;
+    _xBeschriftungMitziehen(c);
+    const off = vz * monate * _monatsBreite(c);
+    if (c.$spalten && c.$spalten.zug) c.$spalten.off = off;
+    else c.$spalten = { off, delta: 0, streifen: null, zug: true, labelLinks: _labelLinks(c) };
+    try { c.draw(); } catch (_) {}
+  });
+  _zeitraumVorschau(z);
+}
+// Der Zielzeitraum im Kartenkopf, solange gezogen wird. `referenceDate` wird dafuer
+// nur fuer den Aufruf von `zeitraumText()` umgestellt und sofort zurueckgesetzt.
+function _zeitraumVorschau(z) {
+  const k = _wischZiel(z);
+  const schluessel = k ? z.richtung * k : 0;
+  if (z.vorschau === schluessel) return;
+  z.vorschau = schluessel;
+  let text = null;
+  const ziel = k ? _navZielMonate(z.richtung, k) : null;
+  if (ziel) {
+    const alt = referenceDate;
+    referenceDate = ziel;
+    try { text = zeitraumText(); } finally { referenceDate = alt; }
+  }
+  document.querySelectorAll('#screen-' + currentScreen + ' .zeitraum-text').forEach(el => {
+    if (el.dataset.vorher == null) el.dataset.vorher = el.textContent;
+    el.textContent = text || el.dataset.vorher;
+    el.classList.toggle('vorschau', !!text);
+  });
+}
+function _zeitraumVorschauEnde() {
+  document.querySelectorAll('#screen-' + currentScreen + ' .zeitraum-text').forEach(el => {
+    if (el.dataset.vorher != null) { el.textContent = el.dataset.vorher; delete el.dataset.vorher; }
+    el.classList.remove('vorschau');
+  });
+}
+
 function _wischZeichnen(z) {
+  if (_spaltenBereich()) { _wischZeichnenMonate(z); return; }
   const daempfung = z.moeglich ? 0.9 : 0.25;
   z.charts.forEach(c => {
     if (!c.chartArea) return;
@@ -3170,11 +3259,15 @@ function _wischAnimieren(charts, dauer, proSchritt, fertig) {
   _navSlideRAF = requestAnimationFrame(schritt);
 }
 function _wischZurueckfedern(charts) {
-  const von = charts.map(c => (c.$navslide ? c.$navslide.offset : 0));
+  _zeitraumVorschauEnde();
+  // Bei Monatsbalken liegt der Zug in `$spalten` (siehe Zeitstrahl-Wisch).
+  const spalten = charts.some(c => c.$spalten && c.$spalten.zug);
+  const von = charts.map(c => spalten ? (c.$spalten ? c.$spalten.off : 0) : (c.$navslide ? c.$navslide.offset : 0));
   _wischAnimieren(charts, 220,
     (c, e) => { const i = charts.indexOf(c), off = von[i] * (1 - e);
-                c.$navslide = { offset: off, alpha: _wischAlpha(c, off) }; },
-    () => charts.forEach(c => { delete c.$navslide; try { c.draw(); } catch (_) {} }));
+                if (spalten) { if (c.$spalten) c.$spalten.off = off; }
+                else c.$navslide = { offset: off, alpha: _wischAlpha(c, off) }; },
+    () => charts.forEach(c => { delete c.$navslide; if (spalten) delete c.$spalten; try { c.draw(); } catch (_) {} }));
 }
 // Der alte Stand gleitet in Wischrichtung aus dem Bild; erst DANACH wird geblaettert,
 // und `_animNavSlide` holt den neuen von der anderen Seite herein.
@@ -3204,10 +3297,21 @@ function diagrammWischen() {
     const z = _diaWisch;
     if (!z || e.touches.length !== 1) return;
     const dx = e.touches[0].clientX - z.x, dy = e.touches[0].clientY - z.y;
-    if (Math.abs(dx) < WISCH_SCHWELLE || Math.abs(dx) < Math.abs(dy) * 1.5) { z.richtung = 0; return; }
+    if (Math.abs(dx) < WISCH_SCHWELLE || Math.abs(dx) < Math.abs(dy) * 1.5) {
+      // Zurueck unter die Schwelle: ein schon gezeigter Zug federt beim Loslassen zurueck.
+      // (Vorher blieb die Flaeche dann mit dem letzten Versatz stehen – in jedem Bereich.)
+      if (z.richtung) z.zurueck = true;
+      z.richtung = 0; return;
+    }
+    z.zurueck = false;
     z.richtung = dx < 0 ? 1 : -1;
     z.dx = dx;
     z.moeglich = !!_navZiel(z.richtung);
+    // Zeitstrahl: wie weit darf es in diese Richtung gehen? Einmal je Richtung ermittelt.
+    if (_spaltenBereich()) {
+      z.max = z.max || {};
+      if (z.max[z.richtung] == null) z.max[z.richtung] = _maxMonate(z.richtung);
+    }
     if (ruhig() || z.frameOffen) return;
     // Hoechstens eine Zeichnung je Bild: `touchmove` feuert oefter als der Bildschirm
     // sich auffrischt, und jedes `draw()` zeichnet alle Diagramme des Tabs neu.
@@ -3223,16 +3327,20 @@ function diagrammWischen() {
   const ende = () => {
     const z = _diaWisch;
     _diaWisch = null;
+    // Unter die Schwelle zurueckgezogen: nichts blaettern, gezeigten Zug zuruecknehmen.
+    if (z && !z.richtung && z.zurueck) { _diaKlickSperreBis = Date.now() + 450; _wischZurueckfedern(z.charts); return; }
     if (!z || !z.richtung) return;
     _diaKlickSperreBis = Date.now() + 450;
     // Am Rand des Datenbestands federt die Flaeche nur zurueck — wie ein Pfeil, der
     // dort nichts tut.
     if (!z.moeglich) { if (!ruhig()) _wischZurueckfedern(z.charts); return; }
+    // Zeitstrahl: auf ganze Monate einrasten und in EINEM Schritt so viele blaettern.
+    const schritte = _spaltenBereich() ? Math.max(1, _wischZiel(z)) : 1;
     const blaettern = () => {
       // Denselben Blickanker setzen wie ein Pfeil-Tipp: der Neuaufbau aendert die
       // Gesamthoehe, und ohne Anker spraenge die Ansicht unter dem Finger weg.
       blickAnkerMerken(z.karte);
-      if (z.richtung > 0) navNext(); else navPrev();
+      _navSchritt(z.richtung, schritte);
     };
     // Monatsbalken: nicht erst hinausgleiten – der Schritt setzt die Bewegung des
     // Fingers direkt fort (`_spaltenMerken` liest den Versatz als `zug`).

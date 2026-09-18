@@ -703,6 +703,9 @@ body.dark .scope-badge{background:#0F172A}
 /* Angezeigter Zeitraum neben "Heute". Bleibt einzeilig – ein Umbruch zerreisst die
    Titelzeile. */
 .filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
+/* Zeitstrahl-Wisch bei Monatsbalken: waehrend des Ziehens steht hier der ZIELzeitraum,
+   in der Tabfarbe – die hereinkommenden Monate sind da noch nicht gezeichnet. */
+.filter-titel .zeitraum-text.vorschau{color:var(--tab-color)}
 .filter-titel .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
 /* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
 
