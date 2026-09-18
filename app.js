@@ -728,6 +728,11 @@ function updateNavUI() {
   };
   document.querySelectorAll('.nav-prev').forEach(b => setzeInaktiv(b, prevDis));
   document.querySelectorAll('.nav-next').forEach(b => setzeInaktiv(b, nextDis));
+  // „Heute" verblasst, wenn man schon am neuesten Tag steht – dann gaebe es nichts zu
+  // springen. Bewusst `referenceDate === maxDate` und NICHT „vorwaerts geht nicht":
+  // bei 7T kann der Pfeil › schon inaktiv sein, waehrend der neueste Tag in der
+  // naechsten Woche liegt.
+  document.querySelectorAll('.zl-heute').forEach(b => setzeInaktiv(b, referenceDate === maxDate));
 }
 
 // Wohin fuehrt ein Schritt in diese Richtung — oder `null`, wenn der Datenbestand
@@ -4197,8 +4202,9 @@ function zeitleisteBauen() {
   // schon mit „Heute" 332 von 332 px (siehe Messnotiz im CSS). „YoY" haette die
   // Zeile umbrechen lassen — an einer beliebigen Stelle statt an der, die zur
   // Bedeutung passt. Der frueher noetige senkrechte `.zl-trenner` ist damit weg.
-  const aktionen = `<button class="zl-heute">Heute</button>`
-    + `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`;
+  // „Heute" sitzt seit 18.09.2026 (auf Wunsch) nicht mehr hier, sondern als eigener
+  // Knopf links neben dem Pfeil ‹ in der Reihe – siehe unten.
+  const aktionen = `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
   el.innerHTML = `<button class="zl-ausklapp" hidden></button>`
@@ -4207,6 +4213,11 @@ function zeitleisteBauen() {
     +   `<div class="zl-zeile">${opts}</div>`
     + `</div>`
     + `<div class="zl-reihe">`
+    // „Heute" links neben ‹ (auf Wunsch, 18.09.2026). Absolut an der Reihe verankert
+    // (siehe CSS): die Reihe bleibt dadurch zentriert, der Ausklapp-Knopf rechts
+    // bekommt keinen Platz weggenommen, und im passiven Modus schrumpft der Knopf mit
+    // der Reihe mit – ein Tipp darauf weckt sie wie Pille und Pfeile.
+    + `<button class="zl-heute" title="Zum neuesten Stand" aria-label="Heute – zum neuesten Stand">Heute</button>`
     + `<button class="nav-arrow nav-prev" aria-label="Zurück">‹</button>`
     + `<button class="zl-pille" aria-haspopup="true" aria-expanded="false"></button>`
     + `<button class="nav-arrow nav-next" aria-label="Vor">›</button>`
@@ -4928,9 +4939,9 @@ document.body.addEventListener('click', (e) => {
     }
   }
 
-  // Passiver Modus: ein Tipp auf Pille oder Pfeil holt die Leiste zurueck, ein Tipp
-  // irgendwo daneben schickt sie zurueck. Ein Tipp auf einen Eintrag der offenen
-  // Auswahl (`.zl-opt`, `.zl-heute`, `.zl-yoy`) laesst den Zustand, wie er ist — er gehoert zum
+  // Passiver Modus: ein Tipp auf Pille, Pfeil oder „Heute" (alle in `.zl-reihe`) holt
+  // die Leiste zurueck, ein Tipp irgendwo daneben schickt sie zurueck. Ein Tipp auf
+  // einen Eintrag der offenen Auswahl (`.zl-opt`, `.zl-yoy`) laesst den Zustand, wie er ist — er gehoert zum
   // Bedienen der Leiste, liegt aber nicht in der Reihe.
   // BEWUSST ohne `return`: der Tipp soll danach noch das tun, wofuer er gedacht war.
   if (t.closest('.zl-reihe') || t.closest('.zl-ausklapp')) zeitleistePassiv(false);
@@ -4947,6 +4958,7 @@ document.body.addEventListener('click', (e) => {
   // Steht man auf 3M im Maerz, bleibt es 3M und zeigt die neuesten drei Monate.
   if (t.closest('.zl-heute')) {
     zeitleisteAuswahl(false);
+    if (t.closest('.zl-heute').classList.contains('inaktiv')) return;
     blickAnkerMerken(t);
     aufHeuteSpringen();
     updateNavUI();

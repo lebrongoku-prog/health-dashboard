@@ -343,8 +343,24 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Chip-Optik erwartete man eine Tagesansicht, und genau die gibt es nicht mehr.
      Der Weg dorthin: erst `.nav-today` in jeder Diagrammkarte, dann kurz ein Bereich
      `heute`, seit 06.09.2026 dieser Knopf.
+     **Seit 18.09.2026 (auf Wunsch) sitzt er links neben dem Pfeil ‹** statt in der
+     aufklappbaren Auswahl — immer sichtbar, ein Tipp statt zwei. Er ist ein Kind von
+     `.zl-reihe`, aber **absolut** verankert (`right: calc(100% + 8px)`, Reihe
+     `position: relative`): im Fluss hätte er die zentrierte Reihe um die halbe
+     Knopfbreite nach links geschoben und rechts gegen den Ausklapp-Knopf gedrückt, wo
+     bei 375 px nur 11 px Luft sind. Als Kind der Reihe schrumpft er im passiven Modus
+     mit und weckt sie per Tipp, ohne eigene Regeln. Optik wie Pfeile und Pille
+     (durchscheinende Fläche), 50 × 53 px, Schrift .78rem.
+     Er **verblasst** (`.inaktiv`, wie die Pfeile — kein `disabled`), wenn
+     `referenceDate` schon der neueste Tag ist. Bewusst nicht „wenn › inaktiv ist": bei
+     7T kann › schon verblasst sein, während der neueste Tag in der nächsten Woche liegt.
+     Gemessen: 375 px → Knopf x 13.5–63.5, 8 px bis ‹, rechts unverändert 10.5 px zum
+     Ausklapp-Knopf; 360 px → x 6–56; 812 px quer → direkt 8 px neben ‹. Passiv
+     dieselbe Unterkante wie die Pille (746 px). **Wer ihn breiter macht, misst bei
+     360 px nach** — dort bleiben links 6 px.
   8. **Die Auswahl hat zwei Zeilen** (seit 12.09.2026): oben die **Befehle**
-     („Heute", „YoY"), darunter die sechs **Bereiche** — beide als `.zl-zeile`
+     (seit 18.09.2026 nur noch „YoY" — „Heute" steht neben ‹, siehe Punkt 6), darunter
+     die sechs **Bereiche** — beide als `.zl-zeile`
      innerhalb von `.zl-optionen`, das dafür von `row` auf `column` umgestellt wurde.
      Der frühere senkrechte `.zl-trenner` ist damit ersatzlos entfallen.
      Der Grund ist Platz **und** Bedeutung: die eine Zeile war mit „Heute" und den

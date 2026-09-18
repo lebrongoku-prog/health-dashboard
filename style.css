@@ -343,6 +343,33 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    wirkt sich das nicht aus — durchsichtig heisst nicht durchlaessig. */
 #zeitleiste.passiv .zl-reihe { transform: scale(0.7); opacity: .5; }
 
+/* „Heute" links neben dem Pfeil ‹ (auf Wunsch, 18.09.2026; vorher in der Befehlszeile
+   der aufklappbaren Auswahl). ABSOLUT an der Reihe, rechts buendig 8 px vor ihrem
+   linken Rand: im Fluss haette er die zentrierte Reihe um die halbe Knopfbreite nach
+   links geschoben und rechts gegen den Ausklapp-Knopf gedrueckt – dort sind bei 375 px
+   nur 11 px Luft. Als Kind der Reihe macht er deren passiven Modus (scale .7, halbe
+   Deckkraft) und deren Weck-Tipp von selbst mit.
+   Breite 50 px: bei 360 px beginnt die Reihe bei x = 64, der Knopf also bei 6 px vom
+   Rand. Wer ihn breiter macht, misst bei 360 px nach. */
+.zl-reihe { position: relative; }
+.zl-heute {
+  position: absolute; bottom: 0; right: calc(100% + 8px);
+  width: 50px; height: var(--zeit-h);
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  color: var(--txt);
+  font-family: inherit; font-size: .78rem; font-weight: 700;
+  cursor: pointer;
+}
+/* Verblasst wie die Pfeile am Rand, wenn man schon am neuesten Tag steht. */
+#zeitleiste .zl-heute.inaktiv { opacity: .35; cursor: default; }
+#zeitleiste .zl-heute.inaktiv:active { opacity: .35; transform: none; }
+
 /* Ausklapp-Knopf der Tabs – seit 07.09.2026 hier statt in der Kopfzeile: unten links
    auf der Hoehe der Pille. Er gehoert damit zur Zeitleiste und macht deren aktiven
    und passiven Zustand mit: gleiche Flaeche, gleiche Deckkraft, gleiche Skalierung.
@@ -468,7 +495,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    In ihrer eigenen Zeile ist Platz, deshalb duerfen sie breiter greifen als die
    Chips (.75rem statt .55rem) — sie sind damit die groessten Tippflaechen der
    Auswahl. Der frueher noetige senkrechte `.zl-trenner` ist mit der Zeile entfallen. */
-.zl-heute, .zl-yoy {
+.zl-yoy {
   height: 34px; padding: 0 .75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
