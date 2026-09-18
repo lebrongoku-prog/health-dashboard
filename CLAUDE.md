@@ -1302,6 +1302,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Während eine Linie ausblendet, sind weitere Schalter-Tipps gesperrt
      (`_hlLaeuft`). Unverändert mit Aufbau-Animation: Bereichswechsel, Jahresvergleich,
      neue Daten. Beim Blättern gilt weiterhin die `navslide`-Animation.
+     **Falle, die daran hing (gemeldet 18.09.2026):** Nach Ausklappen und Hilfslinien-
+     Schalter fehlten Datenbeschriftungen und Wochentrenner. Ohne Aufbau-Animation
+     zeichnet Chart.js schon **im Konstruktor** — also bevor `zeichneDiagramm` `$keys`,
+     `$werteFmt` usw. an das Diagramm hängt, und genau daran hängen beide Plugins. Mit
+     Animation fiel das nie auf, weil das erste Bild erst im nächsten Frame kommt; beim
+     Blättern überdeckte es die `navslide`-Animation, die ohnehin neu zeichnet.
+     `zeichneDiagramm` zeichnet deshalb bei `animation: false` nach dem Anhängen noch
+     einmal. Geprüft: nach Ausklappen und Schalter ändert ein weiteres `draw()` in
+     Herz, Schlaf und Training kein Pixel mehr. **Wer künftig etwas Neues an das
+     Diagramm hängt, hängt es vor dieses `draw()`.**
+     Im Prüfstand stehen die hereinwachsenden Diagramme (Schlafphasen-, Score-Verlauf)
+     dauerhaft mitten in ihrer Aufbau-Animation: Chart.js hält das echte
+     `requestAnimationFrame` fest, bevor `?raf=timer` es ersetzt, und das feuert im
+     verdeckten Pane nie. Das ist kein Fehler der App.
   6. **Markierung** (`setMarkierung`, 150 ms): Tönung und Schleier laufen über
      `_markAlpha`; beim Ausschalten zeichnet das Plugin den eben abgeschalteten Tag
      (`_markVerblasst`) weiter, bis er ausgeklungen ist. `_markIndex(chart, datum)`

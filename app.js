@@ -1454,6 +1454,13 @@ function zeichneDiagramm(id, cfg) {
   charts[id].$werteFmt = cfg.__werteFmt || null;
   charts[id].$nurQuer  = !!cfg.__werteNurQuer;
   charts[id].$werteAus = !!cfg.__werteAusStandard;
+  // OHNE Aufbau-Animation zeichnet Chart.js schon im Konstruktor – also BEVOR die
+  // Angaben oben am Diagramm haengen. Das erste Bild fehlte dann alles, was an ihnen
+  // haengt: Datenbeschriftungen ($werteFmt) und Wochentrenner ($keys). Mit Animation
+  // faellt es nicht auf, das erste Bild kommt erst im naechsten Frame. Gesehen beim
+  // Ausklappen und beim Hilfslinien-Schalter (beide ueber `_ruhigRendern`, 18.09.2026);
+  // beim Blaettern ueberdeckte es die `navslide`-Animation, die ohnehin neu zeichnet.
+  if (cfg.options && cfg.options.animation === false) { try { charts[id].draw(); } catch(_) {} }
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
