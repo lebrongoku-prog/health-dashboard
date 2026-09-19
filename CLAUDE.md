@@ -1808,18 +1808,24 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `.us-kopf` (Kopfzeile der Einstellungen-Seite; ihre Fläche reicht weiter bis zur
   Oberkante, nur Zurück-Pfeil, Titel und Inhalt rücken). **Bewusst nicht:**
   `.bg-fade-layer` (reiner Verlauf hinter der Statusleiste), die Overlays
-  Anmelden/Laden/Fehler (Inhalt senkrecht zentriert, keine Kopfzeile) und
-  `#hinweis-oben` (fest oben angeheftete Leiste mit eigener dunkler Fläche — ob sie
-  mitrutschen soll, ist offen). `body.hinweis-an .screen` rechnet mit der
-  **gemessenen** Leistenhöhe (`--hinweis-h`) und folgt der Leiste damit von selbst.
+  Anmelden/Laden/Fehler (Inhalt senkrecht zentriert, keine Kopfzeile).
+  **Die Hinweisleiste `#hinweis-oben` rückt nur 5 px** (auf Wunsch, 19.09.2026) —
+  eigene Variable `--schleier-hinweis`, in derselben Media-Query wie `--schleier-t`
+  (dort `0px`/`5px`). Sie ist fest angeheftet und trägt eine eigene dunkle Fläche; die
+  reicht weiter bis zur Oberkante, nur Text und Knopf rücken. `body.hinweis-an .screen`
+  rechnet mit der **gemessenen** Leistenhöhe (`--hinweis-h`) und folgt der Leiste
+  damit von selbst — dort darf `--schleier-t` NICHT zusätzlich hinein, sonst stünde
+  eine Lücke zwischen Leiste und Inhalt.
   JavaScript rechnet nirgends mit dem oberen Abstand: Blickanker und oberste Karte
   messen relativ zum Screen, Tooltips relativ zum Fenster.
   **Wer ein neues Element oben verankert** (Vollbild-Ansicht, Overlay mit Kopfzeile,
   Sticky-Offset), addiert `var(--schleier-t)` dort, wo `var(--safe-t)` steht.
   Geprüft (Prüfstand, 375 × 812, Variable von Hand auf 20px): Titel und erste Karte
   aller vier Tabs 20.7 → 40.7 bzw. 70.7 → 90.7, Einstellungen Zurück 10 → 30, Titel
-  20 → 40, Inhalt 61 → 81; Zeitleiste, Tableiste, Verlauf, Hinweisleiste und
-  Overlays unverändert; ohne Variable alles exakt wie vorher.
+  20 → 40, Inhalt 61 → 81; Zeitleiste, Tableiste, Verlauf und Overlays unverändert;
+  ohne Variable alles exakt wie vorher. Hinweisleiste (`?tipp=sofort`, beide Variablen
+  gesetzt): Text 13.1 → 18.1, Knopf 8 → 13, Leistenhöhe 42.4 → 47.4, Tab-Titel
+  darunter 62.7 → 67.7.
 - **Kein Build/Bundler** — Dateien direkt editieren, Chart.js kommt vom CDN.
 - **Beim Entfernen von Code** grep-Check auf verwaiste Referenzen.
 
