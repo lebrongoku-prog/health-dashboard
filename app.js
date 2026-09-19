@@ -176,8 +176,11 @@ function _parseWorkoutRows(rows) {
     };
   });
   // Die Einblicke haengen an workoutData, der Analytics-Cache wird aber nur beim
-  // Einlesen der Gesundheitsdaten geleert – hier eigens verwerfen.
+  // Einlesen der Gesundheitsdaten geleert – hier eigens verwerfen. Herz und Schlaf
+  // gehoeren dazu: ihre Zusammenhaenge lesen die Laeufe bzw. Trainingstage.
   delete _analyticsCache.trainingsInsights;
+  delete _analyticsCache.herzInsights;
+  delete _analyticsCache.schlafInsights;
   // workoutSheetReady wird vom Aufrufer gesetzt (auch im Fehlerfall) – siehe loadFromAPI.
 }
 
@@ -632,8 +635,13 @@ function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24}[timeRa
 function toLocalDateStr(dt) {
   return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
 }
+// In KALENDERTAGEN (setDate), nicht in Millisekunden: mit n × 24 h verrutschte das
+// Ergebnis bei der Zeitumstellung um einen Tag – addDays('2025-10-26', 1) ergab
+// wieder den 26.10. (der Tag hat 25 Stunden), rueckwaerts ueber Ende Maerz den Vortag.
 function addDays(dateStr, n) {
-  return toLocalDateStr(new Date(new Date(dateStr+'T00:00:00').getTime() + n*86400000));
+  const dt = new Date(dateStr + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  return toLocalDateStr(dt);
 }
 function addMonths(dateStr, n) {
   const dt = new Date(dateStr+'T00:00:00');
@@ -3001,6 +3009,7 @@ function pgHerz() {
       <div class="rec-title">Herz-Kreislauf Einordnung ${infoI('baseline')} ${scopeBadge('letzter Tag vs. 30-Tage-Baseline')}</div>
       <div class="rec-text">${herzInterpret.text}</div>
     </div>`:''}
+    ${_weitereOffen.herz ? einblickeHTML(herzInsights()) : ''}
     </div>
 `;
 
@@ -3670,6 +3679,7 @@ function pgSchlaf() {
 
 
     ${hasScore?`<div class="chart-card"><h3>Schlaf-Score Verlauf</h3><div class="chart-legend" aria-hidden="true"></div><div class="chart-wrap"><canvas id="c-sl-score"></canvas></div></div>`:''}
+    ${_weitereOffen.schlaf ? einblickeHTML(schlafInsights()) : ''}
     </div>`;
 
 
@@ -3968,7 +3978,7 @@ async function pgTraining() {
     </div>
     ${!hasAny?noDataCard:''}
     ${vo2.html}
-    ${hasAny && _weitereOffen.training ? trainingsInsightsHTML() : ''}`;
+    ${hasAny && _weitereOffen.training ? einblickeHTML(trainingsInsights(), true) : ''}`;
 
 
   // ── Totale Laufzeit & Laufstrecke ──
@@ -4404,14 +4414,477 @@ function _trainingsInsightsBerechnen() {
   ].filter(a => a.karten.length);
 }
 
-// Die Abschnitte als Markup. EINE Huelle mit `ausklapp-teil` – die Abschnitte darin
-// tragen sie nicht, sonst liefe die Ausklapp-Animation doppelt.
-function trainingsInsightsHTML() {
-  const abschnitte = trainingsInsights();
+// Die Abschnitte als Markup – fuer Training, Herz und Schlaf. EINE Huelle; `klapp`
+// gibt ihr `ausklapp-teil` (Training: sie steht dort frei im Tab). In Herz und Schlaf
+// liegt sie in `.weitere-inhalt`, das die Klasse schon traegt – ein Teil im Teil
+// liefe doppelt.
+function einblickeHTML(abschnitte, klapp) {
   if (!abschnitte.length) return '';
-  return `<div class="tr-insights ausklapp-teil">` + abschnitte.map(a =>
-    `<div class="tr-abschnitt"><span>${a.titel}</span>${a.hinweis ? `<span class="tr-hinweis">${a.hinweis}</span>` : ''}</div>`
+  return `<div class="einblicke${klapp ? ' ausklapp-teil' : ''}">` + abschnitte.map(a =>
+    `<div class="eb-abschnitt"><span>${a.titel}</span>${a.hinweis ? `<span class="eb-hinweis">${a.hinweis}</span>` : ''}</div>`
     + `<div class="pi-grid">${a.karten.map(insightKarte).join('')}</div>`).join('') + `</div>`;
+}
+
+// ── Einblicke in Herz und Schlaf (auf Wunsch, 19.09.2026) ──────────────────
+// Wie die Trainings-Einblicke: Karten hinter dem Ausklapp-Knopf, alle ueber den
+// GESAMTEN Datenbestand – sie folgen dem Zeitfilter nicht. Bewusst ohne Doppel zu
+// „Muster & Zusammenhaenge" der Uebersicht; dort stehen die 30-Tage-Trends,
+// Schlaf→HRV, HRV→Ruhepuls, Training→HRV/Ruhepuls am Folgetag, Schritte→Schlaf/HRV,
+// die HRV je Wochentag und die Schlafdauer Wochentag gegen Wochenende.
+// Nacht-Zuordnung wie ueberall: `sleepTotal` am Tag d ist die Nacht VOR d.
+// Jede Karte hat Mindestmengen und fehlt, wenn sie nicht erreicht sind.
+const _EB_GUT = '#10B981', _EB_ACHTUNG = '#F97316';
+const _ebFett = s => ({ phrase: s, c: 'inherit' });   // nur fett: Tatsache
+const _ebDatum = ds => `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+const _ebTagMonat = ds => `${+ds.slice(8,10)}.${+ds.slice(5,7)}.`;
+const _ebMonat = ym => `${MONAT_LANG[+ym.slice(5,7) - 1]} ${ym.slice(0,4)}`;
+const _ebWochentag = ds => WOCHENTAG_LANG[new Date(ds + 'T00:00:00').getDay()];
+const _ebTage = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+// Uhrzeit aus Stunden (auch ueber 24, fuer Einschlafzeiten nach Mitternacht). Erst auf
+// die Minute runden – fmtHHMM allein machte aus 23.999 „23:00".
+const _ebUhr = h => fmtHHMM((Math.round(h * 60) % 1440 + 1440) % 1440 / 60);
+function _ebQuantil(werte, p) {
+  const s = werte.filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
+  if (!s.length) return null;
+  const i = (s.length - 1) * p, u = Math.floor(i);
+  return s[u] + (s[Math.min(u + 1, s.length - 1)] - s[u]) * (i - u);
+}
+// Werte je Gruppe (Monat, Woche …): { schluessel: [werte] }
+function _ebGruppiert(rows, schluessel, wert) {
+  const g = {};
+  rows.forEach(r => { const v = wert(r); if (v == null) return; const k = schluessel(r); (g[k] = g[k] || []).push(v); });
+  return g;
+}
+// Beste Gruppe nach Mittelwert, nur Gruppen mit mindestens `min` Werten. null, wenn
+// weniger als drei Gruppen in Frage kommen – ein Rekord unter zweien ist keiner.
+function _ebBeste(gruppen, min, hoch) {
+  const l = Object.entries(gruppen).filter(([, v]) => v.length >= min)
+    .map(([k, v]) => ({ k, wert: mittelArr(v), n: v.length }));
+  if (l.length < 3) return null;
+  return l.reduce((a, b) => (hoch ? b.wert >= a.wert : b.wert <= a.wert) ? b : a);   // Gleichstand: der juengste
+}
+const _EB_WINTER = [12, 1, 2], _EB_SOMMER = [6, 7, 8];
+const _ebSaison = (rows, monate) => rows.filter(r => monate.includes(+r.date.slice(5,7)));
+
+function herzInsights() { return _memo('herzInsights', _herzInsightsBerechnen); }
+function _herzInsightsBerechnen() {
+  const hr = allData.filter(r => r.restHR > 0), hv = allData.filter(r => r.hrv > 0);
+  if (hr.length < 14 && hv.length < 14) return [];
+  const daten = [...hr, ...hv].map(r => r.date).sort();
+  const erster = daten[0], ende = daten[daten.length - 1];
+  const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
+  const PULS = '#EF4444', HRV = '#2563EB';
+  const bpm = v => `${Math.round(v)} bpm`, ms = v => `${Math.round(v)} ms`;
+  const puls = rows => rows.map(r => r.restHR), var_ = rows => rows.map(r => r.hrv);
+  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
+  const letzte3 = rows => rows.filter(r => r.date > drei);
+  const davor3  = rows => rows.filter(r => r.date > sechs && r.date <= drei);
+  const rekorde = [], muster = [], entwicklung = [], alltag = [];
+
+  // ── Rekorde ──
+  // 1 Tiefster Ruhepuls
+  if (hr.length >= 14) {
+    const b = hr.reduce((a, r) => r.restHR <= a.restHR ? r : a);
+    const jetzt = mittelArr(puls(hr.filter(r => r.date > addDays(ende, -30))));
+    const kern = bpm(b.restHR);
+    rekorde.push({ icon:'🫀', color:PULS, conf:'Tiefster Ruhepuls',
+      text:`Dein tiefster Ruhepuls: ${kern} am ${_ebWochentag(b.date)}, ${_ebDatum(b.date)}.` +
+        (jetzt != null ? ` In den letzten 30 Tagen liegst du im Schnitt bei ${bpm(jetzt)}.` : ''), hl:[_ebFett(kern)] });
+  }
+  // 2 Hoechste HRV
+  if (hv.length >= 14) {
+    const b = hv.reduce((a, r) => r.hrv >= a.hrv ? r : a);
+    const jetzt = mittelArr(var_(hv.filter(r => r.date > addDays(ende, -30))));
+    const kern = ms(b.hrv);
+    rekorde.push({ icon:'💙', color:HRV, conf:'Höchste HRV',
+      text:`Deine höchste HRV: ${kern} am ${_ebWochentag(b.date)}, ${_ebDatum(b.date)}.` +
+        (jetzt != null ? ` In den letzten 30 Tagen liegst du im Schnitt bei ${ms(jetzt)}.` : ''), hl:[_ebFett(kern)] });
+  }
+  // 3 Ruhigster Monat (tiefster Ø Ruhepuls)
+  {
+    const b = _ebBeste(_ebGruppiert(hr, r => r.date.slice(0,7), r => r.restHR), 10, false);
+    if (b) {
+      const kern = `${_ebMonat(b.k)} mit Ø\u00A0${bpm(b.wert)}`;
+      rekorde.push({ icon:'🗓️', color:PULS, conf:'Ruhigster Monat',
+        text:`Am tiefsten war dein Ruhepuls im ${kern} – über alle Monate liegt er bei Ø\u00A0${bpm(mittelArr(puls(hr)))}.`, hl:[_ebFett(kern)] });
+    }
+  }
+  // 4 Bester HRV-Monat
+  {
+    const b = _ebBeste(_ebGruppiert(hv, r => r.date.slice(0,7), r => r.hrv), 10, true);
+    if (b) {
+      const kern = `${_ebMonat(b.k)} mit Ø\u00A0${ms(b.wert)}`;
+      rekorde.push({ icon:'📅', color:HRV, conf:'Bester HRV-Monat',
+        text:`Am höchsten war deine HRV im ${kern} – über alle Monate liegt sie bei Ø\u00A0${ms(mittelArr(var_(hv)))}.`, hl:[_ebFett(kern)] });
+    }
+  }
+
+  // ── Muster ──
+  // 5 Normalbereich: 8 von 10 Tagen (10. bis 90. Perzentil)
+  {
+    const teile = [], hl = [];
+    if (hr.length >= 30) { const k = `zwischen ${Math.round(_ebQuantil(puls(hr), .1))} und ${bpm(_ebQuantil(puls(hr), .9))}`; teile.push(`dein Ruhepuls ${k}`); hl.push(_ebFett(k)); }
+    if (hv.length >= 30) { const k = `zwischen ${Math.round(_ebQuantil(var_(hv), .1))} und ${ms(_ebQuantil(var_(hv), .9))}`; teile.push(`deine HRV ${k}`); hl.push(_ebFett(k)); }
+    if (teile.length) muster.push({ icon:'🎯', color:PULS, conf:'Dein Normalbereich',
+      text:`An 8 von 10 Tagen liegt ${teile.join(' und ')}. Fällt ein Tag heraus, lohnt ein Blick auf Schlaf und Belastung.`, hl });
+  }
+  // 6 Wochenrhythmus des Ruhepulses (die HRV je Wochentag steht in der Uebersicht)
+  if (hr.length >= 28) {
+    const je = [[],[],[],[],[],[],[]];
+    hr.forEach(r => je[new Date(r.date + 'T00:00:00').getDay()].push(r.restHR));
+    if (je.every(l => l.length >= 4)) {
+      const m = je.map(mittelArr);
+      const lo = m.indexOf(Math.min(...m)), hi = m.indexOf(Math.max(...m));
+      const kern = `am ${WOCHENTAG_LANG[lo]}`;
+      muster.push({ icon:'📆', color:PULS, conf:'Wochenrhythmus',
+        text: m[hi] - m[lo] < 1
+          ? `Dein Ruhepuls ist an allen Wochentagen praktisch gleich – der Unterschied bleibt unter 1 bpm.`
+          : `Am ruhigsten ist dein Herz ${kern} (Ø\u00A0${zahl(m[lo],1)} bpm), am schnellsten schlägt es am ${WOCHENTAG_LANG[hi]} (Ø\u00A0${zahl(m[hi],1)} bpm).`,
+        hl: m[hi] - m[lo] < 1 ? [] : [_ebFett(kern)] });
+    }
+  }
+  // 7 Ausreisser: hoechster Ruhepuls, mit dem, was davor war
+  if (hr.length >= 30) {
+    const a = hr.reduce((x, r) => r.restHR >= x.restHR ? r : x);
+    const schnitt = mittelArr(puls(hr));
+    const sl = a.sleepTotal, vortag = workoutData[addDays(a.date, -1)];
+    const davor = [];
+    if (sl > 0 && sl < 6.5) davor.push(`in der Nacht davor hast du nur ${alsStdMin(sl)} geschlafen`);
+    if (vortag && vortag.distanceKm >= 10) davor.push(`am Vortag bist du ${zahl(vortag.distanceKm,1)} km gelaufen`);
+    else if (vortag && vortag.durationMin >= 60) davor.push(`am Vortag hast du ${fmtMin(vortag.durationMin)} trainiert`);
+    const kern = bpm(a.restHR);
+    const satz = davor.join(', und ');
+    muster.push({ icon:'📍', color:PULS, conf:'Ausreisser',
+      text:`Dein höchster Ruhepuls: ${kern} am ${_ebDatum(a.date)} – ${zahl(a.restHR - schnitt,0)} bpm über deinem Schnitt.` +
+        (satz ? ` ${satz[0].toUpperCase()}${satz.slice(1)}.` : ''), hl:[_ebFett(kern)] });
+  }
+  // 8 Jahreszeiten: Winter (Dez–Feb) gegen Sommer (Jun–Aug)
+  {
+    const saetze = [], hl = [];
+    const vergleich = (rows, wert, schwelle, dec, einheit, name, erster) => {
+      const w = mittelArr(_ebSaison(rows, _EB_WINTER).map(wert)), so = mittelArr(_ebSaison(rows, _EB_SOMMER).map(wert));
+      const nw = _ebSaison(rows, _EB_WINTER).length, ns = _ebSaison(rows, _EB_SOMMER).length;
+      if (nw < 20 || ns < 20) return;
+      const d = w - so, gleich = Math.abs(d) < schwelle;
+      const kern = gleich ? 'etwa gleich hoch' : `${zahl(Math.abs(d), dec)} ${einheit} ${d > 0 ? 'höher' : 'tiefer'}`;
+      saetze.push(`${erster ? 'Im Winter (Dez–Feb) liegt' : 'Im Winter liegt'} ${name} ${kern}${gleich ? ' wie' : ' als'} im Sommer${erster ? ' (Jun–Aug)' : ''} – Ø\u00A0${Math.round(w)} gegen ${Math.round(so)} ${einheit}.`);
+      if (!hl.some(h => h.phrase === kern)) hl.push(_ebFett(kern));
+    };
+    vergleich(hr, r => r.restHR, 1, 1, 'bpm', 'dein Ruhepuls', true);
+    vergleich(hv, r => r.hrv, 1, 0, 'ms', 'deine HRV', !saetze.length);
+    if (saetze.length) muster.push({ icon:'❄️', color:HRV, conf:'Jahreszeiten', text: saetze.join(' '), hl });
+  }
+
+  // ── Entwicklung ──
+  // 9/10 Ruhepuls und HRV: letzte 3 Monate gegen die 3 davor
+  const trend = (rows, wert, schwelle, dec, einheit, besserTief, name, conf, farbe) => {
+    const a = letzte3(rows).map(wert), b = davor3(rows).map(wert);
+    if (a.length < 20 || b.length < 20) return;
+    const ma = mittelArr(a), mb = mittelArr(b), d = ma - mb, gleich = Math.abs(d) < schwelle;
+    const besser = besserTief ? d < 0 : d > 0;
+    const kern = gleich ? 'praktisch unverändert' : `${zahl(Math.abs(d), dec)} ${einheit} ${d < 0 ? 'tiefer' : 'höher'}`;
+    const c = gleich ? 'inherit' : besser ? _EB_GUT : _EB_ACHTUNG;
+    entwicklung.push({ icon: gleich ? '➖' : d < 0 ? '📉' : '📈', color: gleich ? farbe : c, conf,
+      text:`${name} der letzten 3 Monate: ${zahl(ma, dec)} ${einheit} – ${kern}${gleich ? ' gegenüber' : ' als in'} den 3 Monaten davor (${zahl(mb, dec)} ${einheit}).`,
+      hl:[{ phrase: kern, c }] });
+  };
+  trend(hr, r => r.restHR, .5, 1, 'bpm', true,  'Dein Ø Ruhepuls', 'Ruhepuls · 3 Monate', PULS);
+  trend(hv, r => r.hrv,    1,  0, 'ms',  false, 'Deine Ø HRV',     'HRV · 3 Monate',      HRV);
+  // 11 Seit Beginn: erste 3 Monate gegen die letzten 3 – erst ab einem Jahr Daten
+  if (_ebTage(erster, ende) >= 365) {
+    const anfang = rows => rows.filter(r => r.date <= addDays(erster, 90)), jetzt = rows => rows.filter(r => r.date > addDays(ende, -91));
+    const teile = [], heute = [], hl = [];
+    const seit = (rows, wert, schwelle, dec, einheit, besserTief, name) => {
+      const a = anfang(rows).map(wert), n = jetzt(rows).map(wert);
+      if (a.length < 20 || n.length < 20) return;
+      const ma = mittelArr(a), mn = mittelArr(n), d = mn - ma, gleich = Math.abs(d) < schwelle;
+      const kern = gleich ? 'praktisch gleich geblieben' : `um ${zahl(Math.abs(d), dec)} ${einheit} ${d < 0 ? 'gesunken' : 'gestiegen'}`;
+      teile.push(`${name} ${kern}`); heute.push(`${Math.round(mn)} ${einheit}`);
+      if (!hl.some(h => h.phrase === kern)) hl.push({ phrase: kern, c: gleich ? 'inherit' : (besserTief ? d < 0 : d > 0) ? _EB_GUT : _EB_ACHTUNG });
+    };
+    seit(hr, r => r.restHR, .5, 1, 'bpm', true, 'dein Ruhepuls');
+    seit(hv, r => r.hrv, 1, 0, 'ms', false, 'deine HRV');
+    if (teile.length) entwicklung.push({ icon:'🧭', color:PULS, conf:'Seit Beginn',
+      text:`Seit deinen ersten 3 Monaten (ab ${_ebMonat(erster.slice(0,7))}) ist ${teile.join(' und ')} – heute Ø\u00A0${heute.join(' und ')}.`, hl });
+  }
+
+  // ── Herz und Alltag ──
+  // 12 Erholung nach langen Laeufen (ab 15 km; sind es weniger als drei, das laengste
+  // Viertel). Bezug ist der Ø Ruhepuls der 7 Tage VOR dem Lauf, nicht der Gesamtschnitt –
+  // so zaehlt nur, was der Lauf veraendert, nicht die Jahreszeit.
+  {
+    const laufKm = {};
+    Object.keys(workoutData).forEach(d => {
+      const w = workoutData[d] || {};
+      const liste = Array.isArray(w.einheiten) && w.einheiten.length ? w.einheiten : [{ strecke: w.distanceKm }];
+      const km = Math.max(0, ...liste.map(e => (e && typeof e.strecke === 'number' && isFinite(e.strecke)) ? e.strecke : 0));
+      if (km > 0) laufKm[d] = km;
+    });
+    const alle = Object.keys(laufKm);
+    let lang = alle.filter(d => laufKm[d] >= 15), schwelle = 15;
+    if (lang.length < 3 && alle.length >= 8) {
+      lang = [...alle].sort((a, b) => laufKm[b] - laufKm[a]).slice(0, Math.ceil(alle.length / 4));
+      schwelle = Math.floor(Math.min(...lang.map(d => laufKm[d])) * 10) / 10;
+    }
+    const hrAm = d => byDate[d] && byDate[d].restHR > 0 ? byDate[d].restHR : null;
+    const abw = [[], [], []];
+    lang.forEach(d => {
+      const vorher = [1,2,3,4,5,6,7].map(k => hrAm(addDays(d, -k))).filter(v => v != null);
+      if (vorher.length < 4) return;
+      const basis = mittelArr(vorher);
+      for (let k = 1; k <= 3; k++) { const v = hrAm(addDays(d, k)); if (v != null) abw[k - 1].push(v - basis); }
+    });
+    if (abw[0].length >= 3) {
+      const m = abw.map(mittelArr), ab = `Nach Läufen ab ${zahl(schwelle,1)} km`;
+      let text, kern;
+      if (m[0] < .5) {
+        kern = m[0] > -.5 ? 'kaum verändert' : `${zahl(-m[0],1)} bpm tiefer`;
+        text = `${ab} ist dein Ruhepuls am Folgetag ${kern}${m[0] > -.5 ? ' gegenüber' : ' als in'} der Woche davor – dein Herz steckt lange Läufe gut weg.`;
+      } else {
+        kern = `${zahl(m[0],1)} bpm höher`;
+        const zurueck = m.findIndex((v, i) => i > 0 && v != null && v < .5);
+        text = `${ab} liegt dein Ruhepuls am Folgetag ${kern} als in der Woche davor` +
+          (zurueck > 0 ? `; nach ${zurueck + 1} Tagen ist er wieder auf dem gewohnten Niveau.`
+            : m[2] != null ? `, auch drei Tage danach noch ${zahl(m[2],1)} bpm darüber.` : '.');
+      }
+      alltag.push({ icon:'🏃', color:PULS, conf:'Erholung nach langen Läufen', text, hl:[_ebFett(kern)] });
+    }
+  }
+  // 13 Kurze Naechte und Ruhepuls (unter 6h 30m gegen ab Schlafziel)
+  {
+    const ziel = ZIELE.sleepTotal.ziel;
+    const paare = allData.filter(r => r.restHR > 0 && r.sleepTotal > 0);
+    let kurz = paare.filter(r => r.sleepTotal < 6.5), grenze = `unter ${alsStdMin(6.5)}`;
+    if (kurz.length < 8 && paare.length >= 40) {
+      kurz = [...paare].sort((a, b) => a.sleepTotal - b.sleepTotal).slice(0, Math.ceil(paare.length / 4));
+      grenze = `bis ${alsStdMin(kurz[kurz.length - 1].sleepTotal)}`;
+    }
+    const kurzSet = new Set(kurz);
+    const gut = paare.filter(r => r.sleepTotal >= ziel && !kurzSet.has(r));
+    if (kurz.length >= 8 && gut.length >= 8) {
+      const a = mittelArr(puls(kurz)), b = mittelArr(puls(gut)), d = a - b, gleich = Math.abs(d) < .5;
+      const kern = gleich ? 'etwa gleich hoch' : `${zahl(Math.abs(d),1)} bpm ${d > 0 ? 'höher' : 'tiefer'}`;
+      alltag.push({ icon:'😴', color:PULS, conf:'Kurze Nächte und Ruhepuls',
+        text:`Nach Nächten ${grenze} liegt dein Ruhepuls im Schnitt ${kern}${gleich ? ' wie' : ' als'} nach Nächten ab ${alsStdMin(ziel)} (${zahl(a,1)} gegen ${zahl(b,1)} bpm).`,
+        hl:[{ phrase: kern, c: !gleich && d > 0 ? _EB_ACHTUNG : 'inherit' }] });
+    }
+  }
+  // 14 Tiefschlaf und HRV: oberstes gegen unterstes Viertel der Naechte
+  {
+    const paare = allData.filter(r => r.hrv > 0 && r.sleepDeep > 0).sort((a, b) => a.sleepDeep - b.sleepDeep);
+    if (paare.length >= 40) {
+      const k = Math.floor(paare.length / 4), wenig = paare.slice(0, k), viel = paare.slice(-k);
+      const d = mittelArr(var_(viel)) - mittelArr(var_(wenig)), gleich = Math.abs(d) < 1;
+      const kern = gleich ? 'etwa gleich hoch' : `${zahl(Math.abs(d),0)} ms ${d > 0 ? 'höher' : 'tiefer'}`;
+      alltag.push({ icon:'🌊', color:HRV, conf:'Tiefschlaf und HRV',
+        text:`Nach Nächten mit viel Tiefschlaf (ab ${alsStdMin(viel[0].sleepDeep)}) ist deine HRV im Schnitt ${kern}${gleich ? ' wie' : ' als'} nach Nächten mit wenig (bis ${alsStdMin(wenig[k - 1].sleepDeep)}).`,
+        hl:[{ phrase: kern, c: !gleich && d > 0 ? _EB_GUT : 'inherit' }] });
+    }
+  }
+
+  return [
+    { titel: 'Rekorde', hinweis: `seit ${_ebMonat(erster.slice(0,7))}`, karten: rekorde },
+    { titel: 'Muster', karten: muster },
+    { titel: 'Entwicklung', karten: entwicklung },
+    { titel: 'Herz und Alltag', karten: alltag }
+  ].filter(a => a.karten.length);
+}
+
+function schlafInsights() { return _memo('schlafInsights', _schlafInsightsBerechnen); }
+function _schlafInsightsBerechnen() {
+  const naechte = allData.filter(r => r.sleepTotal > 0);
+  if (naechte.length < 14) return [];
+  const erster = naechte[0].date, ende = naechte[naechte.length - 1].date;
+  const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
+  const ZIEL = ZIELE.sleepTotal.ziel;
+  const LILA = '#7C3AED', LILA_HELL = '#8B5CF6', LILA_DUNKEL = '#6D28D9';
+  const dauer = rows => rows.map(r => r.sleepTotal);
+  const minuten = h => Math.round(h * 60);
+  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
+  const letzte3 = rows => rows.filter(r => r.date > drei);
+  const davor3  = rows => rows.filter(r => r.date > sechs && r.date <= drei);
+  const quote = rows => Math.round(rows.filter(r => r.sleepTotal >= ZIEL).length / rows.length * 100);
+  const rekorde = [], rhythmus = [], entwicklung = [], zusammen = [];
+
+  // Schlafzeiten. Einschlafen vor Mittag zaehlt als nach Mitternacht (+24 h), sonst
+  // laege 00:30 im Mittel sieben Stunden vor 23:30. Die Schlafmitte nur, wenn die Nacht
+  // plausibel lang ist (2–16 h) – sonst ist eine der beiden Angaben verrutscht.
+  const fStart = findAnyField(allData,'sleepStart','sleepOnset','bedtime','inBedStart','sleepBegin','asleepAt','sleepTime','startSleep');
+  const fEnde  = findAnyField(allData,'sleepEnd','wakeTime','wakeUp','wakeAt','inBedEnd','sleepStop','wokenAt','endSleep');
+  const zeiten = naechte.map(r => {
+    const s = fStart ? parseTV(r[fStart]) : null, e = fEnde ? parseTV(r[fEnde]) : null;
+    const ein = s != null ? (s < 12 ? s + 24 : s) : null;
+    let mitte = null;
+    if (ein != null && e != null) { let auf = e; while (auf <= ein) auf += 24; if (auf - ein >= 2 && auf - ein <= 16) mitte = (ein + auf) / 2; }
+    return { date: r.date, sleepTotal: r.sleepTotal, ein, auf: e, mitte };
+  });
+  const mitEin = zeiten.filter(z => z.ein != null), mitAuf = zeiten.filter(z => z.auf != null);
+
+  // ── Rekorde ──
+  // 1 Laengste Nacht
+  {
+    const l = naechte.reduce((a, r) => r.sleepTotal >= a.sleepTotal ? r : a);
+    const kern = alsStdMin(l.sleepTotal);
+    rekorde.push({ icon:'🛌', color:LILA, conf:'Längste Nacht',
+      text:`Deine längste Nacht: ${kern} in der Nacht auf ${_ebWochentag(l.date)}, ${_ebDatum(l.date)}. Im Schnitt schläfst du ${alsStdMin(mittelArr(dauer(naechte)))}.`, hl:[_ebFett(kern)] });
+  }
+  // 2 Laengste Serie mit erreichtem Schlafziel – eine fehlende Nacht unterbricht sie
+  {
+    let lauf = 0, best = 0, bestEnde = null, vorher = null;
+    naechte.forEach(r => {
+      const folgt = vorher && addDays(vorher, 1) === r.date;
+      lauf = r.sleepTotal >= ZIEL ? (folgt ? lauf + 1 : 1) : 0;
+      if (lauf && lauf >= best) { best = lauf; bestEnde = r.date; }
+      vorher = r.date;
+    });
+    if (best >= 2) {
+      const kern = `${best} Nächte in Folge`;
+      const jetzt = lauf >= best ? ' Du bist gerade mittendrin – das ist deine Bestserie.'
+        : lauf >= 2 ? ` Aktuell läuft eine Serie von ${lauf} Nächten.` : '';
+      rekorde.push({ icon:'🔗', color:LILA, conf:'Längste Zielserie',
+        text:`Deine längste Serie: ${kern} mit mindestens ${alsStdMin(ZIEL)} Schlaf${lauf >= best ? '' : ` (bis ${_ebDatum(bestEnde)})`}.${jetzt}`, hl:[_ebFett(kern)] });
+    }
+  }
+  // 3 Bester Schlafmonat
+  {
+    const b = _ebBeste(_ebGruppiert(naechte, r => r.date.slice(0,7), r => r.sleepTotal), 10, true);
+    if (b) {
+      const kern = `${_ebMonat(b.k)} mit Ø\u00A0${alsStdMin(b.wert)}`;
+      const n = naechte.filter(r => r.date.startsWith(b.k) && r.sleepTotal >= ZIEL).length;
+      rekorde.push({ icon:'🗓️', color:LILA, conf:'Bester Schlafmonat',
+        text:`Am meisten geschlafen hast du im ${kern} – das Ziel hast du in ${n} von ${b.n} Nächten erreicht.`, hl:[_ebFett(kern)] });
+    }
+  }
+  // 4 Beste Woche (mindestens 5 Naechte)
+  {
+    const b = _ebBeste(_ebGruppiert(naechte, r => getWeekMonday(r.date), r => r.sleepTotal), 5, true);
+    if (b) {
+      const kern = `Ø\u00A0${alsStdMin(b.wert)} pro Nacht`;
+      rekorde.push({ icon:'📅', color:LILA, conf:'Beste Woche',
+        text:`Deine erholsamste Woche: KW ${isoKW(b.k)} (${_ebTagMonat(b.k)}–${_ebTagMonat(addDays(b.k, 6))}${addDays(b.k, 6).slice(0,4)}) mit ${kern}.`, hl:[_ebFett(kern)] });
+    }
+  }
+
+  // ── Rhythmus ──
+  // 5 Typische Schlafzeiten (Median)
+  if (mitEin.length >= 14 && mitAuf.length >= 14) {
+    const kern = `um ${_ebUhr(_ebQuantil(mitEin.map(z => z.ein), .5))}`;
+    rhythmus.push({ icon:'⏰', color:LILA_HELL, conf:'Typische Schlafzeiten',
+      text:`Du schläfst typischerweise ${kern} ein und wachst um ${_ebUhr(_ebQuantil(mitAuf.map(z => z.auf), .5))} auf – der Median aus ${Math.min(mitEin.length, mitAuf.length)} Nächten.`, hl:[_ebFett(kern)] });
+  }
+  // 6 Regelmaessigkeit: die mittlere Haelfte der Naechte (25. bis 75. Perzentil)
+  if (mitEin.length >= 14 && mitAuf.length >= 14) {
+    const spanne = werte => { const a = _ebQuantil(werte, .25), b = _ebQuantil(werte, .75); return { a, b, min: minuten(b - a) }; };
+    const e = spanne(mitEin.map(z => z.ein)), w = spanne(mitAuf.map(z => z.auf));
+    const kern = `${e.min} Minuten`;
+    rhythmus.push({ icon:'🎯', color:LILA_HELL, conf:'Regelmässigkeit',
+      text:`In der Hälfte deiner Nächte schläfst du innerhalb von ${kern} ein (${_ebUhr(e.a)}–${_ebUhr(e.b)}) und wachst innerhalb von ${w.min} Minuten auf (${_ebUhr(w.a)}–${_ebUhr(w.b)}).`, hl:[_ebFett(kern)] });
+  }
+  // 7 Wochenrhythmus: Nacht auf welchen Wochentag ist am laengsten / kuerzesten?
+  {
+    const je = [[],[],[],[],[],[],[]];
+    naechte.forEach(r => je[new Date(r.date + 'T00:00:00').getDay()].push(r.sleepTotal));
+    if (je.every(l => l.length >= 4)) {
+      const m = je.map(mittelArr);
+      const hi = m.indexOf(Math.max(...m)), lo = m.indexOf(Math.min(...m));
+      const kern = `Nacht auf ${WOCHENTAG_LANG[hi]}`;
+      rhythmus.push({ icon:'📆', color:LILA_HELL, conf:'Wochenrhythmus',
+        text:`Am längsten schläfst du in der ${kern} (Ø\u00A0${alsStdMin(m[hi])}), am kürzesten in der Nacht auf ${WOCHENTAG_LANG[lo]} (Ø\u00A0${alsStdMin(m[lo])}).`, hl:[_ebFett(kern)] });
+    }
+  }
+  // 8 Schlafmitte am Wochenende gegen unter der Woche. Naechte auf Samstag und Sonntag
+  // gehen einem freien Tag voraus – das Mass fuer „sozialen Jetlag".
+  {
+    const mitMitte = zeiten.filter(z => z.mitte != null);
+    const we = mitMitte.filter(z => [0, 6].includes(new Date(z.date + 'T00:00:00').getDay()));
+    const wt = mitMitte.filter(z => ![0, 6].includes(new Date(z.date + 'T00:00:00').getDay()));
+    if (we.length >= 8 && wt.length >= 8) {
+      const a = mittelArr(we.map(z => z.mitte)), b = mittelArr(wt.map(z => z.mitte)), d = minuten(a - b), gleich = Math.abs(d) < 15;
+      const kern = gleich ? 'praktisch gleich' : `${Math.abs(d)} Minuten ${d > 0 ? 'später' : 'früher'}`;
+      rhythmus.push({ icon:'🕰️', color:LILA_HELL, conf:'Schlafmitte am Wochenende',
+        text:`Am Wochenende liegt die Mitte deines Schlafs ${kern}${gleich ? ' wie' : ' als'} unter der Woche (${_ebUhr(a)} gegen ${_ebUhr(b)}).` +
+          (d >= 60 ? ' Ab einer Stunde spricht man von sozialem Jetlag – der Körper muss sich jeden Montag neu einstellen.' : ''),
+        hl:[{ phrase: kern, c: d >= 60 ? _EB_ACHTUNG : 'inherit' }] });
+    }
+  }
+
+  // ── Entwicklung ──
+  // 9 Schlafdauer und Zielquote: letzte 3 Monate gegen die 3 davor
+  {
+    const a = letzte3(naechte), b = davor3(naechte);
+    if (a.length >= 20 && b.length >= 20) {
+      const ma = mittelArr(dauer(a)), mb = mittelArr(dauer(b)), d = minuten(ma - mb), gleich = Math.abs(d) < 5;
+      const kern = gleich ? 'praktisch unverändert' : `${Math.abs(d)} Minuten ${d > 0 ? 'mehr' : 'weniger'}`;
+      const c = gleich ? 'inherit' : d > 0 ? _EB_GUT : _EB_ACHTUNG;
+      entwicklung.push({ icon: gleich ? '➖' : d > 0 ? '📈' : '📉', color: gleich ? LILA_DUNKEL : c, conf:'Schlafdauer · 3 Monate',
+        text:`Ø der letzten 3 Monate: ${alsStdMin(ma)} pro Nacht – ${kern}${gleich ? ' gegenüber' : ' als in'} den 3 Monaten davor (${alsStdMin(mb)}). Schlafziel erreicht in ${quote(a)} % der Nächte, davor in ${quote(b)} %.`,
+        hl:[{ phrase: kern, c }] });
+    }
+  }
+  // 10 Einschlafzeit: letzte 3 Monate gegen die 3 davor (Median)
+  {
+    const a = letzte3(mitEin), b = davor3(mitEin);
+    if (a.length >= 20 && b.length >= 20) {
+      const ma = _ebQuantil(a.map(z => z.ein), .5), mb = _ebQuantil(b.map(z => z.ein), .5), d = minuten(ma - mb), gleich = Math.abs(d) < 5;
+      const kern = gleich ? 'praktisch zur selben Zeit' : `${Math.abs(d)} Minuten ${d < 0 ? 'früher' : 'später'}`;
+      entwicklung.push({ icon:'🌙', color:LILA_DUNKEL, conf:'Einschlafzeit · 3 Monate',
+        text:`In den letzten 3 Monaten schläfst du ${kern} ein${gleich ? ' wie' : ' als'} in den 3 Monaten davor (${_ebUhr(ma)} statt ${_ebUhr(mb)}).`, hl:[_ebFett(kern)] });
+    }
+  }
+  // 11 Jahreszeiten: Winter (Dez–Feb) gegen Sommer (Jun–Aug)
+  {
+    const w = _ebSaison(naechte, _EB_WINTER), so = _ebSaison(naechte, _EB_SOMMER);
+    if (w.length >= 20 && so.length >= 20) {
+      const mw = mittelArr(dauer(w)), ms_ = mittelArr(dauer(so)), d = minuten(mw - ms_), gleich = Math.abs(d) < 5;
+      const kern = gleich ? 'etwa gleich lang' : `${Math.abs(d)} Minuten ${d > 0 ? 'länger' : 'kürzer'}`;
+      entwicklung.push({ icon:'❄️', color:LILA_DUNKEL, conf:'Jahreszeiten',
+        text:`Im Winter (Dez–Feb) schläfst du im Schnitt ${kern}${gleich ? ' wie' : ' als'} im Sommer (Jun–Aug) – ${alsStdMin(mw)} gegen ${alsStdMin(ms_)}.`, hl:[_ebFett(kern)] });
+    }
+  }
+
+  // ── Zusammenhaenge ──
+  // 12 Folgenacht nach Trainings- gegen Ruhetage. Ruhetage erst ab dem ersten
+  // erfassten Training – davor fehlt nur das Workout-Blatt, nicht das Training.
+  {
+    const trainTage = Object.keys(workoutData).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if (trainTage.length) {
+      const trainSet = new Set(trainTage);
+      const folge = d => byDate[addDays(d, 1)];
+      const nacht = d => { const r = folge(d); return r && r.sleepTotal > 0 ? r : null; };
+      const T = trainTage.map(nacht).filter(Boolean);
+      const R = allData.filter(r => r.date >= trainTage[0] && !trainSet.has(r.date)).map(r => nacht(r.date)).filter(Boolean);
+      if (T.length >= 10 && R.length >= 10) {
+        const t = mittelArr(dauer(T)), r = mittelArr(dauer(R)), d = minuten(t - r), gleich = Math.abs(d) < 5;
+        const kern = gleich ? 'etwa gleich lang' : `${Math.abs(d)} Minuten ${d > 0 ? 'länger' : 'kürzer'}`;
+        const hl = [{ phrase: kern, c: gleich ? 'inherit' : d > 0 ? _EB_GUT : _EB_ACHTUNG }];
+        let tief = '';
+        const tT = T.filter(x => x.sleepDeep > 0), tR = R.filter(x => x.sleepDeep > 0);
+        if (tT.length >= 10 && tR.length >= 10) {
+          const dt = minuten(mittelArr(tT.map(x => x.sleepDeep)) - mittelArr(tR.map(x => x.sleepDeep)));
+          tief = Math.abs(dt) < 3 ? ', mit etwa gleich viel Tiefschlaf' : `, mit ${Math.abs(dt)} Minuten ${dt > 0 ? 'mehr' : 'weniger'} Tiefschlaf`;
+        }
+        zusammen.push({ icon:'🏋️', color:LILA, conf:'Schlaf nach dem Training',
+          text:`Nach Trainingstagen schläfst du ${kern}${gleich ? ' wie' : ' als'} nach Ruhetagen (${alsStdMin(t)} gegen ${alsStdMin(r)})${tief}.`, hl });
+      }
+    }
+  }
+  // 13 Spaete Naechte: spaetestes Viertel der Einschlafzeiten gegen die uebrigen
+  if (mitEin.length >= 40) {
+    const s = [...mitEin].sort((a, b) => b.ein - a.ein), k = Math.ceil(s.length / 4);
+    const spaet = s.slice(0, k), rest = s.slice(k);
+    const a = mittelArr(dauer(spaet)), b = mittelArr(dauer(rest)), d = minuten(a - b), gleich = Math.abs(d) < 5;
+    const kern = gleich ? 'etwa gleich lang' : `${Math.abs(d)} Minuten ${d < 0 ? 'kürzer' : 'länger'}`;
+    zusammen.push({ icon:'🦉', color:LILA, conf:'Späte Nächte',
+      text:`Schläfst du ab ${_ebUhr(spaet[k - 1].ein)} ein (spätestes Viertel deiner Nächte), schläfst du im Schnitt ${kern}${gleich ? ' wie' : ' als'} sonst – ${alsStdMin(a)} gegen ${alsStdMin(b)}.`,
+      hl:[{ phrase: kern, c: !gleich && d < 0 ? _EB_ACHTUNG : 'inherit' }] });
+  }
+
+  return [
+    { titel: 'Rekorde', hinweis: `seit ${_ebMonat(erster.slice(0,7))}`, karten: rekorde },
+    { titel: 'Rhythmus', karten: rhythmus },
+    { titel: 'Entwicklung', karten: entwicklung },
+    { titel: 'Zusammenhänge', karten: zusammen }
+  ].filter(a => a.karten.length);
 }
 
 // ── VO₂max-Abschnitt (zuunterst im Training-Tab) ───────

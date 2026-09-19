@@ -270,7 +270,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
 - **Emojis nur an vier Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht,
   die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
-  Trainings-Einblicke (seit 18.09.2026). Titel, Überschriften (auch die
+  Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Titel, Überschriften (auch die
   Abschnittstitel der Einblicke), Status- und
   Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
   Kontrast) statt Emojis.
@@ -1561,7 +1561,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ausklapp-Knopf des Training-Tabs unter VO₂max, **alle über den gesamten
   Datenbestand** — sie folgen dem Zeitfilter nicht. Dieselbe Karte wie „Muster &
   Zusammenhänge" (`insightKarte()`, jetzt gemeinsam genutzt), in vier Abschnitten mit
-  weissen Titeln auf dem Tab-Verlauf (`.tr-abschnitt`). Berechnung in
+  weissen Titeln auf dem Tab-Verlauf (`.eb-abschnitt`). Berechnung in
   `_trainingsInsightsBerechnen()`, gemerkt über `_memo('trainingsInsights')`;
   `_parseWorkoutRows` verwirft den Eintrag selbst, weil der Analytics-Cache sonst nur
   beim Einlesen der Gesundheitsdaten geleert wird.
@@ -1596,12 +1596,55 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   190.8 km, längster Lauf 17.19 km am 19.10.2025, beste Pace ab 5 km 4.800 min/km über
   14.58 km, Gesamt 3'851.2 km aus 505 Einheiten, Mix 145/141/122/97 → 29/28/24/19 % —
   alle identisch mit den Karten. Am Desktop spannen die Einblicke über beide Spalten
-  (`#screen-training > .tr-insights`), ihr eigenes Raster teilt sie wieder in zwei.
+  (`#screen-training > .einblicke`), ihr eigenes Raster teilt sie wieder in zwei.
+- **Einblicke in Herz und Schlaf** (auf Wunsch, 19.09.2026): dieselbe Karte, derselbe
+  Aufbau wie im Training — Herz 14, Schlaf 13 Karten, alle über den gesamten
+  Datenbestand, zuunterst im Bereich „Weitere Auswertungen". Markup für alle drei Tabs
+  aus **`einblickeHTML(abschnitte, klapp)`** (vorher `trainingsInsightsHTML`, die
+  Klassen hiessen `.tr-*`): `klapp` setzt `ausklapp-teil` — nur im Training, wo die
+  Einblicke frei im Tab stehen. In Herz und Schlaf liegen sie **in** `.weitere-inhalt`,
+  das die Klasse schon trägt; am Desktop spannen sie dort über beide Spalten
+  (`.weitere-inhalt > .einblicke`). Gebaut wird nur bei offenem Zustand.
+  Berechnung in `_herzInsightsBerechnen()` / `_schlafInsightsBerechnen()`, gemerkt über
+  `_memo`; `_parseWorkoutRows` verwirft beide mit, weil ihre Zusammenhänge
+  `workoutData` lesen. Gemeinsame Helfer `_eb*` (Quantil, Gruppen, bester Monat …).
+  **Bewusst kein Doppel zu „Muster & Zusammenhänge"** der Übersicht (30-Tage-Trends,
+  Schlaf→HRV, HRV→Ruhepuls, Training→HRV/Ruhepuls am Folgetag, Schritte→Schlaf/HRV,
+  HRV je Wochentag, Schlafdauer Wochentag/Wochenende) — wer eine Karte ergänzt,
+  prüft zuerst dort.
+  **Herz** — Rekorde: tiefster Ruhepuls, höchste HRV, ruhigster Monat, bester
+  HRV-Monat (Monate ab 10 Messtagen, mindestens drei davon). Muster: Normalbereich
+  (10.–90. Perzentil, „8 von 10 Tagen"), Wochenrhythmus des Ruhepulses, Ausreisser
+  (höchster Ruhepuls samt kurzer Nacht / langem Lauf am Vortag), Jahreszeiten
+  (Dez–Feb gegen Jun–Aug, je ≥ 20 Tage). Entwicklung: Ruhepuls und HRV je letzte 91
+  Tage gegen die 91 davor, „Seit Beginn" (erste gegen letzte 3 Monate, ab einem Jahr
+  Daten). Herz und Alltag: Erholung nach langen Läufen (Ruhepuls an Tag +1…+3 gegen
+  den Ø der 7 Tage **vor** dem Lauf — so zählt nur der Lauf, nicht die Jahreszeit),
+  kurze Nächte (< 6h 30m gegen ≥ Ziel) und Ruhepuls, Tiefschlaf (oberstes gegen
+  unterstes Viertel) und HRV.
+  **Schlaf** — Rekorde: längste Nacht, längste Zielserie (eine fehlende Nacht
+  unterbricht), bester Monat, beste Woche (ab 5 Nächten). Rhythmus: typische
+  Schlafzeiten (Median), Regelmässigkeit (mittlere Hälfte der Nächte, 25.–75.
+  Perzentil), Wochenrhythmus („Nacht auf Sonntag"), Schlafmitte am Wochenende
+  (sozialer Jetlag, ab 60 min orange). Entwicklung: Dauer + Zielquote und
+  Einschlafzeit je 91 gegen 91 Tage, Jahreszeiten. Zusammenhänge: Folgenacht nach
+  Trainings- gegen Ruhetage (Ruhetage erst ab dem ersten erfassten Training — davor
+  fehlt nur das Blatt, nicht das Training), späte Nächte (spätestes Viertel).
+  **Einschlafzeiten vor 12 Uhr zählen +24 h**, sonst läge 00:30 im Mittel sieben
+  Stunden vor 23:30; `_ebUhr` rundet erst auf die Minute (`fmtHHMM` allein machte aus
+  23.999 „23:00"). Ø steht mit geschütztem Leerzeichen vor dem Wert.
+  **Nachgerechnet** (Prüfstand, `?tage=900`, aus den Rohzeilen): tiefster Ruhepuls
+  43 bpm am 04.04.2024, höchste HRV 112.5 → 113 ms, Ausreisser 61.5 bpm (+9 über Ø
+  52.5), ruhigster Monat Mai 2024 47.4 bpm, Ruhepuls 3 Monate 56.3 gegen 55.3; längste
+  Nacht 9.08 h = 9h 05m am 07.02.2026, Zielserie 16 Nächte bis 01.06.2025, Median
+  23:29 / 07:28, bester Monat Mai 2024 7h 49m, Schlaf 3 Monate 7h 44m gegen 7h 30m,
+  Zielquote 58 / 44 % — alle identisch mit den Karten.
 - **Kartenreihenfolge je Tab** (auf Wunsch festgelegt, nicht umsortieren):
   **Herz** Ruhepuls & HRV → (Weitere Auswertungen) Ruhepuls-Einordnung →
-  HRV-Einordnung → Herz-Kreislauf-Einordnung. **Schlaf** Schlaf-Score-Kachel →
+  HRV-Einordnung → Herz-Kreislauf-Einordnung → Herz-Einblicke (seit 19.09.2026).
+  **Schlaf** Schlaf-Score-Kachel →
   Schlafdauer → (Weitere Auswertungen) Schlafqualität-Verteilung → Schlafschuld →
-  Schlafphasen-Verlauf → Schlaf-Score-Verlauf.
+  Schlafphasen-Verlauf → Schlaf-Score-Verlauf → Schlaf-Einblicke (seit 19.09.2026).
   **Training** Laufstrecke → Trainingszeit → Pace → VO₂max (Stand 06.09.2026) →
   (Weitere Auswertungen) Trainings-Einblicke (seit 18.09.2026).
   Überall gilt: erst die Verläufe, dann die Einordnung — erst die Zahlen,
@@ -1721,6 +1764,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (UTC+1/+2) kommt dabei der Vortag heraus. Immer `toLocalDateStr(dt)` bzw. `addDays(ds,n)`
   nutzen. Dieser Fehler steckte einmal an sechs Stellen und verfälschte Muster-Insights
   und Kalenderansichten.
+  **Und nie in Millisekunden weiterzählen** (`+ n * 86400000`): der Tag der
+  Zeitumstellung hat 23 bzw. 25 Stunden. Genau so rechnete `addDays` bis 19.09.2026 —
+  `addDays('2025-10-26', 1)` ergab wieder den 26.10., rückwärts über Ende März den
+  Vortag. Folgen: in 7T ging über die Umstellung Ende Oktober ein Tipp auf › ins Leere
+  (Sonntag statt Montag, dieselbe Woche), die Wochenschleife der Trainings-Serie lief
+  danach auf Sonntagen und zählte keine Woche mehr, und 91-Tage-Fenster über Ende März
+  waren einen Tag zu lang. Seither `setDate` (Kalendertage). **Abstände** zwischen zwei
+  Daten über die Differenz mit `Math.round(… / 86400000)` sind dagegen richtig — das
+  Runden fängt die fehlende bzw. zusätzliche Stunde ab.
 - **Kein erfundener Platzhalter für fehlende Messwerte.** Fehlt ein Wert, zeigt die App
   „—" statt eines geschätzten Ersatzwerts. Gilt überall.
 - **Testen nur nach SW-Abmeldung.** Ein früher registrierter Service Worker liefert sonst
