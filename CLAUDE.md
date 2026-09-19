@@ -1788,6 +1788,38 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **iOS-PWA:** `viewport-fit=cover`, Status-Bar `black-translucent`, `env(safe-area-inset-*)`.
   **Kein** Body-Gradient mit `background-attachment:fixed` (friert auf iOS ein) — soliden Body
   + `.screen`-Safe-Areas nutzen.
+- **„Liquid Glass"-Schleier oben (iOS 26/27) — `--schleier-t`** (19.09.2026, dieselbe
+  Lösung wie in FitTrack). In der installierten App legt iOS einen hellen Schleier
+  über den oberen Rand, weil die App dank `black-translucent` + `viewport-fit=cover`
+  unter die Statusleiste zeichnet; iOS 27 hat ihn verstärkt, die Titelzeile wirkte
+  unscharf und ausgewaschen. Es gibt **keinen** CSS- oder Meta-Schalter dagegen; nur
+  eine deckende Statusleiste (`black`/`default`) verhindert ihn — ausprobiert und
+  verworfen, weil der Tab-Verlauf bis unter die Uhr laufen soll. **`black-translucent`
+  bleibt.** Stattdessen rückt der Inhalt nach unten, sodass der Schleier über leerem
+  Hintergrund liegt.
+  `--schleier-t` ist `0px` und wird nur unter `@media (display-mode: standalone) and
+  (orientation: portrait)` zu **20px** — im Safari-Tab zeichnet die Seite nicht unter
+  die Statusleiste, quer gibt es den Schleier nicht. **Der Wert steht an EINER
+  Stelle** (`:root`-Block in `style.css`). Warum 20 und nicht die rechnerischen ~38:
+  auf Leonards iPhone gemessen klingt der Schleier ~125 px unter der Oberkante aus,
+  die Titelzeile begann bei 86 px; ausprobiert wurden 40, 30 und 20 px — 20 lässt
+  oben weniger Luft, ein schwacher Rest des Schleiers über dem Titel ist gewollt.
+  **Addiert ist die Variable an zwei Stellen:** `.screen` (alle vier Tabs) und
+  `.us-kopf` (Kopfzeile der Einstellungen-Seite; ihre Fläche reicht weiter bis zur
+  Oberkante, nur Zurück-Pfeil, Titel und Inhalt rücken). **Bewusst nicht:**
+  `.bg-fade-layer` (reiner Verlauf hinter der Statusleiste), die Overlays
+  Anmelden/Laden/Fehler (Inhalt senkrecht zentriert, keine Kopfzeile) und
+  `#hinweis-oben` (fest oben angeheftete Leiste mit eigener dunkler Fläche — ob sie
+  mitrutschen soll, ist offen). `body.hinweis-an .screen` rechnet mit der
+  **gemessenen** Leistenhöhe (`--hinweis-h`) und folgt der Leiste damit von selbst.
+  JavaScript rechnet nirgends mit dem oberen Abstand: Blickanker und oberste Karte
+  messen relativ zum Screen, Tooltips relativ zum Fenster.
+  **Wer ein neues Element oben verankert** (Vollbild-Ansicht, Overlay mit Kopfzeile,
+  Sticky-Offset), addiert `var(--schleier-t)` dort, wo `var(--safe-t)` steht.
+  Geprüft (Prüfstand, 375 × 812, Variable von Hand auf 20px): Titel und erste Karte
+  aller vier Tabs 20.7 → 40.7 bzw. 70.7 → 90.7, Einstellungen Zurück 10 → 30, Titel
+  20 → 40, Inhalt 61 → 81; Zeitleiste, Tableiste, Verlauf, Hinweisleiste und
+  Overlays unverändert; ohne Variable alles exakt wie vorher.
 - **Kein Build/Bundler** — Dateien direkt editieren, Chart.js kommt vom CDN.
 - **Beim Entfernen von Code** grep-Check auf verwaiste Referenzen.
 

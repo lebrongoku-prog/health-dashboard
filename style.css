@@ -14,6 +14,17 @@
   /* Landscape-Safe-Areas für die Notch-Seite (links oder rechts, je nach Drehung) */
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
+  /* Abstand unter dem „Liquid Glass"-Schleier (19.09.2026, wie FitTrack). Seit iOS 26
+     legt das System in der installierten App einen hellen Schleier ueber den oberen
+     Rand, iOS 27 hat ihn verstaerkt; er macht die Titelzeile unscharf. Einen Schalter
+     dagegen gibt es nicht – nur eine deckende Statusleiste verhindert ihn, und die
+     wuerde den Tab-Verlauf unter der Uhr abschneiden (`black-translucent` bleibt).
+     Deshalb rueckt der Inhalt ein Stueck nach unten. Nur installiert und im
+     Hochformat: im Safari-Tab zeichnet die Seite nicht unter die Statusleiste, quer
+     gibt es den Schleier nicht. Gemessen klingt er ~125 px unter der Oberkante aus
+     (Titel ab 86 px, rechnerisch also ~38 px); 20 px ist bewusst weniger – ein
+     schwacher Rest ueber dem Titel ist in Ordnung. EINE Stelle zum Anpassen. */
+  --schleier-t: 0px;
   --bg: #F1F5F9;
   --card: #ffffff;
   --border: #E2E8F0;
@@ -37,6 +48,9 @@
   --body: #6B7280;
   /* Per-Tab dominant color (swapped via body.theme-*) */
   --tab-color: #0891B2;
+}
+@media (display-mode: standalone) and (orientation: portrait) {
+  :root { --schleier-t: 20px; }
 }
 
 *, *::before, *::after {
@@ -166,7 +180,7 @@ body.theme-training   { --tab-color: #F97316; }
   scroll-snap-stop: always;
   /* Padding: Top = Safe-Area (Status-Bar), L/R = Safe-Area+12px (Landscape-Notch),
      Bottom = Nav-Höhe + Safe-Area + Puffer. Topbar ist Teil des Inhalts und scrollt mit. */
-  padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--zeit-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+  padding: calc(var(--safe-t) + var(--schleier-t) + 8px) calc(var(--safe-r) + 12px) calc(var(--nav-h) + var(--zeit-h) + var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
   overscroll-behavior-y: auto;
   overscroll-behavior-x: contain;
   /* Der Platz fuer die Hinweisleiste waechst und schrumpft mit ihr (hinweisZeigen). */
@@ -281,7 +295,9 @@ body.einst-offen #zeitleiste { display: none; }
 
 .us-kopf {
   display: flex; align-items: center; gap: .35rem;
-  padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 8px);
+  /* Kopfzeile einer Vollbild-Ansicht: sie rueckt unter dem Schleier mit (--schleier-t),
+     ihre Flaeche reicht weiter bis zur Oberkante. */
+  padding: calc(var(--safe-t) + var(--schleier-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 8px);
   background: var(--card);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
