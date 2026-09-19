@@ -22,12 +22,10 @@
      Deshalb rueckt der Inhalt ein Stueck nach unten. Nur installiert und im
      Hochformat: im Safari-Tab zeichnet die Seite nicht unter die Statusleiste, quer
      gibt es den Schleier nicht. Gemessen klingt er ~125 px unter der Oberkante aus
-     (Titel ab 86 px, rechnerisch also ~38 px); 20 px ist bewusst weniger – ein
-     schwacher Rest ueber dem Titel ist in Ordnung. EINE Stelle zum Anpassen.
-     --schleier-hinweis: dasselbe fuer die Hinweisleiste oben (#hinweis-oben), auf
-     Wunsch nur 5 px – sie ist fest angeheftet und traegt eine eigene dunkle Flaeche. */
+     (Titel ab 86 px, rechnerisch also ~38 px); 25 px ist bewusst weniger – ein
+     schwacher Rest ueber dem Titel ist in Ordnung (FitTrack: 20 px, hier auf Wunsch
+     5 px mehr). EINE Stelle zum Anpassen. */
   --schleier-t: 0px;
-  --schleier-hinweis: 0px;
   --bg: #F1F5F9;
   --card: #ffffff;
   --border: #E2E8F0;
@@ -53,7 +51,7 @@
   --tab-color: #0891B2;
 }
 @media (display-mode: standalone) and (orientation: portrait) {
-  :root { --schleier-t: 20px; --schleier-hinweis: 5px; }
+  :root { --schleier-t: 25px; }
 }
 
 *, *::before, *::after {
@@ -1309,10 +1307,7 @@ body.dark .pg-act.dark-toggle svg{transform:rotate(180deg)}
 #hinweis-oben{
   position:fixed;top:0;left:0;right:0;z-index:200;
   display:flex;align-items:center;gap:.6rem;
-  /* --schleier-hinweis: der Text rueckt unter dem iOS-Schleier nach unten, die Flaeche
-     reicht weiter bis zur Oberkante. Die Screens darunter folgen ueber die gemessene
-     Hoehe (--hinweis-h) von selbst. */
-  padding:calc(var(--safe-t) + var(--schleier-hinweis) + 8px) calc(var(--safe-r) + 12px) 8px calc(var(--safe-l) + 12px);
+  padding:calc(var(--safe-t) + 8px) calc(var(--safe-r) + 12px) 8px calc(var(--safe-l) + 12px);
   background:#1E293B;color:#F1F5F9;
   font-size:.75rem;line-height:1.35;
   box-shadow:0 2px 10px rgba(0,0,0,.22);

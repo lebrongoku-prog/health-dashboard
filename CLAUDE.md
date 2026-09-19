@@ -1798,34 +1798,33 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   bleibt.** Stattdessen rückt der Inhalt nach unten, sodass der Schleier über leerem
   Hintergrund liegt.
   `--schleier-t` ist `0px` und wird nur unter `@media (display-mode: standalone) and
-  (orientation: portrait)` zu **20px** — im Safari-Tab zeichnet die Seite nicht unter
+  (orientation: portrait)` zu **25px** — im Safari-Tab zeichnet die Seite nicht unter
   die Statusleiste, quer gibt es den Schleier nicht. **Der Wert steht an EINER
-  Stelle** (`:root`-Block in `style.css`). Warum 20 und nicht die rechnerischen ~38:
+  Stelle** (`:root`-Block in `style.css`). Warum 25 und nicht die rechnerischen ~38:
   auf Leonards iPhone gemessen klingt der Schleier ~125 px unter der Oberkante aus,
-  die Titelzeile begann bei 86 px; ausprobiert wurden 40, 30 und 20 px — 20 lässt
-  oben weniger Luft, ein schwacher Rest des Schleiers über dem Titel ist gewollt.
+  die Titelzeile begann bei 86 px; in FitTrack wurden 40, 30 und 20 px ausprobiert
+  und 20 gewählt — weniger Luft oben, ein schwacher Rest des Schleiers über dem Titel
+  ist gewollt. Hier auf Wunsch **5 px mehr** (25, am 19.09.2026 von 20 angehoben).
   **Addiert ist die Variable an zwei Stellen:** `.screen` (alle vier Tabs) und
   `.us-kopf` (Kopfzeile der Einstellungen-Seite; ihre Fläche reicht weiter bis zur
   Oberkante, nur Zurück-Pfeil, Titel und Inhalt rücken). **Bewusst nicht:**
   `.bg-fade-layer` (reiner Verlauf hinter der Statusleiste), die Overlays
-  Anmelden/Laden/Fehler (Inhalt senkrecht zentriert, keine Kopfzeile).
-  **Die Hinweisleiste `#hinweis-oben` rückt nur 5 px** (auf Wunsch, 19.09.2026) —
-  eigene Variable `--schleier-hinweis`, in derselben Media-Query wie `--schleier-t`
-  (dort `0px`/`5px`). Sie ist fest angeheftet und trägt eine eigene dunkle Fläche; die
-  reicht weiter bis zur Oberkante, nur Text und Knopf rücken. `body.hinweis-an .screen`
-  rechnet mit der **gemessenen** Leistenhöhe (`--hinweis-h`) und folgt der Leiste
-  damit von selbst — dort darf `--schleier-t` NICHT zusätzlich hinein, sonst stünde
-  eine Lücke zwischen Leiste und Inhalt.
+  Anmelden/Laden/Fehler (Inhalt senkrecht zentriert, keine Kopfzeile) und die
+  Hinweisleiste `#hinweis-oben` (fest angeheftet, eigene dunkle Fläche). Eine
+  Fassung, in der sie 5 px mitrückte (`--schleier-hinweis`), stand am 19.09.2026 kurz
+  live — ein Missverständnis, zurückgenommen. `body.hinweis-an .screen` rechnet mit
+  der **gemessenen** Leistenhöhe (`--hinweis-h`) und folgt der Leiste damit von
+  selbst — dort darf `--schleier-t` NICHT zusätzlich hinein, sonst stünde eine Lücke
+  zwischen Leiste und Inhalt.
   JavaScript rechnet nirgends mit dem oberen Abstand: Blickanker und oberste Karte
   messen relativ zum Screen, Tooltips relativ zum Fenster.
   **Wer ein neues Element oben verankert** (Vollbild-Ansicht, Overlay mit Kopfzeile,
   Sticky-Offset), addiert `var(--schleier-t)` dort, wo `var(--safe-t)` steht.
-  Geprüft (Prüfstand, 375 × 812, Variable von Hand auf 20px): Titel und erste Karte
-  aller vier Tabs 20.7 → 40.7 bzw. 70.7 → 90.7, Einstellungen Zurück 10 → 30, Titel
-  20 → 40, Inhalt 61 → 81; Zeitleiste, Tableiste, Verlauf und Overlays unverändert;
-  ohne Variable alles exakt wie vorher. Hinweisleiste (`?tipp=sofort`, beide Variablen
-  gesetzt): Text 13.1 → 18.1, Knopf 8 → 13, Leistenhöhe 42.4 → 47.4, Tab-Titel
-  darunter 62.7 → 67.7.
+  Geprüft (Prüfstand, 375 × 812, Variable von Hand gesetzt): Titel und erste Karte
+  aller vier Tabs 20.7 → 45.7 bzw. 70.7 → 95.7 bei 25px (bei 20px entsprechend
+  40.7 / 90.7, ebenso Einstellungen Zurück 10 → 30, Titel 20 → 40, Inhalt 61 → 81);
+  Zeitleiste, Tableiste, Verlauf, Hinweisleiste und Overlays unverändert; ohne
+  Variable alles exakt wie vorher.
 - **Kein Build/Bundler** — Dateien direkt editieren, Chart.js kommt vom CDN.
 - **Beim Entfernen von Code** grep-Check auf verwaiste Referenzen.
 
