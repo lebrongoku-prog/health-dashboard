@@ -54,8 +54,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 ## Dateistruktur
 - `index.html` — Shell: Bottom-Nav (4 Tabs), `.screen`-Sections, Icon-Links mit
   `?v=N`-Cachebust, `theme-color`-Meta.
-- `app.js` (~2740 Z.) — gesamte App-Logik (siehe Architektur).
-- `style.css` (~780 Z.) — Styles.
+- `app.js` (~6000 Z.) — gesamte App-Logik (siehe Architektur).
+- `style.css` (~1300 Z.) — Styles.
 - `sw.js` — Service Worker; `const CACHE='hcc-vNN'` + `ASSETS`-Liste. Beim Umzug: `hcc-v57`.
 - `manifest.json` — PWA-Manifest (Name, Icons, `theme_color`/`background_color` `#0891B2`).
 - `icons/` — `icon.svg` + 8 PNGs (32/120/152/167/180/192/512/1024), EKG/Puls-Logo in Teal.
@@ -218,7 +218,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Auftrag, die Hinweisleiste zu zeigen.
 - **Rendering:** `_renderTab(name)` → Seiten-Funktion `pgOverview`/`pgHerz`/`pgSchlaf`/
   `pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
-  `mkC(id,cfg)`; danach `_injectTopbar(name)` → `_injectChartFilters` + `updateNavUI`.
+  `zeichneDiagramm(id,cfg)`; danach `_tabNachbereiten(name)` → `_zeitraumEinsetzen`
+  (Zeitraum in die Kartentitel), `balkenFuellen`, `kachelnHochzaehlen`, `updateNavUI`.
 - **Chart-Registry:** `charts` (Instanzen nach Canvas-ID), `tabCharts` (IDs pro Tab, für
   Destroy beim Re-Render).
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','training']` (4 Tabs).
@@ -743,8 +744,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **und** *welche Richtung gut ist* — ohne die zweite Angabe lässt sich weder Farbe noch
   Pfeil deuten. Der Kasten ist ein eigenes `.info-tt`-Element (kein `::after`), damit
   `openTooltip` ihn am Bildschirmrand einklemmen kann.
-- **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `mkC(id,cfg)`.
-  **Nur waagrechte Gitterlinien** — `gx` setzt `grid:{display:false}`; die senkrechten
+- **Charts:** Canvas in `.chart-wrap` (`overflow:hidden`), Erzeugung über `zeichneDiagramm(id,cfg)`.
+  **Nur waagrechte Gitterlinien** — `achseX` setzt `grid:{display:false}`; die senkrechten
   trennten nur Kategorien, die die Achsenbeschriftung ohnehin trennt.
   Gitter und Achsen tragen **verschiedene** Farben: `GRID_COLOR` (10 %) für die
   Hilfslinien, `ACHSEN_COLOR` (38 %, via `Chart.defaults.borderColor`) für die Achsen.
@@ -873,7 +874,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Blickposition beim Navigieren:** ein Klick auf `‹ ›` baut den Tab neu auf. Ändert
   sich dabei die Gesamthöhe, klemmt der Browser die Scrollposition und die Ansicht
   springt — am stärksten beim untersten Diagramm. `blickAnkerMerken()` merkt sich die
-  auslösende Karte, `blickAnkerWiederherstellen()` setzt sie in `_injectTopbar` zurück
+  auslösende Karte, `blickAnkerWiederherstellen()` setzt sie in `_tabNachbereiten` zurück
   an dieselbe Stelle. Bewusst **synchron**: `getBoundingClientRect` erzwingt ohnehin ein
   Layout, und in einer nicht gezeichneten Seite feuert `requestAnimationFrame` nie.
   Hilfslinien (Ø-Linie, Ziellinie) gehören nicht in die Tooltips — Filter `nurMesswerte`.
@@ -1333,7 +1334,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
   `zahl()` statt `fn()`, `zeichneDiagramm()` statt `mkC()`, `alsStdMin()` statt `toHM()`,
-  `prozentDiff()` statt `pct()`, `monatsMittel`/`wochenSumme` statt `mAvg`/`wSum`.
+  `prozentDiff()` statt `pct()`, `achseX`/`achseY` statt `gx`/`gy`,
+  `bereichSetzen()` statt `setR()`, `fehlerZeigen()` statt `showErr()`.
 - **Gemeinsame Helfer statt Copy-Paste:** `statZeile(label, wert, farbe)` (Label links,
   Wert rechts — 44 Stellen), `splitWeekWknd(rows)` (Wochentag/Wochenende),
   `fmtPace`/`paceFromSpeed` (Pace), `datenStandZeilen()` (Daten-Stand in der App-Karte
@@ -1391,13 +1393,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   springt der Druckpunkt. **Merke für künftige Scrollbereiche:** ein `transform`
   während `:active` bricht auf iOS die laufende Wischgeste ab — in FitTrack liess sich
   das Jahresraster dadurch gar nicht mehr scrollen.
-- **Aufklapp-Knöpfe teilen eine Klasse:** „Weitere Auswertungen" (Herz, Schlaf) und
-  „Muster & Zusammenhänge" (Übersicht) tragen beide `.weitere-btn` und sehen damit
-  identisch aus. Der Muster-Knopf hatte vorher als `.pi-titel` das Aussehen einer
-  Kapitelüberschrift (grau, versalgesetzt, ohne Fläche); beide Klassen sind
-  zusammengelegt, `.pi-titel`/`.pi-pfeil` gibt es nicht mehr. Neue Aufklapp-Knöpfe
-  nehmen `.weitere-btn` + `.weitere-pfeil`, damit das so bleibt. Drei Stellen nutzen
-  ihn: „Weitere Auswertungen" in **allen drei** Tabs — **alle starten zu**
+- **Ein Ausklapp-Knopf für alle Tabs** (`.zl-ausklapp` in der Zeitleiste, siehe
+  dort). Die früheren Inhalts-Knöpfe `.weitere-btn`/`.weitere-pfeil` sind samt CSS
+  entfallen (27.09.2026 beim Aufräumen, sie hatten keinen Nutzer mehr). Er bedient
+  „Weitere Auswertungen" in **allen** Tabs — **alle starten zu**
   (`_weitereOffen = {overview, herz, schlaf, training}`; `training` seit 14.09.2026). In der Übersicht steckt seit
   08.09.2026 auch das **Verlaufs-Diagramm** dahinter, nicht mehr nur das
   Muster-Raster; deshalb heisst der Zustand nicht mehr `_musterOffen` und der
@@ -1483,7 +1482,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      als Streifen am oberen Rand. Der Platz darüber wächst über
      `.screen{transition: padding-top .28s}` mit. Gemessen: −56.4 → −9.1 → 0 px bei
      0/140/279 ms, Innenabstand 8 → 40.6 → 50 px.
-  4. **Balken der Einordnungs-Karten** (`balkenFuellen`, aus `_injectTopbar`):
+  4. **Balken der Einordnungs-Karten** (`balkenFuellen`, aus `_tabNachbereiten`):
      `.goal-bar-fill`/`.debt-bar-fill` trugen schon immer `transition: width .5s`, kamen
      per innerHTML aber in voller Breite an — zu sehen war davon nie etwas. Jetzt
      startet jeder Balken bei seiner **letzten** Breite (je Tab und Position gemerkt):

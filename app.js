@@ -49,6 +49,11 @@ function _checkHashToken() {
   history.replaceState(null, '', location.pathname + location.search);
   return true;
 }
+// Abgelaufenen oder abgewiesenen Token vergessen – im Speicher und im localStorage.
+function tokenVerwerfen() {
+  accessToken = null; tokenExpiry = 0;
+  try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
+}
 function _initAuth() {
   if (_checkHashToken()) return true;
   try {
@@ -105,11 +110,14 @@ function _awaitWorkoutSheet(timeoutMs = 10000) {
   });
 }
 
+// Gueltiges Tagesdatum im Format JJJJ-MM-TT. Dieselbe Pruefung fuer Health-Sheet,
+// Workout-Sheet und Zwischenspeicher – alle drei sind Daten von aussen.
+function istDatum(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+
 // ── Workout-Daten aus API-Response parsen ──────────────
-// Symbol zur Trainingsart – Stichwortsuche statt exakter Namensliste.
 function _parseWorkoutRows(rows) {
   // Sheet-Werte kommen als Strings – hier ausdruecklich in Zahlen wandeln.
-  const pN = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
+  const alsZahl = v => { if (v === null || v === undefined || v === '') return null; const n = parseFloat(v); return isNaN(n) ? null : n; };
 
   // MEHRERE Einheiten am selben Tag werden ZUSAMMENGEFASST, nicht ueberschrieben.
   // Vorher stand hier schlicht `workoutData[date] = {…}` – bei zwei Eintraegen am
@@ -119,13 +127,13 @@ function _parseWorkoutRows(rows) {
   const proTag = {};
   rows.forEach(r => {
     const date = r['Date'] || r['date'];
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return;
+    if (!date || !istDatum(String(date))) return;
     (proTag[date] = proTag[date] || []).push({
       typeRaw:  String(r['Type'] || r['type'] || '').trim(),
-      dauer:    pN(r['Duration (min)']),
-      strecke:  pN(r['Distance (km)']),
-      puls:     pN(r['Avg HR']),
-      speed:    pN(r['Speed (km/h)'])
+      dauer:    alsZahl(r['Duration (min)']),
+      strecke:  alsZahl(r['Distance (km)']),
+      puls:     alsZahl(r['Avg HR']),
+      speed:    alsZahl(r['Speed (km/h)'])
     });
   });
 
@@ -251,12 +259,26 @@ Chart.register({
   }
 });
 
-const showErr = m => {
+function fehlerZeigen(meldung) {
   document.getElementById('loading').style.display = 'none';
-  const e = document.getElementById('err-screen');
-  e.style.display = 'flex';
-  document.getElementById('err-txt').textContent = m;
-};
+  document.getElementById('err-screen').style.display = 'flex';
+  document.getElementById('err-txt').textContent = meldung;
+}
+function anmeldungZeigen() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// GET gegen die Sheets-API mit dem aktuellen Token. 401 ist kein Fehler, sondern
+// „Anmeldung noetig" – der Aufrufer entscheidet, was dann geschieht.
+// `fehlertext(res)` baut die Meldung fuer alle anderen Fehlerstatus.
+async function _sheetsAbruf(pfad, fehlertext) {
+  const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + pfad,
+    { headers: { 'Authorization': 'Bearer ' + accessToken } });
+  if (res.status === 401) return { authError: true };
+  if (!res.ok) throw new Error(await fehlertext(res));
+  return { json: await res.json() };
+}
 
 // ── Blattnamen-Zwischenspeicher ───────────────────────
 // Vor jedem Wertabruf fragte die App das Spreadsheet, wie seine Blätter heissen –
@@ -279,20 +301,16 @@ function _tabsHolen(sheetId) {
   return _tabsLaeuft[sheetId];
 }
 async function _tabsHolenJetzt(sheetId) {
-  const res = await fetch(
-    'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '?fields=sheets.properties.title',
-    { headers: { 'Authorization': 'Bearer ' + accessToken } }
-  );
-  if (res.status === 401) return { authError: true };
-  if (!res.ok) throw new Error('Sheets API Fehler ' + res.status + ': ' + await res.text());
-  const meta = await res.json();
-  const titel = (meta.sheets || []).map(x => x.properties.title);
+  const r = await _sheetsAbruf(sheetId + '?fields=sheets.properties.title',
+    async res => 'Sheets API Fehler ' + res.status + ': ' + await res.text());
+  if (r.authError) return r;
+  const titel = (r.json.sheets || []).map(x => x.properties.title);
   _tabsMerken(sheetId, titel);
   return { titel };
 }
 
-// ── Daten von Apps Script API laden ───────────────────
-// Sheets-Tab-Name ermitteln und Daten laden (wie Tesla Dashboard)
+// ── Ein Blatt aus der Google-Tabelle laden ────────────
+// Ohne `blattName` das erste Blatt der Tabelle.
 async function _fetchSheet(sheetId, blattName) {
   // Token-Ablauf proaktiv prüfen – wenn er in < 60 s abläuft, gilt er als ungültig.
   // Hier wird BEWUSST nicht mehr von selbst zur Anmeldung weitergeleitet: seit die
@@ -300,8 +318,7 @@ async function _fetchSheet(sheetId, blattName) {
   // eine Weiterleitung und risse den Nutzer aus der laufenden Ansicht. Der Aufrufer
   // entscheidet, was mit `authError` geschieht.
   if (!accessToken || Date.now() > tokenExpiry - 60_000) {
-    accessToken = null; tokenExpiry = 0;
-    try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
+    tokenVerwerfen();
     return { authError: true };
   }
   // Blattnamen aus dem Zwischenspeicher; fehlt der gesuchte, einmal frisch holen.
@@ -314,17 +331,13 @@ async function _fetchSheet(sheetId, blattName) {
   }
   const tabName = gesucht();
   if (!tabName) return { values: [], fehlt: true };   // Blatt gibt es noch nicht
-  const dataRes = await fetch(
-    'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/' + encodeURIComponent(tabName),
-    { headers: { 'Authorization': 'Bearer ' + accessToken } }
-  );
-  if (dataRes.status === 401) return { authError: true };
-  if (!dataRes.ok) throw new Error('Daten-Abruf fehlgeschlagen: ' + dataRes.status);
-  const json = await dataRes.json();
-  return { values: json.values || [] };
+  const r = await _sheetsAbruf(sheetId + '/values/' + encodeURIComponent(tabName),
+    res => 'Daten-Abruf fehlgeschlagen: ' + res.status);
+  if (r.authError) return r;
+  return { values: r.json.values || [] };
 }
 
-// Laedt alle fuenf Blaetter. `still:true` = Hintergrund-Abruf, waehrend bereits Daten
+// Laedt Health-, Workout- und Meta-Blatt. `still:true` = Hintergrund-Abruf, waehrend bereits Daten
 // aus dem Zwischenspeicher auf dem Bildschirm stehen: dann darf weder der Login-Screen
 // noch die Fehlerkarte den vorhandenen Stand ueberdecken.
 // Rueckgabe: true (geladen) | 'auth' (Anmeldung noetig) | false (Fehler).
@@ -345,52 +358,15 @@ async function loadFromAPI(opt = {}) {
       _fetchSheet(HEALTH_SHEET_ID, META_BLATT).catch(alsFehler)
     ]);
     if (health.authError) {
-      accessToken = null; tokenExpiry = 0;
-      try { localStorage.removeItem('g_token'); localStorage.removeItem('g_expiry'); } catch(_) {}
-      if (!still) {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
-      }
+      tokenVerwerfen();
+      if (!still) anmeldungZeigen();
       return 'auth';
     }
-    if (!health.values || health.values.length < 2) throw new Error('Keine Gesundheitsdaten im Sheet gefunden');
-    const hHeaders = health.values[0].map(h => h.trim());
-    const strCols = new Set(['date','sleepStart','sleepEnd']);
-    allData = health.values.slice(1).map(row => {
-      const obj = {};
-      hHeaders.forEach((h, i) => {
-        const v = (row[i] ?? '').toString().trim();
-        if (v === '') { obj[h] = null; return; }
-        obj[h] = strCols.has(h) ? v : (isNaN(v) ? v : parseFloat(v));
-      });
-      return obj;
-      // Nur echte Datumszeilen übernehmen. Vorher genügte irgendein nicht-leerer
-      // Text in der Datumsspalte – der wäre bis in die Anzeige durchgereicht worden.
-      // Das Workout-Sheet prüft schon immer nach demselben Muster.
-    }).filter(r => r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
-    if (!allData.length) throw new Error('Keine Zeile mit gültigem Datum (Format JJJJ-MM-TT) gefunden');
+    allData = _healthZeilen(health.values);
     // Export-Zeitstempel. Ein Fehlschlag aendert nichts: dann bleibt der zuletzt
     // bekannte Stempel stehen, und ohne Stempel nennt die App weiter nur den Tag.
     const _st = (meta && !meta.fehler && !meta.authError) ? _stempelAusBlatt(meta.values) : null;
     if (_st) _exportStempel = _st;
-    allData.sort((a, b) => a.date.localeCompare(b.date));
-
-    // Doppelte Datumszeilen zusammenführen.
-    // Das Apps-Script schreibt beim Refresh die letzten Tage neu; steht ein Tag danach
-    // zweimal im Sheet, zählte er bisher in JEDEN Durchschnitt doppelt – Schlaf, Puls,
-    // HRV, Schritte, Score, Baselines. Aufgefallen ist es im Schlafschuld-Tooltip, wo
-    // dieselbe Nacht mehrfach aufgelistet wurde; die Ursache lag aber im Einlesen.
-    // Zusammenführen statt Verwerfen: die spätere Zeile gewinnt, überschreibt aber
-    // keinen vorhandenen Wert mit null (eine Nachzügler-Zeile kann Felder leer lassen).
-    const _proTag = new Map();
-    allData.forEach(r => {
-      const vorhanden = _proTag.get(r.date);
-      if (!vorhanden) { _proTag.set(r.date, r); return; }
-      Object.keys(r).forEach(k => { if (r[k] != null) vorhanden[k] = r[k]; });
-    });
-    const _dubletten = allData.length - _proTag.size;
-    if (_dubletten > 0) console.info(`[Daten] ${_dubletten} doppelte Datumszeile(n) zusammengeführt.`);
-    allData = [..._proTag.values()];
     // Nur auf den neuesten Tag springen, wenn der Nutzer nicht selbst geblättert hat.
     if (!_datumSelbstGewaehlt || !referenceDate) referenceDate = allData[allData.length - 1].date;
     _analyticsCache = {}; // neue Daten → Analytics-Cache invalidieren
@@ -433,11 +409,45 @@ async function loadFromAPI(opt = {}) {
     // Im Hintergrund-Abruf bleibt der Stand aus dem Zwischenspeicher stehen – eine
     // Fehlerkarte wuerde funktionierende Daten hinter einer Meldung verstecken.
     if (still) { console.warn('[Daten] Hintergrund-Abruf fehlgeschlagen:', e.message); return false; }
-    showErr('Fehler beim Laden: ' + e.message); return false;
+    fehlerZeigen('Fehler beim Laden: ' + e.message); return false;
   }
   _lastLoadTs = Date.now();
   datenCacheSchreiben();
   return true;
+}
+
+// Rohwerte des Health-Blatts → eine Zeile je Datum, nach Datum sortiert.
+function _healthZeilen(werte) {
+  if (!werte || werte.length < 2) throw new Error('Keine Gesundheitsdaten im Sheet gefunden');
+  const kopf = werte[0].map(h => h.trim());
+  const textSpalten = new Set(['date','sleepStart','sleepEnd']);
+  const zeilen = werte.slice(1).map(row => {
+    const obj = {};
+    kopf.forEach((h, i) => {
+      const v = (row[i] ?? '').toString().trim();
+      if (v === '') { obj[h] = null; return; }
+      obj[h] = textSpalten.has(h) ? v : (isNaN(v) ? v : parseFloat(v));
+    });
+    return obj;
+    // Nur echte Datumszeilen übernehmen – irgendein Text in der Datumsspalte wäre
+    // sonst bis in die Anzeige durchgereicht worden.
+  }).filter(r => istDatum(r.date));
+  if (!zeilen.length) throw new Error('Keine Zeile mit gültigem Datum (Format JJJJ-MM-TT) gefunden');
+  zeilen.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Doppelte Datumszeilen zusammenführen. Das Apps-Script schreibt beim Refresh die
+  // letzten Tage neu; steht ein Tag danach zweimal im Sheet, zählte er sonst in JEDEN
+  // Durchschnitt doppelt. Die spätere Zeile gewinnt, überschreibt aber keinen
+  // vorhandenen Wert mit null (eine Nachzügler-Zeile kann Felder leer lassen).
+  const proTag = new Map();
+  zeilen.forEach(r => {
+    const vorhanden = proTag.get(r.date);
+    if (!vorhanden) { proTag.set(r.date, r); return; }
+    Object.keys(r).forEach(k => { if (r[k] != null) vorhanden[k] = r[k]; });
+  });
+  const dubletten = zeilen.length - proTag.size;
+  if (dubletten > 0) console.info(`[Daten] ${dubletten} doppelte Datumszeile(n) zusammengeführt.`);
+  return [...proTag.values()];
 }
 
 // ── Export-Zeitstempel aus dem Blatt `Meta` ───────────
@@ -461,8 +471,7 @@ function _stempelAusBlatt(werte) {
 // Dieselbe Pruefung fuer den Zwischenspeicher: localStorage ist von aussen
 // beschreibbar und damit nicht vertrauenswuerdiger als eine Sheet-Zelle.
 function _stempelGeprueft(s) {
-  return (s && typeof s.datum === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.datum)
-            && typeof s.zeit === 'string' && /^\d{2}:\d{2}$/.test(s.zeit))
+  return (s && istDatum(s.datum) && typeof s.zeit === 'string' && /^\d{2}:\d{2}$/.test(s.zeit))
     ? { datum: s.datum, zeit: s.zeit } : null;
 }
 
@@ -514,7 +523,7 @@ function datenCacheLesen() {
   if (!Array.isArray(d.allData) || !d.allData.length) return false;
   // Dieselbe Datumsprüfung wie beim Einlesen aus dem Sheet: der Zwischenspeicher ist
   // beschreibbar von aussen, also nicht vertrauenswürdiger als eine Sheet-Zelle.
-  const zeilen = d.allData.filter(r => r && typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  const zeilen = d.allData.filter(r => r && istDatum(r.date));
   if (!zeilen.length) return false;
   allData = zeilen;
   allData.sort((a, b) => a.date.localeCompare(b.date));
@@ -535,27 +544,14 @@ _initAuth();
 const _startAusCache = datenCacheLesen();
 if (!_startAusCache) {
   // Ohne gespeicherten Stand gibt es nichts zu zeigen – wie bisher: Login bzw. warten.
-  if (!accessToken) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'flex';
-    return;
-  }
+  if (!accessToken) { anmeldungZeigen(); return; }
   if ((await loadFromAPI()) !== true) return;
 }
 
-// ── Field detection ────────────────────────────────────
-function findField(rows, ...candidates) {
-  for (const c of candidates) {
-    if (rows.some(r => r[c] != null && r[c] !== 0 && !isNaN(r[c]))) return c;
-  }
-  return null;
-}
-
 // ── Window / filter ────────────────────────────────────
-// Die auswählbaren Bereiche stehen in _RANGE_OPTS (Quelle für das Dropdown).
-// 'heute' stand hier bis 06.09.2026 als eigener Bereich (ein einzelner Tag). Er ist
-// auf Wunsch entfallen: „Heute" ist jetzt ein Sprung auf den neuesten Ausschnitt,
-// kein Zeitraum. Diagramme zeigen damit nie mehr nur einen einzigen Tag.
+// Die auswählbaren Bereiche stehen in _RANGE_OPTS (Quelle für die Zeitleiste).
+// „Heute" ist kein Bereich, sondern ein Sprung auf den neuesten Ausschnitt
+// (aufHeuteSpringen) – Diagramme zeigen nie nur einen einzigen Tag.
 // Jahresvergleich (12.09.2026, auf Wunsch): kein Zeitraum im bisherigen Sinn, sondern
 // DERSELBE Kalendermonat in allen Jahren, die Daten haben – Sep 24, Sep 25, Sep 26
 // nebeneinander. Er laeuft als eigener Wert von `timeRange`, damit jede Stelle, die
@@ -707,18 +703,18 @@ function prevPeriod() {
 }
 
 
+// "07.09." – Tag und Monat zweistellig, Grundlage aller kurzen Datumsangaben.
+function _tagPunktMonat(dt) {
+  return String(dt.getDate()).padStart(2,'0') + '.' + String(dt.getMonth()+1).padStart(2,'0') + '.';
+}
 function fmtDayShort(d) {
   if (!d) return '–';
   const dt = new Date(d+'T00:00:00');
-  return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'+String(dt.getFullYear()).slice(-2);
+  return _tagPunktMonat(dt) + String(dt.getFullYear()).slice(-2);
 }
 
-// Hinweis: navDateLabel wurde entfernt – die Filterleiste zeigt die Zeitspanne
-// nicht mehr als Text, sie steht auf der Zeitachse der Diagramme.
-
+// Aktiv-/Inaktiv-Zustand der Blätterpfeile und von „Heute".
 function updateNavUI() {
-  // Die Zeitspanne als Text entfiel mit der neuen Filterleiste (sie steht auf der
-  // Zeitachse). Geblieben ist der Aktiv-/Inaktiv-Zustand der beiden Pfeile.
   // Zuerst die Zeitleiste, denn der Bereichsname stimmt auch ohne Daten.
   zeitleisteAktualisieren();
   if (!allData.length) return;
@@ -757,10 +753,13 @@ function updateNavUI() {
 // dort endet? EINE Quelle fuer Pfeile, Wischgeste und deren Gummiband-Verhalten.
 function _navZiel(richtung) {
   if (!referenceDate || !allData.length) return null;
-  const nr = is7D() ? addDays(referenceDate, richtung * 7) : addMonths(referenceDate, richtung);
-  if (richtung < 0 && nr < allData[0].date) return null;
-  if (richtung > 0 && nr > allData[allData.length - 1].date) return null;
-  return nr;
+  return _imDatenbestand(is7D() ? addDays(referenceDate, richtung * 7) : addMonths(referenceDate, richtung), richtung);
+}
+// Das Ziel eines Schritts – oder null, wenn es jenseits des ersten bzw. letzten Tags liegt.
+function _imDatenbestand(ziel, richtung) {
+  if (richtung < 0 && ziel < allData[0].date) return null;
+  if (richtung > 0 && ziel > allData[allData.length - 1].date) return null;
+  return ziel;
 }
 
 // Ein Schritt in eine Richtung – fuer Pfeile und Wischgeste. Bei Monatsbalken
@@ -784,10 +783,7 @@ function _navSchritt(richtung, schritte = 1) {
 // Wie _navZiel, aber um `n` Monate – fuer den Zeitstrahl-Wisch bei Monatsbalken.
 function _navZielMonate(richtung, n) {
   if (!referenceDate || !allData.length || n < 1) return null;
-  const nr = addMonths(referenceDate, richtung * n);
-  if (richtung < 0 && nr < allData[0].date) return null;
-  if (richtung > 0 && nr > allData[allData.length - 1].date) return null;
-  return nr;
+  return _imDatenbestand(addMonths(referenceDate, richtung * n), richtung);
 }
 // Wie viele Monate lassen sich in diese Richtung hoechstens blaettern?
 function _maxMonate(richtung) {
@@ -798,13 +794,6 @@ function _maxMonate(richtung) {
 
 function navPrev() { _navSchritt(-1); }   // zurück: Daten wischen nach rechts
 function navNext() { _navSchritt(1); }    // vor: Daten wischen nach links
-
-// Wisch-Animation beim Pfeil-Navigator. Verschiebt via navslide-Plugin NUR die
-// Datenfläche jedes Charts (Achsen/Gitter bleiben stehen). dir=-1 (zurück) →
-// Daten kommen von links herein (Bewegung nach rechts); dir=+1 (vor) → von rechts.
-// Sanftes, etwas längeres Ease-Out + Einblendung. Respektiert reduce-motion.
-let _navSliding = false;
-let _navSlideRAF = null;
 
 // ── Kurze Uebergaenge (18.09.2026) ──────────────────────────────────────────
 // EIN Helfer fuer die kleinen Zeichen-Animationen (Markierung, Beschriftungen,
@@ -837,7 +826,16 @@ function uebergang(dauer, proSchritt, fertig) {
   raf = requestAnimationFrame(schritt);
   return () => { vorbei = true; if (raf) cancelAnimationFrame(raf); clearTimeout(zg); };
 }
-//
+
+// `_navSliding`: waehrend eines Schritts ohne Aufbau-Animation bauen (zeichneDiagramm).
+// `_navSlideRAF`: die laufende Schiebe-/Wisch-Animation – nie zwei gleichzeitig.
+let _navSliding = false;
+let _navSlideRAF = null;
+
+// Wisch-Animation beim Pfeil-Navigator. Verschiebt via navslide-Plugin NUR die
+// Datenfläche jedes Charts (Achsen/Gitter bleiben stehen). dir=-1 (zurück) →
+// Daten kommen von links herein (Bewegung nach rechts); dir=+1 (vor) → von rechts.
+// Sanftes, etwas längeres Ease-Out + Einblendung. Respektiert reduce-motion.
 // Seit 18.09.2026 zwei Faelle:
 //  - 7T, 1M, Jahresvergleich: ein Schritt tauscht das GANZE Fenster → wie bisher
 //    weiter Weg (42 %, hoechstens 110 px) mit Einblenden.
@@ -884,24 +882,15 @@ function _animNavSlide(dir, ausnahmen, vorher, schritte = 1) {
   if (monat) los(); else requestAnimationFrame(los);
 }
 
-function setR(r) {
-  timeRange = r;
-  // Die Filter-Controls liegen jetzt in den Diagrammen und werden beim Re-Render
-  // (mit korrektem Bereich + Navigator-Sichtbarkeit) frisch aufgebaut.
+// Zeitbereich wechseln ('7d', '1m' … oder 'yoy') und neu aufbauen.
+function bereichSetzen(bereich) {
+  timeRange = bereich;
   _refreshAfterStateChange();
 }
 
 // ── Helpers ────────────────────────────────────────────
-const MO = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MO[m-1]+' '+String(y).slice(-2); }
-// Nachkommastellen nur, wo sie etwas aussagen: "25.0" wird zu "25", "25.5" bleibt.
-// (Auf Wunsch, 06.09.2026.) `Number()` um `toFixed()` herum wirft die Nullen weg —
-// das gilt auch fuer die zweite Stelle: 25.10 -> "25.1", 25.00 -> "25".
-// `dec` bleibt damit eine OBERGRENZE, keine feste Breite. Wer je eine feste Breite
-// braucht (etwa fuer eine rechtsbuendige Spalte), darf nicht `zahl()` nehmen.
-// Mittelwert eines Arrays, leere Werte uebersprungen. `mittel(rows,feld)` gibt es
-// schon fuer Zeilenobjekte – hier liegen die Werte bereits als Reihe vor.
-function mittelArr(a) { const f=(a||[]).filter(v=>v!=null); return f.length?f.reduce((x,y)=>x+y,0)/f.length:null; }
+const MONAT_KURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+function fmtM(ym) { if (!ym) return '—'; const [y,m] = ym.split('-').map(Number); return MONAT_KURZ[m-1]+' '+String(y).slice(-2); }
 
 // Wochen in einem Zeitraum – als Kommazahl. Ein Monat ist NICHT "vier Wochen":
 // 28 Tage sind 4.00, 31 Tage 4.43. Wer rund rechnet, liegt je nach Monat um bis zu
@@ -917,6 +906,11 @@ function wochenImMonat(monatsKey) {
   return (j && m) ? new Date(j, m, 0).getDate() / 7 : null;
 }
 
+// Nachkommastellen nur, wo sie etwas aussagen: "25.0" wird zu "25", "25.5" bleibt.
+// (Auf Wunsch, 06.09.2026.) `Number()` um `toFixed()` herum wirft die Nullen weg —
+// das gilt auch fuer die zweite Stelle: 25.10 -> "25.1", 25.00 -> "25".
+// `dec` bleibt damit eine OBERGRENZE, keine feste Breite. Wer je eine feste Breite
+// braucht (etwa fuer eine rechtsbuendige Spalte), darf nicht `zahl()` nehmen.
 function zahl(v, dec=1) { return v == null ? '—' : String(Number(Number(v).toFixed(dec))); }
 
 // ── Text aus fremder Quelle entschärfen ────────────────
@@ -934,29 +928,35 @@ function esc(s) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function prozentDiff(curr, prev) { if (curr==null||prev==null||prev===0) return null; return ((curr-prev)/Math.abs(prev))*100; }
+// Gueltige Zahlen aus Zeilen (`field` gesetzt) oder aus einer blossen Werte-Reihe.
+function _werte(arr, field) {
+  return (arr || []).map(r => field ? r[field] : r).filter(v => v != null && !isNaN(v));
+}
 function mittel(arr, field) {
-  const vals = arr.map(r => field ? r[field] : r).filter(v => v != null && !isNaN(v));
+  const vals = _werte(arr, field);
   return vals.length ? vals.reduce((a,b) => a+b, 0)/vals.length : null;
 }
+// Mittelwert einer Werte-Reihe, leere Werte uebersprungen.
+function mittelArr(a) { return mittel(a); }
 function standardabw(arr, field) {
-  const vals = arr.map(r => field ? r[field] : r).filter(v => v != null && !isNaN(v));
+  const vals = _werte(arr, field);
   if (vals.length < 2) return null;
   const m = vals.reduce((a,b)=>a+b,0)/vals.length;
   return Math.sqrt(vals.map(v=>(v-m)**2).reduce((a,b)=>a+b,0)/vals.length);
 }
-function trendLabel() { return 'vs. Vorperiode'; }
-function monatsMittel(rows, field) {
+// Ein Wert je Zeitraum-Schluessel (Monat, Wochenmontag …), passend zu `schluessel`
+// ausgerichtet: Mittel oder Summe der Zeilen, deren `gruppeVon(date)` ihn liefert.
+// Zeitraeume ohne Wert bleiben null.
+function _gruppenReihe(schluessel, rows, field, gruppeVon, art) {
   const b = {};
-  rows.forEach(r => { if(r[field]==null) return; const mo=r.date.slice(0,7); if(!b[mo])b[mo]={sum:0,n:0}; b[mo].sum+=r[field]; b[mo].n++; });
-  return Object.entries(b).sort((a,x)=>a[0].localeCompare(x[0])).map(([mo,{sum,n}])=>({mo,v:sum/n}));
-}
-function monatsSumme(rows, field) {
-  const b = {};
-  rows.forEach(r => { if(r[field]==null) return; const mo=r.date.slice(0,7); b[mo]=(b[mo]||0)+r[field]; });
-  return Object.entries(b).sort((a,x)=>a[0].localeCompare(x[0])).map(([mo,v])=>({mo,v}));
+  rows.forEach(r => {
+    if (r[field] == null) return;
+    const g = b[gruppeVon(r.date)] = b[gruppeVon(r.date)] || { sum: 0, n: 0 };
+    g.sum += r[field]; g.n++;
+  });
+  return schluessel.map(k => b[k] ? (art === 'summe' ? b[k].sum : b[k].sum / b[k].n) : null);
 }
 function allMonths(rows) { return [...new Set(rows.map(r=>r.date.slice(0,7)))].sort(); }
-function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])); return mos.map(m2=>m[m2]??null); }
 // Dauer-Beschriftung in den Diagrammen: "1:37" (Stunden:Minuten, Minuten immer
 // zweistellig) und "28'" fuer alles unter einer Stunde – auf Wunsch, 12.09.2026;
 // vorher "1h 37m" bzw. "38m".
@@ -968,17 +968,21 @@ function alignByMo(mos, arr) { const m=Object.fromEntries(arr.map(x=>[x.mo,x.v])
 // 40 % schmaler als "7h 25m" und passt auch neben 24 Nachbarn in eine Zeile.
 // alsStdMin() bleibt daneben bestehen – Tooltips, Fusszeilen und Kacheln schreiben
 // weiter "7h 25m", wo genug Platz ist und der Text fuer sich stehen muss.
+// Stunden → [ganze Stunden, Minuten]; eine auf 60 gerundete Minute laeuft ueber.
+function _stundenMinuten(h) {
+  let st = Math.floor(h), mi = Math.round((h % 1) * 60);
+  if (mi === 60) { st++; mi = 0; }
+  return [st, mi];
+}
 function stdMinLabel(stunden) {
   if (stunden == null) return '';
-  let st = Math.floor(stunden), mi = Math.round((stunden % 1) * 60);
-  if (mi === 60) { st++; mi = 0; }
+  const [st, mi] = _stundenMinuten(stunden);
   return st ? st + ':' + String(mi).padStart(2, '0') : mi + "'";
 }
 
 function alsStdMin(h) {
   if (h == null) return '—';
-  let st = Math.floor(h), mi = Math.round((h % 1) * 60);
-  if (mi === 60) { st++; mi = 0; }
+  const [st, mi] = _stundenMinuten(h);
   return st + 'h ' + String(mi).padStart(2,'0') + 'm';
 }
 // Pace: km/h → min/km, plus einheitliche Darstellung 5'30".
@@ -999,9 +1003,23 @@ function fmtPace(minPerKm) {
   return `${m}'${String(s).padStart(2,'0')}"`;
 }
 function fmtHHMM(h) { if(h==null) return '—'; const hh=Math.floor(h)%24; const mm=Math.round((h%1)*60)%60; return hh.toString().padStart(2,'0')+':'+mm.toString().padStart(2,'0'); }
-function parseTV(val) { if(val==null)return null; if(typeof val==='number'&&!isNaN(val))return val; if(typeof val==='string'){const dt=val.match(/\d{4}-\d{2}-\d{2}\s+(\d{2}):(\d{2})/);if(dt)return parseInt(dt[1])+parseInt(dt[2])/60; const t=val.match(/^(\d{1,2}):(\d{2})/);if(t)return parseInt(t[1])+parseInt(t[2])/60;} return null; }
-function avgCircTime(rows,field,isSleepOnset){ if(!field)return null; const vals=rows.map(r=>parseTV(r[field])).filter(v=>v!=null); if(!vals.length)return null; const norm=isSleepOnset?vals.map(h=>h<12?h+24:h):vals; const avg=norm.reduce((a,b)=>a+b,0)/norm.length; return avg>=24?avg-24:avg; }
-function findAnyField(rows,...cands){ for(const c of cands){if(rows.some(r=>r[c]!=null))return c;} return null; }
+// Uhrzeit aus einer Sheet-Zelle ("23:14" oder "2026-09-07 23:14") → Stunden als Zahl.
+function parseTV(val) {
+  if (val == null) return null;
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  if (typeof val !== 'string') return null;
+  const m = val.match(/\d{4}-\d{2}-\d{2}\s+(\d{2}):(\d{2})/) || val.match(/^(\d{1,2}):(\d{2})/);
+  return m ? parseInt(m[1]) + parseInt(m[2]) / 60 : null;
+}
+// Mittlere Uhrzeit. Einschlafzeiten vor Mittag zaehlen als nach Mitternacht (+24 h),
+// sonst laege 00:30 im Mittel sieben Stunden vor 23:30.
+function avgCircTime(rows, field, isSleepOnset) {
+  const vals = rows.map(r => parseTV(r[field])).filter(v => v != null);
+  if (!vals.length) return null;
+  const norm = isSleepOnset ? vals.map(h => h < 12 ? h + 24 : h) : vals;
+  const avg = norm.reduce((a, b) => a + b, 0) / norm.length;
+  return avg >= 24 ? avg - 24 : avg;
+}
 
 // ── Wochentag / Wochenende ─────────────────────────────
 // Dieselbe Zerlegung stand vorher an 14 Stellen wortwörtlich im Code – jede
@@ -1036,51 +1054,33 @@ function isoKW(dateStr) {
 function weekDays7() {
   if (!referenceDate) return [];
   const mon = getWeekMonday(referenceDate);
-  return Array.from({length:7}, (_,i) => { const d=new Date(mon+'T00:00:00'); d.setDate(d.getDate()+i); return toLocalDateStr(d); });
-}
-function wochenMittel(rows, field) {
-  const b = {};
-  rows.forEach(r => { if(r[field]==null) return; const w=getWeekMonday(r.date); if(!b[w])b[w]={sum:0,n:0}; b[w].sum+=r[field]; b[w].n++; });
-  return Object.entries(b).sort((a,x)=>a[0].localeCompare(x[0])).map(([w,{sum,n}])=>({w,v:sum/n}));
-}
-function wochenSumme(rows, field) {
-  const b = {};
-  rows.forEach(r => { if(r[field]==null) return; const w=getWeekMonday(r.date); b[w]=(b[w]||0)+r[field]; });
-  return Object.entries(b).sort((a,x)=>a[0].localeCompare(x[0])).map(([w,v])=>({w,v}));
+  return Array.from({length:7}, (_,i) => addDays(mon, i));
 }
 function allWeeks(rows) { return [...new Set(rows.map(r=>getWeekMonday(r.date)))].sort(); }
-function alignByWeek(weeks,arr) { const m=Object.fromEntries(arr.map(x=>[x.w,x.v])); return weeks.map(w=>m[w]??null); }
 // Zweizeilige Achsenbeschriftung für Tagesauflösung: Wochentag über dem Datum.
 // Chart.js rendert ein Array als mehrzeiligen Tick – erster Eintrag oben.
 const WOCHENTAG_KURZ = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 function wochentagKurz(dateStr) { return WOCHENTAG_KURZ[new Date(dateStr+'T00:00:00').getDay()]; }
-function tagLabel(dateStr) {
-  const dt = new Date(dateStr+'T00:00:00');
-  return [wochentagKurz(dateStr),
-          String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'];
+function tagLabel(dateStr) { return [wochentagKurz(dateStr), fmtWeek(dateStr)]; }
+function fmtWeek(w) { return _tagPunktMonat(new Date(w+'T00:00:00')); }
+
+// Tagesauflösung (7T, 1M): eine Säule je Tag aus `days`.
+function _tagesDim(days, rows) {
+  const byDate = {};
+  rows.forEach(r => { byDate[r.date] = r; });
+  const align = field => days.map(d => byDate[d]?.[field] ?? null);
+  return { labels: days.map(tagLabel), align, alignSum: align,
+           hasData: days.some(d => d in byDate), keys: days, keyTyp: 'tag' };
 }
-function fmtWeek(w) { const dt=new Date(w+'T00:00:00'); return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0')+'.'; }
 
 // granular=true → weekly buckets for 1M/3M (line charts); false → monthly (bar charts)
 function timeDim(rows, granular=false, keepAggregated=false) {
-  if (is7D()) {
-    const days = weekDays7();
-    const byDate = {};
-    rows.forEach(r => { byDate[r.date] = r; });
-    const labels = days.map(tagLabel);
-    const align = field => days.map(d => byDate[d]?.[field] ?? null);
-    return { labels, align, alignSum:align, hasData:days.some(d => d in byDate), keys:days, keyTyp:'tag' };
-  }
-  // Daily data for 1M
+  if (is7D()) return _tagesDim(weekDays7(), rows);
+  // 1M: jeder Kalendertag des Monats
   if (timeRange==='1m' && !keepAggregated) {
-    const mw=moWindow();
-    const byDate={};
-    rows.forEach(r=>{byDate[r.date]=r;});
-    const days=[];
-    if(mw){let d=new Date(mw.s+'T00:00:00');const end=new Date(mw.e+'T00:00:00');while(d<=end){days.push(toLocalDateStr(d));d.setDate(d.getDate()+1);}}
-    const labels=days.map(tagLabel);
-    const align=field=>days.map(d=>byDate[d]?.[field]??null);
-    return{labels,align,alignSum:align,hasData:days.some(d=>d in byDate),keys:days,keyTyp:'tag'};
+    const mw = moWindow(), days = [];
+    if (mw) for (let d = mw.s; d <= mw.e; d = addDays(d, 1)) days.push(d);
+    return _tagesDim(days, rows);
   }
   if (granular && (timeRange==='1m' || timeRange==='3m')) {
     const weeks = allWeeks(rows);
@@ -1091,24 +1091,25 @@ function timeDim(rows, granular=false, keepAggregated=false) {
     const labels = weeks.map(w => fmtWeek(filterStart && w < filterStart ? filterStart : w));
     return {
       labels,
-      align: field => alignByWeek(weeks, wochenMittel(rows, field)),
-      alignSum: field => alignByWeek(weeks, wochenSumme(rows, field)),
+      align: field => _gruppenReihe(weeks, rows, field, getWeekMonday, 'mittel'),
+      alignSum: field => _gruppenReihe(weeks, rows, field, getWeekMonday, 'summe'),
       hasData: weeks.length > 0,
       keys: weeks, keyTyp: 'woche'
     };
   }
   const mos = allMonths(rows);
+  const monatVon = d => d.slice(0, 7);
   return {
     labels: mos.map(fmtM),
-    align: field => alignByMo(mos, monatsMittel(rows, field)),
-    alignSum: field => alignByMo(mos, monatsSumme(rows, field)),
+    align: field => _gruppenReihe(mos, rows, field, monatVon, 'mittel'),
+    alignSum: field => _gruppenReihe(mos, rows, field, monatVon, 'summe'),
     hasData: mos.length > 0,
     keys: mos, keyTyp: 'monat'
   };
 }
 
 // ═══════════════════════════════════════════════════════════
-// Zeitraum-Schlüssel, Wochenend-Tönung und app-weite Markierung
+// Zeitraum-Schlüssel, Wochentrenner und app-weite Markierung
 // ═══════════════════════════════════════════════════════════
 // Jedes Diagramm meldet über cfg.__keys, welcher Zeitraum hinter welcher Säule
 // steckt, und über cfg.__keyTyp dessen Auflösung ('tag' | 'woche' | 'monat').
@@ -1145,7 +1146,7 @@ function _cssFarbe(name, fallback) {
   return v || fallback;
 }
 
-// ── Ebene 1: Wochenenden tönen (nur bei Tagesauflösung) ──
+// ── Ebene 1: Wochentrenner (nur im 1M-Fenster) ──
 // Feiner Strich am Wochenanfang – nur im 1M-Fenster, wo eine ganze Kalenderwoche
 // als Block erkennbar sein soll. Die frueher getoenten Wochenendspalten sind
 // entfallen: sie legten eine zweite Flaeche unter die Daten und stoerten dort, wo
@@ -1174,7 +1175,7 @@ const wochentrennerPlugin = {
   }
 };
 
-// ── Ebene 2: markierte Säule tönen + einrahmen (vor den Daten) ──
+// ── Ebene 2: markierte Säule tönen (vor den Daten) ──
 const markierungPlugin = {
   id: 'markierung',
   beforeDatasetsDraw(chart) {
@@ -1299,20 +1300,12 @@ function _chartTipp(chart, evt) {
 }
 
 // ── Datenbeschriftungen ueber Balken und Punkten ─────────────────────────────
-// Nur im QUERFORMAT und nur, wo ein Diagramm sie ueber `cfg.__werteFmt` anfordert
-// (derzeit die vier Karten des Training-Tabs). Im Hochformat ist die Karte halb so
-// breit — dort stuenden die Zahlen bei einem Monatsfenster als graues Band ueber
-// den Balken.
-//
-// Die Entscheidung faellt beim ZEICHNEN, nicht beim Aufbau des Tabs. Chart.js
+// Nur, wo ein Diagramm sie ueber `cfg.__werteFmt` anfordert. Ob sie zu sehen sind,
+// entscheidet `beschriftungAn()` beim ZEICHNEN, nicht beim Aufbau des Tabs: Chart.js
 // zeichnet bei jeder Groessenaenderung ohnehin neu, dadurch kommen und gehen die
-// Zahlen beim Drehen des Geraets von selbst — ohne dass `_renderTab` laufen muss.
-//
-// Ueberlappungen loest es selbst: gezeichnet wird von links nach rechts, und was
-// nicht mehr neben die zuletzt gesetzte Zahl passt, faellt weg. Lieber einzelne
-// Werte auslassen als eine unlesbare Reihe. Deshalb braucht es auch keine
-// Sonderregel je Zeitraum: bei 7T steht ueber jedem Balken eine Zahl, bei 1M nur
-// ueber so vielen, wie nebeneinander Platz haben.
+// Zahlen beim Drehen des Geraets von selbst.
+// Ueberlappungen loest das Plugin selbst (belegte Rechtecke, siehe unten) – lieber
+// einzelne Werte auslassen als eine unlesbare Reihe.
 // ── Datenbeschriftungen: Standard und Wunsch des Nutzers ─────────────────────
 // Ein Tipp auf den Kartentitel schaltet die Zahlen eines Diagramms um (auf Wunsch,
 // 08.09.2026) — unabhaengig von Zeitraum und Ausrichtung, und die Wahl bleibt
@@ -1451,6 +1444,10 @@ function _werteBlenden(liste, an) {
 // `$hlBlende` = { art: 'oe'|'ziel', alpha } wirkt auf jeden Datensatz dieser Art;
 // in Ruhepuls & HRV schaltet ein Schalter beide Ø-Linien, beide blenden gemeinsam.
 const HL_DAUER = 220;
+// Hilfslinie einer Art: 'ziel' (Label „Ziel …“) oder 'oe' (Label „Ø …“).
+// Hilfslinie ueberhaupt (Ø oder Ziel) – dieselbe Regel fuer Tooltip, Beschriftung
+// und alle Verschiebe-Plugins.
+function _istHilfslinienLabel(l) { return /^(Ø|Ziel)/.test(l || ''); }
 function _istHilfslinie(ds, art) { return (art === 'ziel' ? /^Ziel/ : /^Ø/).test(ds.label || ''); }
 const hilfslinienBlende = {
   id: 'hilfslinienBlende',
@@ -1536,7 +1533,6 @@ function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY(); 
 function _zwischen(wert, ziel, spiel = 0) {
   return Math.max(Math.min(0, ziel) - spiel, Math.min(Math.max(0, ziel) + spiel, wert));
 }
-const _istHilfslinienLabel = l => /^(Ø|Ziel)/.test(l || '');
 
 // Vor dem Neuaufbau: wie sieht jedes Diagramm des sichtbaren Tabs gerade aus?
 function _spaltenMerken() {
@@ -1629,7 +1625,7 @@ function _spaltenPlan(c, v, richtung, schritte = 1) {
   });
   const linien = [];
   c.data.datasets.forEach(ds => {
-    if (!/^Ø/.test(ds.label || '')) return;
+    if (!_istHilfslinie(ds, 'oe')) return;
     const alt = v.hl.find(h => h.label === ds.label);
     const nach = ds.data.find(w => w != null);
     if (!alt || alt.wert == null || nach == null || alt.wert === nach) return;
@@ -1885,7 +1881,7 @@ Chart.register(wochentrennerPlugin, markierungPlugin, werteLabelPlugin, hilfslin
   });
 })();
 
-function killCharts() {
+function alleDiagrammeZerstoeren() {
   Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
   Object.keys(charts).forEach(k => delete charts[k]);
 }
@@ -1893,22 +1889,21 @@ function zeichneDiagramm(id, cfg) {
   const el = document.getElementById(id);
   if (!el) return null;
   if (charts[id]) { try { charts[id].destroy(); } catch(e){} }
-  // Während einer Pfeil-Navigation die Aufbau-Animation abschalten – die seitliche
-  // Wisch-Bewegung übernimmt _animNavSlide (sonst zwei konkurrierende Animationen).
-  if (_navSliding) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
-  // Dasselbe, wo sich die Daten nicht aendern (Hilfslinie, Ausklappen): siehe _ruhigRendern.
-  if (_ruhigeIds && _ruhigeIds.has(id)) { cfg.options = cfg.options || {}; cfg.options.animation = false; }
+  cfg.options = cfg.options || {};
+  // Ohne Aufbau-Animation bauen: während einer Pfeil-Navigation (die seitliche
+  // Bewegung übernimmt _animNavSlide) und wo sich die Daten nicht ändern
+  // (Hilfslinie, Ausklappen – siehe _ruhigRendern).
+  if (_navSliding || (_ruhigeIds && _ruhigeIds.has(id))) cfg.options.animation = false;
   // Platz fuer die Datenbeschriftungen ueber dem hoechsten Balken (siehe LABEL_LUFT).
   // An EINER Stelle fuer alle Diagramme: jedes einzeln zu bedenken hiesse, dass das
   // naechste neue Diagramm es wieder vergisst. Kein Diagramm setzt `layout` selbst.
   if (cfg.__werteFmt) {
-    cfg.options = cfg.options || {};
     cfg.options.layout = cfg.options.layout || {};
     cfg.options.layout.padding = Object.assign({ top: LABEL_LUFT }, cfg.options.layout.padding);
   }
   charts[id] = new Chart(el, cfg);
   // Zeitraum-Schlüssel am Chart hinterlegen (siehe Kern-Block oben) und den Tipp
-  // verkabeln. Ohne __keys bleibt ein Diagramm von Wochenend-Tönung und Markierung
+  // verkabeln. Ohne __keys bleibt ein Diagramm von Wochentrenner und Markierung
   // unberührt – so lassen sich einzelne Diagramme bewusst ausnehmen.
   charts[id].$keys   = cfg.__keys   || null;
   charts[id].$keyTyp = cfg.__keyTyp || null;
@@ -1923,7 +1918,7 @@ function zeichneDiagramm(id, cfg) {
   // faellt es nicht auf, das erste Bild kommt erst im naechsten Frame. Gesehen beim
   // Ausklappen und beim Hilfslinien-Schalter (beide ueber `_ruhigRendern`, 18.09.2026);
   // beim Blaettern ueberdeckte es die `navslide`-Animation, die ohnehin neu zeichnet.
-  if (cfg.options && cfg.options.animation === false) { try { charts[id].draw(); } catch(_) {} }
+  if (cfg.options.animation === false) { try { charts[id].draw(); } catch(_) {} }
   if (charts[id].$keys) {
     el.addEventListener('click', e => _chartTipp(charts[id], e));
     el.style.cursor = 'pointer';
@@ -1948,7 +1943,7 @@ function zeichneDiagramm(id, cfg) {
 // unerreichbar. Jetzt: Antippen öffnet, erneutes Antippen oder ein Tipp daneben
 // schliesst; auf dem Desktop funktioniert Hover unverändert weiter.
 //
-// Betroffen sind drei Bauarten, die absichtlich verschieden bleiben:
+// Zwei Bauarten, die absichtlich verschieden bleiben:
 //   .debt-tt-wrap      → Tooltip-Element im DOM, wird frei positioniert
 //   .info-i            → Erklärungskasten als .info-tt-Element im Anker
 const TT_TAP_SELECTOR = '.debt-tt-wrap, .info-i';
@@ -1993,8 +1988,6 @@ function openTooltip(el) {
     if (!tt) { _ttOpenEl = null; return; }
     el.classList.add('tt-open');                        // erst sichtbar, dann messen
     _placeTooltip(tt, rect, 220, 110);
-  } else {
-    el.classList.add('tt-open');                        // reine CSS-Tooltips
   }
 }
 
@@ -2026,8 +2019,8 @@ window.addEventListener('scroll', () => { if (_ttOpenEl) closeTooltips(); }, tru
 
 // Nur waagrechte Gitterlinien: die senkrechten trennten lediglich die Kategorien,
 // die ohnehin durch die Achsenbeschriftung getrennt sind.
-const gx = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}}};
-const gy = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:10}}};
+const achseX = {grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}}};
+const achseY = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:10}}};
 
 // ═══════════════════════════════════════════════════════════
 // Zielwerte – EINE Quelle für alle Soll/Ist-Vergleiche
@@ -2054,20 +2047,13 @@ function zielErfuellt(key, wert) {
   if (!z || wert == null) return null;
   return z.richtung === 'hoch' ? wert >= z.ziel : wert <= z.ziel;
 }
-// Hinweis: zielBadge wurde entfernt – die Marke sass ausschliesslich in der
-// Trend-Karte der Uebersicht. Mit ihr entfiel auch zielText, das nur von zielBadge
-// gebraucht wurde. zielErfuellt bleibt: die Statuszeile oben nutzt es weiter.
 // Tooltip-Filter: Hilfslinien (Ø-Linie, Ziellinie) sind Orientierung, keine Messwerte –
 // sie gehören nicht in die Werteliste beim Antippen eines Datenpunkts.
-const nurMesswerte = item => !/^(Ø|Ziel)/.test(item.dataset.label || '');
+const nurMesswerte = item => !_istHilfslinienLabel(item.dataset.label);
 
-// ── Gestrichelte Ø-Linien im Training-Tab (auf Wunsch, 07.09.2026) ────────────
-// Der Zustand liegt AUSSERHALB der Seitenfunktion, sonst waere er nach jedem
-// Neuaufbau des Tabs zurueckgesetzt – derselbe Grund wie beim frueheren
-// `_kombiAktiv`. Fehlender Eintrag heisst "an".
-//
-// Fuer Herz und Schlaf gilt weiterhin die aeltere Regel „Ø gehoert in die
-// Fusszeile"; im Training-Tab war die Linie ausdruecklich gewuenscht.
+// ── Ein-/ausblendbare Hilfslinien (Ø, Ziel) ─────────────────────────────────
+// Der Zustand liegt AUSSERHALB der Seitenfunktionen, sonst waere er nach jedem
+// Neuaufbau des Tabs zurueckgesetzt. Fehlender Eintrag heisst "an".
 // Schluessel ist '<canvas-id>|<art>' mit art = 'oe' oder 'ziel'. Ein Diagramm kann
 // beide haben (Schlafdauer, VO2max), und zwei Diagramme duerfen sich nicht
 // gegenseitig schalten – deshalb die Canvas-ID im Schluessel.
@@ -2115,9 +2101,9 @@ function zielLinie(key, laenge, achse) {
   };
 }
 
-// ── Statuszeile: alle Ziele auf einen Blick ────────────
+// ── Ziel-Karte: alle Ziele auf einen Blick ─────────────
 // Beantwortet beim Öffnen der App die Frage "liegt gerade etwas ausserhalb?",
-// ohne dass durch fünf Tabs gescrollt werden muss.
+// ohne dass durch die Tabs gescrollt werden muss.
 function zielUebersichtHTML() {
   const last = allData[allData.length-1] || {};
   const letzte7 = allData.slice(-7);
@@ -2165,7 +2151,6 @@ const ERKLAERUNG = {
   pace:       'Pace: benötigte Zeit pro Kilometer. Weniger ist besser (schneller).',
   baseline:   'Baseline: dein eigener Durchschnitt der letzten 30 Tage. Verglichen wird also mit dir selbst, nicht mit Richtwerten.'
 };
-// Antippbares Fragezeichen. Nutzt das zentrale Tooltip-System (Maus + Finger).
 // Erklärt, wie die Zahl auf einer Minikachel der Übersicht zu lesen ist.
 // Bewusst je Kennzahl formuliert statt eines allgemeinen Satzes: entscheidend ist,
 // in welche Richtung eine Abweichung gut ist – das unterscheidet sich pro Wert.
@@ -2189,19 +2174,13 @@ function _infoAnker(text) {
 function infoI(key)     { return _infoAnker(ERKLAERUNG[key]); }
 function infoMini(key)  { return _infoAnker(ERKLAERUNG_MINI[key]); }
 
-// Hinweis: computeHealthScore/scoreCat wurden entfernt – die Score-Karte auf der
-// Uebersicht ist auf Wunsch weggefallen und war ihr einziger Aufrufer.
-
 // ─────────────────────────────────────────────────────────
 // ── Coaching Helpers ───────────────────────────────────
 // ─────────────────────────────────────────────────────────
 
-// Calculate average of a field over the last N days of allData (memoisiert)
+// Mittelwert eines Felds über die letzten N Tage von allData (memoisiert)
 function calculateBaseline(field, nDays) {
-  return _memo('baseline:'+field+':'+nDays, () => {
-    const rows = allData.slice(-nDays).filter(r => r[field] != null);
-    return rows.length ? rows.reduce((s,r) => s+r[field], 0)/rows.length : null;
-  });
+  return _memo('baseline:'+field+':'+nDays, () => mittel(allData.slice(-nDays), field));
 }
 
 // % deviation of current from baseline (positive = above baseline)
@@ -2210,9 +2189,8 @@ function calculateDeviation(current, baseline) {
   return ((current - baseline) / baseline) * 100;
 }
 
-// Sleep debt: target minus actual, in hours
-// SLEEP_TARGET_H is the personal nightly goal
-const SLEEP_TARGET_H = 7.5;
+// Schlafschuld: Ziel minus tatsächlicher Schlaf, in Stunden.
+const SLEEP_TARGET_H = ZIELE.sleepTotal.ziel;
 // Bezugsgröße ist durchgehend das übergebene Fenster (aktuell: 14 Nächte).
 // `perNight` ist der eigentliche Kennwert – die Summe allein sagt nichts aus,
 // solange die Anzahl der Nächte nicht dabei steht.
@@ -2233,47 +2211,28 @@ function sleepDebtLevel(perNight) {
   return                         { color:'#10B981', label:'Ziel erreicht' };
 }
 
-// Hinweis: Die frühere classifySleepConsistency wurde entfernt – ihr Ergebnis
-// wurde nirgends angezeigt, und sie enthielt eine doppelte Streuungsberechnung
-// (eine davon ungenutzt). Die Konsistenz-Einstufung auf dem Schlaf-Tab kommt
-// aus consGrade(), das auf dem gewählten Zeitfenster arbeitet.
-
-// ── Main Daily Recommendation Logic ───────────────────
-// Returns {status, statusColor, badge, text, action}
-// THRESHOLDS are centralised here so they're easy to adjust
+// ── Schwellen für Belastungswarnung und Herz-Kreislauf-Einordnung ─────────
+// Abweichung vom eigenen 30-Tage-Schnitt in Prozent bzw. Schlaf in Stunden.
 const COACHING_THRESHOLDS = {
-  hvDevGood:     5,   // HRV >5% above 30d baseline → good signal
-  hvDevBad:     -10,  // HRV >10% below 30d baseline → bad signal
-  hrDevGood:    -3,   // HR >3% below 30d baseline → good signal
-  hrDevBad:      5,   // HR >5% above 30d baseline → bad signal
-  sleepGoodH:    7.5, // ≥7.5h → good sleep
-  sleepBadH:     6.0, // <6.0h → bad sleep
+  hvDevGood:     5,   // HRV >5% über Baseline → gutes Zeichen
+  hvDevBad:     -10,  // HRV >10% unter Baseline → Belastung
+  hrDevGood:    -3,   // Ruhepuls >3% unter Baseline → gutes Zeichen
+  hrDevBad:      5,   // Ruhepuls >5% über Baseline → Belastung
+  sleepBadH:     6.0, // unter 6h → zu wenig Schlaf
 };
-// Hinweis: getDailyRecommendation/_computeDailyRecommendation wurden entfernt –
-// die Kachel "Heutige Empfehlung" auf der Uebersicht ist auf Wunsch weggefallen und
-// war ihr einziger Aufrufer. COACHING_THRESHOLDS bleibt: die Belastungswarnung
-// (detectWarningSignals) nutzt dieselben Schwellen weiter.
 
-// ── Multi-signal Warning Logic ─────────────────────────
-// Returns null or {signals:[], text}
-// A warning triggers when ≥3 of the following signals are present simultaneously
+// ── Belastungswarnung ──────────────────────────────────
+// null oder {signals:[], text}. Sie erscheint erst, wenn alle drei Signale
+// gleichzeitig vorliegen.
 function detectWarningSignals() { return _memo('warningSignals', _computeWarningSignals); }
 function _computeWarningSignals() {
   const last = allData[allData.length-1];
   if (!last) return null;
-  const bl30 = {
-    hrv:   calculateBaseline('hrv',   30),
-    hr:    calculateBaseline('restHR',30),
-    sleep: calculateBaseline('sleepTotal',30)
-  };
   const signals = [];
-  // Sleep under target
   if (last.sleepTotal != null && last.sleepTotal < COACHING_THRESHOLDS.sleepBadH) signals.push('Schlafdauer unter Ziel');
-  // HRV significantly below baseline
-  const devHRV = calculateDeviation(last.hrv, bl30.hrv);
+  const devHRV = calculateDeviation(last.hrv, calculateBaseline('hrv', 30));
   if (devHRV != null && devHRV <= COACHING_THRESHOLDS.hvDevBad) signals.push('HRV unter Baseline');
-  // HR significantly above baseline
-  const devHR = calculateDeviation(last.restHR, bl30.hr);
+  const devHR = calculateDeviation(last.restHR, calculateBaseline('restHR', 30));
   if (devHR != null && devHR >= COACHING_THRESHOLDS.hrDevBad) signals.push('Ruhepuls erhöht');
 
   if (signals.length < 3) return null;
@@ -2303,13 +2262,10 @@ function _computePatternInsights() {
   const insights = [];
   if (allData.length < 14) return insights;
 
-  // Helper: build date → row lookup
   const byDate = {};
   allData.forEach(r => { byDate[r.date] = r; });
-  // Nutzt addDays (lokale Zeitrechnung). Die frühere eigene Variante rechnete über
-  // toISOString nach UTC um und lieferte in CH denselben statt des nächsten Tages.
   const nextDay = dateStr => addDays(dateStr, 1);
-  // Helper: linear trend slope (positive = rising)
+  // Steigung der Regressionsgeraden je Messpunkt (positiv = steigend)
   function linTrend(rows, field) {
     const pts = rows.map((r,i)=>({x:i,y:r[field]})).filter(p=>p.y!=null);
     if (pts.length < 7) return null;
@@ -2361,21 +2317,24 @@ function _computePatternInsights() {
     }
   }
 
-  // Insight 4: Training → HRV am Folgetag
+  // Insight 4/5: Training → HRV bzw. Ruhepuls am Folgetag.
   // Trainingstage aus dem Workout-Sheet – dieselbe Regel wie ueberall sonst in der App.
-  // Frueher stand hier `r.runSpeed != null`, also ein Feld des Health-Sheets: Indoor-
-  // Laeufe ohne GPS fehlten dadurch, obwohl sie als Training erfasst waren.
   const trainDates = new Set(Object.keys(workoutData).filter(d=>workoutData[d]?.durationMin>0));
-  if (trainDates.size >= 5) {
-    const afterTrain=[], afterRest=[];
+  // Mittelwert von `feld` an Tagen nach einem Training bzw. nach einem Ruhetag
+  // (je mindestens drei Tage, sonst null).
+  const nachTraining = feld => {
+    const nachT=[], nachR=[];
     allData.forEach(r => {
-      if (r.hrv==null) return;
-      const prevStr = addDays(r.date, -1); // lokal, nicht über UTC (sonst zwei Tage zurück)
-      if (trainDates.has(prevStr)) afterTrain.push(r);
-      else if (byDate[prevStr]) afterRest.push(r);
+      if (r[feld]==null) return;
+      const vortag = addDays(r.date, -1);
+      if (trainDates.has(vortag)) nachT.push(r);
+      else if (byDate[vortag]) nachR.push(r);
     });
-    const hvTrain = afterTrain.length>=3?mittel(afterTrain,'hrv'):null;
-    const hvRest  = afterRest.length >=3?mittel(afterRest, 'hrv'):null;
+    return { training: nachT.length>=3 ? mittel(nachT,feld) : null,
+             ruhe:     nachR.length>=3 ? mittel(nachR,feld) : null };
+  };
+  if (trainDates.size >= 5) {
+    const { training: hvTrain, ruhe: hvRest } = nachTraining('hrv');
     if (hvTrain&&hvRest) {
       const diff = Math.abs(hvTrain-hvRest).toFixed(0);
       if (diff >= 2) {
@@ -2385,58 +2344,39 @@ function _computePatternInsights() {
           insights.push({icon:'🏋️',color:'#F97316',text:`Nach Trainingstagen ist deine HRV am Folgetag im Schnitt ${diff} ms tiefer als nach Ruhetagen – ein normales Erholungszeichen.`,hl:[{phrase:`${diff} ms tiefer`,c:'#F97316'}],conf:'Training–HRV-Folgetag'});
       }
     }
-  }
-
-  // Insight 5: Training → Ruhepuls am Folgetag
-  if (trainDates.size >= 5) {
-    const afterTrainHR=[], afterRestHR=[];
-    allData.forEach(r => {
-      if (r.restHR==null) return;
-      const prevStr = addDays(r.date, -1); // lokal, nicht über UTC (sonst zwei Tage zurück)
-      if (trainDates.has(prevStr)) afterTrainHR.push(r);
-      else if (byDate[prevStr]) afterRestHR.push(r);
-    });
-    const hrTrain = afterTrainHR.length>=3?mittel(afterTrainHR,'restHR'):null;
-    const hrRest  = afterRestHR.length >=3?mittel(afterRestHR, 'restHR'):null;
+    const { training: hrTrain, ruhe: hrRest } = nachTraining('restHR');
     if (hrTrain&&hrRest&&hrTrain>hrRest+1.5) {
       const diff = (hrTrain-hrRest).toFixed(0);
       insights.push({icon:'💓',color:'#EF4444',text:`Nach Trainingstagen ist dein Ruhepuls am Folgetag im Schnitt ${diff} bpm erhöht – der Körper arbeitet an der Erholung.`,hl:[{phrase:`${diff} bpm erhöht`,c:'#F97316'}],conf:'Training–Ruhepuls-Folgetag'});
     }
   }
 
-  // Insight 6: Schritte → Schlaf der Folgenacht
-  const withStepsNextSleep = allData.filter(r => {
-    const nd = byDate[nextDay(r.date)];
-    return r.steps!=null && nd && nd.sleepTotal!=null;
-  });
-  if (withStepsNextSleep.length >= 10) {
-    const median = [...withStepsNextSleep].sort((a,b)=>a.steps-b.steps)[Math.floor(withStepsNextSleep.length/2)].steps;
-    const activeRows  = withStepsNextSleep.filter(r=>r.steps>=median);
-    const inactiveRows= withStepsNextSleep.filter(r=>r.steps< median);
-    const slActive  = mittel(activeRows.map(r=>byDate[nextDay(r.date)]).filter(Boolean), 'sleepTotal');
-    const slInactive= mittel(inactiveRows.map(r=>byDate[nextDay(r.date)]).filter(Boolean), 'sleepTotal');
+  // Insight 6/7: Schritte → Schlaf bzw. HRV der Folgenacht. Tage am Median der
+  // Schritte geteilt; verglichen wird der Mittelwert von `feld` am Folgetag.
+  const nachSchritten = feld => {
+    const tage = allData.filter(r => {
+      const nd = byDate[nextDay(r.date)];
+      return r.steps!=null && nd && nd[feld]!=null;
+    });
+    if (tage.length < 10) return null;
+    const median = [...tage].sort((a,b)=>a.steps-b.steps)[Math.floor(tage.length/2)].steps;
+    const folge = rows => mittel(rows.map(r=>byDate[nextDay(r.date)]).filter(Boolean), feld);
+    return { aktiv: folge(tage.filter(r=>r.steps>=median)), ruhig: folge(tage.filter(r=>r.steps<median)) };
+  };
+  const schlafNachSchritten = nachSchritten('sleepTotal');
+  if (schlafNachSchritten) {
+    const { aktiv: slActive, ruhig: slInactive } = schlafNachSchritten;
     if (slActive&&slInactive&&slActive>slInactive+0.2) {
       const diff = Math.round((slActive-slInactive)*60);
       insights.push({icon:'🌙',color:'#7C3AED',text:`An aktiveren Tagen (mehr Schritte) schläfst du in der Folgenacht im Schnitt ${diff} Minuten länger.`,hl:[{phrase:`${diff} Minuten länger`,c:'#10B981'}],conf:'Schritte–Schlaf-Zusammenhang'});
     }
   }
-
-  // Insight 7: Schritte → HRV der Folgenacht
-  const withStepsNextHRV = allData.filter(r => {
-    const nd = byDate[nextDay(r.date)];
-    return r.steps!=null && nd && nd.hrv!=null;
-  });
-  if (withStepsNextHRV.length >= 10) {
-    const median7 = [...withStepsNextHRV].sort((a,b)=>a.steps-b.steps)[Math.floor(withStepsNextHRV.length/2)].steps;
-    const hiRows = withStepsNextHRV.filter(r=>r.steps>=median7);
-    const loRows = withStepsNextHRV.filter(r=>r.steps< median7);
-    const hvHi = mittel(hiRows.map(r=>byDate[nextDay(r.date)]).filter(Boolean),'hrv');
-    const hvLo = mittel(loRows.map(r=>byDate[nextDay(r.date)]).filter(Boolean),'hrv');
-    if (hvHi&&hvLo&&Math.abs(hvHi-hvLo)>=2) {
-      if (hvHi>hvLo) {
-        const diff = ((hvHi-hvLo)/hvLo*100).toFixed(0);
-        insights.push({icon:'💪',color:'#059669',text:`Nach aktiveren Tagen ist deine HRV in der Folgenacht im Schnitt ${diff}% höher – Bewegung fördert deine Herzgesundheit.`,hl:[{phrase:`${diff}% höher`,c:'#10B981'}],conf:'Schritte–HRV-Zusammenhang'});
-      }
+  const hrvNachSchritten = nachSchritten('hrv');
+  if (hrvNachSchritten) {
+    const { aktiv: hvHi, ruhig: hvLo } = hrvNachSchritten;
+    if (hvHi&&hvLo&&hvHi-hvLo>=2) {
+      const diff = ((hvHi-hvLo)/hvLo*100).toFixed(0);
+      insights.push({icon:'💪',color:'#059669',text:`Nach aktiveren Tagen ist deine HRV in der Folgenacht im Schnitt ${diff}% höher – Bewegung fördert deine Herzgesundheit.`,hl:[{phrase:`${diff}% höher`,c:'#10B981'}],conf:'Schritte–HRV-Zusammenhang'});
     }
   }
 
@@ -2469,7 +2409,6 @@ function _computePatternInsights() {
   // Insight 10: VO₂max-Entwicklung
   const vo2Rows = allData.filter(r=>r.vo2max!=null);
   if (vo2Rows.length >= 5) {
-    const slope = linTrend(vo2Rows, 'vo2max');
     const first = mittel(vo2Rows.slice(0, Math.ceil(vo2Rows.length/3)), 'vo2max');
     const last  = mittel(vo2Rows.slice(-Math.ceil(vo2Rows.length/3)), 'vo2max');
     if (first&&last&&Math.abs(last-first)>=0.5) {
@@ -2557,8 +2496,7 @@ function scopeBadge(text) {
 // ── Daten-Stand ────────────────────────────────────────
 // Zeigt, bis wann Daten vorliegen und wann zuletzt geladen wurde. Ohne diese
 // Angabe war nach einem Abruf nicht erkennbar, ob er etwas bewirkt hat.
-// Steht als Zeilen in der App-Karte auf der Einstellungen-Seite (früher im Tab-Titel — dort
-// wiederholte sich dieselbe Angabe auf allen fünf Tabs).
+// Steht als Zeilen in der App-Karte auf der Einstellungen-Seite.
 function datenStandZeilen() {
   if (!allData.length) return '';
   const newest = allData[allData.length-1].date;
@@ -2587,19 +2525,16 @@ function datenStandZeilen() {
   const bisTxt = (_exportStempel && _exportStempel.datum >= newest)
     ? fmtDayShort(_exportStempel.datum) + ', ' + _exportStempel.zeit + ' Uhr'
     : fmtDayShort(newest);
+  // Stand der Anmeldung: der Text kommt allein aus anmeldeStand().
+  const anmeldung = anmeldeStand();
   return statZeile('Daten bis', bisTxt+ageTxt, stale ? '#F59E0B' : null)
        + statZeile('Zuletzt geladen', loaded)
-       // Stand der Anmeldung: eine Zeile, drei moegliche Werte. Der Text kommt aus
-       // anmeldeStand() – frueher stand hier eine zweite, eigene Pruefung auf
-       // `accessToken`, die den Fall „nur Lesen" gar nicht kannte und nach dem Umbau
-       // dieselbe Zeile ein zweites Mal erzeugte.
-       + (()=>{ const a = anmeldeStand();
-           return statZeile('Google-Anmeldung', a.text, a.farbe); })();
+       + statZeile('Google-Anmeldung', anmeldung.text, anmeldung.farbe);
 }
 
 function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
   const dir = delta==null?'neu':delta>0?'pos':'neg';
-  const dStr = delta==null?'—':(delta>0?'↑':'↓')+' '+zahl(Math.abs(delta),1)+'% '+(deltaLabel||trendLabel());
+  const dStr = delta==null?'—':(delta>0?'↑':'↓')+' '+zahl(Math.abs(delta),1)+'% '+(deltaLabel||'vs. Vorperiode');
   return `<div class="kpi" style="border-top-color:${color||'transparent'}">
     <div class="kpi-hd"><span class="kpi-lbl">${label}</span>${icon?`<span class="kpi-ico">${icon}</span>`:''}</div>
     <div class="kpi-val">${value}<span class="kpi-unit">${unit||''}</span></div>
@@ -2607,11 +2542,6 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
     ${sub?`<div class="kpi-sub">${sub}</div>`:''}
   </div>`;
 }
-
-// Hinweis: sparkSVG wurde entfernt – die Sparklines lebten ausschliesslich in der
-// Trend-Karte der Uebersicht.
-
-
 
 // ── Übersicht ──────────────────────────────────────────
 // Farbschleier einer Minikachel. Seit die Kacheln ohne Karte direkt auf dem dunklen
@@ -2675,28 +2605,73 @@ function kachelnHochzaehlen() {
   }));
 }
 
-function pgOverview() {
-  // Last day + 7-day window for mini-cards
-  const lastDay = allData[allData.length-1] || {};
-  const priorDays = allData.slice(-8,-1); // 7 days before last
-  const avg7d = {
-    sleep: mittel(priorDays,'sleepTotal'),
-    hr:    mittel(priorDays,'restHR'),
-    hrv:   mittel(priorDays,'hrv'),
-    vo2:   mittel(priorDays.filter(r=>r.vo2max),'vo2max')
-  };
+// ── Minikacheln der Übersicht ──────────────────────────
+// Wert = letzter Tag, Vergleich = Ø der sieben Tage davor.
+const vorzeichen = d => (d >= 0 ? '+' : '');
+// Signalklasse der Abweichung: `hochGut` = mehr ist besser.
+function deltaKlasse(d, schwelle, hochGut) {
+  if (d > schwelle)  return hochGut ? 'pos' : 'neg';
+  if (d < -schwelle) return hochGut ? 'neg' : 'pos';
+  return 'neu';
+}
+function kachelDelta(klasse, text) { return `<div class="ti-metric-delta ${klasse}">${text}</div>`; }
+function kachel(tab, titel, farbe, rgb, beschriftung, info, wertHTML, deltaHTML) {
+  return `<div class="ti-metric" ${kachelZiel(tab, titel)} style="${kachelStil(farbe, rgb)}">
+            <div class="ti-metric-lbl">${beschriftung} ${infoMini(info)}</div>
+            <div class="ti-metric-val">${wertHTML}</div>
+            ${deltaHTML}
+          </div>`;
+}
+const LEERE_KACHEL = '<div class="ti-metric"></div>';
+// Schlaf-Abweichung in Minuten, ab einer Stunde als "+1h 05min".
+function schlafDeltaText(d) {
+  const m = Math.round(d * 60), sign = m >= 0 ? '+' : '-', abs = Math.abs(m);
+  if (abs < 60) return sign + abs + 'm vs. Ø';
+  return sign + Math.floor(abs / 60) + 'h ' + String(abs % 60).padStart(2, '0') + 'min vs. Ø';
+}
+function tageswertKacheln(lastDay, priorDays) {
+  const hrLast = lastDay.restHR, hvLast = lastDay.hrv, slLast = lastDay.sleepTotal;
+  const hrAvg = mittel(priorDays, 'restHR'), hvAvg = mittel(priorDays, 'hrv'), slAvg = mittel(priorDays, 'sleepTotal');
+  const puls = hrLast == null ? LEERE_KACHEL : kachel('herz', 'Ruhepuls', '#EF4444', '239,68,68', '❤️ Ruhepuls', 'restHR',
+    `${kachelZahl('hr', hrLast)} bpm`,
+    hrAvg == null ? '' : kachelDelta(deltaKlasse(hrLast - hrAvg, 0.5, false), vorzeichen(hrLast - hrAvg) + (hrLast - hrAvg).toFixed(0) + ' vs. Ø'));
+  const hrv = hvLast == null ? LEERE_KACHEL : kachel('herz', 'HRV', '#2563EB', '37,99,235', '💙 HRV', 'hrv',
+    `${kachelZahl('hv', hvLast)} ms`,
+    hvAvg == null ? '' : kachelDelta(deltaKlasse(hvLast - hvAvg, 0.5, true), vorzeichen(hvLast - hvAvg) + (hvLast - hvAvg).toFixed(0) + ' vs. Ø'));
+  const schlaf = slLast == null ? LEERE_KACHEL : kachel('schlaf', 'Schlaf', '#7C3AED', '124,58,237', '🌙 Schlaf', 'sleepTotal',
+    kachelZahl('sl', slLast, 'std'),
+    slAvg == null ? '' : kachelDelta(deltaKlasse(slLast - slAvg, 0.08, true), schlafDeltaText(slLast - slAvg)));
+  return puls + hrv + schlaf + trainingsKachel(lastDay, priorDays);
+}
+// An Trainingstagen die Dauer der Einheit, sonst die Zahl der Trainingstage im
+// Siebentagefenster – die Kachel bleibt damit beim Thema Training.
+function trainingsKachel(lastDay, priorDays) {
+  const trMin = workoutData[lastDay.date]?.durationMin ?? null;
+  if (trMin != null) {
+    const trAvg = mittel(priorDays.map(r => workoutData[r.date]?.durationMin));
+    // Weniger Training als üblich ist kein schlechtes Zeichen – deshalb nie 'neg'.
+    const delta = trAvg == null ? '' : kachelDelta(trMin - trAvg > 2 ? 'pos' : 'neu',
+      vorzeichen(Math.round(trMin - trAvg)) + Math.round(trMin - trAvg) + ' min vs. Ø');
+    return kachel('training', 'Training', '#F97316', '249,115,22', '🏃 Training', 'training',
+      `${kachelZahl('tr', trMin)} min`, delta);
+  }
+  const zaehl = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
+  const tage7v = allData.slice(-14, -7);
+  const nWoche = zaehl(allData.slice(-7));
+  const nVor = tage7v.length >= 7 ? zaehl(tage7v) : null;
+  const delta = nVor == null ? '' : kachelDelta(deltaKlasse(nWoche - nVor, 0, true),
+    vorzeichen(nWoche - nVor) + (nWoche - nVor) + ' vs. Vorwoche');
+  return kachel('training', 'Training', '#F97316', '249,115,22', '🏃 Trainings', 'trainWoche',
+    `${kachelZahl('tage', nWoche)}<span class="ti-metric-einheit"> / 7 Tage</span>`, delta);
+}
 
-  // Belastungswarnung und Muster-Insights – vom Wegfall der Score-Karte unberührt.
+function pgOverview() {
+  const lastDay = allData[allData.length-1] || {};
+  const priorDays = allData.slice(-8,-1); // die 7 Tage vor dem letzten
   const warnSig = detectWarningSignals();
   const patternIns = generatePatternInsights();
 
-  // Mini-card deltas (absolute vs 7-day avg)
-  const slLast = lastDay.sleepTotal;
-  const hrLast = lastDay.restHR;
-  const hvLast = lastDay.hrv;
-
-
-  // Verlaufs-Chart + Trend folgen jetzt dem globalen Zeitfilter (D = gewähltes Fenster).
+  // Verlaufs-Chart: folgt dem globalen Zeitfilter (D = gewähltes Fenster).
   const D = filtered();
   const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin > 0);
   const { labels: wLabels, align: wAlign, hasData: wHas, keys: wKeys, keyTyp: wKeyTyp } = timeDim(D);
@@ -2710,11 +2685,9 @@ function pgOverview() {
   const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
   const _wocheAgg = !(timeRange === '7d' || timeRange === '1m'); // aggregierte Buckets → "Ø" im Tooltip
 
-
-
   document.getElementById("screen-overview").innerHTML = `
     ${pgBanner('📊','Übersicht')}
-    <!-- Warning signals (only shown when triggered). Steht ueber dem Kartenpaar:
+    <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber dem Kartenpaar:
          eine Warnung gehoert nach oben, und im Querformat stehen Ziele und Kacheln
          nebeneinander – dazwischen waere kein Platz fuer sie. -->
     ${warnSig ? `<div class="warn-card">
@@ -2727,61 +2700,15 @@ function pgOverview() {
     <!-- Ziele und Tageswerte: im Hochformat untereinander, im Querformat nebeneinander. -->
     <div class="ov-oben">
     ${zielUebersichtHTML()}
-
-    <!-- Aktuelle Tageswerte. Der Gesundheits-Score stand hier daneben und wurde
-         auf Wunsch komplett entfernt; die Belastungswarnung oben bleibt. -->
-      <!-- Aktuelle Tageswerte. Die frühere "Heutige Empfehlung" saß hier darüber und
-           wurde auf Wunsch entfernt; die Belastungswarnung oben auf der Seite bleibt. -->
     <div class="ov-oben-kacheln">
-    <div class="ov-combo-card">
-        <!-- Die Bezugszeitraum-Pille ("letzter Tag · Vergleich: Ø 7 Tage") wurde auf
-             Wunsch entfernt; die Kacheln tragen den Vergleich bereits im Text ("vs. Ø"). -->
+      <div class="ov-combo-card">
         <div class="ti-metrics">
-          ${hrLast!=null?`<div class="ti-metric" ${kachelZiel('herz','Ruhepuls')} style="${kachelStil('#EF4444','239,68,68')}">
-            <div class="ti-metric-lbl">❤️ Ruhepuls ${infoMini('restHR')}</div>
-            <div class="ti-metric-val">${kachelZahl('hr', hrLast)} bpm</div>
-            ${avg7d.hr!=null?`<div class="ti-metric-delta ${hrLast-avg7d.hr<-0.5?'pos':hrLast-avg7d.hr>0.5?'neg':'neu'}">${(()=>{const d=hrLast-avg7d.hr;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
-          </div>`:'<div class="ti-metric"></div>'}
-          ${hvLast!=null?`<div class="ti-metric" ${kachelZiel('herz','HRV')} style="${kachelStil('#2563EB','37,99,235')}">
-            <div class="ti-metric-lbl">💙 HRV ${infoMini('hrv')}</div>
-            <div class="ti-metric-val">${kachelZahl('hv', hvLast)} ms</div>
-            ${avg7d.hrv!=null?`<div class="ti-metric-delta ${hvLast-avg7d.hrv>0.5?'pos':hvLast-avg7d.hrv<-0.5?'neg':'neu'}">${(()=>{const d=hvLast-avg7d.hrv;return (d>=0?'+':'')+d.toFixed(0)+' vs. Ø';})()}</div>`:''}
-          </div>`:'<div class="ti-metric"></div>'}
-          ${slLast!=null?`<div class="ti-metric" ${kachelZiel('schlaf','Schlaf')} style="${kachelStil('#7C3AED','124,58,237')}">
-            <div class="ti-metric-lbl">🌙 Schlaf ${infoMini('sleepTotal')}</div>
-            <div class="ti-metric-val">${kachelZahl('sl', slLast, 'std')}</div>
-            ${avg7d.sleep!=null?`<div class="ti-metric-delta ${slLast-avg7d.sleep>0.08?'pos':slLast-avg7d.sleep<-0.08?'neg':'neu'}">${(()=>{const d=slLast-avg7d.sleep;const m=Math.round(d*60);const sign=m>=0?'+':'-';const abs=Math.abs(m);if(abs>=60){const h=Math.floor(abs/60);const min=abs%60;return sign+h+'h '+String(min).padStart(2,'0')+'min vs. Ø';}return sign+abs+'m vs. Ø';})()}</div>`:''}
-          </div>`:'<div class="ti-metric"></div>'}
-          ${(()=>{
-            const trMin=workoutData[lastDay.date]?.durationMin??null;
-            const trAvg=(()=>{const v=priorDays.map(r=>workoutData[r.date]?.durationMin).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;})();
-            if(trMin!=null){return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
-              <div class="ti-metric-lbl">🏃 Training ${infoMini('training')}</div>
-              <div class="ti-metric-val">${kachelZahl('tr', trMin)} min</div>
-              ${trAvg!=null?`<div class="ti-metric-delta ${trMin-trAvg>2?'pos':trMin-trAvg<-2?'neu':'neu'}">${(()=>{const d=Math.round(trMin-trAvg);return(d>=0?'+':'')+d+' min vs. Ø';})()}</div>`:''}
-            </div>`;}
-            // Kein Training an diesem Tag: statt der Tagesdauer die Anzahl der
-            // Trainingstage im Siebentagefenster – die Kachel bleibt damit beim
-            // Thema Training. Die frueher hier stehenden Schritte sind auf Wunsch
-            // ganz entfallen (auch als Zielmetrik).
-            const tage7   = allData.slice(-7);
-            const tage7v  = allData.slice(-14, -7);
-            const zaehl   = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
-            const nWoche  = zaehl(tage7);
-            const nVor    = tage7v.length >= 7 ? zaehl(tage7v) : null;
-            return`<div class="ti-metric" ${kachelZiel('training','Training')} style="${kachelStil('#F97316','249,115,22')}">
-              <div class="ti-metric-lbl">🏃 Trainings ${infoMini('trainWoche')}</div>
-              <div class="ti-metric-val">${kachelZahl('tage', nWoche)}<span class="ti-metric-einheit"> / 7 Tage</span></div>
-              ${nVor!=null?`<div class="ti-metric-delta ${nWoche-nVor>0?'pos':nWoche-nVor<0?'neg':'neu'}">${(()=>{const d=nWoche-nVor;return(d>=0?'+':'')+d+' vs. Vorwoche';})()}</div>`:''}
-            </div>`;
-          })()}
+          ${tageswertKacheln(lastDay, priorDays)}
         </div>
       </div>
     </div>
     </div>
-    </div>
-    <!-- Zeile 2: Verlauf. Seit 08.09.2026 Teil des Ausklapp-Bereichs (auf Wunsch) –
-         dieselbe Bedingung wie das Muster-Raster darunter. -->
+    <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
       <h3>Verlauf</h3>
       <div class="chart-legend">
@@ -2793,28 +2720,24 @@ function pgOverview() {
       <div class="chart-wrap"><canvas id="c-woche"></canvas></div>
     </div>
 
-    <!-- Pattern Insights -->
     ${patternIns.length>0?`
     <div class="pi-grid ausklapp-teil" style="${_weitereOffen.overview?'':'display:none'}">
       ${patternIns.map(insightKarte).join('')}
     </div>`:''}
-    <!-- Die App-Karte stand hier bis 06.09.2026 hinter einem Ausklapp-Knopf. Sie
-         liegt jetzt auf einer eigenen Seite „Einstellungen" (pgEinstellungen),
-         erreichbar ueber den Zahnrad-Knopf in der Kopfzeile dieses Tabs. -->
     `;
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){
-    const lbl=ctx.dataset.label, v=ctx.raw, agg=_wocheAgg;
-    // Bei aggregierten Buckets (Wochen-/Monatswerte) ist der Wert ein Tagesmittel → "Ø …/d".
-    const pre=agg?'Ø ':'', per=agg?'':'';
-    if(lbl==='Schlaf (h)')return`${pre}Schlaf: ${v!=null?alsStdMin(v)+per:'—'}`;
+    const lbl=ctx.dataset.label, v=ctx.raw;
+    // Bei aggregierten Buckets (Wochen-/Monatswerte) ist der Wert ein Tagesmittel → "Ø …".
+    const pre=_wocheAgg?'Ø ':'';
+    if(lbl==='Schlaf (h)')return`${pre}Schlaf: ${v!=null?alsStdMin(v):'—'}`;
     if(lbl===_wocheTrLabel){
-      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${pre}${_wocheTrLabel}: ${mins} min${per}`;}
-      return`${pre}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH')+per:'—'}`;
+      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${pre}${_wocheTrLabel}: ${mins} min`;}
+      return`${pre}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}`;
     }
-    if(lbl==='Ruhepuls') return `${pre}Ruhepuls: ${v!=null?Math.round(v)+' bpm'+per:'—'}`;
-    if(lbl==='HRV')      return `${pre}HRV: ${v!=null?Math.round(v)+' ms'+per:'—'}`;
+    if(lbl==='Ruhepuls') return `${pre}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
+    if(lbl==='HRV')      return `${pre}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
     return lbl+': '+zahl(v,1);
   }
   if(wHas){
@@ -2831,13 +2754,34 @@ function pgOverview() {
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>_wocheTooltipLabel(ctx)}}},
         scales:{
-          x:{...gx},
-          yL:{position:'left',...gy,suggestedMin:0,suggestedMax:10,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}},
+          x:{...achseX},
+          yL:{position:'left',...achseY,suggestedMin:0,suggestedMax:10,ticks:{...achseY.ticks,callback:v=>Math.floor(v)+'h'}},
           yR:{position:'right',display:true,grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}},suggestedMin:30,suggestedMax:100}
         }
       }
     });
   }
+}
+
+// ── Bausteine der Einordnungs-Karten (Herz, Schlaf) ────
+// Eine Zeile der Verteilung: farbiges Label, Balken, Anzahl und Anteil.
+function verteilungZeile(label, farbe, n, gesamt) {
+  const pct = n / gesamt * 100;
+  return `<div class="goal-row"><span class="goal-lbl" style="color:${farbe}">${label}</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%;background:${farbe}"></div></div><span class="goal-val"><span class="goal-num">${n}</span><span style="color:var(--txt3)">(${pct.toFixed(0)}%)</span></span></div>`;
+}
+// Konsistenz über die Streuung, mit Schwellen in der Einheit des Werts. Ein
+// gleichmässiger Verlauf spricht für stabile Erholung, starke Ausschläge für
+// wechselnde Belastung. Liefert [Text, Farbe].
+function konsistenzStufe(streuung, g1, g2, g3, schlechtText) {
+  if (streuung == null) return ['—', '#94A3B8'];
+  if (streuung < g1) return ['Sehr konsistent', '#10B981'];
+  if (streuung < g2) return ['Konsistent', '#84CC16'];
+  if (streuung < g3) return ['Mäßig', '#EAB308'];
+  return [schlechtText, '#EF4444'];
+}
+// Wie viele Tage des Fensters einen Messwert haben.
+function messpunkteZeile(n, fensterTage) {
+  return statZeile('Messpunkte', `${n}d <span style="color:var(--txt3)">(${fensterTage>0?(n/fensterTage*100).toFixed(0):'—'}%)</span>`);
 }
 
 // ── Herz ───────────────────────────────────────────────
@@ -2862,20 +2806,10 @@ function pgHerz() {
   const hrSchlecht = hrf.length?Math.max(...hrf.map(r=>r.restHR)):null;
   const hvBest = hvf.length?Math.max(...hvf.map(r=>r.hrv)):null;
   const hvSchlecht = hvf.length?Math.min(...hvf.map(r=>r.hrv)):null;
-  // Konsistenz über die Streuung – dieselbe Idee wie beim Schlaf, aber mit Schwellen
-  // in der jeweiligen Einheit. Ein gleichmässiger Ruhepuls bzw. eine gleichmässige
-  // HRV spricht für stabile Erholung; starke Ausschläge für wechselnde Belastung.
-  const konsistenz=(streuung,g1,g2,g3)=>{
-    if(streuung==null)return['—','#94A3B8'];
-    if(streuung<g1)return['Sehr konsistent','#10B981'];
-    if(streuung<g2)return['Konsistent','#84CC16'];
-    if(streuung<g3)return['Mäßig','#EAB308'];
-    return['Schwankend','#EF4444'];
-  };
-  const [hrKons,hrKonsFarbe]=konsistenz(standardabw(hrf,'restHR'), 2, 3.5, 5);
-  const [hvKons,hvKonsFarbe]=konsistenz(standardabw(hvf,'hrv'),    6, 10, 15);
+  const [hrKons,hrKonsFarbe]=konsistenzStufe(standardabw(hrf,'restHR'), 2, 3.5, 5, 'Schwankend');
+  const [hvKons,hvKonsFarbe]=konsistenzStufe(standardabw(hvf,'hrv'),    6, 10, 15, 'Schwankend');
 
-  // HR zone classification
+  // Einordnung des Ø-Ruhepulses
   function hrZone(v){
     if(v==null)return['—','#94A3B8'];
     if(v<50)return['Athleten-Bereich','#2563EB'];
@@ -2886,7 +2820,7 @@ function pgHerz() {
   }
   const [hrZoneName,hrZoneColor]=hrZone(hrD);
 
-  // HRV interpretation
+  // Einordnung der Ø-HRV
   function hvCat(v){
     if(v==null)return['—','#94A3B8'];
     if(v>=70)return['Sehr gut','#10B981'];
@@ -2896,18 +2830,10 @@ function pgHerz() {
   }
   const [hvCatName,hvCatColor]=hvCat(hvD);
 
-  // Days in zones
-  const nAthlete=hrf.filter(r=>r.restHR<50).length;
-  const nGood=hrf.filter(r=>r.restHR>=50&&r.restHR<65).length;
-  const nNorm=hrf.filter(r=>r.restHR>=65&&r.restHR<75).length;
-  const nHigh=hrf.filter(r=>r.restHR>=75).length;
-  const nTot=hrf.length||1;
-  // HRV categories
-  const nHVLow=hvf.filter(r=>r.hrv<30).length;
-  const nHVMid=hvf.filter(r=>r.hrv>=30&&r.hrv<50).length;
-  const nHVGood=hvf.filter(r=>r.hrv>=50&&r.hrv<70).length;
-  const nHVHigh=hvf.filter(r=>r.hrv>=70).length;
-  const nHVTot=hvf.length||1;
+  // Tage je Bereich
+  const nHr=(von,bis)=>hrf.filter(r=>r.restHR>=von&&r.restHR<bis).length;
+  const nHv=(von,bis)=>hvf.filter(r=>r.hrv>=von&&r.hrv<bis).length;
+  const nTot=hrf.length||1, nHVTot=hvf.length||1;
 
   const bl30hrv = calculateBaseline('hrv', 30);
   const bl30hr  = calculateBaseline('restHR', 30);
@@ -2916,10 +2842,11 @@ function pgHerz() {
   const devHRhz  = calculateDeviation(lastRow.restHR, bl30hr);
   const herzInterpret = (() => {
     if (devHRVhz==null&&devHRhz==null) return null;
-    const hvGood = devHRVhz!=null&&devHRVhz>=5;
-    const hvBad  = devHRVhz!=null&&devHRVhz<=-10;
-    const hrGood = devHRhz!=null&&devHRhz<=-3;
-    const hrBad  = devHRhz!=null&&devHRhz>=5;
+    const T = COACHING_THRESHOLDS;
+    const hvGood = devHRVhz!=null&&devHRVhz>=T.hvDevGood;
+    const hvBad  = devHRVhz!=null&&devHRVhz<=T.hvDevBad;
+    const hrGood = devHRhz!=null&&devHRhz<=T.hrDevGood;
+    const hrBad  = devHRhz!=null&&devHRhz>=T.hrDevBad;
     const hvPct  = devHRVhz!=null?(devHRVhz>=0?'+':'')+devHRVhz.toFixed(0)+'%':null;
     const hrPct  = devHRhz!=null?(devHRhz>=0?'+':'')+devHRhz.toFixed(0)+'%':null;
     if (hvGood&&hrGood) return {status:'Gute Erholung',color:'#10B981',
@@ -2934,7 +2861,7 @@ function pgHerz() {
       text:`HRV (${hvPct||'—'}) und Ruhepuls (${hrPct||'—'}) liegen nahe der persönlichen 30-Tage-Baseline – keine Auffälligkeiten festgestellt.`};
   })();
 
-  const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
+  const tHD=timeDim(D).hasData;
   const tdL=timeDim(D,true);
   const hrMaL=tdL.align('restHR'); const hvMaL=tdL.align('hrv');
 
@@ -2970,16 +2897,16 @@ function pgHerz() {
           Ø ${zahl(hrD,0)} bpm → <span style="color:${hrZoneColor};font-weight:700">${hrZoneName}</span>
         </p>
         <div class="goal-list">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&lt; 50 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nAthlete/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nAthlete}</span><span style="color:var(--txt3)">(${(nAthlete/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">50–65 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nGood/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nGood}</span><span style="color:var(--txt3)">(${(nGood/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">65–75 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nNorm/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nNorm}</span><span style="color:var(--txt3)">(${(nNorm/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&gt; 75 bpm</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHigh/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHigh}</span><span style="color:var(--txt3)">(${(nHigh/nTot*100).toFixed(0)}%)</span></span></div>
+          ${verteilungZeile('&lt; 50 bpm', '#10B981', nHr(-Infinity,50), nTot)}
+          ${verteilungZeile('50–65 bpm', '#84CC16', nHr(50,65), nTot)}
+          ${verteilungZeile('65–75 bpm', '#EAB308', nHr(65,75), nTot)}
+          ${verteilungZeile('&gt; 75 bpm', '#EF4444', nHr(75,Infinity), nTot)}
         </div>
         <div class="stats-list">
           ${statZeile(`Bester Tag`, `${hrBest!=null?zahl(hrBest,0)+' bpm':'—'}`, `#10B981`)}
           ${statZeile(`Schlechtester Tag`, `${hrSchlecht!=null?zahl(hrSchlecht,0)+' bpm':'—'}`, `#EF4444`)}
-          ${statZeile(`Konsistenz`, `${hrKons}`, `${hrKonsFarbe}`)}
-          ${statZeile(`Messpunkte`, `${hrf.length}d <span style="color:var(--txt3)">(${D.length>0?(hrf.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+          ${statZeile(`Konsistenz`, hrKons, hrKonsFarbe)}
+          ${messpunkteZeile(hrf.length, D.length)}
         </div>
       </div>
       <div class="chart-card split2" style="margin-bottom:0">
@@ -2988,16 +2915,16 @@ function pgHerz() {
           Ø ${zahl(hvD,0)} ms → <span style="color:${hvCatColor};font-weight:700">${hvCatName}</span>
         </p>
         <div class="goal-list">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">≥ 70 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVHigh/nHVTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nHVHigh}</span><span style="color:var(--txt3)">(${(nHVHigh/nHVTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">50–70 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVGood/nHVTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${nHVGood}</span><span style="color:var(--txt3)">(${(nHVGood/nHVTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">30–50 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVMid/nHVTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${nHVMid}</span><span style="color:var(--txt3)">(${(nHVMid/nHVTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">&lt; 30 ms</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nHVLow/nHVTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nHVLow}</span><span style="color:var(--txt3)">(${(nHVLow/nHVTot*100).toFixed(0)}%)</span></span></div>
+          ${verteilungZeile('≥ 70 ms', '#10B981', nHv(70,Infinity), nHVTot)}
+          ${verteilungZeile('50–70 ms', '#84CC16', nHv(50,70), nHVTot)}
+          ${verteilungZeile('30–50 ms', '#EAB308', nHv(30,50), nHVTot)}
+          ${verteilungZeile('&lt; 30 ms', '#EF4444', nHv(-Infinity,30), nHVTot)}
         </div>
         <div class="stats-list">
           ${statZeile(`Bester Tag`, `${hvBest!=null?zahl(hvBest,0)+' ms':'—'}`, `#10B981`)}
           ${statZeile(`Schlechtester Tag`, `${hvSchlecht!=null?zahl(hvSchlecht,0)+' ms':'—'}`, `#EF4444`)}
-          ${statZeile(`Konsistenz`, `${hvKons}`, `${hvKonsFarbe}`)}
-          ${statZeile(`Messpunkte`, `${hvf.length}d <span style="color:var(--txt3)">(${D.length>0?(hvf.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+          ${statZeile(`Konsistenz`, hvKons, hvKonsFarbe)}
+          ${messpunkteZeile(hvf.length, D.length)}
         </div>
       </div>
     </div>
@@ -3038,7 +2965,7 @@ function pgHerz() {
       {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
       // Ø-Linien in der Farbe ihrer Reihe statt der beiden grauen Ziellinien: bei zwei
       // Kurven auf einer Skala liessen sich zwei gleich graue Hilfslinien nicht
-      // zuordnen. Die Zielwerte stehen in der Statuszeile der Übersicht.
+      // zuordnen. Die Zielwerte stehen in der Ziel-Karte der Übersicht.
       // EIN Schalter fuer beide Ø-Linien. Zwei Eintraege („Ø Puls", „Ø HRV") machten
       // die Legende doppelt so lang fuer einen Zustand, den man ohnehin gemeinsam
       // will. Der Marker ist deshalb grau statt rot oder blau.
@@ -3055,7 +2982,7 @@ function pgHerz() {
         // zuhalten – sie teilen sich im Diagramm eine Skala.
         callbacks:{label:ctx=>ctx.parsed.y==null?null:
           `${ctx.dataset.label}: ${Math.round(ctx.parsed.y)} ${ctx.dataset.label==='Ruhepuls'?'bpm':'ms'}`}}},
-      scales:{x:gx,
+      scales:{x:achseX,
         yL:_yAxis({position:'left',grid:{color:GRID_COLOR}}),
         // Rechte Achse ausgeblendet: sie ist mit der linken synchronisiert und zeigte
         // exakt dieselben Zahlen – auf dem iPhone verschenkte Breite ohne Aussage.
@@ -3063,15 +2990,9 @@ function pgHerz() {
   }
 }
 
-// Welche Reihen des Vergleichsdiagramms sind eingeblendet? Ueberlebt Re-Render und
-// Tabwechsel – sonst waere die Auswahl nach jedem Klick auf die Zeitpfeile zurueck.
-// Start ZU (auf Wunsch, 06.09.2026): die Uebersicht soll mit Zielen, Kacheln und
-// Verlauf beginnen; die Deutungen holt man sich dazu, wenn man sie will.
-// Herz und Schlaf zeigen zunaechst nur ihr erstes Diagramm; alles Weitere liegt
-// hinter einem Knopf. Standardmaessig zu, damit der Tab beim Oeffnen ruhig bleibt.
-// Ausklapp-Zustand je Tab. Alle drei starten ZU. `overview` hiess bis 08.09.2026
-// `_musterOffen` und deckte nur das Muster-Raster ab; seit der Verlauf dazugehoert,
-// passt der eigene Name nicht mehr – jetzt fuehren alle drei Tabs denselben Weg.
+// Ausklapp-Zustand je Tab („Weitere Auswertungen"). Alle starten ZU, damit ein Tab
+// beim Oeffnen ruhig bleibt; die Deutungen holt man sich dazu, wenn man sie will.
+// Liegt ausserhalb der Seitenfunktionen und uebersteht damit jeden Neuaufbau.
 const _weitereOffen = { overview:false, herz:false, schlaf:false, training:false };
 // Fusszeilen „Ø Wochentag" / „Ø Wochenende" (auf Wunsch, 14.09.2026): sie gehoeren zum
 // Ausklapp-Zustand ihres Tabs und sind damit standardmaessig zu. Eine eigene Huelle
@@ -3084,11 +3005,9 @@ function fussMehr(tab, zeilen) {
   if (!_weitereOffen[tab] || !zeilen || !zeilen.trim()) return '';
   return `<div class="fuss-mehr ausklapp-teil">${zeilen}</div>`;
 }
-// Knopf + oeffnendes <div>. Der schliessende Tag steht im Markup, damit die Karten
-// dazwischen unveraendert bleiben – ein String-Parameter haette die Template-Literale
-// der Karten verschachtelt und war nicht sauber zu escapen.
-// Nur noch das oeffnende <div>; der Schalter sitzt seit 03.09.2026 als Knopf in der
-// Kopfzeile des Tabs (pgBanner) statt als breiter Balken mitten im Inhalt.
+// Das oeffnende <div> des Ausklapp-Bereichs. Der schliessende Tag steht im Markup,
+// damit die Karten dazwischen unveraendert bleiben – ein String-Parameter haette die
+// Template-Literale der Karten verschachtelt. Der Schalter sitzt in der Zeitleiste.
 function weitereAuf(tab) {
   return `<div class="weitere-inhalt ausklapp-teil"${_weitereOffen[tab] ? '' : ' hidden'}>`;
 }
@@ -3362,7 +3281,7 @@ function _wischHinaus(charts, richtung, fertig) {
 }
 
 function diagrammWischen() {
-  const ruhig = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ruhig = bewegungAus;
 
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { _diaWisch = null; return; }
@@ -3484,24 +3403,31 @@ function einstellungenWischen() {
 
 // Welche Tabs haben ueberhaupt etwas zum Aufklappen – und wie heisst es?
 // EINE Quelle fuer Knopf, Zustand und Umschalten; sonst muesste jede der drei
-// Stellen ihre eigene Fallunterscheidung fuehren.
-const AUSKLAPP = {
-  overview: { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.overview,
-              um: () => { _weitereOffen.overview = !_weitereOffen.overview; } },
-  herz:     { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.herz,
-              um: () => { _weitereOffen.herz = !_weitereOffen.herz; } },
-  schlaf:   { titel: 'Weitere Auswertungen',   offen: () => _weitereOffen.schlaf,
-              um: () => { _weitereOffen.schlaf = !_weitereOffen.schlaf; } },
-  // Seit 14.09.2026 auch im Training-Tab: dort klappt der Knopf die Fusszeilen
-  // „Ø Wochentag" / „Ø Wochenende" aller vier Diagramme auf einmal – und seit
-  // 18.09.2026 zusaetzlich die Trainings-Einblicke unter VO2max. Deshalb ist er jetzt
-  // auch im Jahresvergleich sichtbar (vorher `sichtbar: () => !istYoY()`: ohne
-  // Wochenzeilen gab es dort nichts zu klappen, die Einblicke gibt es aber immer).
-  training: { titel: 'Weitere Auswertungen', offen: () => _weitereOffen.training,
-              um: () => { _weitereOffen.training = !_weitereOffen.training; } }
-};
+// Stellen ihre eigene Fallunterscheidung fuehren. Seit 14.09.2026 hat jeder Tab einen
+// Eintrag; im Training klappt der Knopf die Wochentag/Wochenende-Fusszeilen und die
+// Trainings-Einblicke. Ein optionales `sichtbar()` blendet den Knopf je Zustand aus
+// (derzeit nutzt es kein Tab).
+const AUSKLAPP = Object.fromEntries(Object.keys(_weitereOffen).map(tab => [tab, {
+  titel: 'Weitere Auswertungen',
+  offen: () => _weitereOffen[tab],
+  um:    () => { _weitereOffen[tab] = !_weitereOffen[tab]; }
+}]));
 
 // ── Schlaf ─────────────────────────────────────────────
+// Schlafschuld als Text: Defizit mit "−", Überschuss mit "+".
+function schuldText(h) { return h == null ? '—' : (h > 0 ? '−' + alsStdMin(h) : '+' + alsStdMin(-h)); }
+function schuldFarbe(h) { return h == null ? 'var(--txt3)' : (h > 0 ? '#EF4444' : '#10B981'); }
+
+// Ein- oder Aufwachzeit je Säule – ausgerichtet an den Zeitraum-Schlüsseln des
+// Schlafdauer-Diagramms: je Tag der Wert der Nacht, je Monat die mittlere Uhrzeit.
+function schlafzeitReihe(D, keys, keyTyp, feld, einschlafen) {
+  if (keyTyp === 'tag') {
+    const byDate = {}; D.forEach(r => { byDate[r.date] = r; });
+    return keys.map(d => parseTV(byDate[d]?.[feld] ?? null));
+  }
+  return keys.map(k => avgCircTime(D.filter(r => r.date.startsWith(k)), feld, einschlafen));
+}
+
 function pgSchlaf() {
   const D=filtered(), P=prevPeriod();
   const last14sl = allData.slice(-14);
@@ -3509,82 +3435,50 @@ function pgSchlaf() {
   const debtLvl = sleepDebtLevel(sleepDebt.perNight);
   const slD=mittel(D,'sleepTotal');
   const scD=mittel(D,'sleepScore'), scP=mittel(P,'sleepScore');
-  const dpD=mittel(D,'sleepDeep')||mittel(D,'deepSleep');
-  const remD=mittel(D,'sleepRem')||mittel(D,'remSleep');
-  const lD=mittel(D,'sleepCore')||mittel(D,'lightSleep');
-  const slStd=standardabw(D.filter(r=>r.sleepTotal!=null),'sleepTotal');
+  const dpD=mittel(D,'sleepDeep');
+  const remD=mittel(D,'sleepRem');
+  const lD=mittel(D,'sleepCore');
   const slRows=D.filter(r=>r.sleepTotal!=null);
+  const slStd=standardabw(slRows,'sleepTotal');
   const slZielN = slRows.filter(r=>zielErfuellt('sleepTotal', r.sleepTotal)).length;
   const slMax=slRows.length?Math.max(...slRows.map(r=>r.sleepTotal)):null;
   const slMin=slRows.length?Math.min(...slRows.map(r=>r.sleepTotal)):null;
-  // Per-night breakdown for sleep debt tooltip
-  const WDAYS=['So','Mo','Di','Mi','Do','Fr','Sa'];
-  const debtTooltipRows=last14sl.filter(r=>r.sleepTotal!=null).map(r=>{
+  // Einzelne Nächte für den Tooltip der Schlafschuld
+  const debtNaechte=last14sl.filter(r=>r.sleepTotal!=null);
+  const debtTooltipRows=debtNaechte.map(r=>{
     const d=SLEEP_TARGET_H-r.sleepTotal;
-    const [,mo,dy]=r.date.split('-');   // Jahr wird hier nicht gebraucht
-    const wd=WDAYS[new Date(r.date+'T00:00:00').getDay()];
-    return `<div class="debt-tt-row"><span class="debt-tt-date">${wd} ${dy}.${mo}.</span><span class="debt-tt-slept">${alsStdMin(r.sleepTotal)}</span><span class="debt-tt-d ${d>0?'neg':'pos'}">${d>0?'-'+alsStdMin(d):'+'+alsStdMin(-d)}</span></div>`;
+    return `<div class="debt-tt-row"><span class="debt-tt-date">${wochentagKurz(r.date)} ${fmtWeek(r.date)}</span><span class="debt-tt-slept">${alsStdMin(r.sleepTotal)}</span><span class="debt-tt-d ${d>0?'neg':'pos'}">${d>0?'-'+alsStdMin(d):'+'+alsStdMin(-d)}</span></div>`;
   }).join('');
-  const debtTtNDays=last14sl.filter(r=>r.sleepTotal!=null).length;
   const {labels:tL,align:tA,hasData:tHD,keys:tKeys,keyTyp:tKeyTyp}=timeDim(D);
   const tdL=timeDim(D,true);
   const slMa=tA('sleepTotal');
-  const dpField=D.some(r=>r.sleepDeep!=null)?'sleepDeep':'deepSleep';
-  const remField=D.some(r=>r.sleepRem!=null)?'sleepRem':'remSleep';
-  const lField=D.some(r=>r.sleepCore!=null)?'sleepCore':'lightSleep';
-  const dpMa=tA(dpField);
-  const remMa=tA(remField);
-  const lMa=tA(lField);
+  const dpMa=tA('sleepDeep');
+  const remMa=tA('sleepRem');
+  const lMa=tA('sleepCore');
   const awMa=tA('sleepAwake');
   const scMa=tdL.align('sleepScore');
-  const hasPhases=D.some(r=>r.sleepDeep!=null||r.deepSleep!=null||r.sleepRem!=null||r.remSleep!=null||r.sleepCore!=null||r.lightSleep!=null);
+  const hasPhases=D.some(r=>r.sleepDeep!=null||r.sleepRem!=null||r.sleepCore!=null);
   const hasAwake=D.some(r=>r.sleepAwake!=null);
   const hasScore=D.some(r=>r.sleepScore!=null);
-  const awD=mittel(D.filter(r=>r.sleepAwake!=null),'sleepAwake');
+  const awD=mittel(D,'sleepAwake');
 
   const total=slD||1;
-  const dpPct=dpD!=null?(dpD/total*100).toFixed(0):null;
-  const remPct=remD!=null?(remD/total*100).toFixed(0):null;
-  const lPct=lD!=null?(lD/total*100).toFixed(0):null;
-  const awPct=awD!=null?(awD/total*100).toFixed(0):null;
+  const anteil=v=>v!=null?(v/total*100).toFixed(0):null;
+  const dpPct=anteil(dpD), remPct=anteil(remD), lPct=anteil(lD), awPct=anteil(awD);
 
-  // Sleep quality buckets
-  const nBelow6=D.filter(r=>r.sleepTotal!=null&&r.sleepTotal<6).length;
-  const n6to7=D.filter(r=>r.sleepTotal!=null&&r.sleepTotal>=6&&r.sleepTotal<7).length;
-  const n7to85=D.filter(r=>r.sleepTotal!=null&&r.sleepTotal>=7&&r.sleepTotal<8.5).length;
-  const nOver85=D.filter(r=>r.sleepTotal!=null&&r.sleepTotal>=8.5).length;
-  const nTot=nBelow6+n6to7+n7to85+nOver85||1;
+  // Nächte je Dauer-Bereich
+  const nSl=(von,bis)=>slRows.filter(r=>r.sleepTotal>=von&&r.sleepTotal<bis).length;
+  const nTot=slRows.length||1;
 
-  // Weekday vs weekend sleep
   const slSplit=splitWeekWknd(slRows);
   const slWeek=mittel(slSplit.wkd,'sleepTotal');
   const slWknd=mittel(slSplit.wknd,'sleepTotal');
 
-  // Consistency grade
-  function consGrade(s){
-    if(s==null)return['—','#94A3B8'];
-    if(s<0.5)return['Sehr konsistent','#10B981'];
-    if(s<0.75)return['Konsistent','#84CC16'];
-    if(s<1.0)return['Mäßig','#EAB308'];
-    return['Inkonsistent','#EF4444'];
-  }
-  const [consLabel,consColor]=consGrade(slStd);
+  const [consLabel,consColor]=konsistenzStufe(slStd, 0.5, 0.75, 1.0, 'Inkonsistent');
 
-  // Sleep timing (onset & wake)
-  const sleepStartField=findAnyField(D,'sleepStart','sleepOnset','bedtime','inBedStart','sleepBegin','asleepAt','sleepTime','startSleep');
-  const sleepEndField=findAnyField(D,'sleepEnd','wakeTime','wakeUp','wakeAt','inBedEnd','sleepStop','wokenAt','endSleep');
-
-  // Timing arrays aligned to tL for tooltip use in c-sl-dur
-  const slStartArr=(()=>{
-    if(is7D()){const days=weekDays7();const bd={};D.forEach(r=>{bd[r.date]=r;});return days.map(d=>parseTV(bd[d]?.[sleepStartField]??null));}
-    const mos=allMonths(D);
-    return mos.map(mo=>{const moR=D.filter(r=>r.date.startsWith(mo));return avgCircTime(moR,sleepStartField,true);});
-  })();
-  const slEndArr=(()=>{
-    if(is7D()){const days=weekDays7();const bd={};D.forEach(r=>{bd[r.date]=r;});return days.map(d=>parseTV(bd[d]?.[sleepEndField]??null));}
-    const mos=allMonths(D);
-    return mos.map(mo=>{const moR=D.filter(r=>r.date.startsWith(mo));return avgCircTime(moR,sleepEndField,false);});
-  })();
+  // Ein- und Aufwachzeiten für den Tooltip des Schlafdauer-Diagramms
+  const slStartArr=schlafzeitReihe(D, tKeys, tKeyTyp, 'sleepStart', true);
+  const slEndArr=schlafzeitReihe(D, tKeys, tKeyTyp, 'sleepEnd', false);
 
   document.getElementById("screen-schlaf").innerHTML=`
     ${pgBanner('🌙','Schlaf')}
@@ -3618,16 +3512,16 @@ function pgSchlaf() {
       <div class="chart-card split2">
         <h3>Schlafqualität-Verteilung</h3>
         <div class="goal-list">
-          <div class="goal-row"><span class="goal-lbl" style="color:#10B981">&gt; 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nOver85/nTot*100}%;background:#10B981"></div></div><span class="goal-val"><span class="goal-num">${nOver85}</span><span style="color:var(--txt3)">(${(nOver85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#84CC16">7 – 8.5h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n7to85/nTot*100}%;background:#84CC16"></div></div><span class="goal-val"><span class="goal-num">${n7to85}</span><span style="color:var(--txt3)">(${(n7to85/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EAB308">6 – 7h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${n6to7/nTot*100}%;background:#EAB308"></div></div><span class="goal-val"><span class="goal-num">${n6to7}</span><span style="color:var(--txt3)">(${(n6to7/nTot*100).toFixed(0)}%)</span></span></div>
-          <div class="goal-row"><span class="goal-lbl" style="color:#EF4444">≤ 6h</span><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${nBelow6/nTot*100}%;background:#EF4444"></div></div><span class="goal-val"><span class="goal-num">${nBelow6}</span><span style="color:var(--txt3)">(${(nBelow6/nTot*100).toFixed(0)}%)</span></span></div>
+          ${verteilungZeile('&gt; 8.5h', '#10B981', nSl(8.5,Infinity), nTot)}
+          ${verteilungZeile('7 – 8.5h', '#84CC16', nSl(7,8.5), nTot)}
+          ${verteilungZeile('6 – 7h', '#EAB308', nSl(6,7), nTot)}
+          ${verteilungZeile('≤ 6h', '#EF4444', nSl(-Infinity,6), nTot)}
         </div>
         <div class="stats-list">
           ${statZeile(`Beste Nacht`, `${alsStdMin(slMax)}`, `#10B981`)}
           ${statZeile(`Kürzeste Nacht`, `${alsStdMin(slMin)}`, `#EF4444`)}
-          ${statZeile(`Konsistenz`, `${consLabel}`, `${consColor}`)}
-          ${statZeile(`Messpunkte`, `${slRows.length}d <span style="color:var(--txt3)">(${D.length>0?(slRows.length/D.length*100).toFixed(0):'—'}%)</span>`)}
+          ${statZeile(`Konsistenz`, consLabel, consColor)}
+          ${messpunkteZeile(slRows.length, D.length)}
         </div>
       </div>
 
@@ -3635,16 +3529,16 @@ function pgSchlaf() {
         <div class="chart-head"><h3>Schlafschuld</h3>${scopeBadge('letzte 14 Nächte')}</div>
         <div class="stats-list">
           ${statZeile(`Zielschlaf pro Nacht`, `${alsStdMin(SLEEP_TARGET_H)}`)}
-          ${statZeile(`Letzte Nacht`, `${sleepDebt.last!=null?(sleepDebt.last>0?'−'+alsStdMin(sleepDebt.last):'+'+alsStdMin(-sleepDebt.last)):'—'}`, `${sleepDebt.last!=null?(sleepDebt.last>0?'#EF4444':'#10B981'):'var(--txt3)'}`)}
-          ${statZeile(`Ø pro Nacht`, `${sleepDebt.perNight!=null?(sleepDebt.perNight>0?'−'+alsStdMin(sleepDebt.perNight):'+'+alsStdMin(-sleepDebt.perNight)):'—'}`, `${debtLvl.color}`)}
-          ${statZeile(`Summe über ${sleepDebt.nDays} Nächte`, `${sleepDebt.total!=null?(sleepDebt.total>0?'−'+alsStdMin(sleepDebt.total):'+'+alsStdMin(-sleepDebt.total)):'—'}`, `${sleepDebt.total!=null?(sleepDebt.total>0?'#EF4444':'#10B981'):'var(--txt3)'}`)}
+          ${statZeile(`Letzte Nacht`, schuldText(sleepDebt.last), schuldFarbe(sleepDebt.last))}
+          ${statZeile(`Ø pro Nacht`, schuldText(sleepDebt.perNight), debtLvl.color)}
+          ${statZeile(`Summe über ${sleepDebt.nDays} Nächte`, schuldText(sleepDebt.total), schuldFarbe(sleepDebt.total))}
         </div>
         <div class="debt-bar-wrap">
           ${sleepDebt.perNight!=null?`<div style="font-size:.66rem;color:var(--txt3);margin-bottom:.3rem">${debtLvl.label} · Balken voll bei Ø ${alsStdMin(SLEEP_DEBT_FULL_BAR_H)} Defizit pro Nacht</div>
           <div class="debt-tt-wrap" tabindex="0" role="button" aria-label="Zusammensetzung der Schlafschuld anzeigen">
             <div class="debt-bar-bg"><div class="debt-bar-fill" style="width:${Math.min(100,Math.max(0,(sleepDebt.perNight/SLEEP_DEBT_FULL_BAR_H)*100))}%;background:${debtLvl.color}"></div></div>
             <div class="debt-tt">
-              <div class="debt-tt-title">Zusammensetzung – ${debtTtNDays} Nächte · Ziel ${alsStdMin(SLEEP_TARGET_H)}/Nacht</div>
+              <div class="debt-tt-title">Zusammensetzung – ${debtNaechte.length} Nächte · Ziel ${alsStdMin(SLEEP_TARGET_H)}/Nacht</div>
               <div class="debt-tt-hd"><span>Datum</span><span>Geschlafen</span><span style="text-align:right">Schuld / Plus</span></div>
               ${debtTooltipRows}
             </div>
@@ -3666,8 +3560,8 @@ function pgSchlaf() {
       </div>
       <div class="chart-wrap"><canvas id="c-sl-phases"></canvas></div>
       ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([
-          { werte: yoyWerte(D, r => r.sleepRem ?? r.remSleep ?? null, 'mittel'), vor: 'REM ' },
-          { werte: yoyWerte(D, r => r.sleepDeep ?? r.deepSleep ?? null, 'mittel'), vor: 'Tief ' }])}</div>`
+          { werte: yoyWerte(D, r => r.sleepRem, 'mittel'), vor: 'REM ' },
+          { werte: yoyWerte(D, r => r.sleepDeep, 'mittel'), vor: 'Tief ' }])}</div>`
       : awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
         ${awD!=null?`${statZeile(oeLabel('Wach'), `${alsStdMin(awD)} – ${awPct}%`)}`:''}
         ${remD!=null?`${statZeile(oeLabel('REM-Schlaf'), `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
@@ -3687,7 +3581,7 @@ function pgSchlaf() {
     // Y-Achse flexibel: nicht ab 0, sondern an den Datenbereich angeschmiegt, damit
     // die Variation zwischen den Nächten sichtbar wird (Schritt = 1 Std.).
     const _slV=slMa.filter(v=>v!=null);
-    const _slY={...gy,ticks:{...gy.ticks,stepSize:1,callback:v=>Math.floor(v)+'h'}};
+    const _slY={...achseY,ticks:{...achseY.ticks,stepSize:1,callback:v=>Math.floor(v)+'h'}};
     if(_slV.length){
       _slY.min=Math.max(0, Math.floor(Math.min(..._slV) - 0.5));
       _slY.max=Math.ceil(Math.max(..._slV) + 0.2);
@@ -3727,8 +3621,7 @@ function pgSchlaf() {
        spanGaps:true,stack:'ziel-avg'}]:[])
     ]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
-        // Der Balken ist aus zwei Segmenten aufgebaut, gemeint ist aber EINE Nacht:
-        // nur das untere Segment beschriften, und zwar mit der Gesamtdauer.
+        // Nur der Balken selbst, nicht die Hilfslinien.
         if(ctx.datasetIndex!==0) return null;
         const i=ctx.dataIndex;
         const gesamt=slMa[i];
@@ -3740,7 +3633,7 @@ function pgSchlaf() {
         if(slStartArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Eingeschlafen: '+fmtHHMM(slStartArr[i])));
         if(slEndArr[i]!=null) lines.push((_isAvg?'Ø ':'')+('Aufgewacht: '+fmtHHMM(slEndArr[i])));
         return lines;
-      }}}},scales:{x:{...gx,stacked:true},y:{..._slY,stacked:true}}}});
+      }}}},scales:{x:{...achseX,stacked:true},y:{..._slY,stacked:true}}}});
     if(hasPhases){
       const _phDs=[
         {label:'Tiefschlaf',data:dpMa,backgroundColor:'#1E1B6E',borderRadius:BALKEN_RADIUS,stack:'s'},
@@ -3763,16 +3656,16 @@ function pgSchlaf() {
           label:ctx=>{
             if(ctx.raw==null)return null;
             const total=ctx.chart.data.datasets.reduce((s,ds)=>s+(ds.data[ctx.dataIndex]??0),0);
-            const prozentDiff=total>0?Math.round(ctx.raw/total*100):0;
-            return `${ctx.dataset.label}: ${alsStdMin(ctx.raw)} (${prozentDiff}%)`;
+            const anteil=total>0?Math.round(ctx.raw/total*100):0;
+            return `${ctx.dataset.label}: ${alsStdMin(ctx.raw)} (${anteil}%)`;
           }
         }}},
-        scales:{x:{...gx,stacked:true},y:{...gy,stacked:true,ticks:{...gy.ticks,callback:v=>Math.floor(v)+'h'}}}}});
+        scales:{x:{...achseX,stacked:true},y:{...achseY,stacked:true,ticks:{...achseY.ticks,callback:v=>Math.floor(v)+'h'}}}}});
     }
     if(hasScore) zeichneDiagramm('c-sl-score',{__keys:tdL.keys,__keyTyp:tdL.keyTyp,
       __werteFmt:v=>String(Math.round(v)),
       type:'line',data:{labels:tdL.labels,datasets:[{data:scMa,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.08)',tension:.3,fill:true,pointRadius:3}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:gx,y:{...gy,min:0,max:100}}}});
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:achseX,y:{...achseY,min:0,max:100}}}});
   }
 }
 
@@ -3802,39 +3695,23 @@ async function pgTraining() {
   }
 
   // ── Trainingstage im aktuellen Filterzeitraum ──
-  // Quelle ist ausschließlich das Workout-Sheet (workoutData).
+  // Quelle ist ausschließlich das Workout-Sheet (workoutData); in zeitlicher
+  // Reihenfolge die Grundlage für das Pace-Diagramm.
   const _healthDates=new Set(D.map(r=>r.date));
   const trainDates=Object.keys(workoutData).filter(d=>_healthDates.has(d)).sort();
-  // Workout rows for current period (with HR data)
-
-  // ── Workout stats ──
-  // Trainingstage in zeitlicher Reihenfolge – Grundlage fuer Laufstrecke und Pace.
-  const trendDates=trainDates.slice().sort();
-  const trendLabels=trendDates.map(tagLabel);   // je Trainingstag: Wochentag + Datum
-  const trendDist=trendDates.map(d=>(workoutData[d]?.distanceKm??null));
-  // Very broad field detection
-  // minField removed – durationMin comes exclusively from Workout Data sheet (workoutData)
-
-  // New chart data — durationMin + distanceKm from CSV workout files
-  // Pace ausschliesslich aus `Speed (km/h)` des Workout-Sheets (Wunsch 05.09.2026).
-  // Damit stammen Strecke UND Pace aus derselben Messung – vorher kam die Strecke aus
-  // dem Workout-Sheet, die Pace aber aus `runSpeed` des Health-Sheets.
-  const trendPace=trendDates.map(d=>{
+  const trendLabels=trainDates.map(tagLabel);   // je Trainingstag: Wochentag + Datum
+  // Pace ausschliesslich aus `Speed (km/h)` des Workout-Sheets (Wunsch 05.09.2026):
+  // Strecke UND Pace stammen damit aus derselben Messung.
+  const trendPace=trainDates.map(d=>{
     const kmh = workoutData[d]?.avgSpeedKph>0 ? workoutData[d].avgSpeedKph : null;
     return kmh!=null ? Math.round(paceFromSpeed(kmh)*100)/100 : null;
   });
-  // Werktags / Wochenende splits for new chart footers
-  const _wkdIdx=trendDates.reduce((a,d,i)=>{const wd=new Date(d+'T00:00:00').getDay();if(wd>=1&&wd<=5)a.push(i);return a;},[]);
-  const _wkndIdx=trendDates.reduce((a,d,i)=>{const wd=new Date(d+'T00:00:00').getDay();if(wd===0||wd===6)a.push(i);return a;},[]);
-  const _avgNn=arr=>{const f=arr.filter(v=>v!=null);return f.length?f.reduce((a,b)=>a+b,0)/f.length:null;};
-  const distWkdAvg=_avgNn(_wkdIdx.map(i=>trendDist[i]));
-  const distWkndAvg=_avgNn(_wkndIdx.map(i=>trendDist[i]));
 
-  // Totals for period
-
-  // Aktive Tage = Tage mit Workout-Sheet-Eintrag und durationMin > 0.
-
-  // Weekday vs weekend training (use all days with the field, not just active ones)
+  // Wochentag/Wochenende: Strecke je Trainingstag, Dauer je Tag mit Eintrag.
+  const strSplit=splitWeekWknd(trainDates.map(d=>({date:d})));
+  const _strMittel=rows=>mittel(rows.map(r=>workoutData[r.date]?.distanceKm ?? null));
+  const distWkdAvg=_strMittel(strSplit.wkd);
+  const distWkndAvg=_strMittel(strSplit.wknd);
   const woMinSplit=splitWeekWknd(D.filter(r=>workoutData[r.date]?.durationMin!=null));
   const _woDur=rows=>rows.map(r=>workoutData[r.date].durationMin);
   const minWeek=mittel(_woDur(woMinSplit.wkd));
@@ -3846,8 +3723,6 @@ async function pgTraining() {
   // `_fensterWochen` — wie viele Wochen umfasst das ANGEZEIGTE FENSTER? Daraus wird
   // die Fusszeile „Ø pro Woche". `moWindow()` liefert ab 1M ein Fenster, bei 7T nicht:
   // dort waere der Wochenschnitt sinnlos, weil das Fenster selbst eine Woche IST.
-  // Seit 07.09.2026 ist 1M ausdruecklich eingeschlossen (vorher nur ab 3M) – ein
-  // Monat ist keine Woche, die Summe sagt fuer sich also ebenso wenig.
   //
   // `_monatsModus` — zeigt ein BALKEN einen ganzen Monat? Nur dann bekommt der
   // Tooltip seine zweite Zeile. Bei 1M steht je Balken ein Tag; ein Wochenschnitt
@@ -3856,18 +3731,16 @@ async function pgTraining() {
   const _fensterWochen = _mw ? wochenZwischen(_mw.s, _mw.e) : null;
   const _monatsModus = tKeyTyp === 'monat' && !!_mw;
 
-  // Workout-CSV-based aggregation (Duration + Distance from workoutData, all workout types)
-  // NOTE: _woByDate was removed — es filterte auf Health-Sheet-Tage und liess Indoor-Workouts aus
-  const woRows=D.map(r=>({date:r.date,_woDurMin:workoutData[r.date]?.durationMin??null,_woDistKm:workoutData[r.date]?.distanceKm??null,
-    _woHR:workoutData[r.date]?.avgHR??null,
-    // Pace aus derselben Quelle wie im Pace-Diagramm: Workout-Sheet.
-    _woPace:(()=>{const kmh=workoutData[r.date]?.avgSpeedKph>0?workoutData[r.date].avgSpeedKph:null;
-      return kmh!=null?paceFromSpeed(kmh):null;})(),
-    // Zaehlt die EINHEITEN je Zeitraum – gebraucht fuer "Oe pro Training". Vorher
-    // stand hier 1 je Tag; an Tagen mit zwei Einheiten fiel der Schnitt dadurch zu hoch aus.
-    _woAnzahl:workoutData[r.date]?(workoutData[r.date].anzahl||1):null,
-    _woLaeufe:workoutData[r.date]?.laeufe??null}));
-  const {align:tAvgWo,alignSum:tASwo}=timeDim(woRows);
+  // Workout-Werte je Health-Tag (alle Trainingsarten). Nicht auf Tage mit Workout
+  // gefiltert – sonst fielen Indoor-Einheiten ohne Health-Zeile heraus.
+  const woRows=D.map(r=>{
+    const w=workoutData[r.date];
+    return {date:r.date, _woDurMin:w?.durationMin??null, _woDistKm:w?.distanceKm??null,
+      // Zaehlt die EINHEITEN je Zeitraum – ein Tag mit zwei Einheiten zaehlt zweifach.
+      _woAnzahl:w?(w.anzahl||1):null,
+      _woLaeufe:w?.laeufe??null};
+  });
+  const {alignSum:tASwo}=timeDim(woRows);
   // Gesamtwerte des dargestellten Zeitraums – Summe ueber alle Tage des Fensters,
   // unabhaengig von der gewaehlten Aggregation (Tag/Woche/Monat).
   const summe = feld => { const v = woRows.map(r=>r[feld]).filter(x=>x!=null);
@@ -3886,41 +3759,21 @@ async function pgTraining() {
     m.laeufe += r._woLaeufe || 0;
     m.einheiten += r._woAnzahl || 0;
   });
-  const minSm_wo=tASwo('_woDurMin');
-  const distSm_wo=tASwo('_woDistKm');
 
-  // 1M daily: only show bars on actual training days (workout CSV present)
-  const _train1m=timeRange==='1m';
-  const minSmD=_train1m?minSm_wo.map(v=>v!=null&&v>0?v:null):minSm_wo;
-  const distSmD=_train1m?distSm_wo.map((v,i)=>minSmD[i]!=null?v:null):distSm_wo;
-
-  // 1M: build full calendar-month arrays + Monday indices for week gridlines
-  let _1mLabels=tL, _1mKeys=tKeys, _1mMinData=minSmD, _1mDistData=distSmD;
-  if(timeRange==='1m'){
-    const _rd=new Date(referenceDate+'T00:00:00');
-    const _yr=_rd.getFullYear(), _mo=_rd.getMonth();
-    const _dim=new Date(_yr,_mo+1,0).getDate();
-    const _bd={};D.forEach(r=>{_bd[r.date]=r;});
-    const _moDays=Array.from({length:_dim},(_,i)=>toLocalDateStr(new Date(_yr,_mo,i+1)));
-    _1mLabels=_moDays.map(tagLabel);
-    _1mKeys=_moDays;
-    _1mMinData=_moDays.map(d=>workoutData[d]?.durationMin??null);
-    _1mDistData=_moDays.map(d=>workoutData[d]?.distanceKm??null);
-  }
-
-  // Die Balkenreihen beider Diagramme – hier bestimmt statt erst beim Zeichnen, weil
-  // die Fusszeile „Durchschnitt" (auf Wunsch, 18.09.2026) denselben Wert zeigt wie die
-  // gestrichelte Ø-Linie: den Mittelwert der Balken, also je Tag (7T, 1M) bzw. je
-  // Monat (ab 3M) – passend zur Legende „pro Tag"/„pro Monat". Tage ohne Einheit
-  // fehlen in der Reihe (null) und zaehlen deshalb nicht mit.
-  const _balkenZeit = timeRange==='1m' ? _1mMinData  : minSmD;
-  const _balkenStr  = timeRange==='1m' ? _1mDistData : distSmD;
+  // Balkenreihen und Achse beider Diagramme. Bei 1M jeder Kalendertag des Monats
+  // direkt aus workoutData – auch Tage mit Workout, aber ohne Health-Zeile.
+  const _is1m=timeRange==='1m';
+  const _balkenKeys=tKeys, _balkenLabels=tL, _balkenKeyTyp=tKeyTyp;
+  const _balkenZeit = _is1m ? tKeys.map(d=>workoutData[d]?.durationMin??null) : tASwo('_woDurMin');
+  const _balkenStr  = _is1m ? tKeys.map(d=>workoutData[d]?.distanceKm??null)  : tASwo('_woDistKm');
+  // Die Fusszeile „Ø 1M" zeigt denselben Wert wie die gestrichelte Ø-Linie: den
+  // Mittelwert der Balken, also je Tag (7T, 1M) bzw. je Monat (ab 3M). Tage ohne
+  // Einheit fehlen in der Reihe (null) und zaehlen deshalb nicht mit.
   const oeZeitBalken = mittelArr(_balkenZeit);
   const oeStrBalken  = mittelArr(_balkenStr);
   // Ø-Pace: ebenfalls der Wert der Ø-Linie – Mittel ueber die Einheiten.
   const oePace = mittelArr(trendPace);
 
-  // hasAny stützt sich allein auf das Workout-Sheet – keine Health-CSV-Felder mehr.
   const hasAny=trainDates.length>0;
 
   const noDataCard=`<div class="no-data">
@@ -3983,17 +3836,9 @@ async function pgTraining() {
 
   // ── Totale Laufzeit & Laufstrecke ──
   {
-    const _is1m=timeRange==='1m';
-    const _zeitInH=timeRange!=='7d'&&timeRange!=='1m'; // 3M+ → show hours
-    const _xTot=gx;
-    const _lZeitData=_balkenZeit;
-    const _lStrData=_balkenStr;
-    const _lZeitLbls=_is1m?_1mLabels:tL;
-    const _lStrLbls=_is1m?_1mLabels:tL;
-    const _lZeitKeys=_is1m?_1mKeys:tKeys;
-    const _lKeyTyp=_is1m?'tag':tKeyTyp;
+    const _zeitInH=timeRange!=='7d'&&timeRange!=='1m'; // ab 3M: Achse in Stunden
 
-    zeichneDiagramm('c-tot-zeit',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
+    zeichneDiagramm('c-tot-zeit',{__keys:_balkenKeys,__keyTyp:_balkenKeyTyp,
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
@@ -4002,9 +3847,9 @@ async function pgTraining() {
       // vorher nur die ganze Stunde ("10h"), weil "10h 12m" neben 24 Nachbarn nicht
       // mehr lesbar war. "10:12" ist schmal genug.
       __werteFmt:v=>v?stdMinLabel(v/60):'',
-      type:'bar',data:{labels:_lZeitLbls,datasets:[
-      {label:'Laufzeit',data:_lZeitData,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
-      ...oeDatensatz('c-tot-zeit|oe', mittelArr(_lZeitData), '#F97316', _lZeitLbls.length)
+      type:'bar',data:{labels:_balkenLabels,datasets:[
+      {label:'Laufzeit',data:_balkenZeit,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
+      ...oeDatensatz('c-tot-zeit|oe', oeZeitBalken, '#F97316', _balkenLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       // fmtMin schreibt ab einer Stunde "1h 25min", darunter "45 min" – unabhaengig
       // davon, ob die Achse in Stunden oder Minuten beschriftet ist.
@@ -4015,8 +3860,8 @@ async function pgTraining() {
           // Monatsbalken (auf Wunsch, 14.09.2026, auch im Jahresvergleich): unter der
           // Summe „Ø / Lauf", darunter wie bisher „Ø / Woche". Die Zeit teilt durch ALLE
           // Einheiten – dieselbe Rechnung wie die Fusszeile „Ø pro Lauf".
-          if(_lKeyTyp!=='monat')return t;
-          const mo=_lZeitKeys[ctx.dataIndex], zeilen=[t];
+          if(_balkenKeyTyp!=='monat')return t;
+          const mo=_balkenKeys[ctx.dataIndex], zeilen=[t];
           const n=_proMonat[mo]?.einheiten;
           if(n)zeilen.push(`Ø ${fmtMin(ctx.raw/n)} / Lauf`);
           // Woche nur, wo es ein Fenster gibt (_monatsModus) – im Jahresvergleich nicht.
@@ -4024,40 +3869,40 @@ async function pgTraining() {
           if(w)zeilen.push(`Ø ${fmtMin(ctx.raw/w)} / Woche`);
           return zeilen.length>1?zeilen:t;
         }}}},
-      scales:{x:_xTot,y:{...gy,
-        ticks:{...gy.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
+      scales:{x:achseX,y:{...achseY,
+        ticks:{...achseY.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
-    zeichneDiagramm('c-tot-strecke',{__keys:_lZeitKeys,__keyTyp:_lKeyTyp,
+    zeichneDiagramm('c-tot-strecke',{__keys:_balkenKeys,__keyTyp:_balkenKeyTyp,
       // Ganze Kilometer, OHNE Einheit (auf Wunsch, 12.09.2026): ueber dem Balken
       // zaehlt der schnelle Blick, und "km" steht bereits an der Achse. Die
       // Nachkommastelle steht im Tooltip und in der Fusszeile.
       __werteFmt:v=>v?String(Math.round(v)):'',
-      type:'bar',data:{labels:_lStrLbls,datasets:[
-      {label:'Laufstrecke',data:_lStrData,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
-      ...oeDatensatz('c-tot-strecke|oe', mittelArr(_lStrData), '#FB923C', _lStrLbls.length)
+      type:'bar',data:{labels:_balkenLabels,datasets:[
+      {label:'Laufstrecke',data:_balkenStr,backgroundColor:'rgba(251,146,60,.80)',borderRadius:BALKEN_RADIUS},
+      ...oeDatensatz('c-tot-strecke|oe', oeStrBalken, '#FB923C', _balkenLabels.length)
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{
         label:ctx=>{
           if(ctx.raw==null)return null;
           const t=`${zahl(ctx.raw,1)} km`;
           // Wie bei der Trainingszeit; die Strecke teilt durch die Einheiten MIT Strecke.
-          if(_lKeyTyp!=='monat')return t;
-          const mo=_lZeitKeys[ctx.dataIndex], zeilen=[t];
+          if(_balkenKeyTyp!=='monat')return t;
+          const mo=_balkenKeys[ctx.dataIndex], zeilen=[t];
           const n=_proMonat[mo]?.laeufe;
           if(n)zeilen.push(`Ø ${zahl(ctx.raw/n,1)} km / Lauf`);
           const w=_monatsModus?wochenImMonat(mo):null;
           if(w)zeilen.push(`Ø ${zahl(ctx.raw/w,1)} km / Woche`);
           return zeilen.length>1?zeilen:t;
         }}}},
-      scales:{x:_xTot,y:{...gy,
-        ticks:{...gy.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});
+      scales:{x:achseX,y:{...achseY,
+        ticks:{...achseY.ticks,callback:v=>v===0?'0':Math.round(v)+' km'}}}}});
   }
 
   // ── Pace pro Training ──
   {
-    const _hasP=trendDates.length>0&&trendPace.some(v=>v!=null);
+    const _hasP=trainDates.length>0&&trendPace.some(v=>v!=null);
     const _paceLabels=_hasP?trendLabels:tL;
-    const _paceKeys=_hasP?trendDates:tKeys;
+    const _paceKeys=_hasP?trainDates:tKeys;
     const _paceKeyTyp=_hasP?'tag':tKeyTyp;
     const _paceData=_hasP?trendPace:tL.map(()=>null);
     const _pMin=_hasP?Math.floor(Math.min(...trendPace.filter(v=>v!=null))*0.97*10)/10:4;
@@ -4075,9 +3920,9 @@ async function pgTraining() {
         if(ctx.raw==null)return null;
         return `Pace: ${fmtPace(ctx.raw)} min/km`;
       }}}},
-      scales:{x:{...gx,ticks:{...gx.ticks,maxRotation:45,minRotation:30}},
-        y:{...gy,min:_pMin,max:_pMax,
-          ticks:{...gy.ticks,callback:v=>fmtPace(v)}}}}});
+      scales:{x:{...achseX,ticks:{...achseX.ticks,maxRotation:45,minRotation:30}},
+        y:{...achseY,min:_pMin,max:_pMax,
+          ticks:{...achseY.ticks,callback:v=>fmtPace(v)}}}}});
   }
 
   vo2.zeichnen();
@@ -4107,10 +3952,54 @@ const TRAININGSART_KURZ = {
   'Hochintensives Intervalltraining': 'Intervall (HIIT)'
 };
 function artLabel(typ) { const t = String(typ || '').trim(); return esc(TRAININGSART_KURZ[t] || t || 'Workout'); }
+// ── Gemeinsame Helfer der Einblicke (Training, Herz, Schlaf) ─────────────────
+const _EB_GUT = '#10B981', _EB_ACHTUNG = '#F97316';
+const _ebFett = s => ({ phrase: s, c: 'inherit' });   // nur fett: Tatsache
+const _ebDatum = ds => `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+const _ebTagMonat = ds => `${+ds.slice(8,10)}.${+ds.slice(5,7)}.`;
+const _ebMonat = ym => `${MONAT_LANG[+ym.slice(5,7) - 1]} ${ym.slice(0,4)}`;
+const _ebWochentag = ds => WOCHENTAG_LANG[new Date(ds + 'T00:00:00').getDay()];
+const _ebTage = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+const _ebMedian = werte => _ebQuantil(werte, .5);
+// Die letzten 91 Tage bis `ende` und die 91 davor – fuer alle „3 Monate gegen die
+// 3 davor"-Vergleiche. `datum(x)` liest das Datum eines Eintrags.
+function _ebQuartale(ende, datum = x => x.date) {
+  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
+  return {
+    letzte3: liste => liste.filter(x => datum(x) > drei),
+    davor3:  liste => liste.filter(x => datum(x) > sechs && datum(x) <= drei)
+  };
+}
+// Uhrzeit aus Stunden (auch ueber 24, fuer Einschlafzeiten nach Mitternacht). Erst auf
+// die Minute runden – fmtHHMM allein machte aus 23.999 „23:00".
+const _ebUhr = h => fmtHHMM((Math.round(h * 60) % 1440 + 1440) % 1440 / 60);
+function _ebQuantil(werte, p) {
+  const s = werte.filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
+  if (!s.length) return null;
+  const i = (s.length - 1) * p, u = Math.floor(i);
+  return s[u] + (s[Math.min(u + 1, s.length - 1)] - s[u]) * (i - u);
+}
+// Werte je Gruppe (Monat, Woche …): { schluessel: [werte] }
+function _ebGruppiert(rows, schluessel, wert) {
+  const g = {};
+  rows.forEach(r => { const v = wert(r); if (v == null) return; const k = schluessel(r); (g[k] = g[k] || []).push(v); });
+  return g;
+}
+// Beste Gruppe nach Mittelwert, nur Gruppen mit mindestens `min` Werten. null, wenn
+// weniger als drei Gruppen in Frage kommen – ein Rekord unter zweien ist keiner.
+function _ebBeste(gruppen, min, hoch) {
+  const l = Object.entries(gruppen).filter(([, v]) => v.length >= min)
+    .map(([k, v]) => ({ k, wert: mittelArr(v), n: v.length }));
+  if (l.length < 3) return null;
+  return l.reduce((a, b) => (hoch ? b.wert >= a.wert : b.wert <= a.wert) ? b : a);   // Gleichstand: der juengste
+}
+const _EB_WINTER = [12, 1, 2], _EB_SOMMER = [6, 7, 8];
+const _ebSaison = (rows, monate) => rows.filter(r => monate.includes(+r.date.slice(5,7)));
+
 function trainingsInsights() { return _memo('trainingsInsights', _trainingsInsightsBerechnen); }
 
 function _trainingsInsightsBerechnen() {
-  const tage = Object.keys(workoutData).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const tage = Object.keys(workoutData).filter(istDatum).sort();
   if (!tage.length) return [];
   const zahlOk = v => (typeof v === 'number' && isFinite(v)) ? v : null;
   const einheiten = [];
@@ -4129,23 +4018,16 @@ function _trainingsInsightsBerechnen() {
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
 
   // Helfer
-  const F = s => ({ phrase: s, c: 'inherit' });                 // nur fett: Tatsache
-  const GUT = '#10B981', ACHTUNG = '#F97316';
-  const datumDe = ds => `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
-  const tagMonat = ds => `${+ds.slice(8,10)}.${+ds.slice(5,7)}.`;
-  const monatLang = ym => `${MONAT_LANG[+ym.slice(5,7) - 1]} ${ym.slice(0,4)}`;
+  const F = _ebFett, GUT = _EB_GUT, ACHTUNG = _EB_ACHTUNG, ORANGE = '#F97316';
+  const datumDe = _ebDatum, tagMonat = _ebTagMonat, monatLang = _ebMonat, tageZwischen = _ebTage, median = _ebMedian;
   const tsd = v => Math.round(v).toLocaleString('de-CH');
-  const tageZwischen = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
   const summe = (liste, f) => liste.reduce((s, e) => s + (f(e) || 0), 0);
-  const median = arr => { const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  // Groesster Eintrag eines Zaehlers; bei Gleichstand der juengste Schluessel.
   const maxEintrag = obj => Object.entries(obj).sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0];
   const pace = e => paceFromSpeed(e.speed);
-  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
-  const letzte3 = liste => liste.filter(e => e.datum > drei);
-  const davor3  = liste => liste.filter(e => e.datum > sechs && e.datum <= drei);
+  const { letzte3, davor3 } = _ebQuartale(ende, e => e.datum);
 
   const rekorde = [], gewohnheiten = [], entwicklung = [], gesundheit = [];
-  const ORANGE = '#F97316';
 
   // ── Rekorde ──
   // 1 Rekordmonat (km)
@@ -4433,39 +4315,6 @@ function einblickeHTML(abschnitte, klapp) {
 // die HRV je Wochentag und die Schlafdauer Wochentag gegen Wochenende.
 // Nacht-Zuordnung wie ueberall: `sleepTotal` am Tag d ist die Nacht VOR d.
 // Jede Karte hat Mindestmengen und fehlt, wenn sie nicht erreicht sind.
-const _EB_GUT = '#10B981', _EB_ACHTUNG = '#F97316';
-const _ebFett = s => ({ phrase: s, c: 'inherit' });   // nur fett: Tatsache
-const _ebDatum = ds => `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
-const _ebTagMonat = ds => `${+ds.slice(8,10)}.${+ds.slice(5,7)}.`;
-const _ebMonat = ym => `${MONAT_LANG[+ym.slice(5,7) - 1]} ${ym.slice(0,4)}`;
-const _ebWochentag = ds => WOCHENTAG_LANG[new Date(ds + 'T00:00:00').getDay()];
-const _ebTage = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
-// Uhrzeit aus Stunden (auch ueber 24, fuer Einschlafzeiten nach Mitternacht). Erst auf
-// die Minute runden – fmtHHMM allein machte aus 23.999 „23:00".
-const _ebUhr = h => fmtHHMM((Math.round(h * 60) % 1440 + 1440) % 1440 / 60);
-function _ebQuantil(werte, p) {
-  const s = werte.filter(v => v != null && isFinite(v)).sort((a, b) => a - b);
-  if (!s.length) return null;
-  const i = (s.length - 1) * p, u = Math.floor(i);
-  return s[u] + (s[Math.min(u + 1, s.length - 1)] - s[u]) * (i - u);
-}
-// Werte je Gruppe (Monat, Woche …): { schluessel: [werte] }
-function _ebGruppiert(rows, schluessel, wert) {
-  const g = {};
-  rows.forEach(r => { const v = wert(r); if (v == null) return; const k = schluessel(r); (g[k] = g[k] || []).push(v); });
-  return g;
-}
-// Beste Gruppe nach Mittelwert, nur Gruppen mit mindestens `min` Werten. null, wenn
-// weniger als drei Gruppen in Frage kommen – ein Rekord unter zweien ist keiner.
-function _ebBeste(gruppen, min, hoch) {
-  const l = Object.entries(gruppen).filter(([, v]) => v.length >= min)
-    .map(([k, v]) => ({ k, wert: mittelArr(v), n: v.length }));
-  if (l.length < 3) return null;
-  return l.reduce((a, b) => (hoch ? b.wert >= a.wert : b.wert <= a.wert) ? b : a);   // Gleichstand: der juengste
-}
-const _EB_WINTER = [12, 1, 2], _EB_SOMMER = [6, 7, 8];
-const _ebSaison = (rows, monate) => rows.filter(r => monate.includes(+r.date.slice(5,7)));
-
 function herzInsights() { return _memo('herzInsights', _herzInsightsBerechnen); }
 function _herzInsightsBerechnen() {
   const hr = allData.filter(r => r.restHR > 0), hv = allData.filter(r => r.hrv > 0);
@@ -4476,9 +4325,7 @@ function _herzInsightsBerechnen() {
   const PULS = '#EF4444', HRV = '#2563EB';
   const bpm = v => `${Math.round(v)} bpm`, ms = v => `${Math.round(v)} ms`;
   const puls = rows => rows.map(r => r.restHR), var_ = rows => rows.map(r => r.hrv);
-  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
-  const letzte3 = rows => rows.filter(r => r.date > drei);
-  const davor3  = rows => rows.filter(r => r.date > sechs && r.date <= drei);
+  const { letzte3, davor3 } = _ebQuartale(ende);
   const rekorde = [], muster = [], entwicklung = [], alltag = [];
 
   // ── Rekorde ──
@@ -4700,19 +4547,15 @@ function _schlafInsightsBerechnen() {
   const LILA = '#7C3AED', LILA_HELL = '#8B5CF6', LILA_DUNKEL = '#6D28D9';
   const dauer = rows => rows.map(r => r.sleepTotal);
   const minuten = h => Math.round(h * 60);
-  const drei = addDays(ende, -91), sechs = addDays(ende, -182);
-  const letzte3 = rows => rows.filter(r => r.date > drei);
-  const davor3  = rows => rows.filter(r => r.date > sechs && r.date <= drei);
+  const { letzte3, davor3 } = _ebQuartale(ende);
   const quote = rows => Math.round(rows.filter(r => r.sleepTotal >= ZIEL).length / rows.length * 100);
   const rekorde = [], rhythmus = [], entwicklung = [], zusammen = [];
 
   // Schlafzeiten. Einschlafen vor Mittag zaehlt als nach Mitternacht (+24 h), sonst
   // laege 00:30 im Mittel sieben Stunden vor 23:30. Die Schlafmitte nur, wenn die Nacht
   // plausibel lang ist (2–16 h) – sonst ist eine der beiden Angaben verrutscht.
-  const fStart = findAnyField(allData,'sleepStart','sleepOnset','bedtime','inBedStart','sleepBegin','asleepAt','sleepTime','startSleep');
-  const fEnde  = findAnyField(allData,'sleepEnd','wakeTime','wakeUp','wakeAt','inBedEnd','sleepStop','wokenAt','endSleep');
   const zeiten = naechte.map(r => {
-    const s = fStart ? parseTV(r[fStart]) : null, e = fEnde ? parseTV(r[fEnde]) : null;
+    const s = parseTV(r.sleepStart), e = parseTV(r.sleepEnd);
     const ein = s != null ? (s < 12 ? s + 24 : s) : null;
     let mitte = null;
     if (ein != null && e != null) { let auf = e; while (auf <= ein) auf += 24; if (auf - ein >= 2 && auf - ein <= 16) mitte = (ein + auf) / 2; }
@@ -4846,7 +4689,7 @@ function _schlafInsightsBerechnen() {
   // 12 Folgenacht nach Trainings- gegen Ruhetage. Ruhetage erst ab dem ersten
   // erfassten Training – davor fehlt nur das Workout-Blatt, nicht das Training.
   {
-    const trainTage = Object.keys(workoutData).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const trainTage = Object.keys(workoutData).filter(istDatum).sort();
     if (trainTage.length) {
       const trainSet = new Set(trainTage);
       const folge = d => byDate[addDays(d, 1)];
@@ -4899,16 +4742,9 @@ function vo2Abschnitt(D) {
   const {labels:_v2tL,align:_v2tA,hasData:_v2tHD,keys:_v2Keys,keyTyp:_v2KeyTyp}=timeDim(D,true,true);
   const v2MaFull=_v2tA('vo2max');
 
-  // Die frühere Karte "Fitness-Einordnung" ist aufgelöst: ihr farbiger Skalenbalken ist
-  // entfallen, ihre Werte standen danach als Fusszeile unter dem Verlauf.
-  // Seit 13.09.2026 waren davon auf Wunsch nur noch zwei Zeilen übrig: „Ø VO₂max" und
-  // „Veränderung". Mit „Einordnung", „Trend" und „Messungen" ist auch die Stufenskala
-  // `_vo2Cat` (Exzellent … Niedrig) ersatzlos entfallen — sie hatte keinen zweiten
-  // Leser. Wer sie zurückholt, findet sie in der Git-Historie.
-  // Seit 18.09.2026 (auf Wunsch) ist auch „Veränderung" weg; mit ihr der Vergleich mit
-  // der Vorperiode (`prevPeriod()`), den nur sie brauchte. Es bleibt die
-  // Durchschnittszeile („Ø 1M" …).
-  const html = `    <!-- VO₂max (vormals eigener Tab → jetzt zuunterst) -->
+  // Fusszeile: nur die Durchschnittszeile („Ø 1M" …) bzw. im Jahresvergleich die
+  // Vorjahreszeilen.
+  const html = `
     <div class="chart-card" style="margin-bottom:0">
       <h3>VO₂max-Verlauf ${infoI('vo2max')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#D97706"></span>VO₂max</div>${hlLegende('c-vo2|ziel','Ziel','rgba(100,116,139,.55)')}${hlLegende('c-vo2|oe','Ø','#D97706')}</div>
@@ -4930,15 +4766,15 @@ function vo2Abschnitt(D) {
       const _v2Step=2;
       const _v2YMin=Math.floor(_v2Min/_v2Step)*_v2Step;
       const _v2YMax=Math.ceil(_v2Max/_v2Step)*_v2Step;
-      const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true}];
-      _v2Dsets.push(...zielDatensatz('c-vo2|ziel', 'vo2max', _v2tL.length));
-      _v2Dsets.push(...oeDatensatz('c-vo2|oe', mittelArr(v2MaFull), '#D97706', _v2tL.length));
+      const _v2Dsets=[{data:v2MaFull,borderColor:'#D97706',backgroundColor:'rgba(217,119,6,.08)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#D97706',spanGaps:true},
+        ...zielDatensatz('c-vo2|ziel', 'vo2max', _v2tL.length),
+        ...oeDatensatz('c-vo2|oe', mittelArr(v2MaFull), '#D97706', _v2tL.length)];
       zeichneDiagramm('c-vo2',{__keys:_v2Keys,__keyTyp:_v2KeyTyp,
         __werteFmt:v=>zahl(v,1),
         type:'line',data:{labels:_v2tL,datasets:_v2Dsets},
         options:{responsive:true,maintainAspectRatio:false,
           plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,filter:nurMesswerte,callbacks:{label:ctx=>ctx.raw!=null?`VO₂max: ${zahl(ctx.raw,2)} ml/kg/min`:null}}},
-          scales:{x:gx,y:{...gy,min:_v2YMin,max:_v2YMax,ticks:{...gy.ticks,stepSize:_v2Step}}}}});
+          scales:{x:achseX,y:{...achseY,min:_v2YMin,max:_v2YMax,ticks:{...achseY.ticks,stepSize:_v2Step}}}}});
     }
   }
 
@@ -4947,29 +4783,20 @@ function vo2Abschnitt(D) {
 
 // ── Navigation ─────────────────────────────────────────
 const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTraining};
-// Page-Banner ohne inline-Gradient – die Per-Tab-Hintergründe sind auf .screen gesetzt.
-// g1/g2 werden zwar von alten Aufrufern noch übergeben, hier aber ignoriert.
+// Kontrast-Symbol des Dark-Toggles (auf Wunsch, 18.09.2026): ein Kreis mit gefuellter
+// Haelfte. EIN Symbol fuer beide Zustaende – im Dunkelmodus dreht es sich per CSS um
+// 180°, deshalb tauscht `applyDarkMode` nichts aus.
 const DARK_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path class="voll" d="M12 3.5a8.5 8.5 0 0 1 0 17Z"/></svg>`;
+// Titelzeile eines Tabs: Emoji + Name, rechtsbündig Zahnrad (nur Übersicht) und
+// Dark-Toggle. Die Tab-Hintergründe sitzen auf .screen, nicht hier.
 function pgBanner(icon,title){
-  // Dark-Toggle sitzt rechtsbündig direkt auf der Titelzeile (keine eigene
-  // Topbar-Kachel mehr). Dark-Icon spiegelt den aktuellen Zustand.
-  // Untertitel und Daten-Stand sind entfallen: der Untertitel erklärte nur den
-  // Tabnamen, der Daten-Stand steht jetzt einmal auf der Einstellungen-Seite.
-  // Kontrast-Symbol statt 🌙/☀️ (auf Wunsch, 18.09.2026): ein Kreis mit gefuellter
-  // Haelfte, in derselben Linienoptik wie das Zahnrad daneben. Es ist EIN Symbol fuer
-  // beide Zustaende – im Dunkelmodus dreht es sich per CSS um 180° (die gefuellte
-  // Haelfte wandert nach links), deshalb tauscht `applyDarkMode` nichts mehr aus.
-  const darkIcon = DARK_SYMBOL;
-  // Der Ausklapp-Schalter sass bis 07.09.2026 hier. Er steht jetzt unten links in der
-  // Zeitleiste (`zeitleisteAusklapp()`) und macht dort deren passiven Modus mit.
-  // Zahnrad NUR in der Uebersicht. Es traegt die durchscheinende Optik der uebrigen
-  // `.pg-act`.
+  // Zahnrad NUR in der Uebersicht, in der durchscheinenden Optik der uebrigen `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
     ? `<button class="pg-act einst-act" title="Einstellungen" aria-label="Einstellungen">
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Dunkelmodus" aria-pressed="${document.body.classList.contains('dark')?'true':'false'}">${darkIcon}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Dunkelmodus" aria-pressed="${document.body.classList.contains('dark')?'true':'false'}">${DARK_SYMBOL}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -4981,14 +4808,11 @@ let _currentRenderingTab = null;
 const _renderedTabs = new Set();
 const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 
-// Refresh + Dark-Toggle liegen jetzt rechtsbündig auf der Banner-Titelzeile
-// jedes Tabs (siehe pgBanner) – keine separate Topbar-Kachel mehr.
-// „Heute" + angezeigter Zeitraum liegen in der Titelzeile jedes Diagramms
-// (filterTitelTeil / _injectChartFilters); Bereichswahl und Blätterpfeile stehen
-// EINMAL in der Zeitleiste unten am Bildschirm (zeitleisteBauen).
+// Der angezeigte Zeitraum steht in der Titelzeile jedes Diagramms (filterTitelTeil);
+// Bereichswahl, „Heute" und Blätterpfeile stehen EINMAL in der Zeitleiste unten am
+// Bildschirm (zeitleisteBauen).
 
-// Filter-Control für eine Diagramm-Karte: Bereichs-Dropdown + Mini-Datumsnavigator.
-// Schreibt in denselben globalen Zustand (timeRange/referenceDate) → app-weit synchron.
+// Die wählbaren Bereiche: [timeRange-Wert, Beschriftung].
 const _RANGE_OPTS = [
   ['7d','7T'],['1m','1M'],['3m','3M'],
   ['6m','6M'],['12m','12M'],['24m','24M']
@@ -5004,10 +4828,9 @@ function oeLabel(zusatz) {
   const basis = 'Ø ' + (t ? t[1] : timeRange);
   return zusatz ? basis + ' · ' + zusatz : basis;
 }
-// Angezeigter Zeitraum als Text – nur bei den Monatsbereichen. Bei Heute/7T steht das
-// Datum bereits auf der Zeitachse; ab 1M zeigt sie je nach Bereich nur noch Monate,
-// und aus "Jun 26" allein ist nicht ablesbar, wie weit das Fenster zurückreicht.
-const MONAT_KURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+// Angezeigter Zeitraum als Text: bei 7T die Kalenderwoche, ab 1M der Monatsbereich –
+// die Zeitachse zeigt dort nur Monate, und aus "Jun 26" allein ist nicht ablesbar,
+// wie weit das Fenster zurückreicht.
 function zeitraumText() {
   // Bei 7T die Kalenderwoche des angezeigten Fensters. Das Fenster laeuft Montag bis
   // Sonntag (weekDays7 baut es ueber getWeekMonday auf) und ist damit genau eine
@@ -5034,17 +4857,8 @@ function zeitraumText() {
   return monat(mw.s) + ' ' + jahr(mw.s) + '–' + monat(mw.e) + ' ' + jahr(mw.e);
 }
 
-  // Eigene Zeile UNTER dem Diagramm-Titel statt daneben: neben dem Titel belegte die
-  // Leiste zwei Drittel der Kopfzeile und schnitt ihn auf „V…" / „❤️.." zusammen.
-  // Die Zeitspanne als Text ist bewusst weg – sie steht bereits auf der Zeitachse.
-// Die Bedienelemente sind auf zwei Zeilen verteilt: "Heute" und der Zeitraum stehen
-// rechts neben dem Kartentitel, Auswahlfeld und Pfeile rechts in der Legendenzeile.
-// So bleibt jede Zeile schmal genug – zusammen belegten sie zwei Drittel einer Zeile.
-// Nur noch der angezeigte Zeitraum. Der frueher hier stehende „Heute"-Knopf ist auf
-// Wunsch entfallen; seine Aufgabe – auf den neuesten Tag springen – hat der Eintrag
-// „Heute" in der Zeitleiste uebernommen (aufHeuteSpringen).
-// zeitraumText() liefert bei 7T die Kalenderwoche ("KW 36"), ab 1M den Monatsbereich.
-// Leer bleibt es nur ohne Bezugsdatum; `.filter-titel:empty` blendet den Kasten dann aus.
+// Der angezeigte Zeitraum rechts im Kartentitel. Leer bleibt er nur ohne
+// Bezugsdatum; `.filter-titel:empty` blendet den Kasten dann aus.
 function filterTitelTeil() {
   const zeitraum = zeitraumText();
   return `<div class="filter-titel">${zeitraum?`<span class="zeitraum-text">${zeitraum}</span>`:''}</div>`;
@@ -5064,11 +4878,8 @@ function aufHeuteSpringen() {
 // nicht verschwindet.
 //
 // Vorher steckten Auswahlfeld und Blätterpfeile in JEDER Diagrammkarte — zwölf
-// Kopien desselben Bedienelements für einen einzigen globalen Zustand. Sie
-// brauchten je Karte eine zweite Zeile und drängten die Legende so weit zusammen,
-// dass zwei Diagramme sie zweizeilig setzen mussten. Jetzt gibt es sie genau einmal.
-// In den Karten bleibt nur, was sich je Karte unterscheidet: „Heute" und der
-// angezeigte Zeitraum (filterTitelTeil).
+// Kopien desselben Bedienelements für einen einzigen globalen Zustand. In den Karten
+// bleibt nur der angezeigte Zeitraum (filterTitelTeil).
 let _zlOffen = false;
 
 function zeitleisteBauen() {
@@ -5076,17 +4887,10 @@ function zeitleisteBauen() {
   // Aus _RANGE_OPTS erzeugt — die Liste der Zeiträume bleibt damit an einer Stelle.
   const opts = _RANGE_OPTS.map(([k,lbl]) =>
     `<button class="zl-opt" data-range="${k}">${lbl}</button>`).join('');
-  // „Heute" und „YoY" sind KEINE Bereiche, sondern Befehle: „Heute" schiebt den
-  // Ausschnitt ans Ende (der Bereich bleibt), „YoY" schaltet den Jahresvergleich ein
-  // und aus. Deshalb ohne `data-range`, mit eigener Klasse und in einer EIGENEN
-  // Zeile ueber den Bereichs-Chips — sonst saehen sie aus wie weitere Auswahlen und
-  // man erwartete eine Tagesansicht.
-  // Die eigene Zeile ist zugleich eine Platzfrage: die Chips belegten bei 375 px
-  // schon mit „Heute" 332 von 332 px (siehe Messnotiz im CSS). „YoY" haette die
-  // Zeile umbrechen lassen — an einer beliebigen Stelle statt an der, die zur
-  // Bedeutung passt. Der frueher noetige senkrechte `.zl-trenner` ist damit weg.
-  // „Heute" sitzt seit 18.09.2026 (auf Wunsch) nicht mehr hier, sondern als eigener
-  // Knopf links neben dem Pfeil ‹ in der Reihe – siehe unten.
+  // „YoY" ist KEIN Bereich, sondern ein Befehl (Jahresvergleich ein/aus). Deshalb
+  // ohne `data-range`, mit eigener Klasse und in einer EIGENEN Zeile ueber den
+  // Bereichs-Chips – das trennt, was etwas tut, von dem, was den Zeitraum waehlt, und
+  // haelt die Chip-Zeile bei 375 px ohne Umbruch.
   const aktionen = `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
@@ -5123,7 +4927,7 @@ function zeitleisteBauen() {
 
 // Ausklapp-Knopf des AKTUELLEN Tabs. Er sitzt in der Zeitleiste, sein Inhalt haengt
 // aber am Tab: `AUSKLAPP` sagt, ob es dort etwas zu klappen gibt und wie es heisst.
-// Tabs ohne Eintrag (Training) zeigen ihn gar nicht.
+// Tabs ohne Eintrag zeigen ihn gar nicht.
 function zeitleisteAusklapp() {
   const knopf = document.querySelector('#zeitleiste .zl-ausklapp');
   if (!knopf) return;
@@ -5155,9 +4959,7 @@ function zeitleisteAktualisieren() {
     yoy.classList.toggle('aktiv', istYoY());
     yoy.setAttribute('aria-pressed', istYoY() ? 'true' : 'false');
   }
-  // Die Pfeile sind immer da. Frueher verschwanden sie beim Bereich „Heute" — den
-  // gibt es nicht mehr, und jeder verbliebene Bereich laesst sich blaettern.
-  // Ob ein Schritt moeglich ist, sagt weiterhin `updateNavUI()` ueber `disabled`.
+  // Ob ein Schritt moeglich ist, sagt `updateNavUI()` ueber die Klasse `.inaktiv`.
   el.querySelectorAll('.zl-opt').forEach(b => {
     b.classList.toggle('aktiv', b.dataset.range === timeRange);
   });
@@ -5230,42 +5032,28 @@ function zeitleisteAuswahl(offen) {
   a.onfinish = ende;
   setTimeout(ende, 150 + 80);
 }
-// Zeitfilter EINMAL pro Tab, direkt unter dem Banner.
-//
-// Vorher steckte diese Leiste in jeder einzelnen Diagramm-Karte – zwölfmal in der
-// App, obwohl alle Kopien denselben globalen Zustand steuern. Sie belegte rund zwei
-// Drittel der Kopfzeile, wodurch die Diagramm-Titel auf dem iPhone zu "V…", "7…"
-// oder "❤️.." abgeschnitten wurden: Man konnte bei keinem Diagramm mehr erkennen,
-// was es zeigt. Eine Leiste pro Tab löst beides auf einmal.
-function _injectChartFilters(name) {
+// Den angezeigten Zeitraum in die Titelzeile jeder Diagrammkarte setzen.
+function _zeitraumEinsetzen(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
-  // Eine Leiste pro Diagramm, auf zwei Zeilen verteilt: "Heute" und der angezeigte
-  // Zeitraum stehen rechts neben dem Titel, Auswahlfeld und Pfeile rechts in der
-  // Legendenzeile. Zusammen in einer Zeile belegten sie zwei Drittel der Breite.
   screenEl.querySelectorAll('.chart-card').forEach(card => {
     if (!card.querySelector('canvas')) return;         // nur echte Diagramm-Karten
-    if (card.querySelector('.filter-titel')) return;   // nicht doppelt injizieren
+    if (card.querySelector('.filter-titel')) return;   // nicht doppelt einsetzen
     const titel = card.querySelector(':scope > .chart-head') || card.querySelector(':scope > h3');
     if (titel) titel.insertAdjacentHTML('beforeend', filterTitelTeil());
-    // Zweite Zeile mit Auswahlfeld und Pfeilen gibt es nicht mehr — das steht jetzt
-    // in der Zeitleiste unten am Bildschirm. Die Legende bekommt damit die volle
-    // Kartenbreite zurück.
   });
 }
 
-// Nach dem Render eines Tabs: Filter-Controls in die Diagramme setzen und
-// den Navigations-Zustand (Pfeile/Label) aktualisieren. (Refresh/Dark sitzen
-// jetzt im Banner, daher keine separate Topbar-Injektion mehr.)
-function _injectTopbar(name) {
+// Nach dem Aufbau eines Tabs: Zeitraum in die Karten, Balken und Kacheln animieren,
+// Pfeil-Zustand setzen und die Blickposition wiederherstellen.
+function _tabNachbereiten(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
-  _injectChartFilters(name); // Filter-Controls in die Diagramm-Karten setzen
+  _zeitraumEinsetzen(name);
   balkenFuellen(name);
   if (name === 'overview') kachelnHochzaehlen();
-  // Disable-State der Pfeile + Label gleich nach Inject korrekt setzen
   updateNavUI();
-  // Erst hier steht die endgueltige Hoehe fest – die Filterleisten sind gesetzt.
+  // Erst hier steht die endgueltige Hoehe fest – die Zeitraum-Angaben sind gesetzt.
   if (name === currentScreen) blickAnkerWiederherstellen();
 }
 
@@ -5299,7 +5087,8 @@ function balkenFuellen(tab) {
   _balkenStand[tab] = neu;
 }
 
-// Render einen Tab (oder gibt zurück, wenn schon gerendert)
+// Einen Tab (neu) aufbauen. Rückgabe: Promise bei async-Tabs (Training), sonst
+// undefined – fürs sequentielle Vorrendern.
 function _renderTab(name) {
   _currentRenderingTab = name;
   // alte Charts dieses Tabs zerstören
@@ -5309,20 +5098,17 @@ function _renderTab(name) {
   tabCharts[name] = [];
   const seitenFn = PAGE_FNS[name];
   if (!seitenFn) return;
+  const fehler = e => {
+    document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${esc(e.message)}</div>`;
+    _tabNachbereiten(name);
+  };
   let r;
   try {
     r = seitenFn();
-    if (r && typeof r.then === 'function') {
-      r.then(() => _injectTopbar(name))
-       .catch(e => { document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${esc(e.message)}</div>`; _injectTopbar(name); });
-    } else {
-      _injectTopbar(name);
-    }
-  } catch(e) {
-    document.getElementById('screen-'+name).innerHTML = `<div class="no-data"><strong>Fehler</strong> ${esc(e.message)}</div>`;
-    _injectTopbar(name);
-  }
-  return r; // Promise bei async-Tabs (Training), sonst undefined – fürs sequentielle Vorrendern
+    if (r && typeof r.then === 'function') r.then(() => _tabNachbereiten(name)).catch(fehler);
+    else _tabNachbereiten(name);
+  } catch(e) { fehler(e); }
+  return r;
 }
 
 // ── Tabs im Hintergrund vorrendern, damit beim Wischen kein leeres Panel erscheint ──
@@ -5365,8 +5151,6 @@ function _setStatusBarColor(name) {
   if (meta && TAB_THEME_COLORS[name]) {
     meta.setAttribute('content', TAB_THEME_COLORS[name]);
   }
-  // KEIN setzen von documentElement.style.background mehr – Body-Gradient mit
-  // height:100dvh deckt jetzt die volle physische Viewport-Fläche ab.
 }
 
 // ── Farb-Crossfade: vollflächiger Hintergrund-Gradient pro Tab ──────────
@@ -5410,7 +5194,6 @@ function setTabBackgroundInstant(name) {
   void a.offsetWidth; // Reflow erzwingen, damit der Sofort-Wechsel sicher greift
 }
 
-// Tab-State setzen (Bottom-Nav-Active, Body-Theme-Klasse, ggf. lazy rendern)
 // Tabfarbe umschalten, ohne alles andere am <body> mitzureissen.
 //
 // Vorher stand hier zweimal `document.body.className = 'theme-' + name + …` — einmal
@@ -5427,16 +5210,19 @@ function setTabBackgroundInstant(name) {
 // unberuehrt — auch Klassen, die es heute noch gar nicht gibt.
 function themaSetzen(name) {
   const body = document.body;
-  Array.prototype.slice.call(body.classList)
-    .filter(function (c) { return c.indexOf('theme-') === 0; })
-    .forEach(function (c) { body.classList.remove(c); });
+  [...body.classList].filter(c => c.startsWith('theme-')).forEach(c => body.classList.remove(c));
   body.classList.add('theme-' + name);
 }
-
-function _applyTabState(name) {
+// Markierung in der Tableiste auf den Tab `name` setzen.
+function tableisteMarkieren(name) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const navEl = document.getElementById('nav-'+name);
   if (navEl) navEl.classList.add('active');
+}
+
+// Tab-Zustand setzen (Tableiste, Tabfarbe, Zeitleiste, ggf. erst jetzt aufbauen).
+function _applyTabState(name) {
+  tableisteMarkieren(name);
   themaSetzen(name);
   // Beim Tabwechsel hat eine offene Auswahl ausgedient.
   zeitleisteAuswahl(false);
@@ -5449,7 +5235,7 @@ function _applyTabState(name) {
     _renderedTabs.add(name);
   }
   // Bottom-Nav-Sichtbarkeit bleibt beim Tab-Wechsel erhalten: ausgeblendet bleibt
-  // ausgeblendet, bis sie per Hintergrund-Tipp oder Hochscrollen zurückgeholt wird.
+  // ausgeblendet, bis sie per Hintergrund-Tipp zurückgeholt wird.
 }
 
 // Programmatischer Tab-Wechsel (Klick auf Bottom-Nav-Button)
@@ -5490,8 +5276,7 @@ function zuTabWischen(name) {
   if (!TAB_ORDER.includes(name) || name === currentScreen) return;
   const container = document.getElementById('tab-container');
   const w = container ? container.clientWidth : 0;
-  const ruhig = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!w || ruhig) { showScreen(name); return; }
+  if (!w || bewegungAus()) { showScreen(name); return; }
   if (!_renderedTabs.has(name)) { _renderTab(name); _renderedTabs.add(name); }
   if (_tabWischRAF) cancelAnimationFrame(_tabWischRAF);
   const start = container.scrollLeft;
@@ -5537,7 +5322,7 @@ function zuTabWischen(name) {
 // State-Change (Filter, Datum, Refresh, Dark-Mode) → alle Tabs invalidieren + aktuellen neu rendern
 function _refreshAfterStateChange() {
   // Alle Charts zerstören (Theme- oder Datenwechsel)
-  killCharts();
+  alleDiagrammeZerstoeren();
   TAB_ORDER.forEach(t => { tabCharts[t] = []; });
   _renderedTabs.clear();
   _renderTab(currentScreen);
@@ -5569,9 +5354,7 @@ function initTabScrollSync() {
       const name = TAB_ORDER[clamped];
       if (name !== lastReported) {
         // Theme/Nav-Highlight schon während des Snaps wechseln
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        const navEl = document.getElementById('nav-'+name);
-        if (navEl) navEl.classList.add('active');
+        tableisteMarkieren(name);
         themaSetzen(name);
         _setStatusBarColor(name);
         // Wischen zaehlt wie Scrollen: die Zeitleiste tritt zurueck (auf Wunsch,
@@ -5603,9 +5386,7 @@ function initTabScrollSync() {
   });
 }
 
-// Auto-Hide nur noch für Bottom-Nav (Topbar ist jetzt Teil des Scroll-Inhalts
-// und rollt natürlich nach oben raus, keine separate Animation nötig).
-// Die Zeitleiste sitzt ueber der Tableiste und folgt ihr nach unten, wenn diese
+// Auto-Hide der Bottom-Nav. Die Zeitleiste sitzt ueber der Tableiste und folgt ihr nach unten, wenn diese
 // ausgeblendet wird — sie selbst bleibt immer sichtbar. Beides an EINER Stelle
 // umgeschaltet, sonst laufen Leiste und Tableiste auseinander.
 function navAusblenden(nav, aus) {
@@ -5645,23 +5426,17 @@ function initScrollHideNav() {
       });
     }, { passive: true });
   });
-  // Tippen auf den Tab-Hintergrund (alles außer echten Bedienelementen wie Buttons,
-  // Links, Eingabefeldern, Selects und der oberen Filterleiste) → Bottom-Nav aus-/einblenden.
+  // Tippen auf den freien Tab-Hintergrund → Bottom-Nav aus-/einblenden.
   const _tapContainer = document.getElementById('tab-container');
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
-    // Nur auf "totem" Hintergrund togglen. Alles, was selbst etwas auslöst, ausnehmen:
-    // Buttons/Links/Eingaben, die Chart-Canvas (Tooltip beim Antippen), die Filterleiste
-    // und Elemente mit eigenem Tooltip (data-tt / Tooltip-Wrapper).
-    // Tooltip-Anker sind ebenfalls ausgenommen: ein Tipp darauf soll das Tooltip
-    // öffnen und nicht zusätzlich die Bottom-Nav umschalten.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-tt], [data-lauftag], [data-ziel-tab], ' + TT_TAP_SELECTOR)) return;
+    // Alles, was selbst etwas auslöst, ausnehmen: Bedienelemente, Diagramme (Markierung),
+    // Kartentitel (Datenbeschriftung), Minikacheln (Tabwechsel) und Tooltip-Anker.
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-ziel-tab], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
 
-// Aufklapp-Schalter in der Kopfzeile: „Weitere Auswertungen" (Herz, Schlaf) und
-// „Muster & Zusammenhänge" (Übersicht) laufen ueber denselben Knopf und dieselbe
-// Tabelle (AUSKLAPP).
+// Ausklapp-Knopf der Zeitleiste – alle Tabs laufen ueber dieselbe Tabelle (AUSKLAPP).
 document.body.addEventListener('click', (e) => {
   const knopf = e.target.closest('[data-ausklapp]');
   if (!knopf) return;
@@ -5730,7 +5505,7 @@ function _ausklappAnimieren(el, auf) {
 function ausklappUmschalten(tab) {
   const k = AUSKLAPP[tab];
   if (!k || _ausklappLaeuft) return;
-  const ruhig = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ruhig = bewegungAus();
   if (k.offen()) {
     k.um();
     zeitleisteAusklapp();              // Chevron sofort umdrehen, nicht erst nach 280 ms
@@ -5753,8 +5528,8 @@ function ausklappUmschalten(tab) {
     .then(() => { _ausklappLaeuft = false; }, () => { _ausklappLaeuft = false; });
 }
 
-// Ø-Linien der Training-Diagramme ein-/ausschalten. Neu aufgebaut wird der ganze
-// Tab: die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
+// Hilfslinien (Ø, Ziel) ein-/ausschalten. Neu aufgebaut wird der ganze Tab: die
+// Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
 // Seit 18.09.2026 ohne erneutes Wachsen aller Diagramme; nur die Linie blendet
 // (siehe _ruhigRendern / hilfslinienBlende). Waehrend eine Linie ausblendet, sind
 // weitere Tipps gesperrt – der Neuaufbau am Ende muss den dann gueltigen Zustand sehen.
@@ -5766,8 +5541,7 @@ document.body.addEventListener('click', (e) => {
   const an = !hlAn(schluessel);
   const [id, art] = schluessel.split('|');
   const alt = charts[id];
-  // Den AKTUELLEN Tab neu aufbauen – die Schalter stehen inzwischen in Herz, Schlaf
-  // und Training. Die Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
+  // Den AKTUELLEN Tab neu aufbauen – die Schalter stehen in Herz, Schlaf und Training.
   const neuAufbauen = () => {
     _hilfslinie[schluessel] = an;
     _hlPlan = an && !bewegungAus() ? { id, art } : null;
@@ -5786,8 +5560,8 @@ document.body.addEventListener('click', (e) => {
 });
 
 // ── Event-Wiring (nach Daten-Load) ───────────────────────
-// Topbar-Buttons werden per Delegation auf document.body verkabelt,
-// weil die Topbar dynamisch in jede .screen-Fläche injiziert wird (sechs Instanzen).
+// Per Delegation auf document.body, weil die Seiten bei jedem Neuaufbau per
+// innerHTML ersetzt werden.
 document.body.addEventListener('click', (e) => {
   const t = e.target;
   // Tipp auf eine Minikachel: Wisch in ihren Tab. Das ⓘ darin bleibt ausgenommen –
@@ -5854,12 +5628,12 @@ document.body.addEventListener('click', (e) => {
   if (t.closest('.zl-yoy')) {
     zeitleisteAuswahl(false);
     blickAnkerMerken(t);
-    if (istYoY()) { setR(_yoyVorher); }
-    else { _yoyVorher = timeRange; setR('yoy'); }
+    if (istYoY()) { bereichSetzen(_yoyVorher); }
+    else { _yoyVorher = timeRange; bereichSetzen('yoy'); }
     return;
   }
   const zlOpt = t.closest('.zl-opt');
-  if (zlOpt) { zeitleisteAuswahl(false); setR(zlOpt.dataset.range); return; }
+  if (zlOpt) { zeitleisteAuswahl(false); bereichSetzen(zlOpt.dataset.range); return; }
   // Am Rand des Datenbestands passiert nichts – der Knopf bleibt aber ein Knopf und
   // faengt den Tipp ab, statt ihn an die Bottom-Nav durchzureichen.
   const pfeilZurueck = t.closest('.nav-prev'), pfeilVor = t.closest('.nav-next');
@@ -5886,10 +5660,7 @@ document.body.addEventListener('click', (e) => {
       const _vt = document.startViewTransition(() => setDarkMode(_dunkel));
       if (_vt && _vt.ready) _vt.ready.catch(() => {});
     } else setDarkMode(_dunkel);
-    return;
   }
-  const pill = t.closest('.tbtn[data-range]');
-  if (pill) { setR(pill.dataset.range); return; }
 });
 // Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
@@ -5918,8 +5689,6 @@ document.body.addEventListener('keydown', (e) => {
 // ── Dark Mode ──────────────────────────────────────────
 function applyDarkMode(isDark) {
   document.body.classList.toggle('dark', isDark);
-  Chart.defaults.borderColor = ACHSEN_COLOR;
-  Chart.defaults.color       = isDark ? '#94A3B8' : '#94A3B8';
   // Das Symbol bleibt dasselbe (die Drehung macht das CSS über `body.dark`); nur der
   // Zustand fuer Screenreader zieht nach. Vorher wurde hier 🌙/☀️ getauscht – ein
   // `textContent` wuerde das SVG loeschen.
@@ -6089,19 +5858,15 @@ function hinweisAus() {
   a.onfinish = ende;
   setTimeout(ende, 220 + 80);
 }
-// Der Stand der Google-Anmeldung steht NICHT mehr als Leiste ueber allen Tabs,
-// sondern als Zeile „Google-Anmeldung" in der App-Karte der Einstellungen – dort, wo
-// auch die uebrigen App-Angelegenheiten liegen. Die Leiste oben bleibt allein dem
-// Fall „Neue Daten geladen" vorbehalten, der eine sofortige Antwort verlangt.
+// Der Stand der Google-Anmeldung steht als Zeile „Google-Anmeldung" in der App-Karte
+// der Einstellungen. Die Leiste oben bleibt allein dem Fall „Neue Daten geladen"
+// vorbehalten, der eine sofortige Antwort verlangt.
 // `anmeldeStand()` ist die einzige Quelle fuer diesen Zustand.
 function anmeldeStand() {
-  if (!accessToken) return { schluessel:'abgelaufen', text:'abgelaufen', farbe:'#F59E0B',
+  if (!accessToken) return { text:'abgelaufen', farbe:'#F59E0B',
     hinweis:'Ohne Anmeldung zeigt die App den zuletzt geladenen Stand. Neue Daten holen geht erst nach dem Anmelden wieder.' };
-  return { schluessel:'aktiv', text:'aktiv', farbe:null, hinweis:null };
+  return { text:'aktiv', farbe:null, hinweis:null };
 }
-// Frueher zeigte das die Leiste oben. Es frischt jetzt die App-Karte auf, damit die
-// Zeile dort den neuen Stand traegt.
-function hinweisAuthZeigen() { appKarteAuffrischen(); }
 // Die App-Karte liegt seit 06.09.2026 auf der Einstellungen-Seite. Neu aufgebaut wird
 // sie nur, wenn diese gerade offen ist – sonst holt sie sich den Stand beim naechsten
 // Oeffnen ohnehin frisch (einstellungenOeffnen ruft pgEinstellungen).
@@ -6126,10 +5891,10 @@ document.body.addEventListener('click', (e) => {
 // solange der Nutzer nichts angetippt hat, sofort und still – danach erst auf Tipp,
 // sonst springt ihm die Ansicht unter dem Finger weg.
 async function hintergrundLaden() {
-  if (!accessToken) { hinweisAuthZeigen(); return; }
+  if (!accessToken) { appKarteAuffrischen(); return; }
   const vorher = datenStand();
   const ergebnis = await loadFromAPI({ still: true });
-  if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
+  if (ergebnis === 'auth') { appKarteAuffrischen(); return; }
   if (ergebnis !== true) return;               // Netzfehler: der alte Stand bleibt stehen
   appKarteAuffrischen();   // Anmeldung wieder gueltig → Zeile in der App-Karte nachziehen
   // Identischer Stand – der Normalfall, wenn die App kurz nacheinander geoeffnet wird.
@@ -6146,15 +5911,12 @@ async function hintergrundLaden() {
 
 // ── Refresh Button ─────────────────────────────────────
 async function refreshData() {
-  // Der Knopf traegt jetzt Text statt eines Symbols – deshalb Beschriftung wechseln
-  // statt drehen. Der alte Text wird am Element gemerkt und danach zurueckgesetzt.
-  // Ohne gültige Anmeldung gibt es nichts zu holen. Frueher lief der Abruf trotzdem
-  // los und endete stumm – jetzt sagt es die Leiste oben und der Knopf fuehrt hin.
+  // Ohne gültige Anmeldung gibt es nichts zu holen – der Knopf sagt es selbst.
   if (!accessToken) {
     // Erst die Karte auffrischen (ersetzt die Knoepfe), dann am NEUEN Knopf antworten.
     // Ohne diese Rueckmeldung passierte auf den Tipp sichtbar gar nichts – die Zeile
     // darueber sagte den Grund zwar, aber nicht als Antwort auf den Druck.
-    hinweisAuthZeigen();
+    appKarteAuffrischen();
     document.querySelectorAll('.refresh-btn').forEach(b => {
       const alt = b.textContent;
       b.textContent = 'Anmeldung nötig';
@@ -6162,6 +5924,7 @@ async function refreshData() {
     });
     return;
   }
+  // Beschriftung „Lädt…"; der alte Text wird am Element gemerkt und danach zurueckgesetzt.
   const btns = document.querySelectorAll('.refresh-btn');
   btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
   // 1. Apps Script: Drive → Sheet aktualisieren. `no-cors` liefert keine auswertbare
@@ -6180,7 +5943,7 @@ async function refreshData() {
     b.disabled = false;
     if (b.dataset.altText) { b.textContent = b.dataset.altText; delete b.dataset.altText; }
   });
-  if (ergebnis === 'auth') { hinweisAuthZeigen(); return; }
+  if (ergebnis === 'auth') { appKarteAuffrischen(); return; }
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
   appKarteAuffrischen();
@@ -6205,9 +5968,7 @@ function refreshBestaetigen() {
     }, 1800);
   });
 }
-// Orientation: keine Lock mehr – App darf in beide Richtungen gedreht werden.
-// Im Manifest steht "any". Tab-Snap-Sync reagiert via resize-Listener auf den Wechsel.
-// Gespeicherte Präferenz laden
+// Gespeicherte Hell/Dunkel-Präferenz laden
 try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e) {}
 
 document.getElementById('loading').style.display = 'none';

@@ -34,9 +34,7 @@
   --txt3: #94A3B8;
   --accent: #4F46E5;
   --r: 14px;
-  /* Derselbe Schatten wie auf den Ausklapp-Knoepfen (.weitere-btn): weicher und
-     tiefer als der fruehere Doppelschatten, und OHNE die Haarlinie – die wirkte
-     neben dem Knopf wie eine Umrandung. Alle Karten (chart-card, kpi, pi-card,
+  /* Weicher Schatten ohne Haarlinie – die wirkte wie eine Umrandung. Alle Karten (chart-card, kpi, pi-card,
      warn-card, rec-card, no-data, …) lesen diese eine Variable. */
   --shadow: 0 1px 6px rgba(0,0,0,.18);
   --shadow-hov: 0 8px 24px rgba(0,0,0,.12);
@@ -128,25 +126,6 @@ body.theme-training   { --tab-color: #F97316; }
 .nav-arrow:disabled, .nav-arrow.inaktiv { opacity: 0.3; cursor: default; }
 /* Kein Druckpunkt, wenn nichts passiert – sonst sieht es aus, als haette es gewirkt. */
 .nav-arrow.inaktiv:active { opacity: 0.3; transform: none; }
-
-/* Filter pills (horizontal scrollable) */
-.tbtn {
-  flex-shrink: 0;
-  padding: 10px 16px;
-  min-height: 44px;
-  background: var(--card);
-  color: var(--txt2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 14.3px; font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-}
-.tbtn.active {
-  background: var(--tab-color);
-  color: #fff;
-  border-color: var(--tab-color);
-}
 
 /* ── App container: horizontal snap-scroller ────────────── */
 #app {
@@ -733,7 +712,6 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
 .chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
-.stat-hint{font-size:.69rem;color:var(--txt2);line-height:1.5;padding:.35rem 0 .1rem;border-top:1px dashed var(--border);margin-top:.3rem}
 
 /* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
 /* ── ⓘ-Erklärungen ───────────────────────────────────────
@@ -1010,7 +988,6 @@ body.dark {
   --shadow: 0 1px 6px rgba(0,0,0,.45);
   --shadow-hov: 0 8px 24px rgba(0,0,0,.55);
 }
-body.dark .tbtn:hover { background: #0F172A; }
 body.dark .stat-row { border-bottom-color: #334155; }
 body.dark .goal-bar-bg { background: #334155; }
 body.dark .field-hint { background: #0F172A; }
@@ -1283,19 +1260,6 @@ h5,
 .pg-act.dark-toggle svg .voll{fill:#fff}
 body.dark .pg-act.dark-toggle svg{transform:rotate(180deg)}
 
-/* Aufklapp-Knopf: "Weitere Auswertungen" (Herz, Schlaf) und "Muster & Zusammenhänge"
-   (Übersicht) teilen sich diese Klasse – volle Kartenbreite, aber transparent, damit
-   der Knopf die Karten darueber nicht ueberstrahlt. Als <button> nimmt ihn der
-   Hintergrund-Tipp (Bottom-Nav) automatisch aus. */
-.weitere-btn{display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;
-  background:rgba(255,255,255,.12);border:0;border-radius:var(--r);
-  padding:.6rem .75rem;margin-bottom:.7rem;cursor:pointer;
-  font:inherit;font-size:.79rem;font-weight:600;color:#fff;
-  /* Kein Rahmen, dafuer ein weicher Schatten – der Knopf bleibt als solcher
-     erkennbar, ohne gegen die Karten darueber anzutreten. */
-  box-shadow:0 1px 6px rgba(0,0,0,.18);
-  -webkit-tap-highlight-color:transparent}
-.weitere-pfeil{font-size:.9rem;line-height:1}
 .weitere-inhalt[hidden]{display:none}
 
 /* ── Hinweisleiste oben ────────────────────────────────────
