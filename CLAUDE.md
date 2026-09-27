@@ -28,6 +28,25 @@ Apple-Health-Daten. Läuft als statische Seite auf **GitHub Pages**. UI durchgeh
   Weil das Auffrisch-Fenster (2 Tage Health, 30 Tage Workout) deutlich grösser ist
   als der Abstand der Läufe, holt ein späterer Lauf jeden ausgefallenen nach — ein
   verpasster Zeitplan reisst keine Lücke.
+  **Schneller Import (27.09.2026):** Das Skript merkt sich den Start des letzten
+  vollständigen Laufs (Script-Property `import_letzter_start_ms`) und fragt Drive per
+  `searchFiles('modifiedDate > …')` nur nach Dateien, die seither neu oder geändert
+  sind (15 min Überlappung gegen die Such-Verzögerung von Drive). Workouts: nur die
+  **Tage** mit geänderter Datei werden neu aufgebaut, mit ALLEN Dateien des Tags.
+  **Einmal pro 24 h läuft er voll** wie früher (alle Dateien, Auffrisch-Fenster) und
+  fängt alles ab, was die Suche verpasst hätte. Die Zeitmarke rückt nur weiter, wenn
+  Health- UND Workout-Import vollständig durchliefen. Unveränderte Tage werden nicht
+  neu geschrieben, neue Health-Tage in einem `setValues`, sortiert nur, wenn ein
+  älterer Tag angehängt wurde. `selbsttest()` Punkt 6 zeigt die Zeitmarken.
+  **Der Bericht an die App:** `writeToSheet()` liefert
+  `{ok, voll, neu, ersetzt, workoutTage, letzteAenderung, dauerMs}`, `doPost` gibt ihn
+  als JSON zurück. Die App liest ihn (Fetch im CORS-Modus, `text/plain` → kein
+  Preflight) in `importAnstossen()`. `nichtsNeues()` erlaubt, das erneute Lesen der
+  Blätter zu überspringen („Schon aktuell ✓"), nur wenn der Bericht 0 Änderungen
+  meldet UND `letzteAenderung` älter ist als der zuletzt geladene Stand (5 min Puffer
+  gegen abweichende Uhren). Kein oder unlesbarer Bericht (altes Skript, Netzfehler)
+  → wie früher neu laden. Die frühere feste Pause von 4 s nach dem Import ist
+  entfallen: `doPost` antwortet erst, wenn der Import fertig ist.
   **Der iPhone-Kurzbefehl stösst den Import NICHT an — bewusst.** Er lässt allein
   Health Auto Export nach Drive exportieren; den Rest macht der Zeitplan. Sein alter
   Schritt „Inhalte von …/exec?refresh=true&token=… abrufen" war nach der

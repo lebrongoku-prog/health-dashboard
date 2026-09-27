@@ -5927,44 +5927,80 @@ async function refreshData() {
   // Beschriftung „Lädt…"; der alte Text wird am Element gemerkt und danach zurueckgesetzt.
   const btns = document.querySelectorAll('.refresh-btn');
   btns.forEach(b => { b.disabled = true; b.dataset.altText = b.textContent; b.textContent = 'Lädt…'; });
-  // 1. Apps Script: Drive → Sheet aktualisieren. `no-cors` liefert keine auswertbare
-  //    Antwort; ob es gewirkt hat, zeigt Schritt 3 – die Daten kommen aus dem Sheet.
-  try {
-    await fetch(REFRESH_URL, { method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ refresh: true, zugang: accessToken }) });
-  } catch(_) {}
-  // 2. Kurz warten bis Sheet bereit ist
-  await new Promise(r => setTimeout(r, 4000));
-  // 3. Daten neu aus Sheet laden
-  workoutSheetReady = false; workoutLoadError = null;
-  const ergebnis = await loadFromAPI();
-  document.querySelectorAll('.refresh-btn').forEach(b => {
+  const knoepfeZurueck = () => document.querySelectorAll('.refresh-btn').forEach(b => {
     b.disabled = false;
     if (b.dataset.altText) { b.textContent = b.dataset.altText; delete b.dataset.altText; }
   });
+  // 1. Apps Script: Drive → Sheet. Das Skript antwortet erst, wenn der Import fertig
+  //    ist – danach stehen die Werte bereits im Sheet. Die fruehere feste Pause von
+  //    4 s danach war deshalb reine Wartezeit (entfernt 27.09.2026).
+  const bericht = await importAnstossen();
+  // 2. Hat der Import nichts geaendert und stand die letzte Aenderung schon beim
+  //    letzten Laden im Sheet, gibt es nichts Neues zu lesen.
+  if (nichtsNeues(bericht)) {
+    knoepfeZurueck();
+    appKarteAuffrischen();
+    refreshBestaetigen('Schon aktuell ✓');
+    return;
+  }
+  // 3. Daten neu aus dem Sheet laden
+  workoutSheetReady = false; workoutLoadError = null;
+  const ergebnis = await loadFromAPI();
+  knoepfeZurueck();
   if (ergebnis === 'auth') { appKarteAuffrischen(); return; }
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
   appKarteAuffrischen();
-  if (ergebnis === true) { refreshBestaetigen(); _kachelnZaehlen = true; }
+  if (ergebnis === true) { refreshBestaetigen('Aktualisiert ✓'); _kachelnZaehlen = true; }
   updateNavUI();
   _refreshAfterStateChange();
 }
+
+// Import im Apps Script ausloesen und seinen Bericht lesen:
+// { ok, neu, ersetzt, workoutTage, letzteAenderung } – oder null, wenn keiner kam
+// (Netzfehler, altes Skript ohne Bericht, Antwort nicht lesbar). null heisst
+// „unbekannt": dann wird wie frueher in jedem Fall neu geladen.
+async function importAnstossen() {
+  try {
+    const res = await fetch(REFRESH_URL, { method: 'POST',
+      // text/plain haelt die Anfrage „einfach" – ohne Vorab-Anfrage (CORS-Preflight),
+      // die das Apps Script nicht beantworten kann.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ refresh: true, zugang: accessToken }) });
+    const bericht = await res.json();
+    if (bericht && bericht.error) console.warn('[Import] Apps Script meldet:', bericht.error);
+    return bericht && typeof bericht === 'object' ? bericht : null;
+  } catch (e) {
+    console.warn('[Import] kein Bericht vom Apps Script:', e.message);
+    return null;
+  }
+}
+
+// Darf das erneute Lesen der Blaetter entfallen? Nur, wenn der Bericht ausdruecklich
+// null Aenderungen meldet UND die letzte Aenderung im Sheet aelter ist als der zuletzt
+// geladene Stand – sonst koennte ein Import per Zeitplan seither etwas geschrieben
+// haben. 5 Minuten Puffer gegen abweichende Uhren von Geraet und Server.
+function nichtsNeues(b) {
+  if (!b || !b.ok || b.error) return false;
+  if ([b.neu, b.ersetzt, b.workoutTage].some(n => typeof n !== 'number') || b.neu + b.ersetzt + b.workoutTage > 0) return false;
+  if (typeof b.letzteAenderung !== 'number' || !_lastLoadTs || !allData.length) return false;
+  return b.letzteAenderung < _lastLoadTs - 5 * 60 * 1000;
+}
 // Rueckmeldung nach erfolgreichem Laden (auf Wunsch, 18.09.2026): der Knopf zeigt
-// 1.8 s lang „Aktualisiert ✓" auf Gruen, dann wieder seinen Text. Vorher sprang er
+// 1.8 s lang `text` auf Gruen („Aktualisiert ✓" bzw. „Schon aktuell ✓", wenn der
+// Import nichts Neues fand), dann wieder seinen Text. Vorher sprang er
 // von „Lädt…" kommentarlos zurueck – ob das Laden geklappt hatte, sah man nicht.
 // Erst NACH `appKarteAuffrischen()` aufrufen: die baut die Einstellungen-Seite neu
 // und ersetzt dabei den Knopf. Nur bei `true` – ein Netzfehler ist kein Erfolg.
-function refreshBestaetigen() {
+function refreshBestaetigen(text) {
   document.querySelectorAll('.refresh-btn').forEach(b => {
     const alt = b.textContent;
-    b.textContent = 'Aktualisiert ✓';
+    b.textContent = text;
     b.classList.add('ok');
     setTimeout(() => {
       if (!b.isConnected) return;
       b.classList.remove('ok');
-      if (b.textContent === 'Aktualisiert ✓') b.textContent = alt;
+      if (b.textContent === text) b.textContent = alt;
     }, 1800);
   });
 }

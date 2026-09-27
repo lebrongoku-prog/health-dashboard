@@ -77,7 +77,9 @@ function doPost(e) {
     return antwort({ error: 'Unauthorized' });
   }
   if (daten.refresh) {
-    try { writeToSheet(); }
+    // Die App liest den Bericht (neu/ersetzt/workoutTage/letzteAenderung) und spart
+    // sich das erneute Lesen der Blaetter, wenn nichts Neues dazukam.
+    try { return antwort(writeToSheet()); }
     catch (err) { return antwort({ error: String(err) }); }
   }
   return antwort({ ok: true });
@@ -221,6 +223,13 @@ function selbsttest() {
   zeilen.push('   (writeToSheet ruft am Ende selbst importWorkoutData auf – ein '
     + 'Zeitplan deckt damit BEIDE Sheets ab.)');
 
+  zeilen.push('6. Schneller Import (nur geaenderte Dateien):');
+  var ip = PropertiesService.getScriptProperties();
+  var zeit = function (k) { var v = Number(ip.getProperty(k) || 0); return v ? new Date(v).toLocaleString('de-DE') : 'noch nie'; };
+  zeilen.push('   Letzter Lauf: ' + zeit(PROP_LETZTER_IMPORT) + ' · letzter voller Lauf: '
+    + zeit(PROP_LETZTER_VOLL) + ' · letzte Aenderung im Sheet: ' + zeit(PROP_LETZTE_AENDERUNG));
+  zeilen.push('   Naechster Lauf: ' + (importModus(ip).voll ? 'VOLL (alle Dateien)' : 'schnell (nur geaenderte Dateien)'));
+
   var text = zeilen.join('\n');
   Logger.log(text);
   return text;
@@ -305,9 +314,13 @@ function getHealthFolder() {
 // Dateien mit identischem Namen im Ordner – und jede erzeugte eine eigene Sheet-Zeile.
 // Bei Mehrfachtreffern gewinnt die zuletzt geänderte Datei.
 
-function getAllHealthFiles() {
+// `seit` (Date, optional): nur Dateien, die danach angelegt oder geaendert wurden –
+// die Drive-Suche liefert dann eine Handvoll statt aller Tagesdateien.
+function getAllHealthFiles(seit) {
   var folder = getHealthFolder();
-  var files = folder.getFiles();
+  var files = seit
+    ? folder.searchFiles("modifiedDate > '" + driveZeit(seit) + "' and title contains 'HealthAutoExport-' and trashed = false")
+    : folder.getFiles();
   var proDatum = {};
   while (files.hasNext()) {
     var f = files.next();
@@ -466,7 +479,54 @@ function neuesterExportStempel(dateien) {
     Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
 }
 
+// ── Schneller Import: nur geaenderte Dateien (27.09.2026) ────────────────────
+// Vorher ging jeder Lauf ALLE Health-Dateien im Ordner durch (eine je Tag, also
+// Hunderte) und las alle Workout-Dateien der letzten 30 Tage neu ein – auch wenn
+// seit dem letzten Lauf keine einzige dazugekommen war.
+// Jetzt merkt sich das Skript, wann der letzte Lauf begann, und fragt Drive gezielt
+// nach Dateien, die seither neu oder geaendert sind. Zwei Sicherungen:
+//  - 15 Minuten UEBERLAPPUNG: Drive nimmt neue Dateien mit kurzer Verzoegerung in die
+//    Suche auf. Eine Datei doppelt zu lesen schadet nicht, eine zu verpassen schon.
+//  - Einmal am Tag ein VOLLER Lauf wie bisher (alle Dateien, Auffrisch-Fenster).
+//    Er faengt alles ab, was die Suche je verpasst haben koennte, und traegt
+//    fehlende Tage nach, deren Datei aus anderem Grund nicht gelesen wurde.
+// Die Zeitmarke rueckt nur weiter, wenn BEIDE Importe vollstaendig durchliefen – ein
+// Abbruch holt sein Pensum beim naechsten Lauf nach.
+var PROP_LETZTER_IMPORT   = 'import_letzter_start_ms';
+var PROP_LETZTER_VOLL     = 'import_letzter_voll_ms';
+var PROP_LETZTE_AENDERUNG = 'import_letzte_aenderung_ms';
+var VOLLER_LAUF_STUNDEN   = 24;
+var UEBERLAPPUNG_MS       = 15 * 60 * 1000;
+
+// { voll: true } oder { voll: false, seit: Date }
+function importModus(props) {
+  var letzter = Number(props.getProperty(PROP_LETZTER_IMPORT) || 0);
+  var voll    = Number(props.getProperty(PROP_LETZTER_VOLL) || 0);
+  if (!letzter || Date.now() - voll > VOLLER_LAUF_STUNDEN * 3600 * 1000) return { voll: true, seit: null };
+  return { voll: false, seit: new Date(letzter - UEBERLAPPUNG_MS) };
+}
+
+// Zeitangabe fuer die Drive-Suche (RFC 3339, UTC).
+function driveZeit(d) {
+  return Utilities.formatDate(d, 'UTC', "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+// Zeilenwert als Vergleichstext – dieselbe Darstellung fuer Sheet und Datei, damit ein
+// unveraenderter Tag nicht neu geschrieben wird.
+function vergleichsText(zeile) {
+  return zeile.map(function(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'number') return String(Math.round(v * 1000) / 1000);
+    return String(v).trim();
+  }).join('\u241F');
+}
+
+// Import Drive → Sheet (Health, danach Workout). Aufgerufen vom Zeitplan, vom Menue
+// und von doPost. Rueckgabe = Bericht fuer die App.
 function writeToSheet() {
+  var start = Date.now();
+  var props = PropertiesService.getScriptProperties();
+  var modus = importModus(props);
   var DAYS_TO_REFRESH = 2;
   var BATCH_LIMIT = 60;
   var r = getOrCreateSheet();
@@ -491,8 +551,11 @@ function writeToSheet() {
     ? minusTage(vorhandene[vorhandene.length - 1], DAYS_TO_REFRESH - 1)
     : null;
 
-  var dateien = getAllHealthFiles();
+  var dateien = getAllHealthFiles(modus.seit);
   var list = dateien.filter(function(item) {
+    // Schneller Lauf: jede geaenderte Datei – geaendert heisst, sie traegt neue Werte.
+    if (!modus.voll) return true;
+    // Voller Lauf:
     // (a) Tag fehlt noch → nachtragen, auch wenn er älter ist als das Fenster
     // (b) Tag liegt im Auffrisch-Fenster → neu schreiben
     return !index[item.date] || (refreshDate && item.date >= refreshDate);
@@ -500,44 +563,99 @@ function writeToSheet() {
   list.sort(function(a, b) { return a.date.localeCompare(b.date); });
   var batch = list.slice(0, BATCH_LIMIT);
   var remaining = list.length - batch.length;
-  var neu = 0, ersetzt = 0;
-  batch.forEach(function(item) {
-    try {
-      var raw = JSON.parse(item.file.getBlob().getDataAsString());
-      if (upsertDay(sheet, parseDay(item.date, raw.data.metrics), index)) ersetzt++;
-      else neu++;
-    } catch(e) { Logger.log('Fehler ' + item.date + ': ' + e); }
-  });
-
-  // Nachgetragene ältere Tage landen beim Anhängen unten. Einmal sortieren hält das
-  // Sheet lesbar – genau die Unordnung hatte die Dubletten zuvor verschleiert.
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 2) {
-    sheet.getRange(2, 1, lastRow - 1, COLUMNS.length).sort({ column: 1, ascending: true });
-  }
+  var h = healthTageSchreiben(sheet, index, batch, vorhandene);
 
   sheet.getRange(1,1).setNote('Zuletzt aktualisiert: ' + new Date().toLocaleString('de-DE'));
   // Zeitstempel der neuesten Datei ins Blatt `Meta`. Ein Fehlschlag darf den Import
   // nicht anhalten — die Angabe ist eine Auskunft, keine Bedingung.
+  // Im schnellen Lauf nur, wenn die neueste gelesene Datei auch der neueste Tag im
+  // Sheet ist: eine verspaetete Datei fuer einen aelteren Tag beschreibt nicht den
+  // aktuellen Stand (die App verwuerfe den Stempel dann ohnehin).
   try {
-    var stempel = neuesterExportStempel(dateien);
-    if (stempel) metaSchreiben(r.ss, 'letzterExport', stempel);
+    var neuesterTag = Object.keys(index).sort().pop();
+    var neuesteDatei = dateien.map(function(d) { return d.date; }).sort().pop();
+    if (modus.voll || (neuesteDatei && neuesteDatei >= neuesterTag)) {
+      var stempel = neuesterExportStempel(dateien);
+      if (stempel) metaSchreiben(r.ss, 'letzterExport', stempel);
+    }
   } catch (e) {
     Logger.log('⚠️ Meta-Blatt nicht geschrieben: ' + e);
   }
   if (remaining > 0) {
-    Logger.log('✅ ' + neu + ' neu, ' + ersetzt + ' aktualisiert. Noch ' + remaining + ' übrig → erneut ausführen!');
+    Logger.log('✅ ' + h.neu + ' neu, ' + h.ersetzt + ' aktualisiert. Noch ' + remaining + ' übrig → erneut ausführen!');
   } else {
-    Logger.log('✅ ' + neu + ' neu, ' + ersetzt + ' aktualisiert. Gesamt: ' + (sheet.getLastRow()-1));
+    Logger.log('✅ ' + h.neu + ' neu, ' + h.ersetzt + ' aktualisiert (' + (modus.voll ? 'voller' : 'schneller')
+      + ' Lauf, ' + dateien.length + ' Datei(en) geprüft). Gesamt: ' + (sheet.getLastRow()-1));
   }
   // Workout Data Sheet ebenfalls aktualisieren (CSV-Dateien aus Workout-Ordner)
+  var workoutTage = 0, workoutOk = false;
   try {
-    importWorkoutData();
+    workoutTage = importWorkoutData(modus);
+    workoutOk = true;
     Logger.log('✅ Workout-Daten aktualisiert.');
   } catch(e) {
     Logger.log('⚠️ Workout-Import übersprungen: ' + e);
   }
-  return r.ss.getId();
+
+  // Zeitmarken fortschreiben – nur nach einem vollstaendigen Lauf (siehe oben).
+  if (remaining === 0 && workoutOk) {
+    props.setProperty(PROP_LETZTER_IMPORT, String(start));
+    if (modus.voll) props.setProperty(PROP_LETZTER_VOLL, String(start));
+  }
+  if (h.neu + h.ersetzt + workoutTage > 0) props.setProperty(PROP_LETZTE_AENDERUNG, String(Date.now()));
+  return {
+    ok: true, voll: modus.voll, neu: h.neu, ersetzt: h.ersetzt, workoutTage: workoutTage,
+    letzteAenderung: Number(props.getProperty(PROP_LETZTE_AENDERUNG) || 0) || null,
+    dauerMs: Date.now() - start
+  };
+}
+
+// Health-Tage schreiben – gebuendelt statt Zeile fuer Zeile:
+//  - Ein vorhandener Tag wird nur ueberschrieben, wenn sich sein Inhalt aendert.
+//    Verglichen wird mit den ANGEZEIGTEN Werten (so liest sie auch die App).
+//  - Neue Tage landen in EINEM setValues am Ende.
+//  - Sortiert wird nur, wenn ein neuer Tag aelter ist als der bisher neueste – sonst
+//    stimmt die Reihenfolge ohnehin.
+// Rueckgabe { neu, ersetzt }.
+function healthTageSchreiben(sheet, index, liste, vorhandene) {
+  var neu = 0, ersetzt = 0, anhaengen = [];
+  var lastRow = sheet.getLastRow();
+  var bestand = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, COLUMNS.length).getDisplayValues() : [];
+  liste.forEach(function(item) {
+    try {
+      var raw = JSON.parse(item.file.getBlob().getDataAsString());
+      var day = parseDay(item.date, raw.data.metrics);
+      var zeile = COLUMNS.map(function(col) {
+        var v = day[col];
+        return (v !== undefined && v !== null) ? v : '';
+      });
+      var row = index[day.date];
+      if (row === -1) return;               // in diesem Lauf schon angehaengt
+      if (row) {
+        if (vergleichsText(bestand[row - 2] || []) === vergleichsText(zeile)) return;
+        sheet.getRange(row, 1, 1, COLUMNS.length).setValues([zeile]);
+        ersetzt++;
+      } else {
+        anhaengen.push(zeile);
+        index[day.date] = -1;   // vorgemerkt: kein zweites Mal anhaengen
+        neu++;
+      }
+    } catch(e) { Logger.log('Fehler ' + item.date + ': ' + e); }
+  });
+  if (anhaengen.length) {
+    var ab = sheet.getLastRow() + 1;
+    var benoetigt = ab + anhaengen.length - 1;
+    // setValues erweitert das Blatt nicht von selbst (anders als appendRow).
+    if (benoetigt > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), benoetigt - sheet.getMaxRows());
+    sheet.getRange(ab, 1, anhaengen.length, COLUMNS.length).setValues(anhaengen);
+    var bisherNeuester = vorhandene.length ? vorhandene[vorhandene.length - 1] : '';
+    var aelterAngehaengt = anhaengen.some(function(z) { return String(z[0]) < bisherNeuester; });
+    var letzte = sheet.getLastRow();
+    if (aelterAngehaengt && letzte > 2) {
+      sheet.getRange(2, 1, letzte - 1, COLUMNS.length).sort({ column: 1, ascending: true });
+    }
+  }
+  return { neu: neu, ersetzt: ersetzt };
 }
 
 // ================================================================
@@ -675,16 +793,48 @@ function makeGetters(hdrs, vals) {
   return { getIdx: getIdx, getRaw: getRaw, getN: getN };
 }
 
-function importWorkoutData() {
+// Eine Workout-Datei → eine Zeile in der Reihenfolge von WORKOUT_SPALTEN, oder null.
+function workoutZeile(file, date) {
+  var parsed = readWorkoutFile(file);
+  if (!parsed) return null;
+  var g = makeGetters(parsed.hdrs, parsed.vals);
+  var durationMin = parseDurationStr(g.getRaw('Duration'));
+  // Reihenfolge MUSS WORKOUT_SPALTEN entsprechen – hier wird positionsbasiert gebaut.
+  return [
+    date,
+    (g.getRaw('Type') || '').trim(),
+    durationMin !== null ? Math.round(durationMin * 100) / 100 : null,
+    g.getN('Distance', 'Distanz', 'Dist'),
+    g.getN('Avg Heart', 'Avg HR'),
+    g.getN('Max Heart', 'Max HR'),
+    g.getN('Speed'),
+    g.getN('Elevation Ascend'),
+    g.getN('Active Energy'),
+    g.getN('Cadence'),
+    g.getN('Step Count', 'Steps')
+  ];
+}
+
+// `modus` aus importModus(). Im schnellen Lauf werden nur die TAGE neu aufgebaut, zu
+// denen seit dem letzten Lauf eine Datei neu oder geaendert ist – und zwar mit ALLEN
+// Dateien dieses Tags, damit ein Tag mit zwei Einheiten vollstaendig bleibt.
+// Rueckgabe: Zahl der Tage, deren Zeilen sich geaendert haben (0 = nichts geschrieben).
+function importWorkoutData(modus) {
+  var schnell = !!(modus && !modus.voll && modus.seit);
   var HEADERS = WORKOUT_SPALTEN;
   var ss, sheet;
-  var existing = DriveApp.getFilesByName(WORKOUT_SHEET_TITLE);
-  if (existing.hasNext()) {
-    ss = SpreadsheetApp.open(existing.next());
-    Logger.log('Bestehendes Sheet gefunden: ' + ss.getId());
-  } else {
-    ss = SpreadsheetApp.create(WORKOUT_SHEET_TITLE);
-    Logger.log('Neues Sheet erstellt: ' + ss.getId());
+  // Direkt ueber die bekannte ID oeffnen – die Namenssuche in Drive kostete bei jedem
+  // Lauf eine zusaetzliche Suche. Sie bleibt als Rueckfall.
+  try { ss = SpreadsheetApp.openById(WORKOUT_SHEET_ID); } catch (e) { ss = null; }
+  if (!ss) {
+    var existing = DriveApp.getFilesByName(WORKOUT_SHEET_TITLE);
+    if (existing.hasNext()) {
+      ss = SpreadsheetApp.open(existing.next());
+      Logger.log('Bestehendes Sheet gefunden: ' + ss.getId());
+    } else {
+      ss = SpreadsheetApp.create(WORKOUT_SHEET_TITLE);
+      Logger.log('Neues Sheet erstellt: ' + ss.getId());
+    }
   }
   sheet = ss.getSheets()[0];
   if (sheet.getLastRow() === 0) {
@@ -719,56 +869,59 @@ function importWorkoutData() {
       .filter(function(r) { return /^\d{4}-\d{2}-\d{2}$/.test(r[0]); });
   }
 
-  // Fenster über das NEUESTE Datum bestimmen, nicht über die Zeilennummer.
-  // Vorher hiess WORKOUT_DAYS_TO_REFRESH zwar "days", zählte aber ZEILEN: die letzten
-  // 30 Zeilen spannten bei unregelmässigem Training über vier Monate. Schlimmer noch:
-  // eine verspätet abgelegte Datei war älter als der so errechnete Stichtag und wurde
-  // dadurch nie eingelesen – dieselbe Lücken-Mechanik wie im Health-Sheet.
-  var daten = bestehend.map(function(r) { return r[0]; }).sort();
-  var refreshDate = daten.length
-    ? minusTage(daten[daten.length - 1], WORKOUT_DAYS_TO_REFRESH - 1)
-    : null;
-  var vorhandeneDaten = {};
-  daten.forEach(function(d) { vorhandeneDaten[d] = true; });
-  if (refreshDate) Logger.log('Refreshe ab: ' + refreshDate);
-
-  // Alles ausserhalb des Fensters bleibt unangetastet stehen.
-  var behalten = bestehend.filter(function(r) { return !refreshDate || r[0] < refreshDate; });
-
   var folder = DriveApp.getFolderById(WORKOUT_FOLDER_ID);
-  var files = folder.getFiles();
   var rows = [];
-  while (files.hasNext()) {
-    var file = files.next();
-    var name = file.getName();
-    var dateMatch = name.match(/(\d{4}-\d{2}-\d{2})/);
-    if (!dateMatch) continue;
-    var date = dateMatch[1];
-    // Eingelesen wird, was im Fenster liegt ODER bisher überhaupt fehlt (Nachzügler).
-    var imFenster = !refreshDate || date >= refreshDate;
-    var fehltNoch = !vorhandeneDaten[date];
-    if (!imFenster && !fehltNoch) continue;
+  var behalten;
+  var datumAus = function(name) { var m = name.match(/(\d{4}-\d{2}-\d{2})/); return m ? m[1] : null; };
+  var lesen = function(file, date) {
     try {
-      var parsed = readWorkoutFile(file);
-      if (!parsed) continue;
-      var g = makeGetters(parsed.hdrs, parsed.vals);
-      var durationMin = parseDurationStr(g.getRaw('Duration'));
-      // Reihenfolge MUSS WORKOUT_SPALTEN entsprechen – hier wird positionsbasiert gebaut.
-      rows.push([
-        date,
-        (g.getRaw('Type') || '').trim(),
-        durationMin !== null ? Math.round(durationMin * 100) / 100 : null,
-        g.getN('Distance', 'Distanz', 'Dist'),
-        g.getN('Avg Heart', 'Avg HR'),
-        g.getN('Max Heart', 'Max HR'),
-        g.getN('Speed'),
-        g.getN('Elevation Ascend'),
-        g.getN('Active Energy'),
-        g.getN('Cadence'),
-        g.getN('Step Count', 'Steps')
-      ]);
+      var z = workoutZeile(file, date);
+      if (z) rows.push(z);
     } catch (e) {
-      Logger.log('Fehler bei Datei ' + name + ': ' + e.message);
+      Logger.log('Fehler bei Datei ' + file.getName() + ': ' + e.message);
+    }
+  };
+
+  if (schnell) {
+    // Welche Tage haben seit dem letzten Lauf eine neue oder geaenderte Datei?
+    var tage = {};
+    var geaendert = folder.searchFiles("modifiedDate > '" + driveZeit(modus.seit) + "' and trashed = false");
+    while (geaendert.hasNext()) { var d = datumAus(geaendert.next().getName()); if (d) tage[d] = true; }
+    var tagListe = Object.keys(tage);
+    if (!tagListe.length) { Logger.log('Workout: keine geaenderten Dateien.'); return 0; }
+    Logger.log('Workout: baue neu auf – ' + tagListe.join(', '));
+    // Alle Dateien dieser Tage lesen (auch unveraenderte des selben Tags).
+    tagListe.forEach(function(tag) {
+      var it = folder.searchFiles("title contains '" + tag + "' and trashed = false");
+      while (it.hasNext()) { var f = it.next(); if (datumAus(f.getName()) === tag) lesen(f, tag); }
+    });
+    behalten = bestehend.filter(function(r) { return !tage[r[0]]; });
+  } else {
+    // Fenster über das NEUESTE Datum bestimmen, nicht über die Zeilennummer.
+    // Vorher hiess WORKOUT_DAYS_TO_REFRESH zwar "days", zählte aber ZEILEN – und eine
+    // verspätet abgelegte Datei war älter als der so errechnete Stichtag und wurde
+    // dadurch nie eingelesen.
+    var daten = bestehend.map(function(r) { return r[0]; }).sort();
+    var refreshDate = daten.length
+      ? minusTage(daten[daten.length - 1], WORKOUT_DAYS_TO_REFRESH - 1)
+      : null;
+    var vorhandeneDaten = {};
+    daten.forEach(function(d) { vorhandeneDaten[d] = true; });
+    if (refreshDate) Logger.log('Refreshe ab: ' + refreshDate);
+
+    // Alles ausserhalb des Fensters bleibt unangetastet stehen.
+    behalten = bestehend.filter(function(r) { return !refreshDate || r[0] < refreshDate; });
+
+    var files = folder.getFiles();
+    while (files.hasNext()) {
+      var file = files.next();
+      var date = datumAus(file.getName());
+      if (!date) continue;
+      // Eingelesen wird, was im Fenster liegt ODER bisher überhaupt fehlt (Nachzügler).
+      var imFenster = !refreshDate || date >= refreshDate;
+      var fehltNoch = !vorhandeneDaten[date];
+      if (!imFenster && !fehltNoch) continue;
+      lesen(file, date);
     }
   }
   // Leere Werte vereinheitlichen, damit der Dubletten-Vergleich unten zuverlässig greift
@@ -790,6 +943,21 @@ function importWorkoutData() {
     return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
   });
 
+  // Welche Tage aendern sich wirklich? Nichts geaendert → nichts schreiben.
+  var jeTag = function(zeilen) {
+    var t = {};
+    zeilen.forEach(function(r) { (t[r[0]] = t[r[0]] || []).push(vergleichsText(r)); });
+    Object.keys(t).forEach(function(k) { t[k] = t[k].sort().join('\n'); });
+    return t;
+  };
+  var vorherJeTag = jeTag(bestehend), nachherJeTag = jeTag(eindeutig);
+  var geaenderteTage = Object.keys(nachherJeTag).concat(Object.keys(vorherJeTag))
+    .filter(function(k, i, a) { return a.indexOf(k) === i && vorherJeTag[k] !== nachherJeTag[k]; }).length;
+  if (!geaenderteTage && eindeutig.length === bestehend.length) {
+    Logger.log('✅ Workouts unverändert · ' + rows.length + ' aus Dateien gelesen');
+    return 0;
+  }
+
   // Datenbereich geschlossen neu schreiben – dadurch kann weder eine Zeile doppelt
   // stehen bleiben noch eine Restzeile aus einem früheren, längeren Stand überleben.
   if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, HEADERS.length).clearContent();
@@ -806,6 +974,6 @@ function importWorkoutData() {
   Logger.log('✅ ' + eindeutig.length + ' Workouts im Sheet · ' + rows.length + ' aus Dateien gelesen'
     + (entfernt > 0 ? ' · ' + entfernt + ' Dublette(n) entfernt' : ''));
   Logger.log('Workout Sheet ID (für Dashboard): ' + ss.getId());
-  return ss.getId();
+  return geaenderteTage || 1;   // geschrieben wurde in jedem Fall (etwa Dubletten entfernt)
 }
 
