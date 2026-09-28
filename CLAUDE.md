@@ -537,11 +537,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Datenbestand**, sonst teilte „Ø pro Woche" im laufenden Jahr durch Wochen, die noch
     nicht stattgefunden haben (2025: 1670.1 km ÷ 52.1 = 32 km, nachgerechnet).
   - **„Ø 2025" in Laufstrecke und Trainingszeit zählt Monate OHNE Training mit 0**
-    (auf Wunsch, 28.09.2026; `_oeBalken` in `pgTraining`, gilt auch für die Ø-Linie).
-    Geteilt wird durch alle Monate **mit Gesundheitsdaten** (die Balkenschlüssel aus
-    `allMonths(D)`) — im laufenden Jahr also nur durch die bisher vergangenen.
-    In allen übrigen Bereichen bleibt es beim Mittel über Balken mit Training.
-    Geprüft: März 2025 ohne Training → 1539.9 km ÷ 12 = 128.3 km (vorher ÷ 11).
+    (auf Wunsch, 28.09.2026) — ebenso bei 3M bis 24M, siehe „Fusszeilen des
+    Training-Tabs". Geprüft: März 2025 ohne Training → 1539.9 km ÷ 12 = 128.3 km.
   - `prevPeriod()` = das Jahr davor; `_spaltenBereich()` schliesst das Einzeljahr aus
     (ein Schritt tauscht das ganze Fenster → Schiebe-Animation wie 7T/1M/YoY).
   - Pille, Kartenkopf und Durchschnittszeile nennen das Jahr (`bereichKurz()` →
@@ -1228,7 +1225,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   bestimmt und von Fusszeile und Linie gemeinsam gelesen. Folge: bei 7T und 1M ist
   „Ø 1M" in der Laufstrecke praktisch „Ø pro Lauf" (je Trainingstag statt je
   Einheit — gleich, solange es keinen Tag mit zwei Läufen gibt); ab 3M ist es der
-  Monatsschnitt. Pace: Mittel über die Einheiten (`mittelArr(trendPace)`), ebenfalls
+  Monatsschnitt. **Bei Monatsbalken (3M–24M, Einzeljahr) zählen Monate ohne Training
+  mit 0** (auf Wunsch, 28.09.2026, `_oeBalken`/`_jeMonat` in `pgTraining`): geteilt
+  wird durch alle Monate mit Gesundheitsdaten im Fenster (`allMonths(D)`), im
+  laufenden Monat bzw. Jahr also nur durch die bisher vergangenen. Bei Tagesbalken
+  (7T, 1M) bleiben Tage ohne Einheit aussen vor, im Jahresvergleich ebenfalls.
+  Geprüft: Juni 2026 ohne Training → 6M 665.6 km ÷ 6 = 110.9 km, 12M 1385 ÷ 12.
+  Pace: Mittel über die Einheiten (`mittelArr(trendPace)`), ebenfalls
   der Linienwert. VO₂max zeigt wie bisher den Mittelwert der Messtage (`v2D`).
   Nachgemessen (Prüfstand, Sep 26): 1M Linie 10.66 km / 67.46 min / 5.62 → Fusszeile
   10.7 km / 1h 7min / 5'37"; 3M 100.16 km / 611.93 min → 100.2 km / 10h 12min.
