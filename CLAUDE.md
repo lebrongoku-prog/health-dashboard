@@ -536,6 +536,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   - `windowMonths()` liefert 12, `moWindow()` das Kalenderjahr — **geklemmt auf den
     Datenbestand**, sonst teilte „Ø pro Woche" im laufenden Jahr durch Wochen, die noch
     nicht stattgefunden haben (2025: 1670.1 km ÷ 52.1 = 32 km, nachgerechnet).
+  - **„Ø 2025" in Laufstrecke und Trainingszeit zählt Monate OHNE Training mit 0**
+    (auf Wunsch, 28.09.2026; `_oeBalken` in `pgTraining`, gilt auch für die Ø-Linie).
+    Geteilt wird durch alle Monate **mit Gesundheitsdaten** (die Balkenschlüssel aus
+    `allMonths(D)`) — im laufenden Jahr also nur durch die bisher vergangenen.
+    In allen übrigen Bereichen bleibt es beim Mittel über Balken mit Training.
+    Geprüft: März 2025 ohne Training → 1539.9 km ÷ 12 = 128.3 km (vorher ÷ 11).
   - `prevPeriod()` = das Jahr davor; `_spaltenBereich()` schliesst das Einzeljahr aus
     (ein Schritt tauscht das ganze Fenster → Schiebe-Animation wie 7T/1M/YoY).
   - Pille, Kartenkopf und Durchschnittszeile nennen das Jahr (`bereichKurz()` →

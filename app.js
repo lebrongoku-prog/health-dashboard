@@ -3819,8 +3819,15 @@ async function pgTraining() {
   // Die Fusszeile „Ø 1M" zeigt denselben Wert wie die gestrichelte Ø-Linie: den
   // Mittelwert der Balken, also je Tag (7T, 1M) bzw. je Monat (ab 3M). Tage ohne
   // Einheit fehlen in der Reihe (null) und zaehlen deshalb nicht mit.
-  const oeZeitBalken = mittelArr(_balkenZeit);
-  const oeStrBalken  = mittelArr(_balkenStr);
+  // AUSNAHME Einzeljahr (auf Wunsch, 28.09.2026): dort zaehlt JEDER Monat mit Daten,
+  // ein Monat ohne Training mit 0 – „Ø 2025" ist das Monatsmittel ueber das Jahr. Die
+  // Reihe enthaelt nur Monate mit Gesundheitsdaten (die Schluessel kommen aus
+  // allMonths(D)), im laufenden Jahr also nur die bisher vergangenen.
+  const _oeBalken = reihe => (istJahr() && reihe.some(v => v != null))
+    ? reihe.reduce((summe, v) => summe + (v || 0), 0) / reihe.length
+    : mittelArr(reihe);
+  const oeZeitBalken = _oeBalken(_balkenZeit);
+  const oeStrBalken  = _oeBalken(_balkenStr);
   // Ø-Pace: ebenfalls der Wert der Ø-Linie – Mittel ueber die Einheiten.
   const oePace = mittelArr(trendPace);
 
