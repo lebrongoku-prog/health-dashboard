@@ -562,6 +562,42 @@ if (!_startAusCache) {
 // Ausschalten steht wieder da, was vorher da war.
 function istYoY() { return timeRange === 'yoy'; }
 
+// ── Einzeljahr (28.09.2026, auf Wunsch) ────────────────────────────────────────
+// Knoepfe „2024", „2025", „2026" in der Befehlszeile der Zeitleiste zeigen EIN
+// Kalenderjahr, Januar bis Dezember als Monatsbalken. `timeRange` ist dann 'jahr';
+// WELCHES Jahr, sagt `referenceDate` – so blaettern die Pfeile ohne Sonderweg ein
+// Jahr weiter (`_navZiel`). Das Fenster (`moWindow`) wird auf den Datenbestand
+// geklemmt: fuer das laufende Jahr endet es am neuesten Tag, sonst teilte „Ø pro
+// Woche" durch Wochen, die noch gar nicht stattgefunden haben.
+// `_jahrVorher` merkt sich Bereich, Bezugsdatum und `_datumSelbstGewaehlt` von vor
+// dem Einschalten; ein zweiter Tipp auf das aktive Jahr stellt alles wieder her.
+function istJahr() { return timeRange === 'jahr'; }
+function jahrVon(ds) { return ds ? +ds.slice(0, 4) : null; }
+// Die Jahre, fuer die Gesundheitsdaten vorliegen – daraus entstehen die Knoepfe.
+function datenJahre() { return [...new Set(allData.map(r => r.date.slice(0, 4)))].sort().map(Number); }
+// Bezugsdatum fuer ein Jahr: sein letzter Tag, im laufenden Jahr der neueste Datentag.
+function jahresBezug(jahr) {
+  const letzter = allData[allData.length - 1].date, ende = jahr + '-12-31';
+  return letzter < ende ? letzter : ende;
+}
+let _jahrVorher = null;
+function jahrUmschalten(jahr) {
+  if (istJahr() && jahrVon(referenceDate) === jahr) {
+    // Zweiter Tipp auf das aktive Jahr: zurueck in den Zustand von vorher.
+    const v = _jahrVorher || { range: '12m', ref: allData[allData.length - 1].date, selbst: false };
+    _jahrVorher = null;
+    referenceDate = v.ref; _datumSelbstGewaehlt = v.selbst;
+    bereichSetzen(v.range);
+    return;
+  }
+  if (!istJahr()) _jahrVorher = { range: timeRange, ref: referenceDate, selbst: _datumSelbstGewaehlt };
+  referenceDate = jahresBezug(jahr);
+  // Ein Nachladen im Hintergrund darf nicht auf den neuesten Tag – also ins
+  // laufende Jahr – zurueckspringen.
+  _datumSelbstGewaehlt = true;
+  bereichSetzen('jahr');
+}
+
 // ── Jahresvergleich: Fusszeilen „2025 vs. 2024" (auf Wunsch, 14.09.2026) ──────
 // Im Jahresvergleich enthaelt D nur EINEN Kalendermonat, verteilt auf mehrere Jahre.
 // Nach `YYYY-MM` gruppiert ergibt das je Jahr genau einen Wert – denselben, den der
@@ -625,7 +661,7 @@ function yoyZeilen(reihen, summe) {
 let _yoyVorher = '1m';
 
 function windowDays() { return {'7d':7}[timeRange] || null; }
-function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24}[timeRange] || null; }
+function windowMonths() { return {'1m':1,'3m':3,'6m':6,'12m':12,'24m':24,'jahr':12}[timeRange] || null; }
 
 // Always format as local YYYY-MM-DD (avoids UTC-offset-off-by-one bug)
 function toLocalDateStr(dt) {
@@ -653,6 +689,12 @@ function moLast(dateStr) { return addDays(addMonths(moFirst(dateStr),1),-1); }
 function moWindow() {
   const wm = windowMonths();
   if (wm == null) return null;
+  if (istJahr()) {
+    // Das Kalenderjahr von referenceDate, geklemmt auf den Datenbestand.
+    const j = jahrVon(referenceDate), erster = allData[0].date, letzter = allData[allData.length - 1].date;
+    const s = j + '-01-01', e = j + '-12-31';
+    return { s: s < erster ? erster : s, e: e > letzter ? letzter : e };
+  }
   const endFirst  = moFirst(referenceDate);          // first of end month
   const startFirst = addMonths(endFirst, -(wm-1));   // first of start month
   return { s: startFirst, e: moLast(referenceDate) };
@@ -682,6 +724,8 @@ function prevPeriod() {
   // nebeneinander im Diagramm. Eine erfundene Vergleichsspanne waere schlechter als
   // keine – die Kacheln zeigen dann „—" statt einer Zahl ohne Bedeutung.
   if (istYoY()) return [];
+  // Einzeljahr: das Kalenderjahr davor.
+  if (istJahr()) { const j = jahrVon(referenceDate) - 1; return allData.filter(r => jahrVon(r.date) === j); }
   if (is7D()) {
     const prevRef = addDays(referenceDate, -7);
     const mon = getWeekMonday(prevRef);
@@ -753,6 +797,11 @@ function updateNavUI() {
 // dort endet? EINE Quelle fuer Pfeile, Wischgeste und deren Gummiband-Verhalten.
 function _navZiel(richtung) {
   if (!referenceDate || !allData.length) return null;
+  // Einzeljahr: ein Schritt ist ein Jahr – sofern es fuer das Zieljahr Daten gibt.
+  if (istJahr()) {
+    const ziel = jahrVon(referenceDate) + richtung;
+    return datenJahre().includes(ziel) ? jahresBezug(ziel) : null;
+  }
   return _imDatenbestand(is7D() ? addDays(referenceDate, richtung * 7) : addMonths(referenceDate, richtung), richtung);
 }
 // Das Ziel eines Schritts – oder null, wenn es jenseits des ersten bzw. letzten Tags liegt.
@@ -1526,7 +1575,8 @@ function _ruhigRendern(tab) {
 // tauscht ein Schritt tatsaechlich das ganze Fenster.
 const SPALTEN_DAUER = 420;
 let _spaltenLauf = null;
-function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY(); }
+// Einzeljahr zaehlt nicht dazu: ein Schritt tauscht dort das GANZE Fenster (ein Jahr).
+function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY() && !istJahr(); }
 // Startversatz auf [0, ziel] begrenzen – plus `spiel` auf beiden Seiten. Der Spielraum
 // ist das Einrasten des Zeitstrahl-Wischs: wer 2.4 Monate zieht, blaettert 2, und die
 // Flaeche federt die 0.4 zurueck; bei 2.6 blaettert er 3 und sie rueckt 0.4 nach.
@@ -4824,9 +4874,15 @@ const _RANGE_OPTS = [
 // Reihen je Zeile (Schlafphasen: „Ø 1M · REM-Schlaf").
 // Im Jahresvergleich entfallen alle Durchschnittszeilen – dort wird es nie gerufen.
 function oeLabel(zusatz) {
-  const t = _RANGE_OPTS.find(([k]) => k === timeRange);
-  const basis = 'Ø ' + (t ? t[1] : timeRange);
+  const basis = 'Ø ' + bereichKurz();
   return zusatz ? basis + ' · ' + zusatz : basis;
+}
+// Kurzname des aktuellen Bereichs – fuer Pille und Durchschnittszeile: „7T", „YoY", „2025".
+function bereichKurz() {
+  if (istYoY()) return 'YoY';
+  if (istJahr()) return String(jahrVon(referenceDate));
+  const t = _RANGE_OPTS.find(([k]) => k === timeRange);
+  return t ? t[1] : timeRange;
 }
 // Angezeigter Zeitraum als Text: bei 7T die Kalenderwoche, ab 1M der Monatsbereich –
 // die Zeitachse zeigt dort nur Monate, und aus "Jun 26" allein ist nicht ablesbar,
@@ -4849,6 +4905,7 @@ function zeitraumText() {
   }
   const mw = moWindow();
   if (!mw) return '';
+  if (istJahr()) return String(jahrVon(referenceDate));
   const monat = ds => MONAT_KURZ[+ds.slice(5,7) - 1];
   const jahr  = ds => ds.slice(2,4);
   if (mw.s.slice(0,7) === mw.e.slice(0,7)) return monat(mw.s) + ' ' + jahr(mw.s);
@@ -4891,7 +4948,9 @@ function zeitleisteBauen() {
   // ohne `data-range`, mit eigener Klasse und in einer EIGENEN Zeile ueber den
   // Bereichs-Chips – das trennt, was etwas tut, von dem, was den Zeitraum waehlt, und
   // haelt die Chip-Zeile bei 375 px ohne Umbruch.
-  const aktionen = `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`;
+  // Die Jahres-Knoepfe fuellt zeitleisteAktualisieren() – sie haengen am Datenbestand.
+  const aktionen = `<button class="zl-yoy" aria-pressed="false" title="Jahresvergleich">YoY</button>`
+    + `<span class="zl-jahre"></span>`;
   const el = document.createElement('div');
   el.id = 'zeitleiste';
   el.innerHTML = `<button class="zl-ausklapp" hidden></button>`
@@ -4949,11 +5008,27 @@ function zeitleisteAusklapp() {
 function zeitleisteAktualisieren() {
   const el = document.getElementById('zeitleiste');
   if (!el) return;
-  const treffer = _RANGE_OPTS.find(([k]) => k === timeRange);
   const pille = el.querySelector('.zl-pille');
-  // Im Jahresvergleich gehoert keiner der sechs Bereiche zum Zustand – dann nennt
-  // die Pille den Modus statt einen Zeitraum.
-  if (pille) pille.textContent = istYoY() ? 'YoY' : (treffer ? treffer[1] : timeRange);
+  // Im Jahresvergleich und im Einzeljahr gehoert keiner der sechs Bereiche zum
+  // Zustand – dann nennt die Pille den Modus bzw. das Jahr.
+  if (pille) pille.textContent = bereichKurz();
+  // Ein Knopf je Jahr mit Daten. Neu gebaut nur, wenn sich die Jahre aendern (etwa
+  // am 1. Januar nach dem Nachladen).
+  const jahre = el.querySelector('.zl-jahre');
+  if (jahre) {
+    const liste = datenJahre();
+    if (jahre.dataset.jahre !== liste.join(',')) {
+      jahre.dataset.jahre = liste.join(',');
+      jahre.innerHTML = liste.map(j =>
+        `<button class="zl-jahr" data-jahr="${j}" aria-pressed="false" title="Nur das Jahr ${j}">${j}</button>`).join('');
+    }
+    const aktiv = istJahr() ? jahrVon(referenceDate) : null;
+    jahre.querySelectorAll('.zl-jahr').forEach(b => {
+      const an = +b.dataset.jahr === aktiv;
+      b.classList.toggle('aktiv', an);
+      b.setAttribute('aria-pressed', an ? 'true' : 'false');
+    });
+  }
   const yoy = el.querySelector('.zl-yoy');
   if (yoy) {
     yoy.classList.toggle('aktiv', istYoY());
@@ -5630,6 +5705,14 @@ document.body.addEventListener('click', (e) => {
     blickAnkerMerken(t);
     if (istYoY()) { bereichSetzen(_yoyVorher); }
     else { _yoyVorher = timeRange; bereichSetzen('yoy'); }
+    return;
+  }
+  // Einzeljahr ein/aus bzw. wechseln (siehe jahrUmschalten).
+  const zlJahr = t.closest('.zl-jahr');
+  if (zlJahr) {
+    zeitleisteAuswahl(false);
+    blickAnkerMerken(t);
+    jahrUmschalten(+zlJahr.dataset.jahr);
     return;
   }
   const zlOpt = t.closest('.zl-opt');

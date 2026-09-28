@@ -511,7 +511,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    In ihrer eigenen Zeile ist Platz, deshalb duerfen sie breiter greifen als die
    Chips (.75rem statt .55rem) — sie sind damit die groessten Tippflaechen der
    Auswahl. Der frueher noetige senkrechte `.zl-trenner` ist mit der Zeile entfallen. */
-.zl-yoy {
+/* Die Jahres-Knoepfe (Einzeljahr, 28.09.2026) sehen aus wie „YoY": ebenfalls Befehle
+   mit Zustand in der Befehlszeile. Ihre Huelle `.zl-jahre` loest sich im Layout auf,
+   damit alle Knoepfe gleichberechtigt in der Zeile umbrechen und denselben Abstand
+   (`gap` von `.zl-zeile`) haben. */
+.zl-jahre { display: contents; }
+.zl-yoy, .zl-jahr {
   height: 34px; padding: 0 .75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -525,7 +530,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    „YoY" traegt sie ebenfalls, denn anders als „Heute" HAT es einen Zustand: der
    Jahresvergleich bleibt an, bis man ihn wieder ausschaltet. „Heute" bekommt sie
    nie — ein Sprung ist nach dem Landen vorbei. */
-.zl-opt.aktiv, .zl-yoy.aktiv {
+.zl-opt.aktiv, .zl-yoy.aktiv, .zl-jahr.aktiv {
   background: var(--tab-color);
   border-color: var(--tab-color);
   color: #fff;

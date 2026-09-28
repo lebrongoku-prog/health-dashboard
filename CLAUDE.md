@@ -525,6 +525,26 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     prüft — derzeit nutzt es kein Tab.
   Nachgerechnet aus den Rohdaten des Prüfstands (`?tage=900`): Laufstrecke 88.9 /
   156.2 / 48.1 km → `+75.7%` / `−69.2%`, Ruhepuls → `+9.1%` / `+6.6%` — identisch.
+- **Einzeljahr („2024", „2025", „2026", 28.09.2026, auf Wunsch):** in der
+  Befehlszeile der Zeitleiste neben „YoY" je ein Knopf pro Jahr mit Daten
+  (`datenJahre()`, gebaut in `zeitleisteAktualisieren()`, neu nur wenn sich die Jahre
+  ändern — am 1. Januar kommt der Knopf also von selbst). Ein Tipp zeigt das
+  **Kalenderjahr** Jan–Dez als Monatsbalken. `timeRange` ist dann `'jahr'`; **welches**
+  Jahr, sagt `referenceDate` (`jahresBezug()`: 31.12. bzw. im laufenden Jahr der
+  neueste Datentag). Dadurch brauchen die Blätterpfeile keinen Sonderweg:
+  `_navZiel()` springt ein Jahr weiter, sofern es Daten hat.
+  - `windowMonths()` liefert 12, `moWindow()` das Kalenderjahr — **geklemmt auf den
+    Datenbestand**, sonst teilte „Ø pro Woche" im laufenden Jahr durch Wochen, die noch
+    nicht stattgefunden haben (2025: 1670.1 km ÷ 52.1 = 32 km, nachgerechnet).
+  - `prevPeriod()` = das Jahr davor; `_spaltenBereich()` schliesst das Einzeljahr aus
+    (ein Schritt tauscht das ganze Fenster → Schiebe-Animation wie 7T/1M/YoY).
+  - Pille, Kartenkopf und Durchschnittszeile nennen das Jahr (`bereichKurz()` →
+    „Ø 2025"). Aktive Jahres-Knöpfe tragen `aktiv` wie „YoY".
+  - **Ein- und Ausschalten** (`jahrUmschalten`): beim Einschalten merkt sich
+    `_jahrVorher` Bereich, Bezugsdatum und `_datumSelbstGewaehlt`, und
+    `_datumSelbstGewaehlt` wird true — sonst zöge das Nachladen im Hintergrund zurück
+    ins laufende Jahr. Ein zweiter Tipp auf das aktive Jahr stellt den alten Zustand
+    wieder her. „Heute" springt im Einzeljahr ins laufende Jahr.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
