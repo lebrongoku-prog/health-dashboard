@@ -720,7 +720,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   die Angabe machte den Wert nur unnötig fett. Gleiches gilt für den Fall „kein
   Signal" — dann `null` übergeben, nicht eine graue Farbe.
 - **Schritte sind KEINE Zielmetrik mehr** (auf Wunsch entfernt): weder in `ZIELE`
-  noch in der Ziel-Karte `zielUebersichtHTML()` noch als Minikachel. Die vierte
+  noch in den Ziel-Ringen bzw. der Wochenbilanz noch als Minikachel. Die vierte
   Minikachel zeigt an Trainingstagen die Dauer der Einheit und sonst die **Zahl der
   Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
   **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
@@ -752,7 +752,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
-  Ziel-Karte `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
+  Ziel-Ringe und Wochenbilanz der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
