@@ -726,7 +726,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
   dort sind sie Messwert, nicht Ziel.
 - **Ziel-Karte (`zielUebersichtHTML()`, erste Karte der Übersicht):** zeigt **immer
-  alle** Ziele — auch die erreichten und die ohne Wert (dann `—`). Vorher standen dort
+  alle** Ziele — auch die erreichten und die ohne Wert (dann `—`). **Ausnahme VO₂max**
+  (entfernt auf Wunsch, 30.09.2026): die Übersicht hat keine Kachel dazu; das Ziel
+  bleibt in `ZIELE` und als Linie im VO₂max-Diagramm. Seither vier Zeilen — im
+  Querformat gibt die Karte damit 200 px statt 235 px Höhe vor, die Kacheln
+  (`--kachel: 1.2`) passen weiterhin (je 96 px, nachgemessen bei 812 × 375). Vorher standen dort
   nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war, liess sich
   nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
   „Ziele" + `scopeBadge`) und darunter eine

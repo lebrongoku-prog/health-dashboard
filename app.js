@@ -2158,7 +2158,6 @@ function zielUebersichtHTML() {
   const last = allData[allData.length-1] || {};
   const letzte7 = allData.slice(-7);
   const trainProWoche = letzte7.filter(r => workoutData[r.date]?.durationMin > 0).length;
-  const letzterVo2 = [...allData].reverse().find(r => r.vo2max != null)?.vo2max ?? null;
 
   // ALLE Ziele, immer – auch die erreichten und die ohne Wert. Vorher zeigte die
   // Karte nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war,
@@ -2167,8 +2166,9 @@ function zielUebersichtHTML() {
     ['sleepTotal', last.sleepTotal],
     ['restHR',     last.restHR],
     ['hrv',        last.hrv],
-    ['trainDays',  letzte7.length >= 7 ? trainProWoche : null],
-    ['vo2max',     letzterVo2]
+    ['trainDays',  letzte7.length >= 7 ? trainProWoche : null]
+    // VO₂max steht hier nicht mehr (auf Wunsch, 30.09.2026): die Übersicht hat keine
+    // Kachel dazu, das Ziel bleibt als Linie im VO₂max-Diagramm des Training-Tabs.
   ];
   if (!allData.length) return '';
 
