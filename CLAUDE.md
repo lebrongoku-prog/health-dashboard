@@ -1218,9 +1218,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Schlafschuld (die folgt nicht dem Zeitfilter, sondern den letzten 14 Nächten).
   Im Jahresvergleich entfallen die Zeilen weiterhin ganz.
 - **Fusszeilen des Training-Tabs** (auf Wunsch, 18.09.2026):
-  **Laufstrecke und Trainingszeit** `Total` → `Ø 1M` → `Ø pro Lauf` →
+  **Laufstrecke und Trainingszeit** `Total` → `Ø 6M · pro Monat` → `Ø pro Lauf` →
   `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt"); aufgeklappt
-  kommen Wochentag/Wochenende dazu. **Pace und VO₂max** tragen nur die
+  kommen Wochentag/Wochenende dazu. **Die Durchschnittszeile gibt es hier nur bei
+  Monatsbalken** (3M–24M, Einzeljahr: `Ø 2025 · pro Monat`) — auf Wunsch,
+  30.09.2026 (Variante C): bei 7T und 1M war „Ø 1M" der Schnitt je Trainingstag und
+  damit fast dieselbe Zahl wie „Ø pro Lauf" darunter. Die gestrichelte Ø-Linie bleibt
+  bei 7T/1M trotzdem im Diagramm (ihr Wert ≈ „Ø pro Lauf"). Bedingung ist `_jeMonat`. **Pace und VO₂max** tragen nur die
   Durchschnittszeile — auch aufgeklappt: Wochentag/Wochenende beim Pace und
   „Veränderung" bei VO₂max sind **ganz entfallen** (auf Wunsch). Mit „Veränderung"
   ging auch der Vorperioden-Vergleich (`prevPeriod()`) aus dem Training-Tab;
