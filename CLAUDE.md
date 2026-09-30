@@ -775,6 +775,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     nicht zur angezeigten Woche gehören (auf Wunsch entfernt).
   - **„vor N Wochen"** links neben `KW nn` (`.zw-vor`), sobald die Wochenbilanz nicht
     die laufende Woche zeigt (nur bei 7T möglich).
+  - **Animiert** (auf Wunsch, 30.09.2026, 260 ms, `OV_DAUER`): **Woche wechseln** →
+    die Punkte gleiten spaltenweise (18 ms versetzt) aus der Richtung herein, aus der
+    die Woche kommt (neuere von rechts), Zahlen rechts und KW blenden ein. **Tag
+    wählen** → die helle Fläche gleitet von der alten zur neuen Spalte. In beiden Fällen
+    laufen die **Ringe** vom alten auf den neuen Stand (Füllung über `data-anteil`, Zahl
+    zählt) und der Titel blendet über. Gemessen wird am DOM: `ovObenMerken()` VOR dem
+    Neuaufbau, `ovObenAnimieren()` danach — in `ovObenNeu()` (Tipp) und in
+    `pgOverview()` (Blättern, Bereichswechsel). Nur im sichtbaren Übersicht-Tab, nicht
+    bei `prefers-reduced-motion`. WAAPI über `_ovAnim` mit Rückfall-`finish()` (sonst
+    blieben die Punkte im nicht gezeichneten Pane auf Deckkraft 0).
   - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
     Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
     202 px, Ringe 296 px).

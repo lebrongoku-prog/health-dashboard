@@ -2199,7 +2199,90 @@ function ovObenHTML() {
 }
 function ovObenNeu() {
   const el = document.querySelector('#screen-overview .ov-oben');
-  if (el) el.outerHTML = ovObenHTML();
+  if (!el) return;
+  const vorher = ovObenMerken();
+  el.outerHTML = ovObenHTML();
+  ovObenAnimieren(vorher);
+}
+
+// ── Animation der Wochenbilanz und der Ringe (auf Wunsch, 30.09.2026) ──────────
+// Zwei Vorgänge: WOCHE wechseln (Pfeile/Wisch bei 7T, Bereichswechsel) → die Punkte
+// gleiten spaltenweise aus der Richtung herein, aus der die Woche kommt; TAG wählen →
+// die helle Fläche gleitet von der alten Spalte zur neuen. In beiden Fällen laufen
+// die Ringe von ihrem alten Stand auf den neuen (Füllung und Zahl) und der Titel
+// blendet über. Vorher/nachher wird am DOM gemessen: `ovObenMerken()` VOR dem
+// Neuaufbau, `ovObenAnimieren()` danach – so braucht keiner der Auslöser (Tipp,
+// Blättern, Neuaufbau der Übersicht) eigenen Code.
+const OV_DAUER = 260;
+function ovObenMerken() {
+  const ob = document.querySelector('#screen-overview .ov-oben');
+  if (!ob) return null;
+  const mark = ob.querySelector('.zw-spalte.gewaehlt');
+  return {
+    woche: ob.querySelector('.ziel-woche')?.dataset.woche,
+    tag: mark?.dataset.tag,
+    markLinks: mark ? mark.getBoundingClientRect().left : null,
+    ringe: [...ob.querySelectorAll('.zr')].map(z => ({
+      anteil: Number(z.querySelector('.zr-fuell')?.dataset.anteil || 0),
+      wert: z.querySelector('.ti-zahl') ? Number(z.querySelector('.ti-zahl').dataset.wert) : null
+    }))
+  };
+}
+// WAAPI mit Rückfall: eine nicht gezeichnete Seite hielte sonst das erste Bild fest
+// (Deckkraft 0) – dieselbe Falle wie bei `_ausklappAnimieren`.
+function _ovAnim(el, frames, opt) {
+  if (!el.animate) return;
+  const a = el.animate(frames, opt);
+  setTimeout(() => { try { if (a.playState !== 'finished') a.finish(); } catch (_) {} }, (opt.delay || 0) + opt.duration + 120);
+}
+function ovObenAnimieren(vorher) {
+  const ob = document.querySelector('#screen-overview .ov-oben');
+  if (!vorher || !ob || bewegungAus() || currentScreen !== 'overview') return;
+  const woche = ob.querySelector('.ziel-woche')?.dataset.woche;
+  const mark = ob.querySelector('.zw-spalte.gewaehlt');
+  const tag = mark?.dataset.tag;
+  const easing = 'cubic-bezier(.22,.8,.3,1)';
+  if (woche && vorher.woche && woche !== vorher.woche) {
+    // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
+    const r = woche > vorher.woche ? 1 : -1;
+    ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
+      [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
+    ob.querySelectorAll('.zw-zahl, .zw-rechts').forEach(el => _ovAnim(el,
+      [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
+  }
+  if (mark && vorher.markLinks != null) {
+    const dx = vorher.markLinks - mark.getBoundingClientRect().left;
+    if (Math.abs(dx) > .5) _ovAnim(mark, [{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
+      { duration: OV_DAUER, easing });
+  } else if (mark) {
+    _ovAnim(mark, [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing });
+  }
+  if (tag === vorher.tag) return;
+  const titel = ob.querySelector('.zr-titel');
+  if (titel) _ovAnim(titel, [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }],
+    { duration: OV_DAUER, easing });
+  // Ringe: Füllung und Zahl vom alten auf den neuen Stand.
+  const U = 2 * Math.PI * 44;
+  const laeufe = [...ob.querySelectorAll('.zr')].map((z, i) => {
+    const alt = vorher.ringe[i] || {};
+    const kreis = z.querySelector('.zr-fuell'), zahl = z.querySelector('.ti-zahl');
+    const l = { kreis, zahl, von: alt.anteil || 0, bis: kreis ? Number(kreis.dataset.anteil) : 0 };
+    if (zahl) {
+      l.wVon = alt.wert; l.wBis = Number(zahl.dataset.wert); l.form = zahl.dataset.form;
+      _kachelZuletzt[zahl.dataset.feld] = l.wBis;
+    }
+    return l;
+  });
+  const fmt = (v, form) => form === 'std' ? alsStdMin(Math.round(v * 60) / 60) : String(Math.round(v));
+  const schritt = e => laeufe.forEach(l => {
+    if (l.kreis && l.kreis.isConnected)
+      l.kreis.setAttribute('stroke-dasharray', `${((l.von + (l.bis - l.von) * e) * U).toFixed(1)} ${U.toFixed(1)}`);
+    if (l.zahl && l.zahl.isConnected && l.wVon != null && isFinite(l.wVon) && isFinite(l.wBis))
+      l.zahl.textContent = fmt(l.wVon + (l.wBis - l.wVon) * e, l.form);
+  });
+  schritt(0);
+  uebergang(OV_DAUER + 120, schritt);
 }
 
 // Anteil 0..1 am Ziel. Bei „weniger ist besser" (Ruhepuls): erreicht = voll, sonst
@@ -2246,7 +2329,7 @@ function zielRingeHTML(tag) {
       <div class="zr-ring">
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <circle cx="50" cy="50" r="44" class="zr-spur"/>
-          ${anteil ? `<circle cx="50" cy="50" r="44" class="zr-fuell" stroke="${r.farbe}"
+          ${anteil ? `<circle cx="50" cy="50" r="44" class="zr-fuell" data-anteil="${anteil}" stroke="${r.farbe}"
             stroke-dasharray="${(anteil * U).toFixed(1)} ${U.toFixed(1)}" transform="rotate(-90 50 50)"/>` : ''}
         </svg>
         <div class="zr-mitte">
@@ -2291,7 +2374,7 @@ function zielWocheHTML(tage, tag) {
   // Wie viele Wochen liegt die angezeigte vor der laufenden?
   const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
   const kopfTage = tage.map(d => `<span class="zw-tag${d === tag ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
-  return `<div class="ziel-woche">
+  return `<div class="ziel-woche" data-woche="${tage[0]}">
     <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
     <div class="zw-raster"><div class="zw-spalten">${spalten}</div>
       <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
@@ -2757,6 +2840,7 @@ function pgOverview() {
   const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
   const _wocheAgg = !(timeRange === '7d' || timeRange === '1m'); // aggregierte Buckets → "Ø" im Tooltip
 
+  const _ovVorher = ovObenMerken();
   document.getElementById("screen-overview").innerHTML = `
     ${pgBanner('📊','Übersicht')}
     <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber dem Kartenpaar:
@@ -2789,6 +2873,7 @@ function pgOverview() {
       ${patternIns.map(insightKarte).join('')}
     </div>`:''}
     `;
+  ovObenAnimieren(_ovVorher);
 
   // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
   function _wocheTooltipLabel(ctx){
