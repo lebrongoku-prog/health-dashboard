@@ -2263,7 +2263,7 @@ function ovObenAnimieren(vorher) {
   // Titel: das alte Datum blendet aus, das neue ein – ohne Bewegung (auf Wunsch).
   const titel = ob.querySelector('.zr-titel');
   if (titel && vorher.titel && vorher.titel !== titel.textContent) {
-    const neu = titel.textContent, halb = OV_DAUER / 2;
+    const neu = titel.textContent, halb = OV_DAUER / 4;   // je 65 ms (auf Wunsch doppelt so schnell)
     let getauscht = false;
     const tauschen = () => {
       if (getauscht || !titel.isConnected) return; getauscht = true;
