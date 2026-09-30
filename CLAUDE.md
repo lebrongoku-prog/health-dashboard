@@ -737,9 +737,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Darunter Name und Zielzeile (`✓ Ziel ≤ 60`, `8m unter Ziel`), grün erreicht /
     gelb-orange offen. Antippbar, siehe „Ziel-Ringe führen per Tipp in ihren Tab".
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
-    30.09.2026): je Ziel sieben Punkte für die **aktuelle Kalenderwoche Mo–So**
-    (`aktuelleWoche()`, nach dem heutigen Datum, nicht dem neuesten Datentag), Etikett
-    `KW 40`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
+    30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
+    Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im
+    Zeitfilter **7T** die angezeigte Woche (`weekDays7()`, die Pfeile ‹ › blättern sie
+    mit), in allen anderen Bereichen die laufende (`aktuelleWoche()`, nach dem heutigen
+    Datum, nicht dem neuesten Datentag). Etikett `KW 40`. Die Ringe folgen dem
+    Zeitfilter NICHT (letzter Tag bzw. laufende Woche). Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
     liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
     der Trainingszeile und keine Kontur um die Karte (beides auf Wunsch entfernt).
     Die Punkte füllen die Breite (7 gleiche Rasterspalten, Punkte 20 px, Schrift 1rem),
@@ -751,8 +754,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
   - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
-    Raster-Bereiche: Ringe links, Wochenbilanz rechts (gemessen 812 × 375: Ringe
-    296 px, Woche 202 px).
+    Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
+    202 px, Ringe 296 px).
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
   7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
@@ -1278,7 +1281,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   setzt `margin-bottom: 0`, sonst stünde der Kartenabstand im Querformat zusätzlich
   zwischen den Spalten und verfälschte die Zeilenhöhe — dieselbe Falle wie bei
   `.ov-oben`. Gemessen bei 900 px: Spalten 281 px, Lücke 11 px.
-- **Übersicht im Querformat:** Ringe links, Wochenbilanz rechts (siehe „Ziele der
+- **Übersicht im Querformat:** Wochenbilanz links, Ringe rechts (siehe „Ziele der
   Übersicht"). Die Warnkarte steht **über** dem Raster.
 - **Minikacheln der Übersicht: entfallen** (30.09.2026, auf Wunsch) — ersetzt durch
   die grossen Ziel-Ringe (siehe „Ziele der Übersicht"). Mit ihnen gingen `.ti-metric*`,

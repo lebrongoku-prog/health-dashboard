@@ -1075,11 +1075,11 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Ringe links, Wochenbilanz rechts – im Querformat ist Breite da und Hoehe knapp,
+  /* Wochenbilanz links, Ringe rechts – im Querformat ist Breite da und Hoehe knapp,
      deshalb dort kleinere Ringe. Der Kartenabstand sitzt am Container, nicht an den
      Kindern – im Raster verfaelschte er sonst die Zeilenhoehe. */
   .ov-oben{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"ringe woche";gap:.7rem;align-items:start;margin-bottom:.7rem}
+    grid-template-areas:"woche ringe";gap:.7rem;align-items:start;margin-bottom:.7rem}
   .ov-oben>*{margin-bottom:0}
   .ov-oben>.ziel-ringe{grid-area:ringe;--ring:92px;gap:.5rem}
   .ov-oben>.ziel-woche{grid-area:woche}

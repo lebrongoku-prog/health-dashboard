@@ -2163,6 +2163,9 @@ function aktuelleWoche() {
   const mo = getWeekMonday(toLocalDateStr(new Date()));
   return Array.from({ length: 7 }, (_, i) => addDays(mo, i));
 }
+// Die Woche der Wochenbilanz: im Zeitfilter 7T die angezeigte Woche (die Pfeile ‹ ›
+// blättern sie mit, auf Wunsch 30.09.2026), in allen anderen Bereichen die laufende.
+function bilanzWoche() { return is7D() && referenceDate ? weekDays7() : aktuelleWoche(); }
 function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
 // Anteil 0..1 am Ziel. Bei „weniger ist besser" (Ruhepuls): erreicht = voll, sonst
@@ -2221,13 +2224,13 @@ function zielRingeHTML() {
   }).join('')}</div>`;
 }
 
-// Wochenbilanz: je Ziel sieben Punkte (Mo … So der laufenden Woche), gefüllt = Ziel
+// Wochenbilanz: je Ziel sieben Punkte (Mo … So, siehe bilanzWoche), gefüllt = Ziel
 // erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
 // blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
 // die Trainingstage gegen das Wochenziel.
 function zielWocheHTML() {
   if (!allData.length) return '';
-  const tage = aktuelleWoche(), heute = toLocalDateStr(new Date());
+  const tage = bilanzWoche(), heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
   const punkte = zustaende => zustaende.map(z => `<i class="${z}"></i>`).join('');
   const zeile = (name, zustaende, zahl, farbe) =>
@@ -2243,9 +2246,9 @@ function zielWocheHTML() {
   return `<div class="ziel-woche">
     <div class="zw-kopf"><h3>Ziele</h3>${scopeBadge('KW ' + isoKW(tage[0]))}</div>
     <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${tage.map(d => `<span>${wochentagKurz(d)}</span>`).join('')}</span><b class="zw-zahl"></b></div>
-    ${messZeile('sleepTotal', 'Schlaf')}
     ${messZeile('restHR', 'Ruhepuls')}
     ${messZeile('hrv', 'HRV')}
+    ${messZeile('sleepTotal', 'Schlaf')}
     ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
       zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
   </div>`;
@@ -2716,8 +2719,8 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
-    <!-- Hochformat: Wochenbilanz über den Ringen. Querformat: Ringe links,
-         Wochenbilanz rechts (Raster-Bereiche in style.css). -->
+    <!-- Hochformat: Wochenbilanz über den Ringen. Querformat: Wochenbilanz links,
+         Ringe rechts (Raster-Bereiche in style.css). -->
     <div class="ov-oben">
       ${zielWocheHTML()}
       ${zielRingeHTML()}
