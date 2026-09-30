@@ -863,32 +863,36 @@ body.dark .scope-badge{background:#0F172A}
 .zw-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
 .zw-kopf h3{margin:0;font-size:1.15rem;font-weight:700;color:#fff}
 .ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
-.zw-zeile{display:grid;grid-template-columns:5.2rem minmax(0,1fr) 2.6rem;align-items:center;gap:.5rem;padding:.4rem 0;font-size:1rem}
-.zw-name{font-weight:600}
-.zw-punkte{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));justify-items:center}
-.zw-punkte i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
-.zw-punkte i.an{background:var(--zw-gut)}
-.zw-punkte i.aus{border:2.5px solid rgba(255,255,255,.5)}
-.zw-punkte i.leer{background:rgba(255,255,255,.12)}
+/* EIN Raster für Kopf und alle vier Zeilen: Name | 7 Tage | Zahl. `.zw-spalten` liegt
+   mit denselben Spalten absolut dahinter – im selben Raster hätten die Flächen über
+   alle Zeilen die Auto-Platzierung der übrigen Zellen verdrängt. */
+.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 2.6rem;display:grid;grid-template-columns:var(--zw-spalten);
+  align-items:center;font-size:1rem;position:relative}
+.zw-spalten{position:absolute;inset:0;display:grid;grid-template-columns:var(--zw-spalten)}
+.zw-raster>:not(.zw-spalten){position:relative;pointer-events:none;padding:.4rem 0}
+.zw-name{font-weight:600;padding-right:.5rem!important}
 .zw-zahl{text-align:right;font-weight:700}
-.zw-tage{padding:0 0 .1rem;font-size:.72rem}
-/* Jede Tagesspalte ist antippbar: die Zelle füllt ihre Rasterspalte, damit die ganze
-   Spalte trifft und nicht nur der 20-px-Punkt. Rückmeldung nur über Deckkraft (kein
-   transform im scrollenden Bereich, siehe Ringe). */
-.zw-zelle{justify-self:stretch;display:flex;justify-content:center;align-items:center;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;transition:opacity .15s}
-.zw-zelle:active{opacity:.6}
-.zw-zelle.zukunft{cursor:default}
-.zw-tage .zw-zelle{color:rgba(255,255,255,.7);font-weight:600;border-radius:999px;padding:.12rem 0}
-/* Gewählter Tag: Kopf als weisse Pille, die Punkte der Spalte mit hellem Hof. */
-.zw-tage .zw-zelle.gewaehlt{background:#fff;color:#0C4A6E;font-weight:800}
-.zw-zelle.gewaehlt i{box-shadow:0 0 0 3px rgba(255,255,255,.4)}
-.zw-zelle:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:1px}
+.zw-punkt{display:flex;justify-content:center}
+.zw-punkt i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
+.zw-punkt i.an{background:var(--zw-gut)}
+.zw-punkt i.aus{border:2.5px solid rgba(255,255,255,.5)}
+.zw-punkt i.leer{background:rgba(255,255,255,.12)}
+.zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);padding:.1rem 0 .2rem!important}
+.zw-tag.gewaehlt{color:#fff;font-weight:800}
+/* Je Tag eine Spalte über alle Zeilen HINTER den Punkten: Tippfläche (auch zwischen
+   den Punkten – Punkte und Beschriftungen lassen Tipps durch) und Hervorhebung des
+   gewählten Tags als Fläche. Rückmeldung nur über Deckkraft (kein transform im
+   scrollenden Bereich, siehe Ringe). */
+.zw-spalte{grid-row:1;margin:0 1px;border-radius:12px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:background .15s,opacity .15s}
+.zw-spalte:active{opacity:.6}
+.zw-spalte.zukunft{cursor:default}
+.zw-spalte.gewaehlt{background:rgba(255,255,255,.2)}
+.zw-spalte:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:-2px}
 .zw-rechts{display:flex;align-items:center;gap:.5rem}
 .zw-vor{font-size:.8rem;font-weight:600;opacity:.85;white-space:nowrap}
-/* Ringe, die nicht zur angezeigten Woche gehören (Blättern in 7T), treten zurück. */
-.ziel-ringe{transition:opacity .2s}
-.ziel-ringe.blass{opacity:.35}
+/* Über den Ringen: der Tag, dessen Werte sie zeigen. */
+.zr-titel{grid-column:1/-1;justify-self:start;margin:0 0 -.4rem;font-size:1.15rem;font-weight:700;color:#fff}
 
 
 /* Letzte Workout Tabelle */

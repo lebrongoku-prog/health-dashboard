@@ -753,20 +753,28 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
-  - **Tag antippen** (auf Wunsch, 30.09.2026): jede Wochentagspalte (Kopf und Punkte,
-    `[data-tag]`, nicht für Tage in der Zukunft) wählt den Tag, dessen Werte die
-    **Ringe** zeigen. Zustand `_bilanzTag` (null = Standard); `gewaehlterTag()`
-    liefert ihn oder `standardTag()` = heute, bzw. der neueste Datentag, solange heute
-    noch kein Export da ist. Gewählter Tag: weisse Kapsel im Kopf, Ring um die Punkte.
-    Der Trainingsring zählt die **Woche des gewählten Tags** (Zielzeile `diese Woche`
-    bzw. `KW 36`). Ein Tipp baut nur `.ov-oben` neu (`ovObenNeu()`), nicht die
-    Übersicht. „Heute" setzt `_bilanzTag` zurück. `[data-tag]` steht in der
-    Ausnahmeliste des Hintergrund-Tipps (sonst schaltete er die Tableiste um).
+  - **Tag antippen** (auf Wunsch, 30.09.2026): jede Tagesspalte wählt den Tag, dessen
+    Werte die **Ringe** zeigen — **die ganze Spalte**, auch zwischen den Punkten. Dafür
+    liegt hinter dem Raster `.zw-raster` ein zweites mit denselben Spalten
+    (`.zw-spalten`, absolut, Variable `--zw-spalten`): je Tag eine Fläche `.zw-spalte`
+    über alle Zeilen mit `data-tag` (nicht für Tage in der Zukunft); Punkte und
+    Beschriftungen tragen `pointer-events:none`. **Nicht ins selbe Raster legen:** mit
+    `grid-row:1/-1` verdrängten die Flächen die Auto-Platzierung der übrigen Zellen.
+    Der gewählte Tag ist eine helle **Fläche** hinter der Spalte (`.zw-spalte.gewaehlt`),
+    keine Umrandung der Punkte.
+    Gemerkt wird der **Wochentag** (`_bilanzWochentag`, 0 = Mo, null = Standard), nicht
+    das Datum: beim Blättern (7T) bleibt er stehen. `gewaehlterTag(tage)` liefert den
+    Tag in der angezeigten Woche; ohne Auswahl `standardTag()` = heute bzw. der neueste
+    Datentag, solange heute noch kein Export da ist; läge der Tag in der Zukunft
+    (Sonntag gewählt, zurück in der laufenden Woche), ebenfalls der Standardtag.
+    Der Trainingsring zählt die Woche des gewählten Tags (`diese Woche` bzw. `KW 36`).
+    Ein Tipp baut nur `.ov-oben` neu (`ovObenNeu()`). „Heute" setzt die Auswahl zurück.
+    `[data-tag]` steht in der Ausnahmeliste des Hintergrund-Tipps.
+  - **Titel über den Ringen** (`.zr-titel`): der gewählte Tag, `Dienstag, 22.09.2026`.
+    Ersetzt die blassen Ringe, die bis 30.09.2026 abends anzeigten, dass die Ringe
+    nicht zur angezeigten Woche gehören (auf Wunsch entfernt).
   - **„vor N Wochen"** links neben `KW nn` (`.zw-vor`), sobald die Wochenbilanz nicht
-    die laufende Woche zeigt (nur bei 7T möglich). **Die Ringe werden blass**
-    (`.ziel-ringe.blass`, Deckkraft .35), solange der gewählte Tag nicht in der
-    angezeigten Woche liegt — sie zeigen dann nicht die Woche, die man sieht. Ein Tipp
-    auf einen Tag dieser Woche macht sie wieder deckend.
+    die laufende Woche zeigt (nur bei 7T möglich).
   - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
     Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
     202 px, Ringe 296 px).

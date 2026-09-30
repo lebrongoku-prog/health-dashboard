@@ -2172,24 +2172,30 @@ function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 // Ein Tipp auf eine Tagesspalte der Wochenbilanz wählt den Tag; die Ringe zeigen dann
 // seine Werte. Ohne Auswahl (null) gilt der heutige Tag – liegt für heute noch kein
 // Export vor, der neueste Datentag, sonst stünden morgens nur „—" in den Ringen.
-// Die Auswahl übersteht das Blättern der Woche; „Heute" setzt sie zurück.
-let _bilanzTag = null;
+// Gemerkt wird der WOCHENTAG (0 = Mo … 6 = So), nicht das Datum: beim Blättern der
+// Woche bleibt er stehen (auf Wunsch, 30.09.2026). „Heute" setzt ihn zurück.
+let _bilanzWochentag = null;
 function standardTag() {
   const heute = toLocalDateStr(new Date());
   const letzter = allData.length ? allData[allData.length - 1].date : heute;
   return letzter < heute ? letzter : heute;
 }
-function gewaehlterTag() { return _bilanzTag || standardTag(); }
+function wochentagIndex(ds) { return (new Date(ds + 'T00:00:00').getDay() + 6) % 7; }
+// Der gewählte Tag in der Woche `tage`. Läge er in der Zukunft (Sonntag gewählt, zurück
+// in der laufenden Woche), gilt der Standardtag.
+function gewaehlterTag(tage) {
+  const std = standardTag();
+  const d = tage[_bilanzWochentag ?? wochentagIndex(std)];
+  return d > toLocalDateStr(new Date()) ? std : d;
+}
 function wocheVon(ds) { const mo = getWeekMonday(ds); return Array.from({ length: 7 }, (_, i) => addDays(mo, i)); }
 
 // Beide Teile zusammen – auch für den Neuaufbau nach einem Tipp auf einen Tag, ohne
 // dass die ganze Übersicht (samt Diagramm und Einblicken) neu entsteht.
 function ovObenHTML() {
   if (!allData.length) return '';
-  const tage = bilanzWoche(), tag = gewaehlterTag();
-  // Blass, sobald die Ringe nicht zur angezeigten Woche gehören – etwa beim Blättern
-  // in 7T, solange kein Tag dieser Woche angetippt ist.
-  return `<div class="ov-oben">${zielWocheHTML(tage, tag)}${zielRingeHTML(tag, !tage.includes(tag))}</div>`;
+  const tage = bilanzWoche(), tag = gewaehlterTag(tage);
+  return `<div class="ov-oben">${zielWocheHTML(tage, tag)}${zielRingeHTML(tag)}</div>`;
 }
 function ovObenNeu() {
   const el = document.querySelector('#screen-overview .ov-oben');
@@ -2221,15 +2227,16 @@ const ZIEL_RINGE = [
 ];
 
 // `tag`: der gewählte Tag (Werte von Ruhepuls, HRV, Schlaf); Training zählt die
-// Trainingstage seiner Kalenderwoche. `blass`: Ringe gehören nicht zur angezeigten Woche.
-function zielRingeHTML(tag, blass) {
+// Trainingstage seiner Kalenderwoche. Der Titel nennt den Tag, dessen Werte gezeigt werden.
+function zielRingeHTML(tag) {
   const zeile = allData.find(r => r.date === tag) || {};
   const werte = {
     restHR: zeile.restHR, hrv: zeile.hrv, sleepTotal: zeile.sleepTotal,
     trainDays: wocheVon(tag).filter(istTrainingstag).length
   };
   const U = 2 * Math.PI * 44;   // Umfang des Rings (r = 44 im 100er-Raster)
-  return `<div class="ziel-ringe${blass ? ' blass' : ''}">${ZIEL_RINGE.map(r => {
+  const titel = `${WOCHENTAG_LANG[new Date(tag + 'T00:00:00').getDay()]}, ${tag.slice(8, 10)}.${tag.slice(5, 7)}.${tag.slice(0, 4)}`;
+  return `<div class="ziel-ringe"><h3 class="zr-titel">${titel}</h3>${ZIEL_RINGE.map(r => {
     const v = werte[r.key], anteil = zielAnteil(r.key, v), ok = zielErfuellt(r.key, v);
     // Ohne Messwert kein Sprung in den Tab – ein Tipp auf eine leere Stelle soll nicht
     // überraschend wechseln (wie früher bei den leeren Kacheln).
@@ -2262,14 +2269,18 @@ function zielRingeHTML(tag, blass) {
 function zielWocheHTML(tage, tag) {
   const heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
-  const zelle = (d, inhalt, extra = '') => {
-    const cls = 'zw-zelle' + (d === tag ? ' gewaehlt' : '') + (d > heute ? ' zukunft' : '');
-    return d > heute ? `<span class="${cls}">${inhalt}</span>` : `<span class="${cls}" data-tag="${d}"${extra}>${inhalt}</span>`;
-  };
-  const punkte = zustaende => zustaende.map((z, i) => zelle(tage[i], `<i class="${z}"></i>`)).join('');
+  // EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Dahinter liegt ein
+  // zweites Raster mit denselben Spalten (`.zw-spalten`): je Tag eine Fläche über alle
+  // Zeilen – die Tippfläche (auch zwischen den Punkten) und die Hervorhebung des
+  // gewählten Tags. Im selben Raster verdrängten die Flächen die übrigen Zellen.
+  const spalten = tage.map((d, i) => d > heute
+    ? `<span class="zw-spalte zukunft" style="grid-column:${i + 2}"></span>`
+    : `<span class="zw-spalte${d === tag ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${d}" role="button" tabindex="0"` +
+      ` aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)} anzeigen"${d === tag ? ' aria-pressed="true"' : ''}></span>`).join('');
+  const punkte = zustaende => zustaende.map((z, i) => `<span class="zw-punkt${tage[i] === tag ? ' gewaehlt' : ''}"><i class="${z}"></i></span>`).join('');
   const zeile = (name, zustaende, zahl, farbe) =>
-    `<div class="zw-zeile"><span class="zw-name">${name}</span><span class="zw-punkte">${punkte(zustaende)}</span>` +
-    `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b></div>`;
+    `<span class="zw-name">${name}</span>${punkte(zustaende)}` +
+    `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>`;
   const messZeile = (key, name) => {
     const z = tage.map(d => { const v = byDate[d]?.[key]; return v == null ? 'leer' : zielErfuellt(key, v) ? 'an' : 'aus'; });
     const mit = z.filter(x => x !== 'leer').length;
@@ -2279,16 +2290,17 @@ function zielWocheHTML(tage, tag) {
   const nTraining = training.filter(x => x === 'an').length;
   // Wie viele Wochen liegt die angezeigte vor der laufenden?
   const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
-  const kopfTage = tage.map(d => zelle(d, wochentagKurz(d),
-    ` role="button" tabindex="0" aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)} anzeigen"${d === tag ? ' aria-pressed="true"' : ''}`)).join('');
+  const kopfTage = tage.map(d => `<span class="zw-tag${d === tag ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
   return `<div class="ziel-woche">
     <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
-    <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${kopfTage}</span><b class="zw-zahl"></b></div>
-    ${messZeile('restHR', 'Ruhepuls')}
-    ${messZeile('hrv', 'HRV')}
-    ${messZeile('sleepTotal', 'Schlaf')}
-    ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
-      zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
+    <div class="zw-raster"><div class="zw-spalten">${spalten}</div>
+      <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
+      ${messZeile('restHR', 'Ruhepuls')}
+      ${messZeile('hrv', 'HRV')}
+      ${messZeile('sleepTotal', 'Schlaf')}
+      ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
+        zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
+    </div>
   </div>`;
 }
 
@@ -4951,7 +4963,7 @@ function filterTitelTeil() {
 // wer am neuesten Tag steht, will beim naechsten Nachladen mitgezogen werden.
 function aufHeuteSpringen() {
   if (!allData.length) return;
-  _bilanzTag = null;   // die Wochenbilanz zeigt wieder den heutigen Tag
+  _bilanzWochentag = null;   // die Wochenbilanz zeigt wieder den heutigen Tag
   referenceDate = allData[allData.length-1].date;
   _datumSelbstGewaehlt = false;
 }
@@ -5672,7 +5684,7 @@ document.body.addEventListener('click', (e) => {
   const _bilanzZelle = t.closest('.ziel-woche [data-tag]');
   if (_bilanzZelle) {
     const d = _bilanzZelle.dataset.tag;
-    _bilanzTag = d === standardTag() ? null : d;
+    _bilanzWochentag = d === standardTag() ? null : wochentagIndex(d);
     ovObenNeu();
     return;
   }
