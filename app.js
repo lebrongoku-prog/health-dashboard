@@ -2222,6 +2222,7 @@ function ovObenMerken() {
     woche: ob.querySelector('.ziel-woche')?.dataset.woche,
     tag: mark?.dataset.tag,
     markLinks: mark ? mark.getBoundingClientRect().left : null,
+    titel: ob.querySelector('.zr-titel')?.textContent,
     ringe: [...ob.querySelectorAll('.zr')].map(z => ({
       anteil: Number(z.querySelector('.zr-fuell')?.dataset.anteil || 0),
       wert: z.querySelector('.ti-zahl') ? Number(z.querySelector('.ti-zahl').dataset.wert) : null
@@ -2259,9 +2260,23 @@ function ovObenAnimieren(vorher) {
     _ovAnim(mark, [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing });
   }
   if (tag === vorher.tag) return;
+  // Titel: das alte Datum blendet aus, das neue ein – ohne Bewegung (auf Wunsch).
   const titel = ob.querySelector('.zr-titel');
-  if (titel) _ovAnim(titel, [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }],
-    { duration: OV_DAUER, easing });
+  if (titel && vorher.titel && vorher.titel !== titel.textContent) {
+    const neu = titel.textContent, halb = OV_DAUER / 2;
+    let getauscht = false;
+    const tauschen = () => {
+      if (getauscht || !titel.isConnected) return; getauscht = true;
+      titel.textContent = neu;
+      _ovAnim(titel, [{ opacity: 0 }, { opacity: 1 }], { duration: halb, easing: 'ease-out' });
+    };
+    titel.textContent = vorher.titel;
+    if (titel.animate) {
+      const a = titel.animate([{ opacity: 1 }, { opacity: 0 }], { duration: halb, easing: 'ease-in', fill: 'forwards' });
+      a.onfinish = () => { tauschen(); a.cancel(); };
+      setTimeout(() => { tauschen(); a.cancel(); }, halb + 120);
+    } else tauschen();
+  }
   // Ringe: Füllung und Zahl vom alten auf den neuen Stand.
   const U = 2 * Math.PI * 44;
   const laeufe = [...ob.querySelectorAll('.zr')].map((z, i) => {

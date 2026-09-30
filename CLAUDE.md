@@ -780,7 +780,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     die Woche kommt (neuere von rechts), Zahlen rechts und KW blenden ein. **Tag
     wählen** → die helle Fläche gleitet von der alten zur neuen Spalte. In beiden Fällen
     laufen die **Ringe** vom alten auf den neuen Stand (Füllung über `data-anteil`, Zahl
-    zählt) und der Titel blendet über. Gemessen wird am DOM: `ovObenMerken()` VOR dem
+    zählt). Der **Titel** blendet schlicht aus und wieder ein (je 130 ms, altes Datum
+    aus, neues ein, **ohne** senkrechte Bewegung — auf Wunsch). Gemessen wird am DOM: `ovObenMerken()` VOR dem
     Neuaufbau, `ovObenAnimieren()` danach — in `ovObenNeu()` (Tipp) und in
     `pgOverview()` (Blättern, Bereichswechsel). Nur im sichtbaren Übersicht-Tab, nicht
     bei `prefers-reduced-motion`. WAAPI über `_ovAnim` mit Rückfall-`finish()` (sonst
