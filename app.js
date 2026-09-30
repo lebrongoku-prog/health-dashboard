@@ -2152,14 +2152,16 @@ function zielLinie(key, laenge, achse) {
 // Ersetzt die frühere weisse Ziel-Karte: sie wiederholte drei Kachelwerte und passte
 // optisch nicht zu den Kacheln. Die RINGE stehen über den Kacheln und zeigen, wie nah
 // der letzte Tag am Ziel ist; die WOCHENBILANZ darunter zeigt je Ziel die letzten
-// sieben Kalendertage als Punkte. Beide lesen ZIELE und zielErfuellt – keine eigenen
-// Schwellen.
+// Tage der AKTUELLEN Kalenderwoche (Mo–So) als Punkte. Beide lesen ZIELE und
+// zielErfuellt – keine eigenen Schwellen.
 // Trainingstage: ein Tag mit mindestens einer Einheit im Workout-Blatt
 // (durationMin > 0) – dieselbe Regel wie überall in der App.
-function letzteSiebenTage() {
-  if (!allData.length) return [];
-  const ende = allData[allData.length - 1].date;
-  return Array.from({ length: 7 }, (_, i) => addDays(ende, i - 6));
+// Montag bis Sonntag der laufenden Woche (nach dem heutigen Datum, nicht dem neuesten
+// Datentag – „diese Woche" soll auch dann stimmen, wenn der Export einen Tag hinterher
+// ist). Tage nach heute gibt es darin auch; sie haben noch keinen Wert.
+function aktuelleWoche() {
+  const mo = getWeekMonday(toLocalDateStr(new Date()));
+  return Array.from({ length: 7 }, (_, i) => addDays(mo, i));
 }
 function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
@@ -2173,9 +2175,9 @@ function zielAnteil(key, wert) {
 }
 
 const ZIEL_RINGE = [
-  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   text: v => alsStdMin(v) },
   { key: 'restHR',     name: 'Ruhepuls', farbe: '#F87171', tab: 'herz',     text: v => `${Math.round(v)} ≤ ${ZIELE.restHR.ziel}` },
   { key: 'hrv',        name: 'HRV',      farbe: '#60A5FA', tab: 'herz',     text: v => `${Math.round(v)} ≥ ${ZIELE.hrv.ziel}` },
+  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   text: v => alsStdMin(v) },
   { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', text: v => `${v} von ${ZIELE.trainDays.ziel}` }
 ];
 
@@ -2184,7 +2186,7 @@ function zielRingeHTML() {
   const last = allData[allData.length - 1];
   const werte = {
     sleepTotal: last.sleepTotal, restHR: last.restHR, hrv: last.hrv,
-    trainDays: letzteSiebenTage().filter(istTrainingstag).length
+    trainDays: aktuelleWoche().filter(istTrainingstag).length
   };
   const U = 2 * Math.PI * 24;   // Umfang des Rings (r = 24)
   return `<div class="ziel-ringe">${ZIEL_RINGE.map(r => {
@@ -2205,13 +2207,13 @@ function zielRingeHTML() {
   }).join('')}</div>`;
 }
 
-// Wochenbilanz: je Ziel sieben Punkte (Di … Mo), gefüllt = Ziel erreicht bzw. beim
-// Training: an diesem Tag trainiert. Hohler Punkt = verfehlt, blasser Punkt = kein
-// Messwert. Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
+// Wochenbilanz: je Ziel sieben Punkte (Mo … So der laufenden Woche), gefüllt = Ziel
+// erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
+// blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
 // die Trainingstage gegen das Wochenziel.
 function zielWocheHTML() {
-  const tage = letzteSiebenTage();
-  if (!tage.length) return '';
+  if (!allData.length) return '';
+  const tage = aktuelleWoche(), heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
   const punkte = zustaende => zustaende.map(z => `<i class="${z}"></i>`).join('');
   const zeile = (name, zustaende, zahl, farbe) =>
@@ -2222,10 +2224,10 @@ function zielWocheHTML() {
     const mit = z.filter(x => x !== 'leer').length;
     return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—');
   };
-  const training = tage.map(d => istTrainingstag(d) ? 'an' : 'aus');
+  const training = tage.map(d => istTrainingstag(d) ? 'an' : d > heute ? 'leer' : 'aus');
   const nTraining = training.filter(x => x === 'an').length;
   return `<div class="ziel-woche">
-    <div class="zw-kopf"><h3>Ziele</h3>${scopeBadge('letzte 7 Tage')}</div>
+    <div class="zw-kopf"><h3>Ziele</h3>${scopeBadge('KW ' + isoKW(tage[0]))}</div>
     <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${tage.map(d => `<span>${wochentagKurz(d)}</span>`).join('')}</span><b class="zw-zahl"></b></div>
     ${messZeile('sleepTotal', 'Schlaf')}
     ${messZeile('restHR', 'Ruhepuls')}
@@ -2728,13 +2730,13 @@ function schlafDeltaText(d) {
 function tageswertKacheln(lastDay, priorDays) {
   const hrLast = lastDay.restHR, hvLast = lastDay.hrv, slLast = lastDay.sleepTotal;
   const hrAvg = mittel(priorDays, 'restHR'), hvAvg = mittel(priorDays, 'hrv'), slAvg = mittel(priorDays, 'sleepTotal');
-  const puls = hrLast == null ? LEERE_KACHEL : kachel('herz', 'Ruhepuls', '#EF4444', '239,68,68', '❤️ Ruhepuls', 'restHR',
+  const puls = hrLast == null ? LEERE_KACHEL : kachel('herz', 'Ruhepuls', '#EF4444', '239,68,68', 'Ruhepuls', 'restHR',
     `${kachelZahl('hr', hrLast)} bpm`,
     hrAvg == null ? '' : kachelDelta(deltaKlasse(hrLast - hrAvg, 0.5, false), vorzeichen(hrLast - hrAvg) + (hrLast - hrAvg).toFixed(0) + ' vs. Ø'));
-  const hrv = hvLast == null ? LEERE_KACHEL : kachel('herz', 'HRV', '#2563EB', '37,99,235', '💙 HRV', 'hrv',
+  const hrv = hvLast == null ? LEERE_KACHEL : kachel('herz', 'HRV', '#2563EB', '37,99,235', 'HRV', 'hrv',
     `${kachelZahl('hv', hvLast)} ms`,
     hvAvg == null ? '' : kachelDelta(deltaKlasse(hvLast - hvAvg, 0.5, true), vorzeichen(hvLast - hvAvg) + (hvLast - hvAvg).toFixed(0) + ' vs. Ø'));
-  const schlaf = slLast == null ? LEERE_KACHEL : kachel('schlaf', 'Schlaf', '#7C3AED', '124,58,237', '🌙 Schlaf', 'sleepTotal',
+  const schlaf = slLast == null ? LEERE_KACHEL : kachel('schlaf', 'Schlaf', '#7C3AED', '124,58,237', 'Schlaf', 'sleepTotal',
     kachelZahl('sl', slLast, 'std'),
     slAvg == null ? '' : kachelDelta(deltaKlasse(slLast - slAvg, 0.08, true), schlafDeltaText(slLast - slAvg)));
   return puls + hrv + schlaf + trainingsKachel(lastDay, priorDays);
@@ -2748,7 +2750,7 @@ function trainingsKachel(lastDay, priorDays) {
     // Weniger Training als üblich ist kein schlechtes Zeichen – deshalb nie 'neg'.
     const delta = trAvg == null ? '' : kachelDelta(trMin - trAvg > 2 ? 'pos' : 'neu',
       vorzeichen(Math.round(trMin - trAvg)) + Math.round(trMin - trAvg) + ' min vs. Ø');
-    return kachel('training', 'Training', '#F97316', '249,115,22', '🏃 Training', 'training',
+    return kachel('training', 'Training', '#F97316', '249,115,22', 'Training', 'training',
       `${kachelZahl('tr', trMin)} min`, delta);
   }
   const zaehl = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
@@ -2757,7 +2759,7 @@ function trainingsKachel(lastDay, priorDays) {
   const nVor = tage7v.length >= 7 ? zaehl(tage7v) : null;
   const delta = nVor == null ? '' : kachelDelta(deltaKlasse(nWoche - nVor, 0, true),
     vorzeichen(nWoche - nVor) + (nWoche - nVor) + ' vs. Vorwoche');
-  return kachel('training', 'Training', '#F97316', '249,115,22', '🏃 Trainings', 'trainWoche',
+  return kachel('training', 'Training', '#F97316', '249,115,22', 'Trainings', 'trainWoche',
     `${kachelZahl('tage', nWoche)}<span class="ti-metric-einheit"> / 7 Tage</span>`, delta);
 }
 
@@ -2793,16 +2795,16 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
-    <!-- Hochformat: Ringe, Kacheln, Wochenbilanz untereinander. Querformat: Kacheln
-         links, Ringe und Wochenbilanz rechts (Raster-Bereiche in style.css). -->
+    <!-- Hochformat: Wochenbilanz, Ringe, Kacheln untereinander. Querformat: Kacheln
+         links, Wochenbilanz und Ringe rechts (Raster-Bereiche in style.css). -->
     <div class="ov-oben">
+      ${zielWocheHTML()}
       ${zielRingeHTML()}
       <div class="ov-combo-card">
         <div class="ti-metrics">
           ${tageswertKacheln(lastDay, priorDays)}
         </div>
       </div>
-      ${zielWocheHTML()}
     </div>
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">

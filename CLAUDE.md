@@ -288,9 +288,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   von 2026, nicht zur KW 53 von 2025). Das 7T-Fenster läuft ohnehin Montag bis
   Sonntag (`weekDays7()` über `getWeekMonday()`) und ist damit genau eine ISO-Woche.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
-- **Emojis nur an vier Stellen:** Tab-Titel (`pgBanner`), Minikacheln der Übersicht,
-  die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
-  Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Titel, Überschriften (auch die
+- **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
+  Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Die
+  Minikacheln der Übersicht tragen seit 30.09.2026 keine mehr (auf Wunsch). Titel, Überschriften (auch die
   Abschnittstitel der Einblicke), Status- und
   Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
   Kontrast) statt Emojis.
@@ -729,24 +729,27 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   und D aus den Mockups). Ersetzen die frühere weisse Ziel-Karte (`zielUebersichtHTML`,
   `.ziel-karte`, `--ziel`, `ZIELE.*.fmtZiel` — alle entfallen): sie wiederholte drei
   Kachelwerte und passte optisch nicht zu den Kacheln auf dem Verlauf.
-  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) über den Kacheln: Schlaf, Ruhepuls,
-    HRV (letzter Tag) und Trainingstage (letzte 7 Kalendertage). Füllung aus
+  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) über den Kacheln, Reihenfolge wie die
+    Kacheln: Ruhepuls, HRV, Schlaf (letzter Tag), Training (Trainingstage der
+    laufenden Kalenderwoche). Füllung aus
     `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert. In der
     Mitte ✓ (erreicht), sonst Prozent bzw. `2/3`, ohne Wert `—`. Darunter Name und
     Wert (`53 ≤ 60`), grün erreicht / gelb-orange offen.
-  - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) unter den Kacheln: je Ziel
-    sieben Punkte für die letzten 7 **Kalendertage** (`letzteSiebenTage()`, bis zum
-    neuesten Datentag) mit Wochentagszeile. Gefüllt = Ziel erreicht, hohl = verfehlt,
-    blass = kein Messwert; rechts `erreicht/Tage mit Wert`. **Training**: ein Punkt je
+  - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
+    30.09.2026): je Ziel sieben Punkte für die **aktuelle Kalenderwoche Mo–So**
+    (`aktuelleWoche()`, nach dem heutigen Datum, nicht dem neuesten Datentag), Etikett
+    `KW 40`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
+    liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
+    der Trainingszeile (auf Wunsch entfernt). **Training**: ein Punkt je
     Tag mit Einheit (`istTrainingstag`: `durationMin > 0`, jede Trainingsart, dieselbe
     Regel wie das Ziel), rechts `n/3` gegen das Wochenziel, farbig.
   - Beide durchscheinend bzw. direkt auf dem Verlauf, weisse Schrift; die Farben
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
-  - **Layout** (`.ov-oben`): Hochformat Ringe → Kacheln → Wochenbilanz. Querformat
-    Raster-Bereiche: Kacheln links, Ringe und Wochenbilanz rechts (gemessen 812 × 375:
-    Kacheln 221 px, Ringe 91 + Woche 179 px). Die frühere Kopplung (Kachel-Kasten
+  - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe → Kacheln. Querformat
+    Raster-Bereiche: Kacheln links, Wochenbilanz und darunter Ringe rechts (gemessen
+    812 × 375: Kacheln 221 px, Woche 170 + Ringe 91 px). Die frühere Kopplung (Kachel-Kasten
     absolut über der Ziele-Karte) ist entfallen, `--kachel` bleibt quer 1.2.
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
   7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.

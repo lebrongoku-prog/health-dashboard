@@ -859,8 +859,7 @@ body.dark .scope-badge{background:#0F172A}
 .zw-zahl{text-align:right;font-weight:700}
 .zw-tage{padding:0 0 .1rem;font-size:.62rem;opacity:.7}
 .zw-tage .zw-punkte span{width:14px;text-align:center}
-/* Trainingszeile abgesetzt: sie zählt gegen ein Wochenziel, nicht Tag für Tag. */
-.zw-zeile:last-child{border-top:1px solid rgba(255,255,255,.18);margin-top:.25rem;padding-top:.5rem}
+
 
 /* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
    die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
@@ -1144,14 +1143,14 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Kacheln links, Ringe und Wochenbilanz rechts – im Querformat ist Breite da und
+  /* Kacheln links, Wochenbilanz und Ringe rechts – im Querformat ist Breite da und
      Hoehe knapp; so sind beide Spalten etwa gleich hoch (Ringe über den Kacheln
      machten die linke doppelt so hoch wie die rechte). Die Reihenfolge im Markup
      bleibt die des Hochformats, die Plätze kommen aus den Raster-Bereichen.
      Der Kartenabstand sitzt am Container, nicht an den Kindern – im Raster
      verfaelschte er sonst die Zeilenhoehe. */
   .ov-oben{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"kacheln ringe" "kacheln woche";grid-template-rows:auto 1fr;
+    grid-template-areas:"kacheln woche" "kacheln ringe";grid-template-rows:auto 1fr;
     gap:.7rem;align-items:start;margin-bottom:.7rem}
   .ov-oben>*{margin-bottom:0}
   .ov-oben>.ziel-ringe{grid-area:ringe}
