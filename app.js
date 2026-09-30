@@ -2032,8 +2032,8 @@ function openTooltip(el) {
     _placeTooltip(tt, rect, 270, 220);
     tt.classList.add('visible');
   } else if (el.classList.contains('info-i')) {
-    // Am Bildschirmrand einklemmen: die ⓘ auf den Minikacheln sitzen ganz links und
-    // ganz rechts, ein mittig zentrierter Kasten ragte dort aus dem Bild.
+    // Am Bildschirmrand einklemmen: ein ⓘ ganz links oder rechts auf einer schmalen
+    // Karte liesse einen mittig zentrierten Kasten aus dem Bild ragen.
     const tt = el.querySelector('.info-tt');
     if (!tt) { _ttOpenEl = null; return; }
     el.classList.add('tt-open');                        // erst sichtbar, dann messen
@@ -2174,35 +2174,49 @@ function zielAnteil(key, wert) {
   return Math.max(0, Math.min(1, z.richtung === 'hoch' ? wert / z.ziel : z.ziel / wert));
 }
 
+// Die Ringe ersetzen seit 30.09.2026 die Minikacheln (auf Wunsch): in der Mitte der
+// Tageswert (zählt wie früher die Kachelzahl hoch, `kachelZahl`), darunter Name und
+// Zielzeile. Ein Tipp wischt in den Tab der Kennzahl (`zuTabWischen`).
 const ZIEL_RINGE = [
-  { key: 'restHR',     name: 'Ruhepuls', farbe: '#F87171', tab: 'herz',     text: v => `${Math.round(v)} ≤ ${ZIELE.restHR.ziel}` },
-  { key: 'hrv',        name: 'HRV',      farbe: '#60A5FA', tab: 'herz',     text: v => `${Math.round(v)} ≥ ${ZIELE.hrv.ziel}` },
-  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   text: v => alsStdMin(v) },
-  { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', text: v => `${v} von ${ZIELE.trainDays.ziel}` }
+  { key: 'restHR',     name: 'Ruhepuls', farbe: '#F87171', tab: 'herz',     feld: 'hr',   einheit: 'bpm',
+    zielText: () => `Ziel ≤ ${ZIELE.restHR.ziel}` },
+  { key: 'hrv',        name: 'HRV',      farbe: '#60A5FA', tab: 'herz',     feld: 'hv',   einheit: 'ms',
+    zielText: () => `Ziel ≥ ${ZIELE.hrv.ziel}` },
+  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   feld: 'sl',   einheit: '', form: 'std',
+    zielText: v => zielErfuellt('sleepTotal', v) ? `Ziel ${alsStdMin(ZIELE.sleepTotal.ziel)}`
+      : `${alsStdMin(ZIELE.sleepTotal.ziel - v).replace(/^0h 0?/, '')} unter Ziel` },
+  { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', feld: 'tage', einheit: `/ ${ZIELE.trainDays.ziel} Tage`,
+    zielText: () => 'diese Woche' }
 ];
 
 function zielRingeHTML() {
   if (!allData.length) return '';
   const last = allData[allData.length - 1];
   const werte = {
-    sleepTotal: last.sleepTotal, restHR: last.restHR, hrv: last.hrv,
+    restHR: last.restHR, hrv: last.hrv, sleepTotal: last.sleepTotal,
     trainDays: aktuelleWoche().filter(istTrainingstag).length
   };
-  const U = 2 * Math.PI * 24;   // Umfang des Rings (r = 24)
+  const U = 2 * Math.PI * 44;   // Umfang des Rings (r = 44 im 100er-Raster)
   return `<div class="ziel-ringe">${ZIEL_RINGE.map(r => {
     const v = werte[r.key], anteil = zielAnteil(r.key, v), ok = zielErfuellt(r.key, v);
-    const mitte = v == null ? '—' : ok ? '✓'
-      : r.key === 'trainDays' ? `${v}/${ZIELE.trainDays.ziel}` : Math.round(anteil * 100) + '%';
-    const wertTxt = v == null ? '—' : r.text(v);
-    return `<div class="zr" role="img" aria-label="${r.name}: ${wertTxt}, Ziel ${ok ? 'erreicht' : 'nicht erreicht'}">
-      <svg viewBox="0 0 60 60" aria-hidden="true">
-        <circle cx="30" cy="30" r="24" class="zr-spur"/>
-        ${anteil ? `<circle cx="30" cy="30" r="24" class="zr-fuell" stroke="${r.farbe}"
-          stroke-dasharray="${(anteil * U).toFixed(1)} ${U.toFixed(1)}" transform="rotate(-90 30 30)"/>` : ''}
-        <text x="30" y="34.5" text-anchor="middle">${mitte}</text>
-      </svg>
+    // Ohne Messwert kein Sprung in den Tab – ein Tipp auf eine leere Stelle soll nicht
+    // überraschend wechseln (wie früher bei den leeren Kacheln).
+    const ziel = v == null ? '' :
+      ` data-ziel-tab="${r.tab}" role="button" tabindex="0" aria-label="${r.name}: ${r.form === 'std' ? alsStdMin(v) : Math.round(v)} ${r.einheit}, Ziel ${ok ? 'erreicht' : 'nicht erreicht'} – zum Tab ${TAB_TITEL[r.tab]}"`;
+    return `<div class="zr"${ziel}>
+      <div class="zr-ring">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="44" class="zr-spur"/>
+          ${anteil ? `<circle cx="50" cy="50" r="44" class="zr-fuell" stroke="${r.farbe}"
+            stroke-dasharray="${(anteil * U).toFixed(1)} ${U.toFixed(1)}" transform="rotate(-90 50 50)"/>` : ''}
+        </svg>
+        <div class="zr-mitte">
+          <span class="zr-zahl${r.form === 'std' ? ' lang' : ''}">${v == null ? '—' : kachelZahl(r.feld, v, r.form)}</span>
+          ${v != null && r.einheit ? `<span class="zr-einheit">${r.einheit}</span>` : ''}
+        </div>
+      </div>
       <div class="zr-name">${r.name}</div>
-      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${wertTxt}</div>
+      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${v == null ? '—' : (ok ? '✓ ' : '') + r.zielText(v)}</div>
     </div>`;
   }).join('')}</div>`;
 }
@@ -2249,28 +2263,15 @@ const ERKLAERUNG = {
   pace:       'Pace: benötigte Zeit pro Kilometer. Weniger ist besser (schneller).',
   baseline:   'Baseline: dein eigener Durchschnitt der letzten 30 Tage. Verglichen wird also mit dir selbst, nicht mit Richtwerten.'
 };
-// Erklärt, wie die Zahl auf einer Minikachel der Übersicht zu lesen ist.
-// Bewusst je Kennzahl formuliert statt eines allgemeinen Satzes: entscheidend ist,
-// in welche Richtung eine Abweichung gut ist – das unterscheidet sich pro Wert.
-// Bezug ist überall derselbe: Wert = letzter Tag, Ø = die sieben Tage davor.
-const ERKLAERUNG_MINI = {
-  sleepTotal: 'Oben die Schlafdauer der letzten Nacht, darunter der Abstand zum Durchschnitt der sieben Nächte davor. „+18m vs. Ø" heisst: 18 Minuten mehr als üblich. Mehr ist besser.',
-  restHR:     'Oben der Ruhepuls des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „−2 vs. Ø" heisst: 2 Schläge weniger als üblich. Weniger ist besser.',
-  hrv:        'Oben die HRV des letzten Tages, darunter der Abstand zum Durchschnitt der sieben Tage davor. „+3 vs. Ø" heisst: 3 ms mehr als üblich. Mehr ist besser.',
-  training:   'Oben die Trainingsminuten des letzten Tages, darunter der Abstand zum Durchschnitt der Trainingstage aus den sieben Tagen davor. Tage ohne Training zählen nicht in den Durchschnitt.',
-  trainWoche: 'Anzahl Tage mit Training in den letzten sieben Tagen, darunter der Vergleich mit den sieben Tagen davor. Diese Kachel erscheint an Tagen ohne Training – an Trainingstagen steht hier die Dauer der Einheit. Mehr ist besser.'
-};
-
 // Antippbares Fragezeichen. Der Text steckt als eigenes Element im Anker, damit ihn
 // openTooltip am Bildschirmrand verschieben kann – ein reiner CSS-Tooltip würde auf
-// den schmalen Minikacheln links und rechts aus dem Bild ragen.
+// schmalen Karten links und rechts aus dem Bild ragen.
 function _infoAnker(text) {
   return text
     ? `<span class="info-i" tabindex="0" role="button" aria-label="Erklärung">i<span class="info-tt">${esc(text)}</span></span>`
     : '';
 }
 function infoI(key)     { return _infoAnker(ERKLAERUNG[key]); }
-function infoMini(key)  { return _infoAnker(ERKLAERUNG_MINI[key]); }
 
 // ─────────────────────────────────────────────────────────
 // ── Coaching Helpers ───────────────────────────────────
@@ -2642,27 +2643,9 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
 }
 
 // ── Übersicht ──────────────────────────────────────────
-// Farbschleier einer Minikachel. Seit die Kacheln ohne Karte direkt auf dem dunklen
-// Tab-Verlauf sitzen (08.09.2026), war der frühere Schleier praktisch unsichtbar —
-// auf Wunsch kraeftiger. EINE Stelle fuer alle vier: vorher standen drei Kacheln auf
-// 5 % und die Trainingskachel auf 7 %, ohne dass das je jemand entschieden haette.
-// Stand: 5/7 % → 16 % (08.09.2026) → 24 % (13.09.2026, „50 % deckender": 16 × 1.5)
-// → 43 % (13.09.2026, „80 % deckender": 24 × 1.8 = 43.2, auf ganze Prozent gerundet).
-const KACHEL_SCHLEIER = .43;
-function kachelStil(farbe, rgb) {
-  return `border-top:3px solid ${farbe};background:rgba(${rgb},${KACHEL_SCHLEIER})`;
-}
-// Minikacheln fuehren per Tipp in ihren Tab (auf Wunsch, 13.09.2026): Ruhepuls und
-// HRV nach „Herz", Schlaf nach „Schlaf", Training nach „Training". Das Ziel steht als
-// `data-ziel-tab` an der Kachel; `role`/`tabindex` machen sie fuer Tastatur und
-// Screenreader zu einem Knopf. Leere Kacheln (kein Messwert) bekommen es NICHT –
-// ein Tipp auf eine leere Flaeche soll nicht ueberraschend den Tab wechseln.
-function kachelZiel(tab, titel) {
-  return `data-ziel-tab="${tab}" role="button" tabindex="0" aria-label="${titel} – zum Tab ${TAB_TITEL[tab]}"`;
-}
 const TAB_TITEL = { overview: 'Übersicht', herz: 'Herz', schlaf: 'Schlaf', training: 'Training' };
 
-// ── Kachel-Zahlen zaehlen hoch (auf Wunsch, 18.09.2026) ──────────────────────
+// ── Zahlen in den Ziel-Ringen zaehlen hoch (auf Wunsch, 18.09.2026, damals Kacheln) ─
 // Beim App-Start von 0 auf den Wert, bei neuen Daten vom zuletzt gezeigten Wert auf
 // den neuen – in 450 ms. NICHT bei jedem Aufbau der Uebersicht (Bereichswechsel,
 // Blaettern, Ausklappen): dort aendern sich die Tageswerte nicht, und eine Zahl, die
@@ -2703,69 +2686,7 @@ function kachelnHochzaehlen() {
   }));
 }
 
-// ── Minikacheln der Übersicht ──────────────────────────
-// Wert = letzter Tag, Vergleich = Ø der sieben Tage davor.
-const vorzeichen = d => (d >= 0 ? '+' : '');
-// Signalklasse der Abweichung: `hochGut` = mehr ist besser.
-function deltaKlasse(d, schwelle, hochGut) {
-  if (d > schwelle)  return hochGut ? 'pos' : 'neg';
-  if (d < -schwelle) return hochGut ? 'neg' : 'pos';
-  return 'neu';
-}
-function kachelDelta(klasse, text) { return `<div class="ti-metric-delta ${klasse}">${text}</div>`; }
-function kachel(tab, titel, farbe, rgb, beschriftung, info, wertHTML, deltaHTML) {
-  return `<div class="ti-metric" ${kachelZiel(tab, titel)} style="${kachelStil(farbe, rgb)}">
-            <div class="ti-metric-lbl">${beschriftung} ${infoMini(info)}</div>
-            <div class="ti-metric-val">${wertHTML}</div>
-            ${deltaHTML}
-          </div>`;
-}
-const LEERE_KACHEL = '<div class="ti-metric"></div>';
-// Schlaf-Abweichung in Minuten, ab einer Stunde als "+1h 05min".
-function schlafDeltaText(d) {
-  const m = Math.round(d * 60), sign = m >= 0 ? '+' : '-', abs = Math.abs(m);
-  if (abs < 60) return sign + abs + 'm vs. Ø';
-  return sign + Math.floor(abs / 60) + 'h ' + String(abs % 60).padStart(2, '0') + 'min vs. Ø';
-}
-function tageswertKacheln(lastDay, priorDays) {
-  const hrLast = lastDay.restHR, hvLast = lastDay.hrv, slLast = lastDay.sleepTotal;
-  const hrAvg = mittel(priorDays, 'restHR'), hvAvg = mittel(priorDays, 'hrv'), slAvg = mittel(priorDays, 'sleepTotal');
-  const puls = hrLast == null ? LEERE_KACHEL : kachel('herz', 'Ruhepuls', '#EF4444', '239,68,68', 'Ruhepuls', 'restHR',
-    `${kachelZahl('hr', hrLast)} bpm`,
-    hrAvg == null ? '' : kachelDelta(deltaKlasse(hrLast - hrAvg, 0.5, false), vorzeichen(hrLast - hrAvg) + (hrLast - hrAvg).toFixed(0) + ' vs. Ø'));
-  const hrv = hvLast == null ? LEERE_KACHEL : kachel('herz', 'HRV', '#2563EB', '37,99,235', 'HRV', 'hrv',
-    `${kachelZahl('hv', hvLast)} ms`,
-    hvAvg == null ? '' : kachelDelta(deltaKlasse(hvLast - hvAvg, 0.5, true), vorzeichen(hvLast - hvAvg) + (hvLast - hvAvg).toFixed(0) + ' vs. Ø'));
-  const schlaf = slLast == null ? LEERE_KACHEL : kachel('schlaf', 'Schlaf', '#7C3AED', '124,58,237', 'Schlaf', 'sleepTotal',
-    kachelZahl('sl', slLast, 'std'),
-    slAvg == null ? '' : kachelDelta(deltaKlasse(slLast - slAvg, 0.08, true), schlafDeltaText(slLast - slAvg)));
-  return puls + hrv + schlaf + trainingsKachel(lastDay, priorDays);
-}
-// An Trainingstagen die Dauer der Einheit, sonst die Zahl der Trainingstage im
-// Siebentagefenster – die Kachel bleibt damit beim Thema Training.
-function trainingsKachel(lastDay, priorDays) {
-  const trMin = workoutData[lastDay.date]?.durationMin ?? null;
-  if (trMin != null) {
-    const trAvg = mittel(priorDays.map(r => workoutData[r.date]?.durationMin));
-    // Weniger Training als üblich ist kein schlechtes Zeichen – deshalb nie 'neg'.
-    const delta = trAvg == null ? '' : kachelDelta(trMin - trAvg > 2 ? 'pos' : 'neu',
-      vorzeichen(Math.round(trMin - trAvg)) + Math.round(trMin - trAvg) + ' min vs. Ø');
-    return kachel('training', 'Training', '#F97316', '249,115,22', 'Training', 'training',
-      `${kachelZahl('tr', trMin)} min`, delta);
-  }
-  const zaehl = rows => rows.filter(r => workoutData[r.date]?.durationMin > 0).length;
-  const tage7v = allData.slice(-14, -7);
-  const nWoche = zaehl(allData.slice(-7));
-  const nVor = tage7v.length >= 7 ? zaehl(tage7v) : null;
-  const delta = nVor == null ? '' : kachelDelta(deltaKlasse(nWoche - nVor, 0, true),
-    vorzeichen(nWoche - nVor) + (nWoche - nVor) + ' vs. Vorwoche');
-  return kachel('training', 'Training', '#F97316', '249,115,22', 'Trainings', 'trainWoche',
-    `${kachelZahl('tage', nWoche)}<span class="ti-metric-einheit"> / 7 Tage</span>`, delta);
-}
-
 function pgOverview() {
-  const lastDay = allData[allData.length-1] || {};
-  const priorDays = allData.slice(-8,-1); // die 7 Tage vor dem letzten
   const warnSig = detectWarningSignals();
   const patternIns = generatePatternInsights();
 
@@ -2795,16 +2716,11 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
-    <!-- Hochformat: Wochenbilanz, Ringe, Kacheln untereinander. Querformat: Kacheln
-         links, Wochenbilanz und Ringe rechts (Raster-Bereiche in style.css). -->
+    <!-- Hochformat: Wochenbilanz über den Ringen. Querformat: Ringe links,
+         Wochenbilanz rechts (Raster-Bereiche in style.css). -->
     <div class="ov-oben">
       ${zielWocheHTML()}
       ${zielRingeHTML()}
-      <div class="ov-combo-card">
-        <div class="ti-metrics">
-          ${tageswertKacheln(lastDay, priorDays)}
-        </div>
-      </div>
     </div>
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
@@ -5401,7 +5317,7 @@ function showScreen(name) {
   _applyTabState(name);
 }
 
-// Tabwechsel MIT Wisch-Animation (Tipp auf eine Minikachel, 13.09.2026).
+// Tabwechsel MIT Wisch-Animation (Tipp auf einen Ziel-Ring der Übersicht, 13.09.2026).
 // Bewegt wird `scrollLeft` des Tab-Scrollers — also genau das, was auch der Finger
 // beim Wischen bewegt. Deshalb laeuft der Rest ueber den vorhandenen Scroll-Sync und
 // sieht aus wie ein Wisch: Hintergrund-Verlauf folgt dem Fortschritt, Tabfarbe und
@@ -5577,7 +5493,7 @@ function initScrollHideNav() {
   const _tapContainer = document.getElementById('tab-container');
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
     // Alles, was selbst etwas auslöst, ausnehmen: Bedienelemente, Diagramme (Markierung),
-    // Kartentitel (Datenbeschriftung), Minikacheln (Tabwechsel) und Tooltip-Anker.
+    // Kartentitel (Datenbeschriftung), Ziel-Ringe (Tabwechsel) und Tooltip-Anker.
     if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-ziel-tab], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
@@ -5711,9 +5627,9 @@ document.body.addEventListener('click', (e) => {
 // innerHTML ersetzt werden.
 document.body.addEventListener('click', (e) => {
   const t = e.target;
-  // Tipp auf eine Minikachel: Wisch in ihren Tab. Das ⓘ darin bleibt ausgenommen –
+  // Tipp auf einen Ziel-Ring: Wisch in seinen Tab. Ein ⓘ darin bliebe ausgenommen –
   // es oeffnet weiterhin seine Erklaerung, statt den Tab zu wechseln.
-  const _kachel = t.closest('.ti-metric[data-ziel-tab]');
+  const _kachel = t.closest('.zr[data-ziel-tab]');
   if (_kachel && !t.closest(TT_TAP_SELECTOR)) { zuTabWischen(_kachel.dataset.zielTab); return; }
   // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
   // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
@@ -5832,10 +5748,10 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
   });
 });
 
-// Minikacheln sind per `role="button"` Knoepfe – dann gehoeren Enter und Leertaste dazu.
+// Ziel-Ringe sind per `role="button"` Knoepfe – dann gehoeren Enter und Leertaste dazu.
 document.body.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const k = e.target.closest && e.target.closest('.ti-metric[data-ziel-tab]');
+  const k = e.target.closest && e.target.closest('.zr[data-ziel-tab]');
   if (!k || e.target !== k) return;
   e.preventDefault();
   zuTabWischen(k.dataset.zielTab);

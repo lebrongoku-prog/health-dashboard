@@ -834,99 +834,45 @@ body.dark .scope-badge{background:#0F172A}
    Grün = erreicht, Gelb-Orange = offen (dieselben hellen Töne wie auf den Kacheln,
    die dunkleren der Karten wären auf dem Verlauf zu schwach). */
 .ov-oben{--zw-gut:#34D399;--zw-offen:#FBBF24}
-.ziel-ringe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.3rem;margin:0 0 .7rem;text-align:center;color:#fff}
-.zr svg{width:60px;height:60px;display:block;margin:0 auto}
-.zr-spur{fill:none;stroke:rgba(255,255,255,.2);stroke-width:7}
-.zr-fuell{fill:none;stroke-width:7;stroke-linecap:round}
-.zr text{fill:#fff;font-size:12.5px;font-weight:700;font-family:inherit}
-.zr-name{font-size:.72rem;font-weight:600;opacity:.9;margin-top:.2rem}
-.zr-wert{font-size:.78rem;font-weight:700;white-space:nowrap}
-.zr-wert.ok{color:var(--zw-gut)}
-.zr-wert.nein{color:var(--zw-offen)}
+/* Ringe ersetzen seit 30.09.2026 die Minikacheln: 2 × 2, gross, Tageswert in der
+   Mitte. `--ring` ist die EINE Grösse – Strich, Schrift und Abstände hängen daran. */
+.ziel-ringe{--ring:128px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem .5rem;margin:0 0 .7rem;text-align:center;color:#fff}
+.zr{display:flex;flex-direction:column;align-items:center;min-width:0;border-radius:var(--r);padding:.3rem 0}
+/* Antippbar (führt in den Tab). Rückmeldung NUR über Deckkraft, ohne transform: die
+   Ringe liegen im waagrecht UND senkrecht scrollenden Bereich, und ein transform
+   während :active bricht auf iOS die laufende Wischgeste ab. */
+.zr[data-ziel-tab]{cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent}
+.zr[data-ziel-tab]:active{opacity:.7}
+.zr[data-ziel-tab]:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:2px}
+.zr-ring{position:relative;width:var(--ring);height:var(--ring)}
+.zr-ring svg{position:absolute;inset:0;width:100%;height:100%}
+.zr-spur{fill:none;stroke:rgba(255,255,255,.2);stroke-width:9}
+.zr-fuell{fill:none;stroke-width:9;stroke-linecap:round}
+.zr-mitte{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.zr-zahl{font-size:calc(var(--ring)*.2);font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+/* „7h 22m" ist doppelt so breit wie „53" – kleiner, damit es nicht an den Ring stösst. */
+.zr-zahl.lang{font-size:calc(var(--ring)*.155)}
+.zr-einheit{font-size:calc(var(--ring)*.095);font-weight:600;opacity:.8;white-space:nowrap}
+.zr-name{font-size:1rem;font-weight:700;margin-top:.45rem}
+.zr-wert{font-size:.85rem;font-weight:600;white-space:nowrap;opacity:.9}
+.zr-wert.ok{color:var(--zw-gut);opacity:1}
+.zr-wert.nein{color:var(--zw-offen);opacity:1}
 /* Wochenbilanz: durchscheinende Fläche wie die Kacheln, keine weisse Karte. */
-.ziel-woche{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--r);
-  padding:.7rem .85rem;margin-bottom:.7rem;color:#fff}
+.ziel-woche{background:rgba(255,255,255,.14);border-radius:var(--r);
+  padding:.85rem 1rem;margin-bottom:.7rem;color:#fff}
 .zw-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
-.zw-kopf h3{margin:0;font-size:1.05rem;font-weight:700;color:#fff}
+.zw-kopf h3{margin:0;font-size:1.15rem;font-weight:700;color:#fff}
 .ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
-.zw-zeile{display:grid;grid-template-columns:minmax(0,1fr) auto 2.6rem;align-items:center;gap:.6rem;padding:.3rem 0;font-size:.86rem}
+.zw-zeile{display:grid;grid-template-columns:5.2rem minmax(0,1fr) 2.6rem;align-items:center;gap:.5rem;padding:.4rem 0;font-size:1rem}
 .zw-name{font-weight:600}
-.zw-punkte{display:flex;gap:5px}
-.zw-punkte i{display:block;width:14px;height:14px;border-radius:50%;box-sizing:border-box}
+.zw-punkte{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));justify-items:center}
+.zw-punkte i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
 .zw-punkte i.an{background:var(--zw-gut)}
-.zw-punkte i.aus{border:2px solid rgba(255,255,255,.5)}
+.zw-punkte i.aus{border:2.5px solid rgba(255,255,255,.5)}
 .zw-punkte i.leer{background:rgba(255,255,255,.12)}
 .zw-zahl{text-align:right;font-weight:700}
-.zw-tage{padding:0 0 .1rem;font-size:.62rem;opacity:.7}
-.zw-tage .zw-punkte span{width:14px;text-align:center}
+.zw-tage{padding:0 0 .1rem;font-size:.72rem;opacity:.7}
 
-
-/* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
-   die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
-/* Die Kacheln sitzen seit 08.09.2026 OHNE Karte direkt auf dem Tab-Verlauf (auf
-   Wunsch): keine Flaeche, kein Schatten, kein Polster. Der Verlauf ist in beiden
-   Themes dunkel — deshalb tragen die Texte darin Weiss statt der Grautoene, sonst
-   waeren sie unlesbar (siehe `.ti-metric-*` weiter unten). */
-.ov-combo-card{background:none;border-radius:var(--r);padding:0;box-shadow:none;display:flex;flex-direction:column;justify-content:center;margin-bottom:.7rem}
-
-/* Monatstrend rows *//* Die Trennlinie sitzt jetzt unter der Ziel-Zeile, nicht mehr unter der Wertzeile –
-   Wert und zugehöriges Ziel gehören optisch zusammen. *//* Farbe = Bewertung, Pfeilrichtung = Verlauf. Beides ist NICHT dasselbe: ein
-   sinkender Ruhepuls zeigt nach unten, ist aber ein gutes Zeichen. Die früheren
-   Klassen .up/.dn färbten nach Richtung und stellten genau das auf den Kopf. *//* Tagesinsights / Ti-Metrics */
-/* Kein margin-top mehr: das war der Abstand zur frueheren Empfehlungs-Kachel, die
-   ueber den Minikacheln sass. Seit sie weg ist, sind die Kacheln der einzige Inhalt
-   der Karte – der Rest war ungenutzter Raum. */
-/* Doppelte Groesse und zwei Zeilen (auf Wunsch, 13.09.2026): vorher standen die vier
-   Kacheln in EINER Reihe und waren entsprechend schmal — der Wert musste sich die
-   Breite mit drei Nachbarn teilen.
-   `--kachel` ist der Massstab fuer ALLES an der Kachel: Schrift, Polster, Abstaende,
-   Rundung und das Symbol. Nur so bleibt sie beim Vergroessern proportional; einzelne
-   Werte zu verdoppeln hiesse, beim naechsten Mal wieder jeden davon zu suchen.
-   Er steht hier und nicht an `.ti-metric`, damit ihn der Querformat-Block weiter
-   unten fuer den engeren Platz neben der Ziele-Karte ueberschreiben kann. */
-/* `grid-auto-rows:1fr` haelt BEIDE Zeilen gleich hoch. In einer Reihe ergab sich das
-   von selbst; ueber zwei Zeilen bemisst jede Zeile sonst ihre eigene Hoehe, und die
-   obere wurde 34 px hoeher, weil „Ruhepuls" mit dem ⓘ umbricht und „Schlaf" nicht.
-   (Bei unbestimmter Gesamthoehe zieht `1fr` alle Zeilen auf die groesste.) */
-.ti-metrics{--kachel:1.6;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:.5rem}
-/* Alle Inhalte mittig – waagrecht wie senkrecht. Die Kacheln sind Grid-Zellen und
-   damit ohnehin alle gleich hoch; der Inhalt sitzt jetzt zentriert darin statt oben
-   links zu kleben. overflow:visible ist nötig, damit der Erklärungskasten des ⓘ
-   nicht beschnitten wird. */
-.ti-metric{padding:calc(var(--kachel,1)*.55rem) calc(var(--kachel,1)*.2rem) calc(var(--kachel,1)*.65rem);border-radius:calc(var(--kachel,1)*10px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-width:0;position:relative;overflow:visible}
-/* ⓘ steht wieder im Textfluss hinter der Beschriftung. Frueher sass es absolut in der
-   Ecke, weil es auf den schmalen Kacheln eine zweite Zeile erzwang und sie
-   unterschiedlich hoch machte – seit die Kacheln im Grid gleich hoch sind, spielt das
-   keine Rolle mehr. Absolut positioniert liesse sich der Inhalt nicht zentrieren:
-   die Abweichungszeile brauchte einen einseitigen Rand als Ausgleich. */
-/* Das Symbol waechst mit, aber mit KLEINEREM Faktor als die Schrift (9 statt 13 px
-   je Massstab-Schritt). Grund ist die laengste Beschriftung: „❤️ Ruhepuls" braucht bei
-   doppelter Schrift 126 px, und mit einem ebenfalls verdoppelten 26-px-Kreis kam die
-   Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist. Das ⓘ rutschte dann
-   allein auf eine zweite Zeile, waehrend die drei Nachbarn einzeilig blieben.
-   Mit 18 px bleiben 8 px Luft. Als Tippflaeche ist es trotzdem groesser als vorher. */
-/* Antippbare Kachel (fuehrt in ihren Tab). Rueckmeldung beim Druecken NUR ueber die
-   Deckkraft, ohne `transform: scale(...)` wie bei Knoepfen: die Kacheln liegen mitten
-   im senkrecht UND waagrecht scrollenden Bereich, und ein transform waehrend `:active`
-   bricht auf iOS die laufende Wischgeste ab (in FitTrack liess sich das Jahresraster
-   dadurch gar nicht mehr scrollen). Wer auf einer Kachel zu scrollen beginnt, soll
-   scrollen koennen. */
-.ti-metric[data-ziel-tab]{cursor:pointer;transition:opacity .15s}
-.ti-metric[data-ziel-tab]:active{opacity:.75}
-.ti-metric[data-ziel-tab]:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:2px}
-.ti-metric .info-i{width:calc(var(--kachel,1)*9px);height:calc(var(--kachel,1)*9px)}
-.ti-metric-lbl{font-weight:600;color:rgba(255,255,255,.78);margin-bottom:calc(var(--kachel,1)*.35rem);display:flex;align-items:center;justify-content:center;gap:calc(var(--kachel,1)*.2rem);flex-wrap:wrap}
-.ti-metric-val{font-weight:800;color:#fff;line-height:1.2}
-/* Bezugsangabe direkt am Wert („3 / 7 Tage"): kleiner und leichter, damit die Zahl
-   die Kachel traegt. Die uebrigen Kacheln zeigen den letzten Tag und brauchen das
-   nicht – diese hier fasst ein Fenster zusammen und muss es sagen. */
-.ti-metric-einheit{font-size:.62em;font-weight:600;color:rgba(255,255,255,.78)}
-.ti-metric-delta{font-weight:500;margin-top:calc(var(--kachel,1)*.25rem)}
-.ti-metric-delta.pos{color:#10B981}
-.ti-metric-delta.neg{color:#EF4444}
-/* Nur das neutrale Grau wird weiss. Gruen und Rot sind Signalfarben und bleiben —
-   sie tragen die Bewertung, nicht die Lesbarkeit. */
-.ti-metric-delta.neu{color:rgba(255,255,255,.78)}
 
 /* Letzte Workout Tabelle */
 
@@ -1039,20 +985,6 @@ body.dark .debt-bar-bg { background: #334155; }
   font-size: 1.32rem !important;
   line-height: 1.2;
 }
-/* Die Minikacheln tragen dieselben Stufen, aber mit `--kachel` malgenommen (siehe
-   dort). Sie stehen deshalb hier einzeln statt in den Gruppen darueber — sonst
-   zoege eine Vergroesserung der Kacheln Banner-Titel und jedes andere Mini-Label
-   mit. Ohne `--kachel` (Fallback 1) ergeben beide wieder die alte Groesse. */
-.ti-metric-val{
-  font-size: calc(var(--kachel,1) * 1.32rem) !important;
-  line-height: 1.2;
-}
-.ti-metric-lbl,
-.ti-metric-delta{
-  font-size: calc(var(--kachel,1) * .72rem) !important;
-  line-height: 1.4;
-}
-
 /* Title – Card-Titel und H3 in den Sections */
 h1,
 h2,
@@ -1143,21 +1075,14 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Kacheln links, Wochenbilanz und Ringe rechts – im Querformat ist Breite da und
-     Hoehe knapp; so sind beide Spalten etwa gleich hoch (Ringe über den Kacheln
-     machten die linke doppelt so hoch wie die rechte). Die Reihenfolge im Markup
-     bleibt die des Hochformats, die Plätze kommen aus den Raster-Bereichen.
-     Der Kartenabstand sitzt am Container, nicht an den Kindern – im Raster
-     verfaelschte er sonst die Zeilenhoehe. */
+  /* Ringe links, Wochenbilanz rechts – im Querformat ist Breite da und Hoehe knapp,
+     deshalb dort kleinere Ringe. Der Kartenabstand sitzt am Container, nicht an den
+     Kindern – im Raster verfaelschte er sonst die Zeilenhoehe. */
   .ov-oben{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"kacheln woche" "kacheln ringe";grid-template-rows:auto 1fr;
-    gap:.7rem;align-items:start;margin-bottom:.7rem}
+    grid-template-areas:"ringe woche";gap:.7rem;align-items:start;margin-bottom:.7rem}
   .ov-oben>*{margin-bottom:0}
-  .ov-oben>.ziel-ringe{grid-area:ringe}
-  .ov-oben>.ov-combo-card{grid-area:kacheln}
+  .ov-oben>.ziel-ringe{grid-area:ringe;--ring:92px;gap:.5rem}
   .ov-oben>.ziel-woche{grid-area:woche}
-  /* Kleinerer Kachel-Massstab als im Hochformat: die Fensterhoehe ist knapp. */
-  .ov-oben .ti-metrics{--kachel:1.2}
 }
 
 /* ═══════════════════════════════════════════════════════════

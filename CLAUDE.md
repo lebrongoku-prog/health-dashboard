@@ -250,7 +250,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
   `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`/
-  `.ti-metric[data-ziel-tab]` (Kachel → Tab, dazu `keydown` für Enter/Leertaste)
+  `.zr[data-ziel-tab]` (Ziel-Ring → Tab, dazu `keydown` für Enter/Leertaste)
   (alle click — der frühere
   `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
   → `_refreshAfterStateChange()`.
@@ -290,7 +290,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
   Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Die
-  Minikacheln der Übersicht tragen seit 30.09.2026 keine mehr (auf Wunsch). Titel, Überschriften (auch die
+  früheren Minikacheln trugen bis 30.09.2026 welche; die Ringe tragen keine. Titel, Überschriften (auch die
   Abschnittstitel der Einblicke), Status- und
   Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
   Kontrast) statt Emojis.
@@ -729,28 +729,30 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   und D aus den Mockups). Ersetzen die frühere weisse Ziel-Karte (`zielUebersichtHTML`,
   `.ziel-karte`, `--ziel`, `ZIELE.*.fmtZiel` — alle entfallen): sie wiederholte drei
   Kachelwerte und passte optisch nicht zu den Kacheln auf dem Verlauf.
-  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) über den Kacheln, Reihenfolge wie die
-    Kacheln: Ruhepuls, HRV, Schlaf (letzter Tag), Training (Trainingstage der
-    laufenden Kalenderwoche). Füllung aus
-    `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert. In der
-    Mitte ✓ (erreicht), sonst Prozent bzw. `2/3`, ohne Wert `—`. Darunter Name und
-    Wert (`53 ≤ 60`), grün erreicht / gelb-orange offen.
+  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) **ersetzen die Minikacheln**: 2 × 2,
+    `--ring` 128 px (quer 92 px), Reihenfolge Ruhepuls, HRV, Schlaf, Training. In der
+    Mitte der Tageswert des letzten Tags (Training: Trainingstage der laufenden Woche
+    `/ 3 Tage`), lange Werte wie „7h 22m" kleiner (`.zr-zahl.lang`). Füllung aus
+    `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert.
+    Darunter Name und Zielzeile (`✓ Ziel ≤ 60`, `8m unter Ziel`), grün erreicht /
+    gelb-orange offen. Antippbar, siehe „Ziel-Ringe führen per Tipp in ihren Tab".
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für die **aktuelle Kalenderwoche Mo–So**
     (`aktuelleWoche()`, nach dem heutigen Datum, nicht dem neuesten Datentag), Etikett
     `KW 40`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
     liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
-    der Trainingszeile (auf Wunsch entfernt). **Training**: ein Punkt je
+    der Trainingszeile und keine Kontur um die Karte (beides auf Wunsch entfernt).
+    Die Punkte füllen die Breite (7 gleiche Rasterspalten, Punkte 20 px, Schrift 1rem),
+    sonst standen grosse Leerräume in der Karte. **Training**: ein Punkt je
     Tag mit Einheit (`istTrainingstag`: `durationMin > 0`, jede Trainingsart, dieselbe
     Regel wie das Ziel), rechts `n/3` gegen das Wochenziel, farbig.
   - Beide durchscheinend bzw. direkt auf dem Verlauf, weisse Schrift; die Farben
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
-  - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe → Kacheln. Querformat
-    Raster-Bereiche: Kacheln links, Wochenbilanz und darunter Ringe rechts (gemessen
-    812 × 375: Kacheln 221 px, Woche 170 + Ringe 91 px). Die frühere Kopplung (Kachel-Kasten
-    absolut über der Ziele-Karte) ist entfallen, `--kachel` bleibt quer 1.2.
+  - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
+    Raster-Bereiche: Ringe links, Wochenbilanz rechts (gemessen 812 × 375: Ringe
+    296 px, Woche 202 px).
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
   7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
@@ -1276,78 +1278,19 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   setzt `margin-bottom: 0`, sonst stünde der Kartenabstand im Querformat zusätzlich
   zwischen den Spalten und verfälschte die Zeilenhöhe — dieselbe Falle wie bei
   `.ov-oben`. Gemessen bei 900 px: Spalten 281 px, Lücke 11 px.
-- **Übersicht im Querformat:** Kacheln links, Ringe und Wochenbilanz rechts (siehe
-  „Ziele der Übersicht"). Die vier Minikacheln stehen **zweizeilig** — Reihenfolge
-  aus dem Markup: **Ruhepuls, HRV, Schlaf, Training**. Die Warnkarte steht **über**
-  dem Raster.
-- **Minikacheln der Übersicht (`.ti-metric`): ohne Kartenhintergrund** (auf Wunsch,
-  08.09.2026). `.ov-combo-card` trägt weder Fläche noch Schatten noch Polster mehr —
-  die vier Kacheln sitzen direkt auf dem Tab-Verlauf. **Der ist in beiden Themes
-  dunkel**, deshalb tragen `ti-metric-lbl`, `-val`, `-einheit` und `-delta.neu` jetzt
-  **Weiss** statt der Grautöne aus dem Type Scale; ohne das wären sie unlesbar.
-  Grün und Rot der Abweichungszeile bleiben — sie tragen die Bewertung, nicht die
-  Lesbarkeit. Farbige Oberkante und Farbschleier jeder Kachel bleiben ebenfalls: sie
-  sind das Einzige, was die Kacheln ohne Karte noch voneinander abgrenzt. Der
-  Schleier steht deshalb auf **43 %** (`KACHEL_SCHLEIER`, dreimal auf Wunsch
-  angehoben: 5/7 % → 16 % am 08.09.2026 → 24 % („50 % deckender") → 43 % („80 %
-  deckender", 24 × 1.8), beide am 13.09.2026; „X % deckender" wird als relative
-  Steigerung gelesen). Bei 43 % tritt das Grün und Rot der Abweichungszeile auf der
-  roten bzw. blauen Kachel sichtbar zurück — wer weiter anhebt, prüft deren Lesbarkeit —
-  die früheren 5 % waren auf dem dunklen Verlauf praktisch unsichtbar. **Eine
-  Quelle für alle vier**: vorher standen drei Kacheln auf 5 % und die
-  Trainingskachel auf 7 %, ohne dass das je jemand entschieden hätte.
-  Inhalte waagrecht **und** senkrecht zentriert. Das ⓘ steht dabei im Textfluss hinter der Beschriftung — absolut in der
-  Ecke liesse sich der Inhalt nicht zentrieren, weil die Abweichungszeile dann einen
-  einseitigen Rand als Ausgleich bräuchte.
-  **Grösser und zweizeilig** (auf Wunsch, 13.09.2026): vier Kacheln in einer
-  Reihe waren 83 px breit, jetzt sind es zwei Reihen à 171 px (bei 375 px Fenster).
-  Reihenfolge unverändert **Ruhepuls, HRV / Schlaf, Training** — sie kommt aus dem
-  Markup, das Raster macht daraus von selbst zwei Zeilen.
-  1. **`--kachel` ist der Massstab für ALLES an der Kachel** — Schrift, Polster,
-     Abstände, Rundung, Symbol. Er steht auf `.ti-metrics` und wird überall
-     multipliziert (`calc(var(--kachel,1) * …)`). Einzelne Werte zu verdoppeln hiesse,
-     beim nächsten Mal wieder jeden davon zu suchen. Fallback 1 ergibt die alte Grösse.
-     **Er steuert Höhe und Schrift, NICHT die Breite** — die kommt aus dem Raster
-     (`1fr 1fr`) und bleibt davon unberührt. Weil jeder Bestandteil der Höhe (Polster,
-     Beschriftung, Wert, Abweichungszeile) mitskaliert und keine feste Grösse dazwischen
-     steht, ist die Höhe **linear** in `--kachel`: gemessen 175.8 px bei 2 und 141.2 px
-     bei 1.6, also exakt −19.7 % für −20 % Massstab. Wer die Kachel höher oder flacher
-     will, ändert deshalb genau diese eine Zahl.
-     **Stand: 1.6** — zuerst stand hier 2, auf Wunsch am selben Tag um 20 % reduziert
-     („Breite behalten, 20 % weniger hoch und kleinere Schrift").
-  2. **Die Schriftgrössen stehen deshalb einzeln im Type Scale**, nicht mehr in den
-     Gruppen „Display M" und „Caption": sonst zöge eine Vergrösserung der Kacheln den
-     Banner-Titel und jedes andere Mini-Label mit.
-  3. **Im Querformat gilt `--kachel: 1.2`.** Dort teilen sich die Kacheln die
-     Zeile mit „Ziele", und diese Karte gibt die Höhe vor (siehe `.ov-oben`). Als der
-     Wert festgelegt wurde, blieben 94 px je Kachelzeile: Massstab 2 ragte 20 px
-     heraus und wurde abgeschnitten, 1.3 passte gerade noch, 1.4 nicht mehr.
-     **Diese Grenze hängt an der Höhe der Ziele-Karte und ist mit ihr gewandert:**
-     seit die Karte 20 % grösser ist (siehe `--ziel`), sind es 113.5 px je Zeile, und
-     nachgemessen passt dort jetzt bis **1.7**. Die 1.2 stehen also nicht mehr am
-     Anschlag — wer sie anhebt, misst neu, statt sich auf eine Zahl von gestern zu
-     verlassen. Erst wer mehr will, als die Zeile hergibt, muss die Kacheln aus der
-     Zeile mit „Ziele" herausnehmen.
-  4. **Das ⓘ wächst mit kleinerem Faktor** (9 px je Schritt statt 13): „❤️ Ruhepuls"
-     braucht bei doppelter Schrift 126 px, mit einem verdoppelten 26-px-Kreis kam die
-     Zeile auf 160 px — 4 px mehr, als die Kachel innen breit ist, und das ⓘ rutschte
-     allein auf eine zweite Zeile. Mit 18 px bleiben 8.5 px Luft.
-  5. **`grid-auto-rows: 1fr` hält beide Zeilen gleich hoch.** In einer Reihe ergab sich
-     das von selbst; über zwei Zeilen bemisst jede ihre eigene Höhe.
-  Gemessen bei 375 px, gegen die alte einreihige Anordnung: Breite 82.9 →
-  **171.5 px** (2.07×), Wert-Schrift 21.1 → **33.8 px** (1.60×), Höhe 131.7 →
-  **141.2 px**. Die Höhe wächst also kaum — die alte kam nicht vom Inhalt, sondern
-  vom Umbruch in der schmalen Kachel. Eine erzwungene Höhe von 263 px wurde bei
-  Massstab 2 ausprobiert und verworfen: die Kachel ist dann halb leer, und die zweite
-  Zeile liegt unter dem Bildschirmrand.
-  **Jeder Wert passt einzeilig, auch bei 360 px** — bei Massstab 2 brach dort noch
-  „53 bpm" um. Für die längste Beschriftung („❤️ Ruhepuls" samt ⓘ) bleiben bei 375 px
-  jetzt 39 px Luft statt 8.5. Die frühere Sonderregel `@media (max-width:360px)`
-  (dort zweispaltig) ist entfallen: zweispaltig ist jetzt der Normalfall.
-- **Minikacheln führen per Tipp in ihren Tab** (auf Wunsch, 13.09.2026): Ruhepuls und
-  HRV → Herz, Schlaf → Schlaf, Training → Training — **mit Wisch-Animation**, nicht als
-  Sprung. Das Ziel steht als `data-ziel-tab` an der Kachel (`kachelZiel()`, dazu
-  `role="button"`, `tabindex="0"`, `aria-label`); **leere Kacheln bekommen es nicht**.
+- **Übersicht im Querformat:** Ringe links, Wochenbilanz rechts (siehe „Ziele der
+  Übersicht"). Die Warnkarte steht **über** dem Raster.
+- **Minikacheln der Übersicht: entfallen** (30.09.2026, auf Wunsch) — ersetzt durch
+  die grossen Ziel-Ringe (siehe „Ziele der Übersicht"). Mit ihnen gingen `.ti-metric*`,
+  `.ti-metrics`, `.ov-combo-card`, `--kachel`, `KACHEL_SCHLEIER`, `kachelStil`,
+  `tageswertKacheln`, `trainingsKachel`, `ERKLAERUNG_MINI`/`infoMini`. Geblieben sind
+  `kachelZahl`/`kachelnHochzaehlen` (die Zahl in der Ringmitte zählt wie früher hoch)
+  und `.ti-zahl`. Die „vs. Ø"-Abweichung der Kacheln gibt es in der Übersicht nicht mehr.
+- **Ziel-Ringe führen per Tipp in ihren Tab** (seit 13.09.2026 bei den Kacheln, seit
+  30.09.2026 bei den Ringen): Ruhepuls und HRV → Herz, Schlaf → Schlaf, Training →
+  Training — **mit Wisch-Animation**. Das Ziel steht als `data-ziel-tab` am Ring
+  (`.zr`, dazu `role="button"`, `tabindex="0"`, `aria-label`); **Ringe ohne Messwert
+  bekommen es nicht**. Enter/Leertaste lösen ebenfalls aus.
   `zuTabWischen(name)` animiert `scrollLeft` des Tab-Scrollers — also genau das, was
   auch der Finger bewegt. Hintergrund-Verlauf, Tabfarbe, Tableisten-Markierung und
   passive Zeitleiste laufen dadurch über den vorhandenen Scroll-Sync mit und sehen
@@ -1368,11 +1311,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   3. **Eine Berührung bricht ab** (`touchstart`/`pointerdown` am Container) — dann gilt
      das native Einrasten, und kein Tab wird erzwungen. Gemessen: Abbruch bei 0.31 →
      rastet zurück auf die Übersicht.
-  4. **Das ⓘ in der Kachel bleibt ausgenommen** (`!t.closest(TT_TAP_SELECTOR)`) und
-     öffnet weiter seine Erklärung; `[data-ziel-tab]` steht in der Ausnahmeliste des
-     Hintergrund-Tipps, sonst schaltete derselbe Tipp zusätzlich die Tableiste um.
-  5. **Druck-Rückmeldung NUR über Deckkraft** (`:active{opacity:.75}`), ohne
-     `transform` wie bei Knöpfen: die Kacheln liegen im waagrecht und senkrecht
+  4. `[data-ziel-tab]` steht in der Ausnahmeliste des Hintergrund-Tipps, sonst
+     schaltete derselbe Tipp zusätzlich die Tableiste um.
+  5. **Druck-Rückmeldung NUR über Deckkraft** (`:active{opacity:.7}`), ohne
+     `transform` wie bei Knöpfen: die Ringe liegen im waagrecht und senkrecht
      scrollenden Bereich, und ein transform während `:active` bricht auf iOS die
      Wischgeste ab (siehe „Tipp-Animation").
   Ein noch nicht gebauter Ziel-Tab wird **vor** dem Start gebaut, sonst wischte eine
