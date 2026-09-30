@@ -829,26 +829,38 @@ body.dark .scope-badge{background:#0F172A}
 
 /* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
    Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
-/* ── Ziele-Karte: eigener Massstab (auf Wunsch 20 % groesser, 13.09.2026) ──────
-   Dieselbe Mechanik wie `--kachel` bei den Minikacheln: EINE Zahl, mit der Schrift,
-   Polster, Zeilenabstand und Badge gemeinsam wachsen. Einzeln gesetzt waere beim
-   naechsten Mal wieder jeder Wert zu suchen, und Titel und Zeilen liefen ausein-
-   ander.
-   Die BREITE steckt nicht darin – die Karte ist im Hochformat ohnehin so breit wie
-   der Bildschirm und im Querformat eine halbe Rasterspalte. „20 % groesser" heisst
-   hier also: 20 % mehr Schrift und 20 % mehr Hoehe.
-   Die Selektoren sind bewusst zweistufig (`.chart-card.ziel-karte`, `.ziel-karte
-   .stat-lbl`): Die Schriftgroessen kommen aus dem Type Scale mit `!important`, und
-   nur eine hoehere Spezifitaet gewinnt dagegen – unabhaengig davon, wo im Stylesheet
-   dieser Block steht. */
-.chart-card.ziel-karte{--ziel:1.2;padding:calc(var(--ziel)*.7rem) calc(var(--ziel)*.75rem)}
-.ziel-karte .chart-head{gap:calc(var(--ziel)*.4rem);margin-bottom:calc(var(--ziel)*.4rem)}
-.chart-card.ziel-karte h3{font-size:calc(var(--ziel)*1.1rem)!important}
-.ziel-karte .scope-badge{font-size:calc(var(--ziel)*.64rem);padding:calc(var(--ziel)*.14rem) calc(var(--ziel)*.45rem)}
-.ziel-karte .stats-list{gap:calc(var(--ziel)*.2rem)}
-.ziel-karte .stat-row{padding:calc(var(--ziel)*.22rem) 0}
-.ziel-karte .stat-lbl,
-.ziel-karte .stat-val{font-size:calc(var(--ziel)*.83rem)!important}
+/* ── Ziele der Übersicht: Ringe und Wochenbilanz (30.09.2026, auf Wunsch) ─────
+   Beide sitzen wie die Kacheln direkt auf dem dunklen Tab-Verlauf: weisse Schrift,
+   Grün = erreicht, Gelb-Orange = offen (dieselben hellen Töne wie auf den Kacheln,
+   die dunkleren der Karten wären auf dem Verlauf zu schwach). */
+.ov-oben{--zw-gut:#34D399;--zw-offen:#FBBF24}
+.ziel-ringe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.3rem;margin:0 0 .7rem;text-align:center;color:#fff}
+.zr svg{width:60px;height:60px;display:block;margin:0 auto}
+.zr-spur{fill:none;stroke:rgba(255,255,255,.2);stroke-width:7}
+.zr-fuell{fill:none;stroke-width:7;stroke-linecap:round}
+.zr text{fill:#fff;font-size:12.5px;font-weight:700;font-family:inherit}
+.zr-name{font-size:.72rem;font-weight:600;opacity:.9;margin-top:.2rem}
+.zr-wert{font-size:.78rem;font-weight:700;white-space:nowrap}
+.zr-wert.ok{color:var(--zw-gut)}
+.zr-wert.nein{color:var(--zw-offen)}
+/* Wochenbilanz: durchscheinende Fläche wie die Kacheln, keine weisse Karte. */
+.ziel-woche{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:var(--r);
+  padding:.7rem .85rem;margin-bottom:.7rem;color:#fff}
+.zw-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
+.zw-kopf h3{margin:0;font-size:1.05rem;font-weight:700;color:#fff}
+.ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
+.zw-zeile{display:grid;grid-template-columns:minmax(0,1fr) auto 2.6rem;align-items:center;gap:.6rem;padding:.3rem 0;font-size:.86rem}
+.zw-name{font-weight:600}
+.zw-punkte{display:flex;gap:5px}
+.zw-punkte i{display:block;width:14px;height:14px;border-radius:50%;box-sizing:border-box}
+.zw-punkte i.an{background:var(--zw-gut)}
+.zw-punkte i.aus{border:2px solid rgba(255,255,255,.5)}
+.zw-punkte i.leer{background:rgba(255,255,255,.12)}
+.zw-zahl{text-align:right;font-weight:700}
+.zw-tage{padding:0 0 .1rem;font-size:.62rem;opacity:.7}
+.zw-tage .zw-punkte span{width:14px;text-align:center}
+/* Trainingszeile abgesetzt: sie zählt gegen ein Wochenziel, nicht Tag für Tag. */
+.zw-zeile:last-child{border-top:1px solid rgba(255,255,255,.18);margin-top:.25rem;padding-top:.5rem}
 
 /* margin-bottom wie bei .chart-card: den Abstand trug frueher die .ov-row-Huelle,
    die mit der Score-Karte entfallen ist – die Karte klebte danach an der naechsten. */
@@ -1132,42 +1144,21 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Ziele und Tageswerte teilen sich eine Zeile – im Querformat ist Breite da und
-     Hoehe knapp. `align-items:start` verhindert, dass die kuerzere Karte auf die
-     Hoehe der laengeren gezogen wird. */
-  .ov-oben{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-items:stretch;
-    /* Der Rand wandert von den Karten auf den Container: Im Raster wuerde er die
-       Zeilenhoehe verfaelschen, ohne ihn stiesse die Verlauf-Karte direkt an –
-       Schatten an Schatten, was wie eine Ueberlappung aussieht. Derselbe Wert wie
-       das margin-bottom jeder anderen Karte. */
-    margin-bottom:.7rem}
+  /* Kacheln links, Ringe und Wochenbilanz rechts – im Querformat ist Breite da und
+     Hoehe knapp; so sind beide Spalten etwa gleich hoch (Ringe über den Kacheln
+     machten die linke doppelt so hoch wie die rechte). Die Reihenfolge im Markup
+     bleibt die des Hochformats, die Plätze kommen aus den Raster-Bereichen.
+     Der Kartenabstand sitzt am Container, nicht an den Kindern – im Raster
+     verfaelschte er sonst die Zeilenhoehe. */
+  .ov-oben{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"kacheln ringe" "kacheln woche";grid-template-rows:auto 1fr;
+    gap:.7rem;align-items:start;margin-bottom:.7rem}
   .ov-oben>*{margin-bottom:0}
-  /* Beide Karten gleich hoch – und zwar so hoch wie „Ziele". Dafuer darf die
-     Kachel-Spalte die Zeilenhoehe NICHT mitbestimmen: Der Kasten bleibt leer, die
-     Karte darin liegt absolut darueber. Bei `align-items:stretch` allein gaebe die
-     HOEHERE der beiden das Mass vor – hier ist das die Kachel-Karte, und „Ziele"
-     wuerde mitwachsen statt umgekehrt. */
-  /* Untergrenze, damit die Kopplung nicht ins Gegenteil kippt: Liegen ausnahmsweise
-     nur ein, zwei Ziele vor, ist die Ziele-Karte kuerzer als die vier Kacheln je
-     brauchen – ohne diesen Wert schnitte `overflow:hidden` sie ab. Ueber 12rem
-     bestimmt weiterhin allein die Ziele-Karte die Hoehe (bei fuenf Zielen ~197 px). */
-  .ov-oben-kacheln{position:relative;min-height:12rem}
-  .ov-oben-kacheln>.ov-combo-card{position:absolute;inset:0;margin:0;overflow:hidden}
-  /* Die vier Kacheln stehen dann zu zweit: oben Ruhepuls und HRV, darunter Schlaf
-     und Training. Die Reihenfolge kommt aus dem Markup und gilt in beiden Lagen.
-     Zwei gleich hohe Zeilen, die den vorgegebenen Platz ausfuellen; `min-height:0`
-     erlaubt den Zellen, unter ihre Inhaltshoehe zu gehen. */
-  /* Im Querformat gilt ein KLEINERER Massstab als die 2 aus dem Grundzustand: die
-     Kacheln teilen sich hier die Zeile mit „Ziele", und diese Karte gibt die Hoehe
-     vor (siehe oben). In den 94 px je Kachelzeile hat der Massstab des Hochformats
-     keinen Platz — mit 2 ragte der Inhalt nachgemessen 20 px heraus und wurde
-     abgeschnitten (oben die Beschriftung, unten die Abweichungszeile).
-     Grenzwert gemessen: bei 1.3 passt es gerade noch, bei 1.4 ragt der Inhalt wieder
-     heraus. 1.2 laesst rund 5 px Luft — genug, damit eine andere Schrift oder ein
-     laengerer Wert nicht sofort anstoesst.
-     Wer hier 2 haben will, muss die Kacheln aus der Zeile mit „Ziele" herausnehmen. */
-  .ov-oben .ti-metrics{--kachel:1.2;height:100%;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-  .ov-oben .ti-metric{min-height:0}
+  .ov-oben>.ziel-ringe{grid-area:ringe}
+  .ov-oben>.ov-combo-card{grid-area:kacheln}
+  .ov-oben>.ziel-woche{grid-area:woche}
+  /* Kleinerer Kachel-Massstab als im Hochformat: die Fensterhoehe ist knapp. */
+  .ov-oben .ti-metrics{--kachel:1.2}
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -725,38 +725,31 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
   **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
   dort sind sie Messwert, nicht Ziel.
-- **Ziel-Karte (`zielUebersichtHTML()`, erste Karte der Übersicht):** zeigt **immer
-  alle** Ziele — auch die erreichten und die ohne Wert (dann `—`). **Ausnahme VO₂max**
-  (entfernt auf Wunsch, 30.09.2026): die Übersicht hat keine Kachel dazu; das Ziel
-  bleibt in `ZIELE` und als Linie im VO₂max-Diagramm. Seither vier Zeilen — im
-  Querformat gibt die Karte damit 200 px statt 235 px Höhe vor, die Kacheln
-  (`--kachel: 1.2`) passen weiterhin (je 96 px, nachgemessen bei 812 × 375). Vorher standen dort
-  nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war, liess sich
-  nicht ablesen. Aufbau wie jede andere Karte: `.chart-card` mit `chart-head` (Titel
-  „Ziele" + `scopeBadge`) und darunter eine
-  `stats-list` mit einer Zeile je Ziel: `Wert · Ziel X`, wobei der Zielteil in
-  `--txt3` zurücktritt.
-  **Sie trägt einen eigenen Massstab `--ziel` (1.2, auf Wunsch 13.09.2026 um 20 %
-  vergrössert)** — dieselbe Mechanik wie `--kachel` bei den Minikacheln: eine Zahl,
-  mit der Schrift, Polster, Zeilenabstand und Badge gemeinsam wachsen. Getragen wird
-  sie von der zusätzlichen Klasse `.ziel-karte` am Kartenelement; sonst ist es eine
-  gewöhnliche `.chart-card`.
-  Zwei Dinge muss man dabei wissen:
-  1. **Die Selektoren sind zweistufig** (`.chart-card.ziel-karte h3`, `.ziel-karte
-     .stat-lbl`). Die Schriftgrössen kommen aus dem Type Scale mit `!important`;
-     dagegen gewinnt nur höhere Spezifität. Ein einstufiges `.ziel-karte h3` wäre
-     gleich spezifisch wie `.chart-card h3` und hinge davon ab, welcher Block weiter
-     unten im Stylesheet steht.
-  2. **Die Breite steckt nicht im Massstab** — im Hochformat ist die Karte so breit
-     wie der Bildschirm, im Querformat eine halbe Rasterspalte. „20 % grösser" heisst
-     hier 20 % mehr Schrift und 20 % mehr Höhe (gemessen 196.6 → 235.1 px).
-  **Im Querformat zieht sie die Kachel-Spalte mit**, weil sie dort die Zeilenhöhe
-  vorgibt: deren Kasten wuchs von 197 auf 235 px, jede Kachel von 94 auf 113.5 px.
-  Das ist der Grund, warum die Grenze für `--kachel` im Querformat neu zu messen ist
-  (siehe dort). Trägt ein Ziel eine Einheit, die im Messwert schon steht,
-  kürzt `ZIELE[key].fmtZiel` sie im Zielteil weg (`4 / Woche · Ziel 3`). **Grün = erreicht, Orange = verfehlt, ohne Farbe = kein
-  Wert** — die Farbe IST hier die Bewertung. Die frühere eigene Optik
-  (`.ziel-status` mit farbiger Kante, `.zs-*`-Pillen) ist entfallen.
+- **Ziele der Übersicht: Ringe + Wochenbilanz** (auf Wunsch, 30.09.2026, Varianten B
+  und D aus den Mockups). Ersetzen die frühere weisse Ziel-Karte (`zielUebersichtHTML`,
+  `.ziel-karte`, `--ziel`, `ZIELE.*.fmtZiel` — alle entfallen): sie wiederholte drei
+  Kachelwerte und passte optisch nicht zu den Kacheln auf dem Verlauf.
+  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) über den Kacheln: Schlaf, Ruhepuls,
+    HRV (letzter Tag) und Trainingstage (letzte 7 Kalendertage). Füllung aus
+    `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert. In der
+    Mitte ✓ (erreicht), sonst Prozent bzw. `2/3`, ohne Wert `—`. Darunter Name und
+    Wert (`53 ≤ 60`), grün erreicht / gelb-orange offen.
+  - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) unter den Kacheln: je Ziel
+    sieben Punkte für die letzten 7 **Kalendertage** (`letzteSiebenTage()`, bis zum
+    neuesten Datentag) mit Wochentagszeile. Gefüllt = Ziel erreicht, hohl = verfehlt,
+    blass = kein Messwert; rechts `erreicht/Tage mit Wert`. **Training**: ein Punkt je
+    Tag mit Einheit (`istTrainingstag`: `durationMin > 0`, jede Trainingsart, dieselbe
+    Regel wie das Ziel), rechts `n/3` gegen das Wochenziel, farbig.
+  - Beide durchscheinend bzw. direkt auf dem Verlauf, weisse Schrift; die Farben
+    `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
+    wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
+    `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
+  - **Layout** (`.ov-oben`): Hochformat Ringe → Kacheln → Wochenbilanz. Querformat
+    Raster-Bereiche: Kacheln links, Ringe und Wochenbilanz rechts (gemessen 812 × 375:
+    Kacheln 221 px, Ringe 91 + Woche 179 px). Die frühere Kopplung (Kachel-Kasten
+    absolut über der Ziele-Karte) ist entfallen, `--kachel` bleibt quer 1.2.
+  Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
+  7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Ziel-Karte `zielUebersichtHTML()` oben auf der Übersicht. Neue Schwellen gehören dorthin,
@@ -1280,22 +1273,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   setzt `margin-bottom: 0`, sonst stünde der Kartenabstand im Querformat zusätzlich
   zwischen den Spalten und verfälschte die Zeilenhöhe — dieselbe Falle wie bei
   `.ov-oben`. Gemessen bei 900 px: Spalten 281 px, Lücke 11 px.
-- **Übersicht im Querformat:** „Ziele" und die Kachel-Karte stehen **nebeneinander**
-  (`.ov-oben`, Grid `1fr 1fr`) und sind **gleich hoch — nach dem Mass der Ziele-Karte**.
-  Dafür bestimmt die Kachel-Spalte die Zeilenhöhe NICHT mit: `.ov-oben-kacheln` bleibt
-  leer, die Karte darin liegt `position:absolute; inset:0`. Mit blossem
-  `align-items:stretch` gäbe die **höhere** der beiden das Mass vor — das ist die
-  Kachel-Karte, und „Ziele" würde mitwachsen statt umgekehrt. `min-height:12rem` am
-  Kasten verhindert den umgekehrten Fehler: liegen ausnahmsweise nur ein, zwei Ziele
-  vor, schnitte `overflow:hidden` die Kacheln sonst ab.
-  Der Kartenabstand sitzt am **Container** (`.ov-oben{margin-bottom:.7rem}`), nicht an
-  den Karten: im Raster verfälschte er die Zeilenhöhe, und ohne ihn stiess die
-  Verlauf-Karte direkt an — Schatten an Schatten, was wie eine Überlappung aussah.
-  Die vier Minikacheln stehen darin **zweizeilig** — seit 13.09.2026 in jeder
-  Ausrichtung (siehe dort). Reihenfolge
-  überall gleich, weil sie aus dem Markup kommt: **Ruhepuls, HRV, Schlaf, Training** —
-  also oben die Herz-Werte, unten Schlaf und Training. Die Warnkarte steht
-  **über** dem Paar; zwischen zwei nebeneinanderliegenden Karten wäre kein Platz.
+- **Übersicht im Querformat:** Kacheln links, Ringe und Wochenbilanz rechts (siehe
+  „Ziele der Übersicht"). Die vier Minikacheln stehen **zweizeilig** — Reihenfolge
+  aus dem Markup: **Ruhepuls, HRV, Schlaf, Training**. Die Warnkarte steht **über**
+  dem Raster.
 - **Minikacheln der Übersicht (`.ti-metric`): ohne Kartenhintergrund** (auf Wunsch,
   08.09.2026). `.ov-combo-card` trägt weder Fläche noch Schatten noch Polster mehr —
   die vier Kacheln sitzen direkt auf dem Tab-Verlauf. **Der ist in beiden Themes

@@ -2085,10 +2085,7 @@ const ZIELE = {
   sleepTotal: { label:'Schlaf',       ziel:7.5,   richtung:'hoch', fmt:v=>alsStdMin(v) },
   restHR:     { label:'Ruhepuls',     ziel:60,    richtung:'tief', fmt:v=>Math.round(v)+' bpm' },
   hrv:        { label:'HRV',          ziel:50,    richtung:'hoch', fmt:v=>Math.round(v)+' ms' },
-  // fmtZiel: kuerzere Fassung fuer die Zielangabe. In der Ziel-Karte steht der
-  // Zielwert direkt hinter dem Messwert – die Einheit ist dort schon gesagt und
-  // haette sich sonst wiederholt („4 / Woche · Ziel 3 / Woche").
-  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche', fmtZiel:v=>String(v) },
+  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche' },
   vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) }
 };
 // Erfüllt der Wert das Ziel? null, wenn kein Wert vorliegt.
@@ -2151,41 +2148,90 @@ function zielLinie(key, laenge, achse) {
   };
 }
 
-// ── Ziel-Karte: alle Ziele auf einen Blick ─────────────
-// Beantwortet beim Öffnen der App die Frage "liegt gerade etwas ausserhalb?",
-// ohne dass durch die Tabs gescrollt werden muss.
-function zielUebersichtHTML() {
-  const last = allData[allData.length-1] || {};
-  const letzte7 = allData.slice(-7);
-  const trainProWoche = letzte7.filter(r => workoutData[r.date]?.durationMin > 0).length;
+// ── Ziele der Übersicht: Ringe (letzter Tag) und Wochenbilanz (auf Wunsch, 30.09.2026)
+// Ersetzt die frühere weisse Ziel-Karte: sie wiederholte drei Kachelwerte und passte
+// optisch nicht zu den Kacheln. Die RINGE stehen über den Kacheln und zeigen, wie nah
+// der letzte Tag am Ziel ist; die WOCHENBILANZ darunter zeigt je Ziel die letzten
+// sieben Kalendertage als Punkte. Beide lesen ZIELE und zielErfuellt – keine eigenen
+// Schwellen.
+// Trainingstage: ein Tag mit mindestens einer Einheit im Workout-Blatt
+// (durationMin > 0) – dieselbe Regel wie überall in der App.
+function letzteSiebenTage() {
+  if (!allData.length) return [];
+  const ende = allData[allData.length - 1].date;
+  return Array.from({ length: 7 }, (_, i) => addDays(ende, i - 6));
+}
+function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
-  // ALLE Ziele, immer – auch die erreichten und die ohne Wert. Vorher zeigte die
-  // Karte nur die verfehlten; ob ein erreichtes knapp oder deutlich erreicht war,
-  // liess sich nicht ablesen. Aufbau wie die uebrigen Karten: Titel + Wertzeilen.
-  const pruef = [
-    ['sleepTotal', last.sleepTotal],
-    ['restHR',     last.restHR],
-    ['hrv',        last.hrv],
-    ['trainDays',  letzte7.length >= 7 ? trainProWoche : null]
-    // VO₂max steht hier nicht mehr (auf Wunsch, 30.09.2026): die Übersicht hat keine
-    // Kachel dazu, das Ziel bleibt als Linie im VO₂max-Diagramm des Training-Tabs.
-  ];
+// Anteil 0..1 am Ziel. Bei „weniger ist besser" (Ruhepuls): erreicht = voll, sonst
+// Ziel ÷ Wert (66 bpm bei Ziel 60 → 91 %).
+function zielAnteil(key, wert) {
+  const z = ZIELE[key];
+  if (wert == null || !z) return null;
+  if (zielErfuellt(key, wert)) return 1;
+  return Math.max(0, Math.min(1, z.richtung === 'hoch' ? wert / z.ziel : z.ziel / wert));
+}
+
+const ZIEL_RINGE = [
+  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   text: v => alsStdMin(v) },
+  { key: 'restHR',     name: 'Ruhepuls', farbe: '#F87171', tab: 'herz',     text: v => `${Math.round(v)} ≤ ${ZIELE.restHR.ziel}` },
+  { key: 'hrv',        name: 'HRV',      farbe: '#60A5FA', tab: 'herz',     text: v => `${Math.round(v)} ≥ ${ZIELE.hrv.ziel}` },
+  { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', text: v => `${v} von ${ZIELE.trainDays.ziel}` }
+];
+
+function zielRingeHTML() {
   if (!allData.length) return '';
+  const last = allData[allData.length - 1];
+  const werte = {
+    sleepTotal: last.sleepTotal, restHR: last.restHR, hrv: last.hrv,
+    trainDays: letzteSiebenTage().filter(istTrainingstag).length
+  };
+  const U = 2 * Math.PI * 24;   // Umfang des Rings (r = 24)
+  return `<div class="ziel-ringe">${ZIEL_RINGE.map(r => {
+    const v = werte[r.key], anteil = zielAnteil(r.key, v), ok = zielErfuellt(r.key, v);
+    const mitte = v == null ? '—' : ok ? '✓'
+      : r.key === 'trainDays' ? `${v}/${ZIELE.trainDays.ziel}` : Math.round(anteil * 100) + '%';
+    const wertTxt = v == null ? '—' : r.text(v);
+    return `<div class="zr" role="img" aria-label="${r.name}: ${wertTxt}, Ziel ${ok ? 'erreicht' : 'nicht erreicht'}">
+      <svg viewBox="0 0 60 60" aria-hidden="true">
+        <circle cx="30" cy="30" r="24" class="zr-spur"/>
+        ${anteil ? `<circle cx="30" cy="30" r="24" class="zr-fuell" stroke="${r.farbe}"
+          stroke-dasharray="${(anteil * U).toFixed(1)} ${U.toFixed(1)}" transform="rotate(-90 30 30)"/>` : ''}
+        <text x="30" y="34.5" text-anchor="middle">${mitte}</text>
+      </svg>
+      <div class="zr-name">${r.name}</div>
+      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${wertTxt}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
 
-  const zeilen = pruef.map(([k, v]) => {
-    const z = ZIELE[k];
-    const zielTxt = `<span style="color:var(--txt3);font-weight:400"> · Ziel ${(z.fmtZiel || z.fmt)(z.ziel)}</span>`;
-    if (v == null) return statZeile(z.label, `—${zielTxt}`, null);
-    const ok = zielErfuellt(k, v);
-    // Farbe ist hier die Bewertung selbst: gruen erreicht, orange verfehlt.
-    return statZeile(z.label, `${z.fmt(v)}${zielTxt}`, ok ? '#10B981' : '#F59E0B');
-  }).join('');
-
-  // `ziel-karte` traegt nur den Massstab (siehe style.css) – sonst ist es eine
-  // gewoehnliche Diagrammkarte.
-  return `<div class="chart-card ziel-karte">
-    <div class="chart-head"><h3>Ziele</h3>${scopeBadge('letzter Tag')}</div>
-    <div class="stats-list">${zeilen}</div>
+// Wochenbilanz: je Ziel sieben Punkte (Di … Mo), gefüllt = Ziel erreicht bzw. beim
+// Training: an diesem Tag trainiert. Hohler Punkt = verfehlt, blasser Punkt = kein
+// Messwert. Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
+// die Trainingstage gegen das Wochenziel.
+function zielWocheHTML() {
+  const tage = letzteSiebenTage();
+  if (!tage.length) return '';
+  const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
+  const punkte = zustaende => zustaende.map(z => `<i class="${z}"></i>`).join('');
+  const zeile = (name, zustaende, zahl, farbe) =>
+    `<div class="zw-zeile"><span class="zw-name">${name}</span><span class="zw-punkte">${punkte(zustaende)}</span>` +
+    `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b></div>`;
+  const messZeile = (key, name) => {
+    const z = tage.map(d => { const v = byDate[d]?.[key]; return v == null ? 'leer' : zielErfuellt(key, v) ? 'an' : 'aus'; });
+    const mit = z.filter(x => x !== 'leer').length;
+    return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—');
+  };
+  const training = tage.map(d => istTrainingstag(d) ? 'an' : 'aus');
+  const nTraining = training.filter(x => x === 'an').length;
+  return `<div class="ziel-woche">
+    <div class="zw-kopf"><h3>Ziele</h3>${scopeBadge('letzte 7 Tage')}</div>
+    <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${tage.map(d => `<span>${wochentagKurz(d)}</span>`).join('')}</span><b class="zw-zahl"></b></div>
+    ${messZeile('sleepTotal', 'Schlaf')}
+    ${messZeile('restHR', 'Ruhepuls')}
+    ${messZeile('hrv', 'HRV')}
+    ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
+      zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
   </div>`;
 }
 
@@ -2747,16 +2793,16 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
-    <!-- Ziele und Tageswerte: im Hochformat untereinander, im Querformat nebeneinander. -->
+    <!-- Hochformat: Ringe, Kacheln, Wochenbilanz untereinander. Querformat: Kacheln
+         links, Ringe und Wochenbilanz rechts (Raster-Bereiche in style.css). -->
     <div class="ov-oben">
-    ${zielUebersichtHTML()}
-    <div class="ov-oben-kacheln">
+      ${zielRingeHTML()}
       <div class="ov-combo-card">
         <div class="ti-metrics">
           ${tageswertKacheln(lastDay, priorDays)}
         </div>
       </div>
-    </div>
+      ${zielWocheHTML()}
     </div>
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
