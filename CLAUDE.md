@@ -731,7 +731,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kachelwerte und passte optisch nicht zu den Kacheln auf dem Verlauf.
   - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) **ersetzen die Minikacheln**: 2 × 2,
     `--ring` 128 px (quer 92 px), Reihenfolge Ruhepuls, HRV, Schlaf, Training. In der
-    Mitte der Tageswert des letzten Tags (Training: Trainingstage der laufenden Woche
+    Mitte der Wert des gewählten Tags (Training: Trainingstage seiner Woche
     `/ 3 Tage`), lange Werte wie „7h 22m" kleiner (`.zr-zahl.lang`). Füllung aus
     `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert.
     Darunter Name und Zielzeile (`✓ Ziel ≤ 60`, `8m unter Ziel`), grün erreicht /
@@ -753,6 +753,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
+  - **Tag antippen** (auf Wunsch, 30.09.2026): jede Wochentagspalte (Kopf und Punkte,
+    `[data-tag]`, nicht für Tage in der Zukunft) wählt den Tag, dessen Werte die
+    **Ringe** zeigen. Zustand `_bilanzTag` (null = Standard); `gewaehlterTag()`
+    liefert ihn oder `standardTag()` = heute, bzw. der neueste Datentag, solange heute
+    noch kein Export da ist. Gewählter Tag: weisse Kapsel im Kopf, Ring um die Punkte.
+    Der Trainingsring zählt die **Woche des gewählten Tags** (Zielzeile `diese Woche`
+    bzw. `KW 36`). Ein Tipp baut nur `.ov-oben` neu (`ovObenNeu()`), nicht die
+    Übersicht. „Heute" setzt `_bilanzTag` zurück. `[data-tag]` steht in der
+    Ausnahmeliste des Hintergrund-Tipps (sonst schaltete er die Tableiste um).
+  - **„vor N Wochen"** links neben `KW nn` (`.zw-vor`), sobald die Wochenbilanz nicht
+    die laufende Woche zeigt (nur bei 7T möglich). **Die Ringe werden blass**
+    (`.ziel-ringe.blass`, Deckkraft .35), solange der gewählte Tag nicht in der
+    angezeigten Woche liegt — sie zeigen dann nicht die Woche, die man sieht. Ein Tipp
+    auf einen Tag dieser Woche macht sie wieder deckend.
   - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
     Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
     202 px, Ringe 296 px).

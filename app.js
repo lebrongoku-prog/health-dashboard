@@ -2168,6 +2168,34 @@ function aktuelleWoche() {
 function bilanzWoche() { return is7D() && referenceDate ? weekDays7() : aktuelleWoche(); }
 function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
+// ── Gewählter Tag der Wochenbilanz (auf Wunsch, 30.09.2026) ─────────────────
+// Ein Tipp auf eine Tagesspalte der Wochenbilanz wählt den Tag; die Ringe zeigen dann
+// seine Werte. Ohne Auswahl (null) gilt der heutige Tag – liegt für heute noch kein
+// Export vor, der neueste Datentag, sonst stünden morgens nur „—" in den Ringen.
+// Die Auswahl übersteht das Blättern der Woche; „Heute" setzt sie zurück.
+let _bilanzTag = null;
+function standardTag() {
+  const heute = toLocalDateStr(new Date());
+  const letzter = allData.length ? allData[allData.length - 1].date : heute;
+  return letzter < heute ? letzter : heute;
+}
+function gewaehlterTag() { return _bilanzTag || standardTag(); }
+function wocheVon(ds) { const mo = getWeekMonday(ds); return Array.from({ length: 7 }, (_, i) => addDays(mo, i)); }
+
+// Beide Teile zusammen – auch für den Neuaufbau nach einem Tipp auf einen Tag, ohne
+// dass die ganze Übersicht (samt Diagramm und Einblicken) neu entsteht.
+function ovObenHTML() {
+  if (!allData.length) return '';
+  const tage = bilanzWoche(), tag = gewaehlterTag();
+  // Blass, sobald die Ringe nicht zur angezeigten Woche gehören – etwa beim Blättern
+  // in 7T, solange kein Tag dieser Woche angetippt ist.
+  return `<div class="ov-oben">${zielWocheHTML(tage, tag)}${zielRingeHTML(tag, !tage.includes(tag))}</div>`;
+}
+function ovObenNeu() {
+  const el = document.querySelector('#screen-overview .ov-oben');
+  if (el) el.outerHTML = ovObenHTML();
+}
+
 // Anteil 0..1 am Ziel. Bei „weniger ist besser" (Ruhepuls): erreicht = voll, sonst
 // Ziel ÷ Wert (66 bpm bei Ziel 60 → 91 %).
 function zielAnteil(key, wert) {
@@ -2189,18 +2217,19 @@ const ZIEL_RINGE = [
     zielText: v => zielErfuellt('sleepTotal', v) ? `Ziel ${alsStdMin(ZIELE.sleepTotal.ziel)}`
       : `${alsStdMin(ZIELE.sleepTotal.ziel - v).replace(/^0h 0?/, '')} unter Ziel` },
   { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', feld: 'tage', einheit: `/ ${ZIELE.trainDays.ziel} Tage`,
-    zielText: () => 'diese Woche' }
+    zielText: (v, tag) => getWeekMonday(tag) === getWeekMonday(toLocalDateStr(new Date())) ? 'diese Woche' : 'KW ' + isoKW(tag) }
 ];
 
-function zielRingeHTML() {
-  if (!allData.length) return '';
-  const last = allData[allData.length - 1];
+// `tag`: der gewählte Tag (Werte von Ruhepuls, HRV, Schlaf); Training zählt die
+// Trainingstage seiner Kalenderwoche. `blass`: Ringe gehören nicht zur angezeigten Woche.
+function zielRingeHTML(tag, blass) {
+  const zeile = allData.find(r => r.date === tag) || {};
   const werte = {
-    restHR: last.restHR, hrv: last.hrv, sleepTotal: last.sleepTotal,
-    trainDays: aktuelleWoche().filter(istTrainingstag).length
+    restHR: zeile.restHR, hrv: zeile.hrv, sleepTotal: zeile.sleepTotal,
+    trainDays: wocheVon(tag).filter(istTrainingstag).length
   };
   const U = 2 * Math.PI * 44;   // Umfang des Rings (r = 44 im 100er-Raster)
-  return `<div class="ziel-ringe">${ZIEL_RINGE.map(r => {
+  return `<div class="ziel-ringe${blass ? ' blass' : ''}">${ZIEL_RINGE.map(r => {
     const v = werte[r.key], anteil = zielAnteil(r.key, v), ok = zielErfuellt(r.key, v);
     // Ohne Messwert kein Sprung in den Tab – ein Tipp auf eine leere Stelle soll nicht
     // überraschend wechseln (wie früher bei den leeren Kacheln).
@@ -2219,7 +2248,7 @@ function zielRingeHTML() {
         </div>
       </div>
       <div class="zr-name">${r.name}</div>
-      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${v == null ? '—' : (ok ? '✓ ' : '') + r.zielText(v)}</div>
+      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${v == null ? '—' : (ok ? '✓ ' : '') + r.zielText(v, tag)}</div>
     </div>`;
   }).join('')}</div>`;
 }
@@ -2228,11 +2257,16 @@ function zielRingeHTML() {
 // erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
 // blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
 // die Trainingstage gegen das Wochenziel.
-function zielWocheHTML() {
-  if (!allData.length) return '';
-  const tage = bilanzWoche(), heute = toLocalDateStr(new Date());
+// `tage`: die sieben Tage der angezeigten Woche; `tag`: der gewählte Tag (Spalte
+// hervorgehoben). Jede Spalte bis heute ist antippbar (`data-tag`); künftige nicht.
+function zielWocheHTML(tage, tag) {
+  const heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
-  const punkte = zustaende => zustaende.map(z => `<i class="${z}"></i>`).join('');
+  const zelle = (d, inhalt, extra = '') => {
+    const cls = 'zw-zelle' + (d === tag ? ' gewaehlt' : '') + (d > heute ? ' zukunft' : '');
+    return d > heute ? `<span class="${cls}">${inhalt}</span>` : `<span class="${cls}" data-tag="${d}"${extra}>${inhalt}</span>`;
+  };
+  const punkte = zustaende => zustaende.map((z, i) => zelle(tage[i], `<i class="${z}"></i>`)).join('');
   const zeile = (name, zustaende, zahl, farbe) =>
     `<div class="zw-zeile"><span class="zw-name">${name}</span><span class="zw-punkte">${punkte(zustaende)}</span>` +
     `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b></div>`;
@@ -2243,9 +2277,13 @@ function zielWocheHTML() {
   };
   const training = tage.map(d => istTrainingstag(d) ? 'an' : d > heute ? 'leer' : 'aus');
   const nTraining = training.filter(x => x === 'an').length;
+  // Wie viele Wochen liegt die angezeigte vor der laufenden?
+  const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
+  const kopfTage = tage.map(d => zelle(d, wochentagKurz(d),
+    ` role="button" tabindex="0" aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)} anzeigen"${d === tag ? ' aria-pressed="true"' : ''}`)).join('');
   return `<div class="ziel-woche">
-    <div class="zw-kopf"><h3>Ziele</h3>${scopeBadge('KW ' + isoKW(tage[0]))}</div>
-    <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${tage.map(d => `<span>${wochentagKurz(d)}</span>`).join('')}</span><b class="zw-zahl"></b></div>
+    <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
+    <div class="zw-zeile zw-tage"><span class="zw-name"></span><span class="zw-punkte">${kopfTage}</span><b class="zw-zahl"></b></div>
     ${messZeile('restHR', 'Ruhepuls')}
     ${messZeile('hrv', 'HRV')}
     ${messZeile('sleepTotal', 'Schlaf')}
@@ -2721,10 +2759,7 @@ function pgOverview() {
     </div>` : ''}
     <!-- Hochformat: Wochenbilanz über den Ringen. Querformat: Wochenbilanz links,
          Ringe rechts (Raster-Bereiche in style.css). -->
-    <div class="ov-oben">
-      ${zielWocheHTML()}
-      ${zielRingeHTML()}
-    </div>
+    ${ovObenHTML()}
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
       <h3>Verlauf</h3>
@@ -4916,6 +4951,7 @@ function filterTitelTeil() {
 // wer am neuesten Tag steht, will beim naechsten Nachladen mitgezogen werden.
 function aufHeuteSpringen() {
   if (!allData.length) return;
+  _bilanzTag = null;   // die Wochenbilanz zeigt wieder den heutigen Tag
   referenceDate = allData[allData.length-1].date;
   _datumSelbstGewaehlt = false;
 }
@@ -5497,7 +5533,7 @@ function initScrollHideNav() {
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
     // Alles, was selbst etwas auslöst, ausnehmen: Bedienelemente, Diagramme (Markierung),
     // Kartentitel (Datenbeschriftung), Ziel-Ringe (Tabwechsel) und Tooltip-Anker.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-ziel-tab], ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-ziel-tab], [data-tag], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
@@ -5632,6 +5668,14 @@ document.body.addEventListener('click', (e) => {
   const t = e.target;
   // Tipp auf einen Ziel-Ring: Wisch in seinen Tab. Ein ⓘ darin bliebe ausgenommen –
   // es oeffnet weiterhin seine Erklaerung, statt den Tab zu wechseln.
+  // Tipp auf eine Tagesspalte der Wochenbilanz: Tag wählen, Ringe zeigen seine Werte.
+  const _bilanzZelle = t.closest('.ziel-woche [data-tag]');
+  if (_bilanzZelle) {
+    const d = _bilanzZelle.dataset.tag;
+    _bilanzTag = d === standardTag() ? null : d;
+    ovObenNeu();
+    return;
+  }
   const _kachel = t.closest('.zr[data-ziel-tab]');
   if (_kachel && !t.closest(TT_TAP_SELECTOR)) { zuTabWischen(_kachel.dataset.zielTab); return; }
   // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
@@ -5754,7 +5798,8 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
 // Ziel-Ringe sind per `role="button"` Knoepfe – dann gehoeren Enter und Leertaste dazu.
 document.body.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const k = e.target.closest && e.target.closest('.zr[data-ziel-tab]');
+  const k = e.target.closest && e.target.closest('.zr[data-ziel-tab], .ziel-woche [data-tag]');
+  if (k && k.dataset.tag && e.target === k) { e.preventDefault(); k.click(); return; }
   if (!k || e.target !== k) return;
   e.preventDefault();
   zuTabWischen(k.dataset.zielTab);

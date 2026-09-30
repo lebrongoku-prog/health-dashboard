@@ -871,7 +871,24 @@ body.dark .scope-badge{background:#0F172A}
 .zw-punkte i.aus{border:2.5px solid rgba(255,255,255,.5)}
 .zw-punkte i.leer{background:rgba(255,255,255,.12)}
 .zw-zahl{text-align:right;font-weight:700}
-.zw-tage{padding:0 0 .1rem;font-size:.72rem;opacity:.7}
+.zw-tage{padding:0 0 .1rem;font-size:.72rem}
+/* Jede Tagesspalte ist antippbar: die Zelle füllt ihre Rasterspalte, damit die ganze
+   Spalte trifft und nicht nur der 20-px-Punkt. Rückmeldung nur über Deckkraft (kein
+   transform im scrollenden Bereich, siehe Ringe). */
+.zw-zelle{justify-self:stretch;display:flex;justify-content:center;align-items:center;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:opacity .15s}
+.zw-zelle:active{opacity:.6}
+.zw-zelle.zukunft{cursor:default}
+.zw-tage .zw-zelle{color:rgba(255,255,255,.7);font-weight:600;border-radius:999px;padding:.12rem 0}
+/* Gewählter Tag: Kopf als weisse Pille, die Punkte der Spalte mit hellem Hof. */
+.zw-tage .zw-zelle.gewaehlt{background:#fff;color:#0C4A6E;font-weight:800}
+.zw-zelle.gewaehlt i{box-shadow:0 0 0 3px rgba(255,255,255,.4)}
+.zw-zelle:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:1px}
+.zw-rechts{display:flex;align-items:center;gap:.5rem}
+.zw-vor{font-size:.8rem;font-weight:600;opacity:.85;white-space:nowrap}
+/* Ringe, die nicht zur angezeigten Woche gehören (Blättern in 7T), treten zurück. */
+.ziel-ringe{transition:opacity .2s}
+.ziel-ringe.blass{opacity:.35}
 
 
 /* Letzte Workout Tabelle */
