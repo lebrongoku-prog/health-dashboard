@@ -1201,6 +1201,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `!important`) und nur dort; Angaben im `split2`-Block wären wirkungslos.
   Auch die Zeilenhöhe setzt der Type Scale direkt auf den Labels — eine Angabe
   an der Zeile wird nicht geerbt.
+- **„Ziel erreicht" in Ruhepuls & HRV** (auf Wunsch, 30.09.2026, analog zu
+  „Schlafziel erreicht"): erste Fusszeile, beide Reihen in EINER Zeile (Puls | HRV,
+  wie alle Zeilen dieses Diagramms): Tage mit erreichtem Ziel (`zielErfuellt`, also
+  Ruhepuls ≤ 60, HRV ≥ 50) von allen Tagen mit Messwert. Grün, sobald mindestens ein
+  Tag das Ziel erreicht; Nenner und Anteil in `--txt3`. **Kurzform `25/30 (83%)`**
+  statt „25 von 30" — mit „von" brach die Zeile bei 12M (dreistellige Zahlen) auf
+  375 px um. Gemessen: 7T bis 24M einzeilig (27 px). Bleibt auch im Jahresvergleich.
 - **Durchschnittszeile heisst „Ø 7T", „Ø 1M" … — in JEDEM Diagramm** (auf Wunsch,
   18.09.2026). Das Zeitfenster steht so da wie in der Pille der Zeitleiste; vorher
   hiess die Zeile „Durchschnitt" bzw. „Ø Schlafdauer". Eine Quelle: `oeLabel(zusatz)`

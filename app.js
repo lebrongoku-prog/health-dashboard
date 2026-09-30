@@ -2856,6 +2856,16 @@ function pgHerz() {
   const hrSchlecht = hrf.length?Math.max(...hrf.map(r=>r.restHR)):null;
   const hvBest = hvf.length?Math.max(...hvf.map(r=>r.hrv)):null;
   const hvSchlecht = hvf.length?Math.min(...hvf.map(r=>r.hrv)):null;
+  // „Ziel erreicht" wie beim Schlaf (auf Wunsch, 30.09.2026): Tage mit erreichtem Ziel
+  // von allen Tagen mit Messwert. Grün, sobald mindestens ein Tag das Ziel erreicht.
+  // Kürzer als beim Schlaf („25/30" statt „25 von 30"): zwei Reihen in einer Zeile
+  // brachen bei 12M (dreistellige Zahlen) auf 375 px sonst um.
+  const zielTeil=(rows,key)=>{
+    if(!rows.length) return '—';
+    const n=rows.filter(r=>zielErfuellt(key,r[key])).length;
+    const txt=`${n}<span style="color:var(--txt3)">/${rows.length} (${Math.round(n/rows.length*100)}%)</span>`;
+    return n>0?`<span style="color:#10B981;font-weight:700">${txt}</span>`:txt;
+  };
   const [hrKons,hrKonsFarbe]=konsistenzStufe(standardabw(hrf,'restHR'), 2, 3.5, 5, 'Schwankend');
   const [hvKons,hvKonsFarbe]=konsistenzStufe(standardabw(hvf,'hrv'),    6, 10, 15, 'Schwankend');
 
@@ -2929,6 +2939,7 @@ function pgHerz() {
            dann HRV. Die Einheiten halten sie auseinander. Getrennte Zeilen je Reihe
            waeren acht Stueck und damit laenger als das Diagramm darueber. -->
       <div class="stats-list diagramm-fuss">
+        ${hrf.length||hvf.length ? statZeile('Ziel erreicht', `${zielTeil(hrf,'restHR')} | ${zielTeil(hvf,'hrv')}`) : ''}
         ${istYoY() ? yoyZeilen([
             { werte: yoyWerte(D, r => r.restHR, 'mittel'), richtung: ZIELE.restHR.richtung },
             { werte: yoyWerte(D, r => r.hrv,    'mittel'), richtung: ZIELE.hrv.richtung }]) : ''}
