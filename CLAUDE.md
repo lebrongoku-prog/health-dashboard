@@ -249,7 +249,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
-  `.refresh-btn`/`.dark-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`/
+  `.refresh-btn`/`.glas-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`/
   `.zr[data-ziel-tab]` (Ziel-Ring → Tab, dazu `keydown` für Enter/Leertaste)
   (alle click — der frühere
   `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
@@ -264,14 +264,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
   der App-Karte auf der Einstellungen-Seite (`datenStandZeilen()`, ab 2 Tagen
   Rückstand orange).
-- **Bedienelemente:** Der Dark-Toggle liegt rechtsbündig auf der `pg-banner`-Titelzeile
-  (`pgBanner()`). Er trägt seit 18.09.2026 (auf Wunsch) statt 🌙/☀️ ein
-  **Kontrast-Symbol** (`DARK_SYMBOL`: Kreis mit gefüllter Hälfte) in derselben
-  Linienoptik wie das Zahnrad daneben. Ein Symbol für beide Zustände: im Dunkelmodus
-  dreht es sich per CSS um 180° (`body.dark .pg-act.dark-toggle svg`), die Drehung
-  sitzt am SVG, weil das `transform` des Knopfs dem Druckpunkt gehört.
-  `applyDarkMode` setzt nur noch `aria-pressed` — ein `textContent` wie früher würde
-  das SVG löschen. Das
+- **Bedienelemente:** Rechtsbündig auf der `pg-banner`-Titelzeile (`pgBanner()`) sitzt
+  der **Transparenz-Knopf** (`.glas-toggle`, siehe „Transparenz-Modus"); bis
+  02.10.2026 stand dort der Dunkel-Schalter. Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
   auf der Einstellungen-Seite — zusammen mit „App-Version aktualisieren" darunter,
   jeder mit eigener Erklärung. Beide tragen Text statt Symbol; `refreshData` wechselt
@@ -338,7 +333,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      ein Tipp auf `‹`/`›` liess sie offen stehen, obwohl sie ihre Aufgabe erfüllt hatte.
   3. **Die Tabfarbe wird über `themaSetzen()` gewechselt — nie über
      `document.body.className`.** Eine Zuweisung an `className` ersetzt ALLE Klassen,
-     also auch `dark`, `nav-weg` und `hinweis-an`. Genau das stand zweimal im Code
+     also auch `nav-weg` und `hinweis-an` (damals auch `dark`). Genau das stand zweimal im Code
      (Tabwechsel per Knopf und per Wisch) und kostete zwei Anläufe: Beim ersten
      Reparieren führte ich `nav-weg` in der einen Kopie mit und übersah die zweite —
      der Fehler blieb, nur trat er jetzt beim Wischen statt beim Tippen auf. Symptom
@@ -790,7 +785,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
     202 px, Ringe 296 px).
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
-  7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert; Dunkelmodus lesbar.
+  7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Ziel-Ringe und Wochenbilanz der Übersicht. Neue Schwellen gehören dorthin,
@@ -1372,12 +1367,49 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `localStorage`, also an die Sheets. Zahlen und Datumsangaben sind ausgenommen, die
   werden beim Einlesen geprüft (Datum: `/^\d{4}-\d{2}-\d{2}$/` in **beiden** Sheets).
   Betrifft besonders neue Anzeigen von Textfeldern wie der Trainingsart (`typeRaw`).
+- **Transparenz-Modus** (02.10.2026, auf Wunsch, 1:1 aus FitTracks Glas-Modus) —
+  **ersetzt den Dunkelmodus**, der samt `body.dark`, `applyDarkMode`/`setDarkMode`,
+  `DARK_SYMBOL` und dem Schlüssel `hcc_dark` entfallen ist (der Schlüssel wird beim
+  Start einmal weggeräumt). Knopf `.glas-toggle` rechts im Banner jedes Tabs, Symbol
+  aus FitTrack (zwei überlappende Karten, `GLAS_SYMBOL`), eingeschaltet mit hellerer
+  Fläche (`[aria-pressed="true"]`). Zustand `hcc_glas` im `localStorage`,
+  `glasAktiv()`, Klasse `glas` am **`<html>`** (`applyGlasModus()`). Standard: aus.
+  - **CSS** (`html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card,
+    .no-data, .kpi)`): 12-%-Weiss, gleicher Schatten, und die Farbtokens `--txt`,
+    `--txt2`, `--txt3`, `--card`, `--border`, `--bg`, `--accent` werden **auf den
+    Karten** neu gesetzt (weiss bzw. halbweiss), nicht auf `:root` — so erben nur deren
+    Inhalte die hellen Farben. Dazu Einzelregeln für fest gesetzte Farben: Kante der
+    `.pi-card`, Trennlinie `.stat-row`, Balkenspur `.goal-bar-bg`/`.debt-bar-bg`,
+    `.warn-sig`. **Wer eine neue Karte oder eine feste Farbe in einer Karte einführt,
+    ergänzt sie dort.**
+  - **Bleibt weiss:** Einstellungen-Seite (liegt ausserhalb von `.screen`, wie
+    FitTracks „Mehr"), Zeitleiste, Tableiste, Tooltips. Wochenbilanz und Ringe sind
+    ohnehin für den Verlauf gebaut.
+  - **Hellere Datenfarben** (auf Wunsch statt FitTracks Weiss — die Farben tragen
+    Bedeutung): `hellerFarbe()` mischt jede Farbe zu `GLAS_AUFHELLUNG` (35 %) mit Weiss,
+    Deckkraft bleibt. **Eine** Funktion für Diagramme UND HTML, damit Legendenpunkt und
+    Linie gleich aussehen. `_glasDiagramm(cfg)` (in `zeichneDiagramm`, vor `new Chart`)
+    hellt alle Farb-Eigenschaften der Datensätze auf — Zeichenketten, Arrays und
+    Funktionen (die Funktion wird umhüllt) — und setzt Achsentext (`GLAS_TEXT`), Gitter
+    (`GLAS_GITTER`) und Achsenlinie (`GLAS_ACHSE`) weiss. Die Achsen-Objekte werden dafür
+    **kopiert**: `achseX`/`achseY` teilen sich alle Diagramme. `glasHtmlAnpassen()` (aus
+    `_tabNachbereiten`) hellt die Inline-Farben des Tabs auf (`color`, `background`,
+    `border-top/left-color`, `--rec-color`), ausser in `.ov-oben`.
+  - **Plugins:** Wochentrenner in `GLAS_ACHSE`, Datenbeschriftung 90-%-Weiss,
+    Markierung weiss getönt (18 %). Der **Schleier über den übrigen Säulen** geht auf
+    dem Glas nicht als Farbe (es gibt keine, die „zurücktritt") — dort nimmt
+    `destination-out` 72 % des Gezeichneten weg, und der Verlauf scheint durch.
+  - **Umschalten** (`glasUmschalten`): Speicher, Klasse, dann `_refreshAfterStateChange()`
+    mit `_navSliding = true` (ohne Aufbau-Animation), alles in der View Transition.
+  Geprüft (Prüfstand, 375 × 812 und 812 × 375, alle vier Tabs aufgeklappt): Karten
+  12-%-Weiss, Schrift weiss, Diagramme mit hellen Datenfarben und weissen Achsen,
+  Markierung blendet die übrigen Säulen aus, Zurückschalten stellt Karten (weiss) und
+  Achsen (`#94A3B8`) wieder her, Zustand übersteht das Neuladen.
 - **Kartenschatten:** `--shadow` ist die **einzige** Quelle — alle Karten
   (`chart-card`, `kpi`, `pi-card`, `warn-card`, `rec-card`, `no-data`, …) lesen sie.
   Sie trägt jetzt denselben Schatten wie die Ausklapp-Knöpfe (`0 1px 6px rgba(0,0,0,.18)`),
   **ohne** die frühere Haarlinie — die wirkte neben dem Knopf wie eine Umrandung.
-  Im Dunkelmodus dieselbe Form mit `.45` statt `.18`: ein 18%-Schwarz verschwindet
-  auf dunklem Grund und die Karten hätten keine Kante mehr.
+  Im Transparenz-Modus tragen die Karten denselben Schatten (siehe dort).
 - **Aufklapp-Schalter sitzt unten rechts in der Zeitleiste** (rechts seit
   08.09.2026, davor kurz links; in der Zeitleiste seit 07.09.2026, davor
   kurz als `.pg-act.ausklapp-act` in der Kopfzeile, davor als breiter Balken im
@@ -1405,7 +1437,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   (`rgba(255,255,255,.95)`, Radius 10, Schatten `0 2px 8px`) mit **Doppel-Chevron**
   als SVG (18 px, `stroke-width:1.8`, runde Enden) — nach unten zum Aufklappen, nach
   oben zum Einklappen. Die Strichfarbe folgt hier `--tab-color` statt FitTracks fester
-  Akzentfarbe. Er hebt sich damit bewusst von den durchscheinenden Nachbarn (＋, 🌙) ab.
+  Akzentfarbe. Er hebt sich damit bewusst von den durchscheinenden Nachbarn (Zahnrad, Transparenz-Knopf) ab.
   **Links davon steht in der Übersicht das Zahnrad** (`.pg-act.einst-act`) zur
   Einstellungen-Seite. Es trägt bewusst die durchscheinende Optik der übrigen
   `.pg-act` — der Ausklapp-Knopf ist der einzige helle Knopf der Zeile und soll das
@@ -1558,10 +1590,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      = {alpha, aus}`; `aus` hält die Zahlen beim Ausblenden noch im Bild, obwohl
      `beschriftungAn` schon false liefert. Im Training-Tab blenden alle vier Diagramme
      gemeinsam.
-  8. **Hell/Dunkel** über `document.startViewTransition` (Safari ab iOS 18): alter
+  8. **Transparenz-Modus** (bis 02.10.2026 Hell/Dunkel) über
+     `document.startViewTransition` (Safari ab iOS 18): alter
      und neuer Zustand blenden als Ganzes ineinander, Dauer 0.28 s in
      `::view-transition-old/new(root)`. Ohne die API wie bisher ein Umschlag in einem
-     Bild. Der Rückruf läuft **asynchron** (direkt nach dem Tipp ist `body.dark` noch
+     Bild. Der Rückruf läuft **asynchron** (direkt nach dem Tipp ist `html.glas` noch
      der alte Stand) und auch dann, wenn der Übergang übersprungen wird — `ready` lehnt
      dann ab und wird abgefangen, sonst stünde die Ablehnung in der Konsole (im
      Vorschau-Pane bei jedem Tipp).

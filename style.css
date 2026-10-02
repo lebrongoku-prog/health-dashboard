@@ -243,10 +243,6 @@ button:active,
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
   will-change: transform;
 }
-body.dark #bottom-nav {
-  background: color-mix(in srgb, var(--tab-color) 22%, #1E293B 78%);
-  border-top-color: #334155;
-}
 #bottom-nav.nav-hidden { transform: translateY(110%); }
 
 /* ── Unterseite (Einstellungen) ─────────────────────────────
@@ -713,7 +709,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   padding:.14rem .45rem;white-space:nowrap;line-height:1.4;
 }
 .chart-head .scope-badge{margin-left:auto}
-body.dark .scope-badge{background:#0F172A}
 
 /* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
 .chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
@@ -911,7 +906,6 @@ body.dark .scope-badge{background:#0F172A}
 .warn-text{font-size:.8rem;color:var(--txt2);line-height:1.55}
 .warn-signals{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem}
 .warn-sig{font-size:.7rem;padding:.1rem .4rem;border-radius:999px;background:#FFF7ED;color:#C2410C;font-weight:600}
-body.dark .warn-sig{background:#431407;color:#FB923C}
 
 /* Baseline Comparison */
 
@@ -958,24 +952,6 @@ body.dark .warn-sig{background:#431407;color:#FB923C}
 
 /* Page intro question (kursive Frage) */
 
-/* ── Dark Mode ──────────────────────────────────────────── */
-body.dark {
-  --bg: #0F172A;
-  --card: #1E293B;
-  --border: #334155;
-  --txt: #F1F5F9;
-  --txt2: #CBD5E1;
-  --txt3: #475569;
-  /* Gleiche Form wie im Hellmodus, nur kraeftiger: ein 18%-Schwarz verschwindet
-     auf dunklem Grund und die Karten haetten keine Kante mehr. */
-  --shadow: 0 1px 6px rgba(0,0,0,.45);
-  --shadow-hov: 0 8px 24px rgba(0,0,0,.55);
-}
-body.dark .stat-row { border-bottom-color: #334155; }
-body.dark .goal-bar-bg { background: #334155; }
-body.dark .field-hint { background: #0F172A; }
-body.dark .no-data { background: var(--card); }
-body.dark .debt-bar-bg { background: #334155; }
 
 /* ═══════════════════════════════════════════════════════════
    Type Scale
@@ -1189,17 +1165,41 @@ h5,
   stroke:#fff;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;
 }
-/* Nachtmodus: Kontrast-Symbol in derselben Linienoptik wie das Zahnrad (18.09.2026,
-   vorher 🌙/☀️). Ein Symbol fuer beide Zustaende – im Dunkelmodus dreht es sich um
-   180°, die gefuellte Haelfte wandert von rechts nach links. Die Drehung sitzt am
-   SVG, nicht am Knopf: dessen `transform` gehoert dem Druckpunkt (`.pg-act:active`). */
-.pg-act.dark-toggle svg{
+/* Transparenz-Knopf: zwei ueberlappende Karten in derselben Linienoptik wie das
+   Zahnrad (Symbol aus FitTrack). Eingeschaltet traegt der Knopf eine hellere Flaeche,
+   wie `#glas-btn[aria-pressed="true"]` dort. */
+.pg-act.glas-toggle svg{
   width:20px;height:20px;fill:none;
   stroke:#fff;stroke-width:1.7;stroke-linejoin:round;
-  transition:transform .35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.pg-act.dark-toggle svg .voll{fill:#fff}
-body.dark .pg-act.dark-toggle svg{transform:rotate(180deg)}
+.pg-act.glas-toggle[aria-pressed="true"]{background:rgba(255,255,255,.42)}
+
+/* ═══════════════════════════════════════════════════════════
+   Transparenz-Modus (02.10.2026, auf Wunsch, aus FitTracks Glas-Modus)
+   Alle Karten der vier Tabs bekommen denselben 12-%-Weiss-Schleier wie dort. Die
+   Farbtoken werden AUF DEN KARTEN neu gesetzt, nicht auf :root – so erben nur deren
+   Inhalte die hellen Farben. Die Einstellungen-Seite liegt ausserhalb von `.screen`
+   und bleibt weiss (wie FitTracks „Mehr"). Datenfarben und Inline-Farben hellt das JS
+   auf (`_glasDiagramm`, `glasHtmlAnpassen`).
+   ═══════════════════════════════════════════════════════════ */
+html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .kpi){
+  background:rgba(255,255,255,.12);
+  box-shadow:0 1px 6px rgba(0,0,0,.18);
+  --txt:#fff;
+  --txt2:rgba(255,255,255,.85);
+  --txt3:rgba(255,255,255,.65);
+  --card:rgba(255,255,255,.10);
+  --border:rgba(255,255,255,.24);
+  --bg:rgba(255,255,255,.10);
+  --accent:#fff;
+  color:var(--txt);
+}
+/* Fest gesetzte helle Flaechen und Kanten in den Karten. */
+html.glas .screen .pi-card{border-top-color:rgba(255,255,255,.24)}
+html.glas .screen .stat-row{border-bottom-color:rgba(255,255,255,.1)}
+html.glas .screen .goal-bar-bg,
+html.glas .screen .debt-bar-bg{background:rgba(255,255,255,.18)}
+html.glas .screen .warn-sig{background:rgba(251,146,60,.28);color:#FED7AA}
 
 .weitere-inhalt[hidden]{display:none}
 
@@ -1233,10 +1233,10 @@ body.hinweis-an .screen{
   padding-top:calc(var(--hinweis-h, 60px) + 8px);
 }
 
-/* ── Hell/Dunkel-Ueberblendung (18.09.2026) ─────────────────────────────────
-   Der Tipp auf 🌙/☀️ laeuft ueber `document.startViewTransition` (Safari ab iOS 18):
-   alter und neuer Zustand blenden als Ganzes ineinander. Ohne die API schaltet die
-   App wie bisher in einem Bild um. */
+/* ── Ueberblendung beim Transparenz-Modus (seit 18.09.2026, damals Hell/Dunkel) ──
+   Der Tipp auf den Transparenz-Knopf laeuft ueber `document.startViewTransition`
+   (Safari ab iOS 18): alter und neuer Zustand blenden als Ganzes ineinander. Ohne die
+   API schaltet die App in einem Bild um. */
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: .28s; }
 

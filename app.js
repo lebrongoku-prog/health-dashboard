@@ -1207,7 +1207,7 @@ const wochentrennerPlugin = {
     const a = chart.chartArea; if (!a) return;
     const ctx = chart.ctx;
     ctx.save();
-    ctx.strokeStyle = ACHSEN_COLOR;
+    ctx.strokeStyle = glasAktiv() ? GLAS_ACHSE : ACHSEN_COLOR;
     ctx.lineWidth = 1;
     chart.$keys.forEach((d, i) => {
       // Montag = Wochenanfang. Der Strich liegt auf der linken Kante seiner Spalte,
@@ -1238,8 +1238,9 @@ const markierungPlugin = {
     // keine senkrechten Randlinien mehr.
     if (sp.rechts <= sp.links) return;
     ctx.save();
-    ctx.fillStyle = _cssFarbe('--tab-color', '#0891B2');
-    ctx.globalAlpha = 0.13 * _markAlpha;
+    // Auf dem Schleier waere die Tabfarbe auf dem Verlauf derselben Farbe unsichtbar.
+    ctx.fillStyle = glasAktiv() ? '#fff' : _cssFarbe('--tab-color', '#0891B2');
+    ctx.globalAlpha = (glasAktiv() ? 0.18 : 0.13) * _markAlpha;
     ctx.fillRect(sp.links, a.top, sp.rechts - sp.links, a.bottom - a.top);
     ctx.restore();
   },
@@ -1254,8 +1255,11 @@ const markierungPlugin = {
     const sp = _markSpalte(chart, i), ctx = chart.ctx;
     ctx.save();
     ctx.globalAlpha = _markAlpha;
-    ctx.fillStyle = document.body.classList.contains('dark')
-      ? 'rgba(30,41,59,.72)' : 'rgba(255,255,255,.72)';
+    // Auf der weissen Karte ein weisser Schleier. Auf dem durchsichtigen Schleier gibt
+    // es keine Farbe, die „zuruecktritt" – dort wird das Gezeichnete stattdessen zu 72 %
+    // weggenommen (destination-out), und der Verlauf scheint durch.
+    if (glasAktiv()) { ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = 'rgba(0,0,0,.72)'; }
+    else ctx.fillStyle = 'rgba(255,255,255,.72)';
     ctx.fillRect(a.left, a.top, Math.max(0, sp.links - a.left), a.bottom - a.top);
     ctx.fillRect(sp.rechts, a.top, Math.max(0, a.right - sp.rechts), a.bottom - a.top);
     ctx.restore();
@@ -1422,7 +1426,7 @@ const werteLabelPlugin = {
       ctx.clip();
     }
     ctx.font = '600 10px ' + (Chart.defaults.font.family || 'sans-serif');
-    ctx.fillStyle = _cssFarbe('--txt2', '#64748B');
+    ctx.fillStyle = glasAktiv() ? 'rgba(255,255,255,.9)' : _cssFarbe('--txt2', '#64748B');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     // Belegte Flaechen ueber ALLE Datensaetze hinweg. Erst nur die x-Achse zu
@@ -1951,6 +1955,7 @@ function zeichneDiagramm(id, cfg) {
     cfg.options.layout = cfg.options.layout || {};
     cfg.options.layout.padding = Object.assign({ top: LABEL_LUFT }, cfg.options.layout.padding);
   }
+  if (glasAktiv()) _glasDiagramm(cfg);
   charts[id] = new Chart(el, cfg);
   // Zeitraum-Schlüssel am Chart hinterlegen (siehe Kern-Block oben) und den Tipp
   // verkabeln. Ohne __keys bleibt ein Diagramm von Wochentrenner und Markierung
@@ -4971,12 +4976,10 @@ function vo2Abschnitt(D) {
 
 // ── Navigation ─────────────────────────────────────────
 const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTraining};
-// Kontrast-Symbol des Dark-Toggles (auf Wunsch, 18.09.2026): ein Kreis mit gefuellter
-// Haelfte. EIN Symbol fuer beide Zustaende – im Dunkelmodus dreht es sich per CSS um
-// 180°, deshalb tauscht `applyDarkMode` nichts aus.
-const DARK_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path class="voll" d="M12 3.5a8.5 8.5 0 0 1 0 17Z"/></svg>`;
+// Symbol des Transparenz-Knopfs: zwei ueberlappende Karten, 1:1 aus FitTrack.
+const GLAS_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="13" height="13" rx="3"/><rect x="8" y="9" width="13" height="11" rx="3"/></svg>`;
 // Titelzeile eines Tabs: Emoji + Name, rechtsbündig Zahnrad (nur Übersicht) und
-// Dark-Toggle. Die Tab-Hintergründe sitzen auf .screen, nicht hier.
+// Transparenz-Knopf. Die Tab-Hintergründe sitzen auf .screen, nicht hier.
 function pgBanner(icon,title){
   // Zahnrad NUR in der Uebersicht, in der durchscheinenden Optik der uebrigen `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
@@ -4984,7 +4987,7 @@ function pgBanner(icon,title){
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act dark-toggle" title="Hell/Dunkel" aria-label="Dunkelmodus" aria-pressed="${document.body.classList.contains('dark')?'true':'false'}">${DARK_SYMBOL}</button></div></div>`;
+  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav
@@ -5264,6 +5267,7 @@ function _tabNachbereiten(name) {
   const screenEl = document.getElementById('screen-'+name);
   if (!screenEl) return;
   _zeitraumEinsetzen(name);
+  glasHtmlAnpassen(screenEl);
   balkenFuellen(name);
   if (name === 'overview') kachelnHochzaehlen();
   updateNavUI();
@@ -5412,7 +5416,7 @@ function setTabBackgroundInstant(name) {
 //
 // Vorher stand hier zweimal `document.body.className = 'theme-' + name + …` — einmal
 // fuer den Tabwechsel per Knopf, einmal fuer den per Wisch. Eine Zuweisung an
-// `className` ersetzt ALLE Klassen, also auch `dark`, `nav-weg` und `hinweis-an`.
+// `className` ersetzt ALLE Klassen, also auch `nav-weg` und `hinweis-an`.
 // Beide Kopien mussten deshalb jede dieser Klassen einzeln mitfuehren, und wer eine
 // vergass, erzeugte einen Fehler, der nur beim Tabwechsel auftrat: `nav-weg` ging
 // verloren, die Bottom-Nav blieb versteckt (ihre Klasse sitzt an ihr selbst), die
@@ -5877,20 +5881,7 @@ document.body.addEventListener('click', (e) => {
   if (t.closest('.anmelde-btn')) { signIn(); return; }
   if (t.closest('.refresh-btn')) { refreshData(); return; }
   if (t.closest('.appver-btn'))  { jetztAktualisieren(); return; }
-  if (t.closest('.dark-toggle')) {
-    // Sanft ueberblenden statt in einem Bild umschlagen (auf Wunsch, 18.09.2026):
-    // die View Transitions API haelt den alten Zustand als Bild fest und blendet ihn
-    // in den neuen (Dauer im CSS unter `::view-transition-*`). Safari kann das ab
-    // iOS 18; aeltere Geraete schalten wie bisher ohne Uebergang um.
-    // Wird der Uebergang uebersprungen (zweiter Tipp waehrend der Blende, Seite gerade
-    // nicht gezeichnet), lehnt `ready` ab – umgeschaltet ist trotzdem, der Rueckruf
-    // laeuft in jedem Fall. Abfangen, sonst steht die Ablehnung in der Konsole.
-    const _dunkel = !document.body.classList.contains('dark');
-    if (document.startViewTransition && !bewegungAus()) {
-      const _vt = document.startViewTransition(() => setDarkMode(_dunkel));
-      if (_vt && _vt.ready) _vt.ready.catch(() => {});
-    } else setDarkMode(_dunkel);
-  }
+  if (t.closest('.glas-toggle')) glasUmschalten();
 });
 // Bottom-Nav bleibt statisch im DOM, weiterhin direkt verkabelt
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
@@ -5917,24 +5908,103 @@ document.body.addEventListener('keydown', (e) => {
   zuTabWischen(k.dataset.zielTab);
 });
 
-// ── Dark Mode ──────────────────────────────────────────
-function applyDarkMode(isDark) {
-  document.body.classList.toggle('dark', isDark);
-  // Das Symbol bleibt dasselbe (die Drehung macht das CSS über `body.dark`); nur der
-  // Zustand fuer Screenreader zieht nach. Vorher wurde hier 🌙/☀️ getauscht – ein
-  // `textContent` wuerde das SVG loeschen.
-  document.querySelectorAll('.dark-toggle').forEach(btn => {
-    btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-  });
-  try { localStorage.setItem('hcc_dark', isDark ? '1' : '0'); } catch(e) {}
+// ── Transparenz-Modus (02.10.2026, auf Wunsch, 1:1 aus FitTracks Glas-Modus) ──────
+// Ersetzt den Dunkelmodus. Alle Karten in den vier Tabs werden durchscheinend (12-%-
+// Weiss auf dem Tab-Verlauf), ihre Schrift weiss. Die Einstellungen-Seite, Zeitleiste
+// und Tableiste bleiben, wie sie sind – sie liegen nicht auf dem Verlauf.
+// Der Zustand liegt nur auf dem Geraet (`hcc_glas`), die Klasse `glas` am <html>.
+// Diagramme und Inline-Farben haengen an JS (`_glasDiagramm`, `glasHtmlAnpassen`),
+// deshalb baut der Wechsel die Tabs neu auf.
+const GLAS_KEY = 'hcc_glas';
+function glasAktiv() { try { return localStorage.getItem(GLAS_KEY) === '1'; } catch (_) { return false; } }
+function applyGlasModus() {
+  const an = glasAktiv();
+  document.documentElement.classList.toggle('glas', an);
+  document.querySelectorAll('.glas-toggle').forEach(b => b.setAttribute('aria-pressed', an ? 'true' : 'false'));
+  Chart.defaults.color = an ? GLAS_TEXT : '#94A3B8';
 }
-function setDarkMode(isDark) {
-  applyDarkMode(isDark);
-  // Theme-Wechsel ändert keine Daten und keinen Text – Karten/Schrift folgen den
-  // CSS-Variablen via body.dark. Statt den ganzen Tab (innerHTML + Analytik +
-  // Chart-Neuaufbau) zu regenerieren, werden nur die bestehenden Chart-Instanzen
-  // neu gezeichnet. Das macht den Dark-Mode-Toggle praktisch instant.
-  Object.values(charts).forEach(c => { try { c.update('none'); } catch(_) {} });
+// Ueberblendung des ganzen Bildschirms (View Transitions, Dauer im CSS unter
+// `::view-transition-*`) wie vorher beim Dunkelmodus. `ready` lehnt ab, wenn der
+// Browser den Uebergang ueberspringt (verdeckte Seite) – abfangen, sonst steht es in
+// der Konsole. Ohne die API oder bei „Bewegung reduzieren" springt es.
+function glasUmschalten() {
+  const umschalten = () => {
+    try { localStorage.setItem(GLAS_KEY, glasAktiv() ? '0' : '1'); } catch (_) {}
+    applyGlasModus();
+    // Neu aufbauen, OHNE Aufbau-Animation – die Daten aendern sich nicht.
+    _navSliding = true;
+    try { _refreshAfterStateChange(); } finally { _navSliding = false; }
+  };
+  if (document.startViewTransition && !bewegungAus()) {
+    const vt = document.startViewTransition(umschalten);
+    if (vt && vt.ready) vt.ready.catch(() => {});
+  } else umschalten();
+}
+
+// Hellere Datenfarben auf dem Schleier (auf Wunsch): jede Farbe wird zu einem Teil mit
+// Weiss gemischt, die Deckkraft bleibt. Rot bleibt rot, Blau blau – nur heller, damit
+// es auf dem Verlauf derselben Farbe nicht untergeht. EINE Funktion fuer Diagramme
+// und HTML, damit Legendenpunkt und Linie dieselbe Farbe tragen.
+const GLAS_AUFHELLUNG = 0.35;
+const GLAS_TEXT   = 'rgba(255,255,255,.8)';
+const GLAS_GITTER = 'rgba(255,255,255,.14)';
+const GLAS_ACHSE  = 'rgba(255,255,255,.4)';
+function _farbTeile(c) {
+  let m = /^#([0-9a-f]{3,8})$/i.exec(c);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3) h = h.replace(/./g, x => x + x);
+    if (h.length !== 6 && h.length !== 8) return null;
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16),
+            h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+  }
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/i.exec(c);
+  if (!m) return null;
+  const a = m[4] == null ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+  return [+m[1], +m[2], +m[3], a];
+}
+function hellerFarbe(c, t = GLAS_AUFHELLUNG) {
+  if (typeof c !== 'string') return c;
+  const p = _farbTeile(c.trim());
+  if (!p) return c;
+  const [r, g, b] = p.slice(0, 3).map(v => Math.round(v + (255 - v) * t));
+  return `rgba(${r},${g},${b},${+p[3].toFixed(3)})`;
+}
+function _hellWert(v) {
+  if (typeof v === 'string') return hellerFarbe(v);
+  if (Array.isArray(v)) return v.map(_hellWert);
+  if (typeof v === 'function') return (...a) => _hellWert(v(...a));
+  return v;
+}
+// Diagramm fuer den Schleier umfaerben: Datenfarben heller, Achsen und Gitter weiss.
+// Die Achsen-Objekte werden KOPIERT – `achseX`/`achseY` teilen sich alle Diagramme.
+const GLAS_DATENFARBEN = ['backgroundColor', 'borderColor', 'pointBackgroundColor', 'pointBorderColor',
+  'hoverBackgroundColor', 'hoverBorderColor', 'pointHoverBackgroundColor', 'pointHoverBorderColor'];
+function _glasDiagramm(cfg) {
+  (cfg.data?.datasets || []).forEach(ds => GLAS_DATENFARBEN.forEach(k => { if (ds[k] != null) ds[k] = _hellWert(ds[k]); }));
+  const sc = cfg.options?.scales;
+  if (sc) Object.keys(sc).forEach(k => {
+    const a = sc[k] || {};
+    sc[k] = { ...a,
+      ticks: { ...(a.ticks || {}), color: GLAS_TEXT },
+      grid: a.grid && a.grid.display === false ? a.grid : { ...(a.grid || {}), color: GLAS_GITTER },
+      border: { ...(a.border || {}), color: GLAS_ACHSE } };
+  });
+}
+// Inline-Farben im HTML eines Tabs (Fusszeilen-Signale, Legendenpunkte, Kartenkanten,
+// Einblicke) ebenso aufhellen. Wochenbilanz und Ringe sind schon fuer den Verlauf
+// gebaut und bleiben aussen vor.
+function glasHtmlAnpassen(root) {
+  if (!glasAktiv() || !root) return;
+  root.querySelectorAll('[style]').forEach(el => {
+    if (el.closest('.ov-oben')) return;
+    ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor'].forEach(p => {
+      const v = el.style[p];
+      if (v && /^(rgb|#)/.test(v)) el.style[p] = hellerFarbe(v);
+    });
+    const rc = el.style.getPropertyValue('--rec-color');
+    if (rc) el.style.setProperty('--rec-color', hellerFarbe(rc.trim()));
+  });
 }
 // ── App-Version + Update ───────────────────────────────
 // Eine installierte PWA übernimmt einen neuen Stand erst beim ZWEITEN Start:
@@ -6236,7 +6306,9 @@ function refreshBestaetigen(text) {
   });
 }
 // Gespeicherte Hell/Dunkel-Präferenz laden
-try { if(localStorage.getItem('hcc_dark')==='1') applyDarkMode(true); } catch(e) {}
+// Der Dunkelmodus ist entfallen (02.10.2026) – sein Schluessel wird einmal weggeraeumt.
+try { localStorage.removeItem('hcc_dark'); } catch(e) {}
+applyGlasModus();
 
 document.getElementById('loading').style.display = 'none';
 updateNavUI();
