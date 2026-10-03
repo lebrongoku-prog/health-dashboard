@@ -572,6 +572,15 @@ function istYoY() { return timeRange === 'yoy'; }
 // `_jahrVorher` merkt sich Bereich, Bezugsdatum und `_datumSelbstGewaehlt` von vor
 // dem Einschalten; ein zweiter Tipp auf das aktive Jahr stellt alles wieder her.
 function istJahr() { return timeRange === 'jahr'; }
+
+// ── Bereich „1Y" (03.10.2026, auf Wunsch) ──────────────────────────────────────
+// Rechts neben „24M": der GANZE Datenbestand, je Kalenderjahr ein Balken bzw. Punkt
+// (2024, 2025, 2026 …). Das Fenster (`moWindow`) reicht vom ersten bis zum neuesten
+// Tag – damit gibt es nichts zu blaettern (die Pfeile verblassen von selbst), und
+// „Ø pro Woche" teilt durch die Wochen des ganzen Bestands. Eine Vorperiode gibt es
+// nicht. Im laufenden Jahr steht nur der bisherige Teil – Summen (Strecke, Zeit)
+// sind dort entsprechend kleiner.
+function ist1Y() { return timeRange === '1y'; }
 function jahrVon(ds) { return ds ? +ds.slice(0, 4) : null; }
 // Die Jahre, fuer die Gesundheitsdaten vorliegen – daraus entstehen die Knoepfe.
 function datenJahre() { return [...new Set(allData.map(r => r.date.slice(0, 4)))].sort().map(Number); }
@@ -687,6 +696,7 @@ function moLast(dateStr) { return addDays(addMonths(moFirst(dateStr),1),-1); }
 
 // For month-based filters: compute calendar-snapped start/end
 function moWindow() {
+  if (ist1Y()) return allData.length ? { s: allData[0].date, e: allData[allData.length - 1].date } : null;
   const wm = windowMonths();
   if (wm == null) return null;
   if (istJahr()) {
@@ -723,7 +733,7 @@ function prevPeriod() {
   // Im Jahresvergleich gibt es keine Vorperiode: die Jahre stehen bereits
   // nebeneinander im Diagramm. Eine erfundene Vergleichsspanne waere schlechter als
   // keine – die Kacheln zeigen dann „—" statt einer Zahl ohne Bedeutung.
-  if (istYoY()) return [];
+  if (istYoY() || ist1Y()) return [];
   // Einzeljahr: das Kalenderjahr davor.
   if (istJahr()) { const j = jahrVon(referenceDate) - 1; return allData.filter(r => jahrVon(r.date) === j); }
   if (is7D()) {
@@ -796,7 +806,7 @@ function updateNavUI() {
 // Wohin fuehrt ein Schritt in diese Richtung — oder `null`, wenn der Datenbestand
 // dort endet? EINE Quelle fuer Pfeile, Wischgeste und deren Gummiband-Verhalten.
 function _navZiel(richtung) {
-  if (!referenceDate || !allData.length) return null;
+  if (!referenceDate || !allData.length || ist1Y()) return null;
   // Einzeljahr: ein Schritt ist ein Jahr – sofern es fuer das Zieljahr Daten gibt.
   if (istJahr()) {
     const ziel = jahrVon(referenceDate) + richtung;
@@ -950,6 +960,15 @@ function wochenZwischen(vonDs, bisDs) {
 }
 // Wochen eines Kalendermonats aus dem Schluessel 'JJJJ-MM'. Tag 0 des Folgemonats ist
 // der letzte Tag des gesuchten – das kennt auch die Schaltjahre.
+// Wochen eines Kalenderjahrs, geklemmt auf den Datenbestand (fuer 1Y): im laufenden
+// Jahr nur bis zum neuesten Tag, im ersten nur ab dem ersten – sonst teilte der
+// Wochenschnitt durch Wochen ohne Daten.
+function wochenImJahr(jahr) {
+  if (!allData.length) return null;
+  const erster = allData[0].date, letzter = allData[allData.length - 1].date;
+  const s = jahr + '-01-01', e = jahr + '-12-31';
+  return wochenZwischen(s < erster ? erster : s, e > letzter ? letzter : e);
+}
 function wochenImMonat(monatsKey) {
   const [j, m] = String(monatsKey).split('-').map(Number);
   return (j && m) ? new Date(j, m, 0).getDate() / 7 : null;
@@ -1125,6 +1144,18 @@ function _tagesDim(days, rows) {
 // granular=true → weekly buckets for 1M/3M (line charts); false → monthly (bar charts)
 function timeDim(rows, granular=false, keepAggregated=false) {
   if (is7D()) return _tagesDim(weekDays7(), rows);
+  // 1Y: je Kalenderjahr eine Saeule – auch fuer Linien (granular), die sonst Wochen zeigen.
+  if (ist1Y()) {
+    const jahre = [...new Set(rows.map(r => r.date.slice(0, 4)))].sort();
+    const jahrVonDs = d => d.slice(0, 4);
+    return {
+      labels: jahre,
+      align: field => _gruppenReihe(jahre, rows, field, jahrVonDs, 'mittel'),
+      alignSum: field => _gruppenReihe(jahre, rows, field, jahrVonDs, 'summe'),
+      hasData: jahre.length > 0,
+      keys: jahre, keyTyp: 'jahr'
+    };
+  }
   // 1M: jeder Kalendertag des Monats
   if (timeRange==='1m' && !keepAggregated) {
     const mw = moWindow(), days = [];
@@ -1176,6 +1207,7 @@ function _markIndex(chart, datum = _markierung) {
   if (!datum || !chart.$keys) return -1;
   const d = datum;
   if (chart.$keyTyp === 'monat') return chart.$keys.indexOf(d.slice(0,7));
+  if (chart.$keyTyp === 'jahr') return chart.$keys.indexOf(d.slice(0,4));
   if (chart.$keyTyp === 'woche') return chart.$keys.indexOf(getWeekMonday(d));
   return chart.$keys.indexOf(d);
 }
@@ -1349,7 +1381,7 @@ function _chartTipp(chart, evt) {
   if (_markIndex(chart) === i) { setMarkierung(null); return; }
   const k = chart.$keys[i];
   // Monats-/Wochensäulen liefern kein Datum: den ersten Tag des Zeitraums nehmen.
-  setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : k);
+  setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : chart.$keyTyp === 'jahr' ? k + '-01-01' : k);
 }
 
 // ── Datenbeschriftungen ueber Balken und Punkten ─────────────────────────────
@@ -1375,9 +1407,9 @@ function beschriftungStandard(chart) {
   if (!chart.$werteFmt) return false;
   if (chart.$werteAus) return false;   // Schlafphasen: nur auf Wunsch
   // Querformat immer; im Hochformat nur, wo wenige Saeulen nebeneinander stehen:
-  // bei 7T hoechstens sieben, im Jahresvergleich eine je Jahr. Ab 1M waeren es 30+.
+  // bei 7T hoechstens sieben, im Jahresvergleich und bei 1Y eine je Jahr. Ab 1M 30+.
   if (window.innerWidth > window.innerHeight) return true;
-  return (timeRange === '7d' || istYoY()) && !chart.$nurQuer;
+  return (timeRange === '7d' || istYoY() || ist1Y()) && !chart.$nurQuer;
 }
 function beschriftungAn(chart) {
   const w = _beschriftung[chart.canvas && chart.canvas.id];
@@ -1580,7 +1612,7 @@ function _ruhigRendern(tab) {
 const SPALTEN_DAUER = 420;
 let _spaltenLauf = null;
 // Einzeljahr zaehlt nicht dazu: ein Schritt tauscht dort das GANZE Fenster (ein Jahr).
-function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY() && !istJahr(); }
+function _spaltenBereich() { return !is7D() && timeRange !== '1m' && !istYoY() && !istJahr() && !ist1Y(); }
 // Startversatz auf [0, ziel] begrenzen – plus `spiel` auf beiden Seiten. Der Spielraum
 // ist das Einrasten des Zeitstrahl-Wischs: wer 2.4 Monate zieht, blaettert 2, und die
 // Flaeche federt die 0.4 zurueck; bei 2.6 blaettert er 3 und sie rueckt 0.4 nach.
@@ -3665,7 +3697,7 @@ function pgSchlaf() {
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
       <div class="chart-card">
-        <h3>${is7D()?'Schlafdauer letzte 7 Tage':'Schlafdauer pro Monat'}</h3>
+        <h3>${is7D()?'Schlafdauer letzte 7 Tage':ist1Y()?'Schlafdauer pro Jahr':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend">
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
           <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>
@@ -3933,9 +3965,11 @@ async function pgTraining() {
   const laeufeGesamt    = summe('_woLaeufe');
   const einheitenGesamt = summe('_woAnzahl');
   // Dieselben Zaehler je Monat – fuer „Ø / Lauf" im Tooltip eines Monatsbalkens.
+  // Bei 1Y je Jahr (Schluessel 'JJJJ') – dieselbe Rechnung, nur groeber gruppiert.
   const _proMonat = {};
+  const _proKey = d => ist1Y() ? d.slice(0, 4) : d.slice(0, 7);
   woRows.forEach(r => {
-    const m = _proMonat[r.date.slice(0, 7)] = _proMonat[r.date.slice(0, 7)] || { laeufe: 0, einheiten: 0 };
+    const m = _proMonat[_proKey(r.date)] = _proMonat[_proKey(r.date)] || { laeufe: 0, einheiten: 0 };
     m.laeufe += r._woLaeufe || 0;
     m.einheiten += r._woAnzahl || 0;
   });
@@ -3981,7 +4015,7 @@ async function pgTraining() {
     ${pgBanner('🏃','Training')}
       <div class="chart-card">
         <h3>Laufstrecke</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-strecke|oe','Ø','#FB923C')}</div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':ist1Y()?'pro Jahr':'pro Monat'}</div>${hlLegende('c-tot-strecke|oe','Ø','#FB923C')}</div>
         <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
@@ -3997,7 +4031,7 @@ async function pgTraining() {
 
       <div class="chart-card">
         <h3>Trainingszeit</h3>
-        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':'pro Monat'}</div>${hlLegende('c-tot-zeit|oe','Ø','#F97316')}</div>
+        <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#F97316"></span>${is7D()||timeRange==='1m'?'pro Tag':ist1Y()?'pro Jahr':'pro Monat'}</div>${hlLegende('c-tot-zeit|oe','Ø','#F97316')}</div>
         <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
@@ -4030,6 +4064,15 @@ async function pgTraining() {
   // ── Totale Laufzeit & Laufstrecke ──
   {
     const _zeitInH=timeRange!=='7d'&&timeRange!=='1m'; // ab 3M: Achse in Stunden
+    // 1Y: Jahressummen von über 100 Stunden – Chart.js waehlt seine Schritte in
+    // Minuten (2000 min) und beschriftet dann krumme Stunden (33h, 66h, 133h). Dort
+    // deshalb ein runder Stundenschritt fuer rund fuenf Linien.
+    const _stundenSchritt = ist1Y() ? (() => {
+      const maxH = Math.max(0, ..._balkenZeit.filter(v => v != null)) / 60;
+      const roh = maxH / 5;
+      const s = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500].find(x => x >= roh) || 1000;
+      return s * 60;
+    })() : undefined;
 
     zeichneDiagramm('c-tot-zeit',{__keys:_balkenKeys,__keyTyp:_balkenKeyTyp,
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
@@ -4053,17 +4096,17 @@ async function pgTraining() {
           // Monatsbalken (auf Wunsch, 14.09.2026, auch im Jahresvergleich): unter der
           // Summe „Ø / Lauf", darunter wie bisher „Ø / Woche". Die Zeit teilt durch ALLE
           // Einheiten – dieselbe Rechnung wie die Fusszeile „Ø pro Lauf".
-          if(_balkenKeyTyp!=='monat')return t;
+          if(_balkenKeyTyp!=='monat'&&_balkenKeyTyp!=='jahr')return t;
           const mo=_balkenKeys[ctx.dataIndex], zeilen=[t];
           const n=_proMonat[mo]?.einheiten;
           if(n)zeilen.push(`Ø ${fmtMin(ctx.raw/n)} / Lauf`);
           // Woche nur, wo es ein Fenster gibt (_monatsModus) – im Jahresvergleich nicht.
-          const w=_monatsModus?wochenImMonat(mo):null;
+          const w=_balkenKeyTyp==='jahr'?wochenImJahr(mo):_monatsModus?wochenImMonat(mo):null;
           if(w)zeilen.push(`Ø ${fmtMin(ctx.raw/w)} / Woche`);
           return zeilen.length>1?zeilen:t;
         }}}},
       scales:{x:achseX,y:{...achseY,
-        ticks:{...achseY.ticks,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
+        ticks:{...achseY.ticks,stepSize:_stundenSchritt,callback:v=>_zeitInH?`${Math.floor(v/60)}h`:Math.round(v)+' min'}}}}});
 
     zeichneDiagramm('c-tot-strecke',{__keys:_balkenKeys,__keyTyp:_balkenKeyTyp,
       // Ganze Kilometer, OHNE Einheit (auf Wunsch, 12.09.2026): ueber dem Balken
@@ -4079,11 +4122,11 @@ async function pgTraining() {
           if(ctx.raw==null)return null;
           const t=`${zahl(ctx.raw,1)} km`;
           // Wie bei der Trainingszeit; die Strecke teilt durch die Einheiten MIT Strecke.
-          if(_balkenKeyTyp!=='monat')return t;
+          if(_balkenKeyTyp!=='monat'&&_balkenKeyTyp!=='jahr')return t;
           const mo=_balkenKeys[ctx.dataIndex], zeilen=[t];
           const n=_proMonat[mo]?.laeufe;
           if(n)zeilen.push(`Ø ${zahl(ctx.raw/n,1)} km / Lauf`);
-          const w=_monatsModus?wochenImMonat(mo):null;
+          const w=_balkenKeyTyp==='jahr'?wochenImJahr(mo):_monatsModus?wochenImMonat(mo):null;
           if(w)zeilen.push(`Ø ${zahl(ctx.raw/w,1)} km / Woche`);
           return zeilen.length>1?zeilen:t;
         }}}},
@@ -4094,12 +4137,16 @@ async function pgTraining() {
   // ── Pace pro Training ──
   {
     const _hasP=trainDates.length>0&&trendPace.some(v=>v!=null);
-    const _paceLabels=_hasP?trendLabels:tL;
-    const _paceKeys=_hasP?trainDates:tKeys;
-    const _paceKeyTyp=_hasP?'tag':tKeyTyp;
-    const _paceData=_hasP?trendPace:tL.map(()=>null);
-    const _pMin=_hasP?Math.floor(Math.min(...trendPace.filter(v=>v!=null))*0.97*10)/10:4;
-    const _pMax=_hasP?Math.ceil(Math.max(...trendPace.filter(v=>v!=null))*1.03*10)/10:8;
+    // 1Y: je Jahr EIN Punkt – das Mittel der Einheiten dieses Jahres. Ueber den ganzen
+    // Bestand stuenden sonst Hunderte Punkte je Training nebeneinander.
+    const _paceJahr=ist1Y()&&_hasP;
+    const _paceJahrWerte=_paceJahr?tKeys.map(j=>mittelArr(trainDates.map((d,i)=>d.slice(0,4)===j?trendPace[i]:null))):null;
+    const _paceLabels=_paceJahr?tL:_hasP?trendLabels:tL;
+    const _paceKeys=_paceJahr?tKeys:_hasP?trainDates:tKeys;
+    const _paceKeyTyp=_paceJahr?tKeyTyp:_hasP?'tag':tKeyTyp;
+    const _paceData=_paceJahr?_paceJahrWerte:_hasP?trendPace:tL.map(()=>null);
+    const _pMin=_hasP?Math.floor(Math.min(..._paceData.filter(v=>v!=null))*0.97*10)/10:4;
+    const _pMax=_hasP?Math.ceil(Math.max(..._paceData.filter(v=>v!=null))*1.03*10)/10:8;
     zeichneDiagramm('c-tr-pace',{__keys:_paceKeys,__keyTyp:_paceKeyTyp,
       __werteFmt:v=>fmtPace(v),
       type:'line',data:{labels:_paceLabels,datasets:[
@@ -4113,7 +4160,7 @@ async function pgTraining() {
         if(ctx.raw==null)return null;
         return `Pace: ${fmtPace(ctx.raw)} min/km`;
       }}}},
-      scales:{x:{...achseX,ticks:{...achseX.ticks,maxRotation:45,minRotation:30}},
+      scales:{x:_paceJahr?achseX:{...achseX,ticks:{...achseX.ticks,maxRotation:45,minRotation:30}},
         y:{...achseY,min:_pMin,max:_pMax,
           ticks:{...achseY.ticks,callback:v=>fmtPace(v)}}}}});
   }
@@ -5006,7 +5053,7 @@ const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 // Die wählbaren Bereiche: [timeRange-Wert, Beschriftung].
 const _RANGE_OPTS = [
   ['7d','7T'],['1m','1M'],['3m','3M'],
-  ['6m','6M'],['12m','12M'],['24m','24M']
+  ['6m','6M'],['12m','12M'],['24m','24M'],['1y','1Y']
 ];
 // Label der Durchschnittszeile unter einem Diagramm (auf Wunsch, 18.09.2026):
 // „Ø 7T", „Ø 1M" … – das Zeitfenster heisst dort genau wie in der Pille der
@@ -5047,6 +5094,8 @@ function zeitraumText() {
   const mw = moWindow();
   if (!mw) return '';
   if (istJahr()) return String(jahrVon(referenceDate));
+  // 1Y: die Spanne der Jahre („2024–2026").
+  if (ist1Y()) { const a = mw.s.slice(0, 4), b = mw.e.slice(0, 4); return a === b ? a : a + '–' + b; }
   const monat = ds => MONAT_KURZ[+ds.slice(5,7) - 1];
   const jahr  = ds => ds.slice(2,4);
   if (mw.s.slice(0,7) === mw.e.slice(0,7)) return monat(mw.s) + ' ' + jahr(mw.s);

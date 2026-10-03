@@ -543,6 +543,30 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `_datumSelbstGewaehlt` wird true — sonst zöge das Nachladen im Hintergrund zurück
     ins laufende Jahr. Ein zweiter Tipp auf das aktive Jahr stellt den alten Zustand
     wieder her. „Heute" springt im Einzeljahr ins laufende Jahr.
+- **Bereich „1Y" (03.10.2026, auf Wunsch):** siebter Chip rechts neben „24M"
+  (`['1y','1Y']` in `_RANGE_OPTS`, `ist1Y()`). Zeigt den **ganzen Datenbestand, je
+  Kalenderjahr eine Säule** (2024, 2025, 2026 …) — in allen neun Diagrammen, Linien
+  eingeschlossen. Anders als YoY (ein Monat über die Jahre) und das Einzeljahr (ein Jahr
+  in Monaten) ist es ein gewöhnlicher Bereich der Bereichszeile.
+  - `timeDim()` hat einen eigenen Zweig **vor** allen anderen (auch vor `granular`):
+    Schlüssel `'JJJJ'`, `keyTyp: 'jahr'`, Werte über `_gruppenReihe` (Mittel bzw. Summe).
+    `_markIndex` kennt `'jahr'` (`d.slice(0,4)`), ein Tipp markiert den 01.01.
+  - `moWindow()` = erster bis neuester Datentag → `filtered()` liefert alles, die Pfeile
+    verblassen von selbst, „Ø pro Woche" teilt durch die Wochen des ganzen Bestands.
+    `_navZiel()` liefert null, `prevPeriod()` [] (Schlaf-Score-Kachel: „—"),
+    `_spaltenBereich()` false. Kartenkopf `2024–2026` (`zeitraumText`), Pille und
+    Durchschnittszeile `1Y`.
+  - Beschriftungen auch im Hochformat (wie 7T/YoY). Legenden „pro Jahr", Titel
+    „Schlafdauer pro Jahr".
+  - **Training:** Laufstrecke/Trainingszeit summieren je Jahr; der Tooltip zeigt wie bei
+    Monatsbalken `Ø / Lauf` (`_proMonat`, bei 1Y je Jahr geschlüsselt) und `Ø / Woche`
+    (`wochenImJahr()`, auf den Datenbestand geklemmt). Die Zeitachse bekommt einen runden
+    Stundenschritt (`_stundenSchritt`), sonst stünden 33h/66h/133h da. **Pace** zeigt je
+    Jahr EINEN Punkt (Mittel der Einheiten) statt aller Trainings. Die Zeile
+    „Ø 6M · pro Monat" entfällt (`_jeMonat` gilt nur für Monatsbalken).
+  - Im laufenden Jahr steht nur der bisherige Teil — Summen sind dort kleiner.
+  Geprüft (Prüfstand, `?tage=900`): Strecke 992.5 / 1676.7 / 1182.0 km = Total 3851.2;
+  Zeitachse 0/50/100/150/200h; Bereichszeile bei 375 px 303 px breit, einzeilig.
 - **Einstellungen sind eine eigene Seite, kein Tab** (06.09.2026, Vorbild FitTrack).
   `#seite-einstellungen` (`.unterseite`) liegt **ausserhalb** von `#app` und wird von
   `pgEinstellungen()` bei jedem Öffnen frisch gefüllt — deshalb braucht es keinen
