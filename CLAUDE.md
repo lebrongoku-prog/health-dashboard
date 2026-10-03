@@ -562,8 +562,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Monatsbalken `Ø / Lauf` (`_proMonat`, bei 1Y je Jahr geschlüsselt) und `Ø / Woche`
     (`wochenImJahr()`, auf den Datenbestand geklemmt). Die Zeitachse bekommt einen runden
     Stundenschritt (`_stundenSchritt`), sonst stünden 33h/66h/133h da. **Pace** zeigt je
-    Jahr EINEN Punkt (Mittel der Einheiten) statt aller Trainings. Die Zeile
-    „Ø 6M · pro Monat" entfällt (`_jeMonat` gilt nur für Monatsbalken).
+    Jahr EINEN Punkt (Mittel der Einheiten) statt aller Trainings. Statt
+    „Ø 6M · pro Monat" steht **„Ø 1Y · pro Jahr"** (auf Wunsch, 03.10.2026): der
+    Mittelwert der Jahresbalken = Wert der Ø-Linie — das angebrochene laufende Jahr
+    zählt mit seinem bisherigen Stand mit.
   - Im laufenden Jahr steht nur der bisherige Teil — Summen sind dort kleiner.
   Geprüft (Prüfstand, `?tage=900`): Strecke 992.5 / 1676.7 / 1182.0 km = Total 3851.2;
   Zeitachse 0/50/100/150/200h; Bereichszeile bei 375 px 303 px breit, einzeilig.

@@ -3992,7 +3992,8 @@ async function pgTraining() {
   // Die Fusszeile „Ø 6M · pro Monat" gibt es nur bei Monatsbalken (auf Wunsch,
   // 30.09.2026, Variante C): bei 7T und 1M war „Ø 1M" der Schnitt je Trainingstag und
   // damit fast dieselbe Zahl wie „Ø pro Lauf" darunter. Die gestrichelte Ø-Linie
-  // bleibt dort trotzdem im Diagramm.
+  // bleibt dort trotzdem im Diagramm. Bei 1Y heisst sie „Ø 1Y · pro Jahr" (auf Wunsch,
+  // 03.10.2026) – der Mittelwert der Jahresbalken, also der Wert der Ø-Linie.
   const _oeBalken = reihe => (_jeMonat && reihe.some(v => v != null))
     ? reihe.reduce((summe, v) => summe + (v || 0), 0) / reihe.length
     : mittelArr(reihe);
@@ -4019,7 +4020,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-strecke"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${distGesamt!=null?`${statZeile(`Total`, `${zahl(distGesamt,1)} km`)}`:''}
-          ${_jeMonat&&oeStrBalken!=null?statZeile(oeLabel('pro Monat'), `${zahl(oeStrBalken,1)} km`):''}
+          ${(_jeMonat||ist1Y())&&oeStrBalken!=null?statZeile(oeLabel(ist1Y()?'pro Jahr':'pro Monat'), `${zahl(oeStrBalken,1)} km`):''}
           ${!istYoY()&&distGesamt!=null&&laeufeGesamt?statZeile(`Ø pro Lauf`, `${zahl(distGesamt/laeufeGesamt,1)} km`):''}
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.distanceKm ?? null, 'summe') }], true) : ''}
@@ -4035,7 +4036,7 @@ async function pgTraining() {
         <div class="chart-wrap"><canvas id="c-tot-zeit"></canvas></div>
         <div class="stats-list diagramm-fuss">
           ${minGesamt!=null?`${statZeile(`Total`, `${fmtMin(minGesamt)}`)}`:''}
-          ${_jeMonat&&oeZeitBalken!=null?statZeile(oeLabel('pro Monat'), `${fmtMin(oeZeitBalken)}`):''}
+          ${(_jeMonat||ist1Y())&&oeZeitBalken!=null?statZeile(oeLabel(ist1Y()?'pro Jahr':'pro Monat'), `${fmtMin(oeZeitBalken)}`):''}
           ${!istYoY()&&minGesamt!=null&&einheitenGesamt?statZeile(`Ø pro Lauf`, `${fmtMin(minGesamt/einheitenGesamt)}`):''}
           ${minGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${fmtMin(minGesamt/_fensterWochen)}`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.durationMin ?? null, 'summe') }], true) : ''}
