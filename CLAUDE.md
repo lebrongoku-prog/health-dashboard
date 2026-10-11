@@ -1276,6 +1276,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „Ø pro Lauf", „Ø pro Woche", „Ø Wochentag/Wochenende" und „Ø pro Nacht" der
   Schlafschuld (die folgt nicht dem Zeitfilter, sondern den letzten 14 Nächten).
   Im Jahresvergleich entfallen die Zeilen weiterhin ganz.
+  **Jede Durchschnittszeile nennt ihren Bezug** (auf Wunsch, Variante A, 11.10.2026): ab 3M zeigen die Balken Monate, die Zahl darunter war aber z. B. ein
+  Tagesschnitt — das las sich wie „pro Monat". Jetzt immer `oeLabel('<Bezug>')`:
+  Ruhepuls & HRV `Ø 6M · pro Tag`, Schlafdauer `Ø 6M · pro Nacht`, Schlafphasen
+  `Ø 6M · REM / Nacht` (Kurzformen Wach/REM/Leicht/Tief und `/` statt „pro" — mit
+  „REM-Schlaf · pro Nacht" brach die Zeile bei 375 px um; gemessen jetzt ≥ 20 px Luft
+  bis 24M), Laufstrecke/Trainingszeit `· pro Monat` bzw. `· pro Jahr`, Pace
+  `· pro Training`, VO₂max `· pro Messung`. **Ein `oeLabel()` ohne Zusatz gibt es
+  nicht mehr — wer eine neue Durchschnittszeile baut, nennt den Bezug.**
 - **Fusszeilen des Training-Tabs** (auf Wunsch, 18.09.2026):
   **Laufstrecke und Trainingszeit** `Total` → `Ø 6M · pro Monat` → `Ø pro Lauf` →
   `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt"); aufgeklappt

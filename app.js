@@ -3094,7 +3094,7 @@ function pgHerz() {
         ${istYoY() ? yoyZeilen([
             { werte: yoyWerte(D, r => r.restHR, 'mittel'), richtung: ZIELE.restHR.richtung },
             { werte: yoyWerte(D, r => r.hrv,    'mittel'), richtung: ZIELE.hrv.richtung }]) : ''}
-        ${istYoY() ? '' : statZeile(oeLabel(), `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
+        ${istYoY() ? '' : statZeile(oeLabel('pro Tag'), `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
         ${istYoY() ? '' : fussMehr('herz',
           statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
         + statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`))}
@@ -3708,7 +3708,7 @@ function pgSchlaf() {
         ${slRows.length>0||slWeek!=null||slWknd!=null?`<div class="stats-list diagramm-fuss">
           ${slRows.length>0?`${statZeile(`Schlafziel erreicht`, `${slZielN} <span style="color:var(--txt3)">von ${slRows.length} (${Math.round(slZielN/slRows.length*100)}%)</span>`, slZielN>0?'#10B981':null)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => r.sleepTotal, 'mittel'), richtung: ZIELE.sleepTotal.richtung }]) : ''}
-          ${istYoY() ? '' : statZeile(oeLabel(), `${slD!=null?alsStdMin(slD):'—'}`)}
+          ${istYoY() ? '' : statZeile(oeLabel('pro Nacht'), `${slD!=null?alsStdMin(slD):'—'}`)}
           ${istYoY() ? '' : fussMehr('schlaf',
             statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
           + statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd):'—'}`))}
@@ -3775,10 +3775,10 @@ function pgSchlaf() {
           { werte: yoyWerte(D, r => r.sleepRem, 'mittel'), vor: 'REM ' },
           { werte: yoyWerte(D, r => r.sleepDeep, 'mittel'), vor: 'Tief ' }])}</div>`
       : awD!=null||remD!=null||lD!=null||dpD!=null?`<div class="stats-list diagramm-fuss">
-        ${awD!=null?`${statZeile(oeLabel('Wach'), `${alsStdMin(awD)} – ${awPct}%`)}`:''}
-        ${remD!=null?`${statZeile(oeLabel('REM-Schlaf'), `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
-        ${lD!=null?`${statZeile(oeLabel('Leichtschlaf'), `${alsStdMin(lD)} – ${lPct}%`)}`:''}
-        ${dpD!=null?`${statZeile(oeLabel('Tiefschlaf'), `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
+        ${awD!=null?`${statZeile(oeLabel('Wach / Nacht'), `${alsStdMin(awD)} – ${awPct}%`)}`:''}
+        ${remD!=null?`${statZeile(oeLabel('REM / Nacht'), `${alsStdMin(remD)} – <span style="color:${parseInt(remPct)>=20?'#10B981':'#F97316'}">${remPct}%</span> <span style="color:var(--txt3)">(Ziel 20–25%)</span>`)}`:''}
+        ${lD!=null?`${statZeile(oeLabel('Leicht / Nacht'), `${alsStdMin(lD)} – ${lPct}%`)}`:''}
+        ${dpD!=null?`${statZeile(oeLabel('Tief / Nacht'), `${alsStdMin(dpD)} – <span style="color:${parseInt(dpPct)>=15?'#10B981':'#F97316'}">${dpPct}%</span> <span style="color:var(--txt3)">(Ziel 15–20%)</span>`)}`:''}
       </div>`:''}
     </div>`:''}
       </div>
@@ -4054,7 +4054,7 @@ async function pgTraining() {
            beim Pace ganz entfallen – auch aufgeklappt. Ohne Pace-Werte keine Fusszeile. -->
       ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>`
         : oePace != null ? `<div class="stats-list diagramm-fuss">
-        ${statZeile(oeLabel(), `${fmtPace(oePace)} min/km`)}
+        ${statZeile(oeLabel('pro Training'), `${fmtPace(oePace)} min/km`)}
       </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
@@ -4993,7 +4993,7 @@ function vo2Abschnitt(D) {
       <div class="stats-list diagramm-fuss">
         ${istYoY()
           ? yoyZeilen([{ werte: yoyWerte(D, r => r.vo2max, 'mittel'), richtung: ZIELE.vo2max.richtung }])
-          : statZeile(oeLabel(), `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
+          : statZeile(oeLabel('pro Messung'), `${v2D!=null?zahl(v2D,1)+' ml/kg/min':'—'}`)}
       </div>
     </div>`;
 
