@@ -557,7 +557,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `_spaltenBereich()` false. Kartenkopf `2024–2026` (`zeitraumText`), Pille und
     Durchschnittszeile `1Y`.
   - Beschriftungen auch im Hochformat (wie 7T/YoY). Legenden „pro Jahr", Titel
-    „Schlafdauer pro Jahr".
+    „Schlafdauer pro Jahr"; dort ohne die Legendeneinträge „erreicht"/„verfehlt"
+    (auf Wunsch, 11.10.2026 — nur noch Ziel und Ø).
   - **Training:** Laufstrecke/Trainingszeit summieren je Jahr; der Tooltip zeigt wie bei
     Monatsbalken `Ø / Lauf` (`_proMonat`, bei 1Y je Jahr geschlüsselt) und `Ø / Woche`
     (`wochenImJahr()`, auf den Datenbestand geklemmt). Die Zeitachse bekommt einen runden
