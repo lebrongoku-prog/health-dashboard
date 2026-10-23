@@ -244,8 +244,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','training']` (4 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
-- **Übersicht (`pgOverview`):** Ziel-Karte → Tageswert-Kacheln → Verlaufs-Chart →
-  Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
+- **Übersicht (`pgOverview`):** Wochenbilanz → Ziel-Ringe → (ausgeklappt)
+  Zielerreichung (seit 23.10.2026 statt Verlaufs-Chart) → Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
   eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
@@ -744,7 +744,8 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   noch in den Ziel-Ringen bzw. der Wochenbilanz noch als Minikachel. Die vierte
   Minikachel zeigt an Trainingstagen die Dauer der Einheit und sonst die **Zahl der
   Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
-  **Verlaufs-Diagramm** und die Muster-Insights zu Schritten bleiben davon unberührt —
+  Muster-Insights zu Schritten bleiben davon unberührt (der Verlauf mit der
+  Schritte-Reihe ist am 23.10.2026 entfallen) —
   dort sind sie Messwert, nicht Ziel.
 - **Ziele der Übersicht: Ringe + Wochenbilanz** (auf Wunsch, 30.09.2026, Varianten B
   und D aus den Mockups). Ersetzen die frühere weisse Ziel-Karte (`zielUebersichtHTML`,
@@ -812,6 +813,27 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     202 px, Ringe 296 px).
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
   7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert.
+- **Diagramm „Zielerreichung“ in der Übersicht** (auf Wunsch, 23.10.2026, Variante A
+  aus den Mockups) — **ersetzt den „Verlauf“** (Schlaf, Puls, HRV, Training/Schritte
+  auf zwei Achsen samt `_wocheTooltipLabel`; entfallen). Canvas-ID bleibt `c-woche`,
+  Platz im Ausklapp-Bereich unverändert.
+  Gestapelte Balken 0–4: je Tag pro Ziel 0/1 (`zielRows`, Felder `_zPuls`, `_zHrv`,
+  `_zSchlaf`, `_zTraining`), über `timeDim` gemittelt — bei 7T/1M je Tag, ab 3M je
+  Woche/Monat bzw. 1Y je Jahr der **Schnitt pro Tag**, jedes Farbstück = Anteil der
+  Tage mit diesem Ziel. Reihen und Farben in `ZIEL_REIHEN` (Ruhepuls `#EF4444`, HRV
+  `#2563EB`, Schlaf `#7C3AED`, Training `#F97316`).
+  **Regeln (auf Wunsch):** Tag **ohne Messwert = nicht erreicht**. **Training** ist ein
+  Wochenziel: erreicht an jedem Tag, dessen Woche (Mo–So, `wocheVon`) das Ziel
+  (`zielErfuellt('trainDays', …)`) erreicht — in der laufenden Woche also erst ab dem
+  dritten Trainingstag, dann rückwirkend. Deshalb weicht die Trainingszeile hier von
+  der Wochenbilanz ab, die einzelne Trainingstage zeigt.
+  Tooltip: Tagessäule „erreicht / nicht erreicht“, sonst „87% der Tage“, Fuss
+  „(Ø) 2.7 von 4 Zielen“. Fusszeile `Ø 6M · pro Tag x von 4` (nicht im YoY) und
+  `Tage mit allen 4 Zielen n/m (p%)`. Kein `__werteFmt` (bei Stapeln stünde je
+  Stück eine Zahl).
+  Geprüft (Prüfstand): KW 43 Puls/HRV/Schlaf je Tag identisch mit der Wochenbilanz,
+  Training 0 bei 2/3 Wochentrainings; 6M Monatsanteile, Fuss 2.8 von 4, 43/176;
+  Transparenz-Modus mit hellen Farben.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Ziel-Ringe und Wochenbilanz der Übersicht. Neue Schwellen gehören dorthin,
@@ -864,7 +886,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
   **Drei Diagramme weichen ab**, alle auf Wunsch nach einem Zwischenschritt:
-  Das **Verlaufs-Diagramm** hat gar kein `__werteFmt` — vier Reihen auf zwei Achsen
+  Das **Verlaufs-Diagramm** (seit 23.10.2026 „Zielerreichung“, ebenfalls ohne) hat gar kein `__werteFmt` — vier Reihen auf zwei Achsen
   blieben auch nach dem Weglassen von Puls und HRV unruhig; es ist damit als einziges
   vom Titel-Tipp ausgenommen. Der **Schlafphasen-Verlauf** trägt
   `__werteAusStandard: true` (Beschriftung gestapelter Balken sitzt mitten im Balken),
@@ -1491,7 +1513,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   entfallen (27.09.2026 beim Aufräumen, sie hatten keinen Nutzer mehr). Er bedient
   „Weitere Auswertungen" in **allen** Tabs — **alle starten zu**
   (`_weitereOffen = {overview, herz, schlaf, training}`; `training` seit 14.09.2026). In der Übersicht steckt seit
-  08.09.2026 auch das **Verlaufs-Diagramm** dahinter, nicht mehr nur das
+  08.09.2026 auch das **Verlaufs-Diagramm** (seit 23.10.2026 „Zielerreichung“) dahinter, nicht mehr nur das
   Muster-Raster; deshalb heisst der Zustand nicht mehr `_musterOffen` und der
   Knopf nicht mehr „Muster & Zusammenhänge". Die frühere vierte Stelle, die
   App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug auf die

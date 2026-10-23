@@ -2878,19 +2878,30 @@ function pgOverview() {
   const warnSig = detectWarningSignals();
   const patternIns = generatePatternInsights();
 
-  // Verlaufs-Chart: folgt dem globalen Zeitfilter (D = gewähltes Fenster).
+  // „Zielerreichung" (ersetzt seit 23.10.2026 den Verlauf der Messwerte, auf Wunsch):
+  // je Tag, welche der vier Ziele erreicht sind – 0 oder 1 je Kategorie, gestapelt zu
+  // 0…4. Folgt dem Zeitfilter; ab 3M zeigt eine Saeule den Schnitt pro Tag, jedes
+  // Farbstueck den Anteil der Tage mit diesem Ziel.
+  // Regeln (auf Wunsch): ein Tag OHNE Messwert gilt als NICHT erreicht. Training ist ein
+  // Wochenziel – erreicht ist es an einem Tag, wenn seine Woche (Mo–So) das Ziel
+  // erreicht; in der laufenden Woche also erst ab dem dritten Trainingstag, dann
+  // rueckwirkend fuer alle ihre Tage. Dieselben Regeln wie Wochenbilanz und Ringe.
   const D = filtered();
-  const _hasWoDur = Object.values(workoutData).some(w => w?.durationMin > 0);
-  const { labels: wLabels, align: wAlign, hasData: wHas, keys: wKeys, keyTyp: wKeyTyp } = timeDim(D);
-  const wSl = wAlign('sleepTotal');
-  const wHR = wAlign('restHR');
-  const wHV = wAlign('hrv');
-  // Training: Ø Trainingsminuten/Tag pro Bucket (0 für Tage ohne Training) → Stunden; sonst Ø Schritte.
-  const _woRows = D.map(r => ({ date: r.date, _dur: _hasWoDur ? (workoutData[r.date]?.durationMin ?? 0) : null, steps: r.steps }));
-  const { align: _woAlign } = timeDim(_woRows);
-  const wTr = _hasWoDur ? _woAlign('_dur').map(v => v != null ? v/60 : null) : _woAlign('steps');
-  const _wocheTrLabel = _hasWoDur ? 'Trainingsmin.' : 'Schritte';
-  const _wocheAgg = !(timeRange === '7d' || timeRange === '1m'); // aggregierte Buckets → "Ø" im Tooltip
+  const zielRows = D.map(r => {
+    const z = {
+      date: r.date,
+      _zPuls:   zielErfuellt('restHR', r.restHR) ? 1 : 0,
+      _zHrv:    zielErfuellt('hrv', r.hrv) ? 1 : 0,
+      _zSchlaf: zielErfuellt('sleepTotal', r.sleepTotal) ? 1 : 0,
+      _zTraining: zielErfuellt('trainDays', wocheVon(r.date).filter(istTrainingstag).length) ? 1 : 0
+    };
+    z._zSumme = z._zPuls + z._zHrv + z._zSchlaf + z._zTraining;
+    return z;
+  });
+  const { labels: zLabels, align: zAlign, hasData: zHas, keys: zKeys, keyTyp: zKeyTyp } = timeDim(zielRows);
+  const zTage = zKeyTyp === 'tag';
+  const oeZiele = mittelArr(zielRows.map(z => z._zSumme));
+  const alleVier = zielRows.filter(z => z._zSumme === 4).length;
 
   const _ovVorher = ovObenMerken();
   document.getElementById("screen-overview").innerHTML = `
@@ -2910,14 +2921,15 @@ function pgOverview() {
     ${ovObenHTML()}
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
-      <h3>Verlauf</h3>
+      <h3>Zielerreichung</h3>
       <div class="chart-legend">
-        <div class="cl-item"><span class="cl-dot" style="background:#7C3AED"></span>Schlaf</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#EF4444"></span>Puls</div>
-        <div class="cl-item"><span class="cl-dot" style="background:#2563EB"></span>HRV</div>
-        <div class="cl-item"><span class="cl-dot" style="background:${_hasWoDur?'#F97316':'#059669'}"></span>${_hasWoDur?'Training':'Schritte'}</div>
+        ${ZIEL_REIHEN.map(z => `<div class="cl-item"><span class="cl-dot" style="background:${z.farbe}"></span>${z.name}</div>`).join('')}
       </div>
       <div class="chart-wrap"><canvas id="c-woche"></canvas></div>
+      ${zielRows.length ? `<div class="stats-list diagramm-fuss">
+        ${istYoY() || oeZiele == null ? '' : statZeile(oeLabel('pro Tag'), `${zahl(oeZiele, 1)} von 4`)}
+        ${statZeile('Tage mit allen 4 Zielen', `<span${alleVier ? ' style="color:#10B981;font-weight:700"' : ''}>${alleVier}</span><span style="color:var(--txt3)">/${zielRows.length} (${Math.round(alleVier / zielRows.length * 100)}%)</span>`)}
+      </div>` : ''}
     </div>
 
     ${patternIns.length>0?`
@@ -2927,42 +2939,41 @@ function pgOverview() {
     `;
   ovObenAnimieren(_ovVorher);
 
-  // Verlaufs-Chart (folgt dem globalen Zeitfilter; Aggregation via timeDim)
-  function _wocheTooltipLabel(ctx){
-    const lbl=ctx.dataset.label, v=ctx.raw;
-    // Bei aggregierten Buckets (Wochen-/Monatswerte) ist der Wert ein Tagesmittel → "Ø …".
-    const pre=_wocheAgg?'Ø ':'';
-    if(lbl==='Schlaf (h)')return`${pre}Schlaf: ${v!=null?alsStdMin(v):'—'}`;
-    if(lbl===_wocheTrLabel){
-      if(_hasWoDur){const mins=Math.round((v??0)*60);return`${pre}${_wocheTrLabel}: ${mins} min`;}
-      return`${pre}${_wocheTrLabel}: ${v!=null?Math.round(v).toLocaleString('de-CH'):'—'}`;
-    }
-    if(lbl==='Ruhepuls') return `${pre}Ruhepuls: ${v!=null?Math.round(v)+' bpm':'—'}`;
-    if(lbl==='HRV')      return `${pre}HRV: ${v!=null?Math.round(v)+' ms':'—'}`;
-    return lbl+': '+zahl(v,1);
-  }
-  if(wHas){
-    zeichneDiagramm('c-woche',{__keys:wKeys,__keyTyp:wKeyTyp,
-      // KEIN __werteFmt: das Verlaufs-Diagramm bleibt ganz ohne Datenbeschriftungen
-      // (auf Wunsch, 07.09.2026, in beiden Ausrichtungen). Vier Reihen auf zwei Achsen
-      // ergaben selbst nach dem Weglassen von Puls und HRV ein unruhiges Bild.
-      data:{labels:wLabels,datasets:[
-        {type:'bar',label:'Schlaf (h)',data:wSl,backgroundColor:'rgba(124,58,237,.35)',borderRadius:BALKEN_RADIUS,yAxisID:'yL'},
-        {type:'line',label:'Ruhepuls',data:wHR,borderColor:'#EF4444',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',yAxisID:'yR',spanGaps:true},
-        {type:'line',label:'HRV',data:wHV,borderColor:'#2563EB',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#2563EB',yAxisID:'yR',spanGaps:true},
-        {type:'line',label:_wocheTrLabel,data:wTr,borderColor:'#F97316',backgroundColor:'transparent',tension:.35,pointRadius:3,pointBackgroundColor:'#F97316',yAxisID:'yL',spanGaps:true}
-      ]},
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>_wocheTooltipLabel(ctx)}}},
-        scales:{
-          x:{...achseX},
-          yL:{position:'left',...achseY,suggestedMin:0,suggestedMax:10,ticks:{...achseY.ticks,callback:v=>Math.floor(v)+'h'}},
-          yR:{position:'right',display:true,grid:{display:false},ticks:{color:'#94A3B8',font:{size:10}},suggestedMin:30,suggestedMax:100}
+  if (zHas) {
+    zeichneDiagramm('c-woche', {__keys: zKeys, __keyTyp: zKeyTyp,
+      // Kein __werteFmt: bei gestapelten Balken stuende je Farbstueck eine Zahl.
+      type: 'bar',
+      data: {labels: zLabels, datasets: ZIEL_REIHEN.map(z => ({
+        label: z.name, data: zAlign(z.feld), backgroundColor: z.farbe,
+        stack: 'ziele', borderRadius: BALKEN_RADIUS, borderSkipped: false
+      }))},
+      options: {responsive: true, maintainAspectRatio: false,
+        plugins: {legend: {display: false}, tooltip: {mode: 'index', intersect: false, callbacks: {
+          // Tagessaeule: erreicht ja/nein; ab 3M: Anteil der Tage.
+          label: ctx => ctx.raw == null ? null
+            : zTage ? `${ctx.dataset.label}: ${ctx.raw ? 'erreicht' : 'nicht erreicht'}`
+            : `${ctx.dataset.label}: ${Math.round(ctx.raw * 100)}% der Tage`,
+          footer: items => {
+            const summe = items.reduce((s, it) => s + (it.raw || 0), 0);
+            return items.length ? `${zTage ? '' : 'Ø '}${zahl(summe, 1)} von 4 Zielen` : '';
+          }
+        }}},
+        scales: {
+          x: {...achseX, stacked: true},
+          y: {...achseY, stacked: true, min: 0, max: 4, ticks: {...achseY.ticks, stepSize: 1}}
         }
       }
     });
   }
 }
+// Die vier Ziele des Diagramms „Zielerreichung" – Reihenfolge und Farben wie die Ringe
+// und die Wochenbilanz.
+const ZIEL_REIHEN = [
+  { name: 'Ruhepuls', feld: '_zPuls',     farbe: '#EF4444' },
+  { name: 'HRV',      feld: '_zHrv',      farbe: '#2563EB' },
+  { name: 'Schlaf',   feld: '_zSchlaf',   farbe: '#7C3AED' },
+  { name: 'Training', feld: '_zTraining', farbe: '#F97316' }
+];
 
 // ── Bausteine der Einordnungs-Karten (Herz, Schlaf) ────
 // Eine Zeile der Verteilung: farbiges Label, Balken, Anzahl und Anteil.
