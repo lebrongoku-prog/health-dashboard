@@ -573,7 +573,7 @@ function istYoY() { return timeRange === 'yoy'; }
 // dem Einschalten; ein zweiter Tipp auf das aktive Jahr stellt alles wieder her.
 function istJahr() { return timeRange === 'jahr'; }
 
-// ── Bereich „1Y" (03.10.2026, auf Wunsch) ──────────────────────────────────────
+// ── Bereich „Y" (03.10.2026 als „1Y", seit 23.10.2026 „Y", auf Wunsch) ──────────
 // Rechts neben „24M": der GANZE Datenbestand, je Kalenderjahr ein Balken bzw. Punkt
 // (2024, 2025, 2026 …). Das Fenster (`moWindow`) reicht vom ersten bis zum neuesten
 // Tag – damit gibt es nichts zu blaettern (die Pfeile verblassen von selbst), und
@@ -5065,7 +5065,7 @@ const tabCharts = { overview:[], herz:[], schlaf:[], training:[] };
 // Die wählbaren Bereiche: [timeRange-Wert, Beschriftung].
 const _RANGE_OPTS = [
   ['7d','7T'],['1m','1M'],['3m','3M'],
-  ['6m','6M'],['12m','12M'],['24m','24M'],['1y','1Y']
+  ['6m','6M'],['12m','12M'],['24m','24M'],['1y','Y']
 ];
 // Label der Durchschnittszeile unter einem Diagramm (auf Wunsch, 18.09.2026):
 // „Ø 7T", „Ø 1M" … – das Zeitfenster heisst dort genau wie in der Pille der

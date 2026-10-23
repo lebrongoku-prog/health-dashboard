@@ -543,8 +543,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `_datumSelbstGewaehlt` wird true — sonst zöge das Nachladen im Hintergrund zurück
     ins laufende Jahr. Ein zweiter Tipp auf das aktive Jahr stellt den alten Zustand
     wieder her. „Heute" springt im Einzeljahr ins laufende Jahr.
-- **Bereich „1Y" (03.10.2026, auf Wunsch):** siebter Chip rechts neben „24M"
-  (`['1y','1Y']` in `_RANGE_OPTS`, `ist1Y()`). Zeigt den **ganzen Datenbestand, je
+- **Bereich „Y" (03.10.2026 als „1Y", seit 23.10.2026 auf Wunsch „Y"):** siebter Chip
+  rechts neben „24M" (`['1y','Y']` in `_RANGE_OPTS`, `ist1Y()` — der interne Wert
+  bleibt `'1y'`). Pille und Durchschnittszeilen heissen damit `Y` („Ø Y · pro Jahr“). Zeigt den **ganzen Datenbestand, je
   Kalenderjahr eine Säule** (2024, 2025, 2026 …) — in allen neun Diagrammen, Linien
   eingeschlossen. Anders als YoY (ein Monat über die Jahre) und das Einzeljahr (ein Jahr
   in Monaten) ist es ein gewöhnlicher Bereich der Bereichszeile.
