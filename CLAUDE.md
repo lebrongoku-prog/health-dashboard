@@ -557,8 +557,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `_spaltenBereich()` false. Kartenkopf `2024–2026` (`zeitraumText`), Pille und
     Durchschnittszeile `1Y`.
   - Beschriftungen auch im Hochformat (wie 7T/YoY). Legenden „pro Jahr", Titel
-    „Schlafdauer pro Jahr"; dort ohne die Legendeneinträge „erreicht"/„verfehlt"
-    (auf Wunsch, 11.10.2026 — nur noch Ziel und Ø).
+    „Schlafdauer pro Jahr".
   - **Training:** Laufstrecke/Trainingszeit summieren je Jahr; der Tooltip zeigt wie bei
     Monatsbalken `Ø / Lauf` (`_proMonat`, bei 1Y je Jahr geschlüsselt) und `Ø / Woche`
     (`wochenImJahr()`, auf den Datenbestand geklemmt). Die Zeitachse bekommt einen runden
@@ -819,7 +818,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
-  Farbnaht. Die Legende heisst deshalb „Ziel erreicht / verfehlt".
+  Farbnaht. Die Legende zeigt seit 23.10.2026 (auf Wunsch, zuerst 11.10. nur bei 1Y)
+  in **allen** Bereichen nur noch **Ziel** und **Ø** — die Einträge „erreicht“/„verfehlt“
+  sind entfallen, die Färbung der Balken bleibt.
   Bei Monatsauflösung bezieht sich die Farbe auf den **Monatsdurchschnitt** — die
   Fusszeile zählt daneben die echten Nächte (24M: 4 kräftige Balken, 69 von 120).
   Das Ziel muss dabei im Sichtbereich bleiben, sonst liegt die Naht ausserhalb und alle

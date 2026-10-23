@@ -3699,8 +3699,8 @@ function pgSchlaf() {
       <div class="chart-card">
         <h3>${is7D()?'Schlafdauer letzte 7 Tage':ist1Y()?'Schlafdauer pro Jahr':'Schlafdauer pro Monat'}</h3>
         <div class="chart-legend">
-          ${ist1Y() ? '' /* 1Y: „erreicht/verfehlt" entfaellt (auf Wunsch, 11.10.2026) */ : `<div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.85)"></span>erreicht</div>
-          <div class="cl-item"><span class="cl-dot" style="background:rgba(124,58,237,.32)"></span>verfehlt</div>`}
+          <!-- „erreicht/verfehlt" entfaellt in allen Bereichen (auf Wunsch, 11.10. bei 1Y,
+               23.10.2026 ueberall) – die Ziellinie zeigt die Grenze. -->
           ${hlLegende('c-sl-dur|ziel','Ziel','#10B981',false)}
           ${hlLegende('c-sl-dur|oe','Ø','rgba(124,58,237,.85)')}
         </div>
