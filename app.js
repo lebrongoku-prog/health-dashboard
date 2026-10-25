@@ -4090,11 +4090,10 @@ async function pgTraining() {
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
-      // Dasselbe Format wie beim Schlaf – die Werte liegen hier in Minuten.
-      // Seit dem schmaleren Format (12.09.2026) ohne Sonderfall bei 24M: dort stand
-      // vorher nur die ganze Stunde ("10h"), weil "10h 12m" neben 24 Nachbarn nicht
-      // mehr lesbar war. "10:12" ist schmal genug.
-      __werteFmt:v=>v?stdMinLabel(v/60):'',
+      // Seit 25.10.2026 (auf Wunsch) auf GANZE Stunden gerundet: „12h" statt „11:42".
+      // Was auf 0 h faellt (unter 30 min), bleibt wie jede Null unbeschriftet; der
+      // genaue Wert steht im Tooltip und in der Fusszeile.
+      __werteFmt:v=>{ const h=Math.round((v||0)/60); return h?`${h}h`:''; },
       type:'bar',data:{labels:_balkenLabels,datasets:[
       {label:'Laufzeit',data:_balkenZeit,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
       ...oeDatensatz('c-tot-zeit|oe', oeZeitBalken, '#F97316', _balkenLabels.length)

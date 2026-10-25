@@ -901,8 +901,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Kilometer und seit 12.09.2026 **ohne Einheit**: `120`, nicht `120km`. Über dem
   Balken zählt der schnelle Blick, und `km` steht bereits an der Achse; die
   Nachkommastelle steht im Tooltip und in der Fusszeile).
-  **Alle Dauern schreibt `stdMinLabel()`** — Schlafdauer, Schlafphasen-Verlauf und
-  Trainingszeit (auf Wunsch, 12.09.2026):
+  **Alle Dauern schreibt `stdMinLabel()`** — Schlafdauer und Schlafphasen-Verlauf
+  (auf Wunsch, 12.09.2026). **Ausnahme Trainingszeit** (seit 25.10.2026, auf Wunsch):
+  dort steht über dem Balken die **gerundete ganze Stunde** (`12h`); unter 30 min
+  ergibt das 0 und die Zahl entfällt. Tooltip und Fusszeile bleiben genau.
   - **Mit Stunden `1:37`**, Minuten immer **zweistellig** (`2:00`, nicht `2:0`).
   - **Unter einer Stunde `28'`** — dasselbe Zeichen wie in `fmtPace`, damit Pace und
     Dauer dieselbe Sprache sprechen.
