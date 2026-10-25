@@ -904,7 +904,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Alle Dauern schreibt `stdMinLabel()`** — Schlafdauer und Schlafphasen-Verlauf
   und Trainingszeit (auf Wunsch, 12.09.2026). **Ausnahme Trainingszeit bei 12M, 24M
   und Y** (seit 25.10.2026, auf Wunsch, `_zeitGerundet`): dort steht über dem Balken
-  die **gerundete ganze Stunde** (`12h`), unter 30 min `<1h`. 7T bis 6M, Einzeljahr
+  die **gerundete ganze Stunde** (`12h`), unter 60 min `<1h`. 7T bis 6M, Einzeljahr
   und YoY bleiben genau (`1:37`). Tooltip und Fusszeile sind immer genau.
   - **Mit Stunden `1:37`**, Minuten immer **zweistellig** (`2:00`, nicht `2:0`).
   - **Unter einer Stunde `28'`** — dasselbe Zeichen wie in `fmtPace`, damit Pace und

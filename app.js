@@ -4092,13 +4092,13 @@ async function pgTraining() {
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
       // Bei 12M, 24M und Y (auf Wunsch, 25.10.2026) auf GANZE Stunden gerundet: „12h"
-      // statt „11:42" – dort stehen viele bzw. sehr hohe Balken. Unter 30 min „<1h".
+      // statt „11:42" – dort stehen viele bzw. sehr hohe Balken. Unter 60 min „<1h".
       // In allen anderen Bereichen wie bisher genau (`stdMinLabel`: „1:37", „28'").
       // Der genaue Wert steht immer im Tooltip und in der Fusszeile.
       __werteFmt:v=>{
         if(!v) return '';
         if(!_zeitGerundet) return stdMinLabel(v/60);
-        const h=Math.round(v/60); return h?`${h}h`:'<1h';
+        return v<60 ? '<1h' : `${Math.round(v/60)}h`;
       },
       type:'bar',data:{labels:_balkenLabels,datasets:[
       {label:'Laufzeit',data:_balkenZeit,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
