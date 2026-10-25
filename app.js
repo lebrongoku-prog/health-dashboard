@@ -4076,6 +4076,7 @@ async function pgTraining() {
   // ── Totale Laufzeit & Laufstrecke ──
   {
     const _zeitInH=timeRange!=='7d'&&timeRange!=='1m'; // ab 3M: Achse in Stunden
+    const _zeitGerundet=timeRange==='12m'||timeRange==='24m'||ist1Y(); // Beschriftung in ganzen Stunden
     // 1Y: Jahressummen von über 100 Stunden – Chart.js waehlt seine Schritte in
     // Minuten (2000 min) und beschriftet dann krumme Stunden (33h, 66h, 133h). Dort
     // deshalb ein runder Stundenschritt fuer rund fuenf Linien.
@@ -4090,10 +4091,15 @@ async function pgTraining() {
       // Beschriftung in der Einheit der Achse. Balken ohne Training tragen keine
       // Null – ein Balken der Hoehe 0 sagt das bereits, und im Monatsfenster
       // stuenden sonst Dutzende Nullen auf der Grundlinie.
-      // Seit 25.10.2026 (auf Wunsch) auf GANZE Stunden gerundet: „12h" statt „11:42".
-      // Was auf 0 h faellt (unter 30 min), bleibt wie jede Null unbeschriftet; der
-      // genaue Wert steht im Tooltip und in der Fusszeile.
-      __werteFmt:v=>{ const h=Math.round((v||0)/60); return h?`${h}h`:''; },
+      // Bei 12M, 24M und Y (auf Wunsch, 25.10.2026) auf GANZE Stunden gerundet: „12h"
+      // statt „11:42" – dort stehen viele bzw. sehr hohe Balken. Unter 30 min „<1h".
+      // In allen anderen Bereichen wie bisher genau (`stdMinLabel`: „1:37", „28'").
+      // Der genaue Wert steht immer im Tooltip und in der Fusszeile.
+      __werteFmt:v=>{
+        if(!v) return '';
+        if(!_zeitGerundet) return stdMinLabel(v/60);
+        const h=Math.round(v/60); return h?`${h}h`:'<1h';
+      },
       type:'bar',data:{labels:_balkenLabels,datasets:[
       {label:'Laufzeit',data:_balkenZeit,backgroundColor:'rgba(249,115,22,.80)',borderRadius:BALKEN_RADIUS},
       ...oeDatensatz('c-tot-zeit|oe', oeZeitBalken, '#F97316', _balkenLabels.length)
