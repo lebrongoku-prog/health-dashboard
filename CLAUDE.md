@@ -784,8 +784,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   sind genau gleich hoch. Beide Raster setzen ihre Zeilenhöhen selbst
   (`grid-template-rows`, keine Innenabstände der Zellen): Kopfzeile `--zw-kopf-h`
   (Wochentage bzw. „Letzte 5 Wochen", die dafür als erste Zeile IM Raster steht), dann
-  4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. Die Felder füllen ihre Zelle bis
-  auf 3 px rundum. **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
+  4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. **Die Lücke zwischen zwei Wochen
+  ist dieselbe wie zwischen zwei Zielzeilen** (13.6 px = `--zw-zeile-h` − Punkt 20 px;
+  auf Wunsch, 04.11.2026): das sichtbare Feld (`.zm-zelle i`) ist deshalb nur
+  `20px − 0.2 × --zw-zeile-h` ≈ 13.3 px hoch, getippt wird aber die ganze Zelle
+  (26.9 px). Waagrecht 3 px Rand je Seite. **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
   der Karte, Innenrand des Tagesdetails und jede Lücke zwischen den Teilen (`gap` der
   Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen mit
   negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
@@ -793,7 +796,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   darunter über die volle Breite (`grid-template-areas` an `.ziel-woche`).
   Gemessen (Prüfstand): 375 × 812 Raster je 155.2 px, Innenrand und alle Lücken 16 px,
   mit und ohne Detail; 812 × 375 Raster je 370 × 155 px nebeneinander, Lücken 16 px;
-  360 px Detail-Zellen 63 px, nichts ragt heraus (Status dafür .66rem).
+  360 px nichts ragt heraus.
+  **Schriftgrössen der ganzen Karte = die der Wochenbilanz** (auf Wunsch, 04.11.2026),
+  genau drei: 1.15rem Titel „Ziele", **1rem** für Namen, Zahlen und Werte (Zielnamen,
+  `2/3`, `KW 41`, `Ø 3.3`, Datum und Werte im Tagesdetail), **.72rem** für
+  Beschriftungen (Wochentage, „Letzte 5 Wochen", Legende, „vor N Wochen", Namen,
+  Status und Einheiten im Tagesdetail). Das Tagesdetail steht dafür als 2 × 2
+  (Querformat 4 nebeneinander), Status in der Beschriftungszeile neben dem Namen
+  (`Schlaf · 31m zu kurz`) — in vier Spalten hätte er bei 360 px keinen Platz.
+  Rechte Spalte 3rem für `Ø 3.3` in 1rem.
   Nachgerechnet (KW 45, aus den Rohzeilen): 5-Wochen-Felder und Ø
   3.29/2.14/3.43/2.14/1.33 — identisch.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,

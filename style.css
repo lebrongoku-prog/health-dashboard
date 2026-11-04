@@ -846,7 +846,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
 /* EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Die Zeilenhöhen stehen
    im Raster, nicht als Innenabstand der Zellen. */
-.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 2.6rem;display:grid;grid-template-columns:var(--zw-spalten);
+.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 3rem;display:grid;grid-template-columns:var(--zw-spalten);
   align-items:center;font-size:1rem;position:relative}
 .zw-woche{grid-template-rows:var(--zw-kopf-h) repeat(4,var(--zw-zeile-h))}
 /* Hinter dem Raster dieselben Spalten noch einmal (`.zw-spalten`): je Tag eine Fläche
@@ -873,38 +873,40 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-spalte:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:-2px}
 /* Tagesdetail unter der Wochenbilanz (Tipp auf einen Tag). */
 .zt{padding:var(--zw-abstand);border-radius:12px;background:rgba(255,255,255,.12)}
-.zt-kopf{font-size:.85rem;font-weight:700;margin-bottom:.5rem}
-.zt-raster{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
+.zt-kopf{font-size:1rem;font-weight:700;margin-bottom:.5rem}
+.zt-raster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem var(--zw-abstand)}
 .zt-zelle{display:flex;flex-direction:column;min-width:0}
-.zt-name{font-size:.7rem;font-weight:600;opacity:.75}
-.zt-wert{font-size:1.05rem;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
-.zt-wert small{font-size:.65rem;font-weight:600;opacity:.75;margin-left:.15rem}
-.zt-status{font-size:.66rem;font-weight:600;white-space:nowrap;opacity:.8}
-.zt-status.gut{color:var(--zw-gut);opacity:1}
-.zt-status.offen{color:var(--zw-offen);opacity:1}
+.zt-name{font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);white-space:nowrap}
+.zt-wert{font-size:1rem;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.zt-wert small{font-size:.72rem;font-weight:600;opacity:.7;margin-left:.15rem}
+.zt-status.gut{color:var(--zw-gut)}
+.zt-status.offen{color:var(--zw-offen)}
 /* Letzte 5 Wochen: dieselben Spalten wie die Wochenbilanz, je Tag ein Feld 0–4.
-   Kopfzeile + fünf Zeilen à 4/5 einer Zielzeile = genau die Höhe der Woche darüber. */
+   Kopfzeile + fünf Zeilen à 4/5 einer Zielzeile = genau die Höhe der Woche darüber.
+   Die LÜCKE zwischen zwei Wochen ist dieselbe wie zwischen zwei Zielzeilen
+   (`--zw-zeile-h` − Punkt 20 px = 13.6 px): das sichtbare Feld `i` ist deshalb nur
+   so hoch, wie die kürzere Zeile übrig lässt (20 px − 0.2 × Zeile ≈ 13.3 px).
+   Getippt wird trotzdem die ganze Zelle (`.zm-zelle`), nicht nur das Feld. */
 .zm-raster{grid-template-rows:var(--zw-kopf-h) repeat(5,calc(var(--zw-zeile-h) * .8))}
 .zm-kopf{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font-size:.72rem;font-weight:700}
-.zm-legende{display:flex;align-items:center;gap:3px;font-size:.62rem;font-weight:600;opacity:.8}
-.zm-legende .zm-zelle{width:10px;height:10px;margin:0;border-radius:3px;pointer-events:none}
-.zm-raster .zm-kw{font-size:.78rem;opacity:.75}
-.zm-raster .zm-kw.aktuell{opacity:1}
-.zm-oe{font-size:.75rem;font-weight:600;opacity:.85}
-/* Die Felder füllen ihre Zelle bis auf 3 px rundum – waagrecht und senkrecht dieselbe Lücke. */
-.zm-zelle{display:block;align-self:stretch;margin:3px;border-radius:5px;background:rgba(255,255,255,.12)}
+.zm-legende{display:flex;align-items:center;gap:3px;font-weight:600;opacity:.8}
+.zm-legende .zm-zelle{margin:0}
+.zm-legende .zm-zelle i{width:10px;height:10px;border-radius:3px}
+.zm-zelle{align-self:stretch;display:flex;align-items:center;margin:0 3px}
+.zm-zelle i{display:block;width:100%;height:calc(20px - var(--zw-zeile-h) * .2);border-radius:5px;background:rgba(255,255,255,.12)}
 .zm-raster .zm-zelle[data-tag]{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
 .zm-raster .zm-zelle[data-tag]:active{opacity:.6}
-.zm-zelle.leer{background:rgba(255,255,255,.05)}
-.zm-zelle.n0{background:rgba(255,255,255,.14)}
-.zm-zelle.n1{background:color-mix(in srgb,var(--zw-gut) 38%,transparent)}
-.zm-zelle.n2{background:color-mix(in srgb,var(--zw-gut) 58%,transparent)}
-.zm-zelle.n3{background:color-mix(in srgb,var(--zw-gut) 80%,transparent)}
-.zm-zelle.n4{background:var(--zw-gut)}
-.zm-zelle.gewaehlt{box-shadow:0 0 0 2px #fff}
-.zm-zelle:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:1px}
+.zm-zelle.leer i{background:rgba(255,255,255,.05)}
+.zm-zelle.n0 i{background:rgba(255,255,255,.14)}
+.zm-zelle.n1 i{background:color-mix(in srgb,var(--zw-gut) 38%,transparent)}
+.zm-zelle.n2 i{background:color-mix(in srgb,var(--zw-gut) 58%,transparent)}
+.zm-zelle.n3 i{background:color-mix(in srgb,var(--zw-gut) 80%,transparent)}
+.zm-zelle.n4 i{background:var(--zw-gut)}
+.zm-zelle.gewaehlt i{box-shadow:0 0 0 2px #fff}
+.zm-zelle:focus-visible{outline:none}
+.zm-zelle:focus-visible i{outline:2px solid rgba(255,255,255,.85);outline-offset:1px}
 .zw-rechts{display:flex;align-items:center;gap:.5rem}
-.zw-vor{font-size:.8rem;font-weight:600;opacity:.85;white-space:nowrap}
+.zw-vor{font-size:.72rem;font-weight:600;opacity:.85;white-space:nowrap}
 
 
 /* Letzte Workout Tabelle */
@@ -1098,6 +1100,7 @@ h5,
   .ziel-woche>.zw-woche{grid-area:woche}
   .ziel-woche>.zm-raster{grid-area:monat}
   .ziel-woche>.zt{grid-area:detail}
+  .ziel-woche .zt-raster{grid-template-columns:repeat(4,minmax(0,1fr))}   /* über die volle Breite ist Platz für eine Zeile */
 
 }
 

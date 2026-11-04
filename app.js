@@ -2349,10 +2349,12 @@ function _ztAbstand(d) { return d < 1 ? zahl(d, 1) : Math.round(d); }
 // seiner Woche („Woche 2/3").
 function zielTagHTML(tag, byDate) {
   const r = byDate[tag] || {};
+  // 2 × 2 statt vier Spalten: in der Schrift der Wochenbilanz (1rem / .72rem) hätten
+  // „31m zu kurz" und Co. in einer Viertelspalte keinen Platz. Status steht deshalb
+  // in der Beschriftungszeile neben dem Namen, der Wert darunter.
   const zelle = (name, wert, einheit, status, klasse) =>
-    `<div class="zt-zelle"><span class="zt-name">${name}</span>` +
-    `<b class="zt-wert">${wert}${einheit && wert !== '—' ? `<small>${einheit}</small>` : ''}</b>` +
-    `<span class="zt-status ${klasse}">${status}</span></div>`;
+    `<div class="zt-zelle"><span class="zt-name">${name} · <span class="zt-status ${klasse}">${status}</span></span>` +
+    `<b class="zt-wert">${wert}${einheit && wert !== '—' ? `<small>${einheit}</small>` : ''}</b></div>`;
   const mess = (key, name, einheit, wertText, abstand) => {
     const v = r[key];
     if (v == null) return zelle(name, '—', '', 'kein Wert', '');
@@ -2391,17 +2393,17 @@ function zielMonatHTML(wochen, gewaehlt, byDate) {
     const werte = [];
     const felder = tage.map(d => {
       const r = byDate[d];
-      if (d > heute || !r) return `<span class="zm-zelle leer"></span>`;
+      if (d > heute || !r) return `<span class="zm-zelle leer"><i></i></span>`;
       const n = ['restHR', 'hrv', 'sleepTotal'].filter(k => zielErfuellt(k, r[k])).length + (trainingOk ? 1 : 0);
       werte.push(n);
       return `<span class="zm-zelle n${n}${d === gewaehlt ? ' gewaehlt' : ''}" data-tag="${d}" role="button" tabindex="0"` +
-        ` aria-label="${fmtWeek(d)}: ${n} von 4 Zielen"></span>`;
+        ` aria-label="${fmtWeek(d)}: ${n} von 4 Zielen"><i></i></span>`;
     }).join('');
     const oe = mittelArr(werte);
-    return `<span class="zw-name zm-kw${mo === wochen[4] ? ' aktuell' : ''}">KW ${isoKW(mo)}</span>${felder}` +
-      `<span class="zw-zahl zm-oe">${oe == null ? '—' : 'Ø ' + zahl(oe, 1)}</span>`;
+    return `<span class="zw-name">KW ${isoKW(mo)}</span>${felder}` +
+      `<b class="zw-zahl">${oe == null ? '—' : 'Ø ' + zahl(oe, 1)}</b>`;
   }).join('');
-  const legende = [0, 1, 2, 3, 4].map(n => `<span class="zm-zelle n${n}"></span>`).join('');
+  const legende = [0, 1, 2, 3, 4].map(n => `<span class="zm-zelle n${n}"><i></i></span>`).join('');
   // Kopfzeile IM Raster (über alle Spalten), wie die Wochentage der Wochenbilanz –
   // so haben beide Raster denselben Aufbau und dieselbe Höhe (siehe style.css).
   return `<div class="zw-raster zm-raster">
