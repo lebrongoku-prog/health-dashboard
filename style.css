@@ -851,7 +851,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    im Raster, nicht als Innenabstand der Zellen. Die Zahlenspalte (3.8rem) trägt in der
    Kopfzeile das KW-Symbol – breit genug für „vor 10 W" (61 px); die Namensspalte
    (4.9rem) ist so breit wie „Ruhepuls" samt Abstand. */
-.zw-raster{--zw-spalten:4.9rem repeat(7,minmax(0,1fr)) 3.8rem;display:grid;grid-template-columns:var(--zw-spalten);
+.zw-raster{--zw-spalten:4.9rem repeat(var(--zw-n,7),minmax(0,1fr)) 3.8rem;display:grid;grid-template-columns:var(--zw-spalten);
   align-items:center;font-size:1rem;position:relative}
 .zw-woche{grid-template-rows:var(--zw-kopf-h) repeat(4,var(--zw-zeile-h))}
 /* Hinter dem Raster dieselben Spalten noch einmal (`.zw-spalten`): je Tag eine Fläche
@@ -862,11 +862,14 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-name{font-weight:600;padding-right:.5rem}
 .zw-zahl{text-align:right;font-weight:700}
 .zw-punkt{display:flex;justify-content:center}
-.zw-punkt i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
+.zw-punkt i{display:block;width:min(20px,calc(100% - 2px));aspect-ratio:1;border-radius:50%;box-sizing:border-box}
+/* Füllkreis ab 1M: Kreisausschnitt in der Kategoriefarbe im hohlen Ring. */
+.zw-punkt i.teil{border:2.5px solid var(--zw-hohl);
+  background:conic-gradient(var(--zw-an) calc(var(--anteil) * 1%), transparent 0)}
 .zw-punkt i.an{background:var(--zw-an,var(--zw-gut))}   /* Kategoriefarbe der Zeile */
 .zw-punkt i.aus{border:2.5px solid var(--zw-hohl)}
 .zw-punkt i.leer{background:var(--zw-leer)}
-.zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:var(--txt2)}
+.zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:var(--txt2);white-space:nowrap;overflow:hidden}
 .zw-tag.gewaehlt{color:var(--txt);font-weight:800}
 /* Rückmeldung nur über Deckkraft – ein transform während :active bricht auf iOS die
    laufende Wischgeste ab (die Karte liegt im waagrecht scrollenden Tab-Bereich). */

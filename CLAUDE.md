@@ -806,6 +806,30 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Gemessen (Prüfstand): 375 × 812 und 360 × 780 Raster 160 px, Innenrand und Lücke
   16 px, Titel, Wochentage und Symbol auf derselben Mitte, bei 360 px ragt nichts
   heraus.
+  - **Ab 1M folgt die Karte dem Zeitfilter** (Variante A aus den Mockups, auf Wunsch
+    04.11.2026; vorher zeigte sie ausserhalb von 7T immer die laufende Woche).
+    `ovObenHTML()` wählt: 7T → `zielWocheHTML()` (unten), sonst `zielZeitraumHTML()`.
+    Spalten aus `zielSpalten()`: **1M Kalenderwochen** (Kopf `KW45`, ab 5 Spalten nur
+    `45`), **3M/6M/12M/Einzeljahr Monate** (`Jun`, ab 7 Spalten nur `J`; das
+    Einzeljahr zeigt immer Jan–Dez), **24M Quartale** (`Q1`), **Y und YoY Jahre**.
+    Tage aus `moWindow()` (alle Kalendertage), im YoY aus `filtered()`.
+    Jeder Punkt ist ein **Füllkreis** (`i.teil`, `--anteil` in %, `conic-gradient` in
+    `--zw-an` im hohlen Ring; 0 % = `aus`, 100 % = `an`, keine Daten/Zukunft = `leer`).
+    Anteil je Abschnitt (`zielAbschnitt()`): Ruhepuls, HRV, Schlaf = Tage im Ziel von
+    Tagen MIT Messwert (wie die Woche); Training = Tage mit Daten, deren Woche das
+    Wochenziel erreicht (Regel von „Zielerreichung“). **Rechts der Anteil in Prozent**
+    über den ganzen Zeitraum (Training: Wochen mit erreichtem Ziel) — Brüche wie
+    `317/339` passten ab 6M nicht in die 3.8rem-Spalte. KW-Symbol: 1M der Monat
+    (`Nov 26`), YoY der Monat (`Nov`), sonst `bereichKurz()` (`6M`, `Y`, `2025`).
+    Spaltenzahl über `--zw-n` im Raster, Punkte `min(20px, Spalte − 2px)` (12M: 13 px).
+    **Tipp auf eine Spalte → Abschnittsdetail** (`zielAbschnittHTML`, gleiche `.zt`):
+    Titel (`Juli 2026`, `KW 45 · 03.11.–09.11.`, `Q3 2026`, `2025`), je Ziel `Ø`-Wert
+    und `an/mit Tage` (Schlaf: Nächte) — grün, wenn der Ø das Ziel erreicht; Training
+    `Ø 2.9 / Wo.` und `3/5 Wo.`, grün ab Ø 3. `_bilanzTag` hält dafür den
+    Spalten-Schlüssel (Datum, `2026-07`, `2026-Q3`, `2025`).
+    Nachgerechnet (Prüfstand, `?tage=900`, 6M Jun–Nov 26): Ruhepuls je Monat
+    93/90/97/73/77/100 %, gesamt 87 %, Juli Ø 55 bpm 28/31 — identisch mit den Rohzeilen.
+    Bei 360 px ragt in 1M, 12M, 24M und 7T nichts heraus.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im

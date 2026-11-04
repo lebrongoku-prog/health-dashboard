@@ -2211,7 +2211,8 @@ let _bilanzTag = null;
 
 function ovObenHTML() {
   if (!allData.length) return '';
-  return `<div class="ov-oben">${zielWocheHTML(bilanzWoche())}</div>`;
+  // Bei 7T die Woche, sonst die Abschnitte des Zeitraums (seit 04.11.2026).
+  return `<div class="ov-oben">${is7D() ? zielWocheHTML(bilanzWoche()) : zielZeitraumHTML()}</div>`;
 }
 function ovObenNeu() {
   const el = document.querySelector('#screen-overview .ov-oben');
@@ -2252,9 +2253,10 @@ function ovObenAnimieren(vorher) {
   if (woche && vorher.woche && woche !== vorher.woche) {
     // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
     const r = woche > vorher.woche ? 1 : -1;
+    const n = ob.querySelectorAll('.zw-tag').length || 7;   // Spalten je Zeile
     ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
       [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
-      { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
+      { duration: OV_DAUER, delay: (r > 0 ? i % n : n - 1 - i % n) * 18, easing, fill: 'backwards' }));
     ob.querySelectorAll('.zw-zahl, .zw-kw').forEach(el => _ovAnim(el,
       [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
     return;
@@ -2373,6 +2375,149 @@ function zielTagHTML(tag, byDate) {
       ${mess('sleepTotal', 'Schlaf', '', v => alsStdMin(v), v => `${alsStdMin(ZIELE.sleepTotal.ziel - v).replace(/^0h 0?/, '').replace(/^0m$/, '<1m')} zu kurz`)}
       ${zelle('Training', min > 0 ? fmtMin(min).replace(' min', '') : '—', min > 0 && min < 60 ? 'min' : '',
         `Woche ${nWoche}/${ZIELE.trainDays.ziel}`, wocheOk ? 'gut' : 'offen')}
+    </div>
+  </div>`;
+}
+
+// ── Zielkarte ab 1M: Spalten folgen dem Zeitfilter (Variante A, auf Wunsch 04.11.2026)
+// Bei 7T bleibt die Wochenbilanz (`zielWocheHTML`). In allen übrigen Bereichen stehen
+// statt Mo–So die Abschnitte des Zeitraums: 1M Kalenderwochen, 3M/6M/12M und das
+// Einzeljahr Monate, 24M Quartale, Y und YoY Jahre. Jeder Punkt ist ein FÜLLKREIS in der
+// Farbe seiner Kategorie, gefüllt mit dem Anteil der Tage, an denen das Ziel erreicht
+// war – bei Ruhepuls, HRV und Schlaf von den Tagen MIT Messwert (wie die Woche), beim
+// Training von den Tagen mit Daten, deren Woche das Wochenziel erreicht (dieselbe Regel
+// wie „Zielerreichung"). Rechts die Summe über den ganzen Zeitraum, beim Training in
+// Wochen, als Prozent. Ein Tipp auf eine Spalte zeigt darunter die Durchschnitte und
+// Zählungen dieses Abschnitts.
+function zielSpalten() {
+  const D = filtered();
+  if (!D.length) return null;
+  const heute = toLocalDateStr(new Date());
+  // Alle Kalendertage des Fensters (auch ohne Datenzeile – sie bleiben dann blass).
+  // Im Jahresvergleich gibt es kein zusammenhängendes Fenster: dort die Tage aus D.
+  let tage;
+  const mw = moWindow();
+  if (mw && !istYoY()) {
+    tage = [];
+    const ende = istJahr() ? jahrVon(referenceDate) + '-12-31' : mw.e;
+    for (let d = mw.s; d <= ende; d = addDays(d, 1)) tage.push(d);
+  } else tage = D.map(r => r.date);
+  const art = timeRange === '1m' ? 'woche' : timeRange === '24m' ? 'quartal'
+    : (ist1Y() || istYoY()) ? 'jahr' : 'monat';
+  const schluessel = d => art === 'woche' ? getWeekMonday(d)
+    : art === 'monat' ? d.slice(0, 7)
+    : art === 'quartal' ? d.slice(0, 4) + '-Q' + (Math.floor((+d.slice(5, 7) - 1) / 3) + 1)
+    : d.slice(0, 4);
+  const gruppen = new Map();
+  tage.forEach(d => { const k = schluessel(d); if (!gruppen.has(k)) gruppen.set(k, []); gruppen.get(k).push(d); });
+  const n = gruppen.size;
+  const spalten = [...gruppen.entries()].map(([key, t]) => {
+    let label, titel;
+    // Ab 5 Wochen nur die Nummer – „KW45" ist für sechs Spalten zu breit.
+    if (art === 'woche') { label = (n > 4 ? '' : 'KW') + isoKW(key); titel = 'KW ' + isoKW(key) + ' · ' + fmtWeek(t[0]) + '–' + fmtWeek(t[t.length - 1]); }
+    else if (art === 'monat') {
+      const m = MONAT_KURZ[+key.slice(5, 7) - 1];
+      label = n > 6 ? m[0] : m;   // ab 7 Spalten nur der Anfangsbuchstabe – sonst zu breit
+      titel = MONAT_LANG[+key.slice(5, 7) - 1] + ' ' + key.slice(0, 4);
+    }
+    else if (art === 'quartal') { label = key.slice(5); titel = key.slice(5) + ' ' + key.slice(0, 4); }
+    else { label = key; titel = istYoY() ? MONAT_LANG[+referenceDate.slice(5, 7) - 1] + ' ' + key : key; }
+    return { key, label, titel, tage: t, zukunft: t[0] > heute };
+  });
+  // Symbol rechts oben: der Zeitraum, so kurz es geht.
+  const symbol = timeRange === '1m' ? zeitraumText() : istYoY() ? MONAT_KURZ[+referenceDate.slice(5, 7) - 1] : bereichKurz();
+  return { art, spalten, symbol };
+}
+
+// Kennzahlen eines Abschnitts (oder des ganzen Zeitraums) je Ziel.
+function zielAbschnitt(tage, byDate) {
+  const heute = toLocalDateStr(new Date());
+  const t = tage.filter(d => d <= heute);
+  const mess = key => {
+    const werte = t.map(d => byDate[d]?.[key]).filter(v => v != null);
+    return { an: werte.filter(v => zielErfuellt(key, v)).length, mit: werte.length, oe: mittelArr(werte) };
+  };
+  // Training: Tag mit Daten, dessen Woche das Ziel erreicht – wie „Zielerreichung".
+  const mitDaten = t.filter(d => byDate[d] || istTrainingstag(d));
+  const wochen = [...new Set(t.map(getWeekMonday))];
+  const wocheOk = mo => !!zielErfuellt('trainDays', wocheVon(mo).filter(istTrainingstag).length);
+  return {
+    restHR: mess('restHR'), hrv: mess('hrv'), sleepTotal: mess('sleepTotal'),
+    trainDays: {
+      an: mitDaten.filter(d => wocheOk(getWeekMonday(d))).length, mit: mitDaten.length,
+      wochenOk: wochen.filter(wocheOk).length, wochen: wochen.length,
+      proWoche: t.length ? t.filter(istTrainingstag).length / (t.length / 7) : null
+    }
+  };
+}
+
+function zielZeitraumHTML() {
+  const sp = zielSpalten();
+  if (!sp) return '';
+  const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
+  const { spalten } = sp;
+  const werte = spalten.map(s => zielAbschnitt(s.tage, byDate));
+  const gesamt = zielAbschnitt(spalten.flatMap(s => s.tage), byDate);
+  const gi = spalten.findIndex(s => s.key === _bilanzTag);
+  const gewaehlt = gi >= 0 && !spalten[gi].zukunft && werte[gi].restHR.mit + werte[gi].trainDays.mit ? spalten[gi] : null;
+  const leer = i => spalten[i].zukunft || !(werte[i].restHR.mit + werte[i].hrv.mit + werte[i].sleepTotal.mit + werte[i].trainDays.mit);
+  const flaechen = spalten.map((s, i) => leer(i)
+    ? `<span class="zw-spalte zukunft" style="grid-column:${i + 2}"></span>`
+    : `<span class="zw-spalte${s === gewaehlt ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${s.key}" role="button" tabindex="0"` +
+      ` aria-label="${s.titel}: Werte zeigen"${s === gewaehlt ? ' aria-pressed="true"' : ''}></span>`).join('');
+  const farbe = name => { const f = ZIEL_REIHEN.find(r => r.name === name)?.farbe; return f && glasAktiv() ? hellerFarbe(f) : f; };
+  // Füllkreis: 0 % = hohl (wie verfehlt), 100 % = voll (wie erreicht), dazwischen ein
+  // Kreisausschnitt in der Kategoriefarbe (`.teil`, Anteil als `--anteil` in Prozent).
+  const kreis = (an, mit) => {
+    if (!mit) return '<i class="leer"></i>';
+    const p = Math.round(an / mit * 100);
+    return p >= 100 ? '<i class="an"></i>' : p <= 0 ? '<i class="aus"></i>' : `<i class="teil" style="--anteil:${p}"></i>`;
+  };
+  const zeile = (key, name, summe) => {
+    const f = farbe(name);
+    return `<span class="zw-name">${name}</span>` +
+      werte.map((w, i) => `<span class="zw-punkt" style="--zw-an:${f}">${spalten[i].zukunft ? '<i class="leer"></i>' : kreis(w[key].an, w[key].mit)}</span>`).join('') +
+      `<b class="zw-zahl">${summe}</b>`;
+  };
+  // Rechts der ANTEIL in Prozent statt „317/339": dreistellige Brüche passen ab 6M
+  // nicht in die Spalte. Die Zählung steht im Abschnittsdetail.
+  const prozent = (an, mit) => mit ? Math.round(an / mit * 100) + '%' : '—';
+  const bruch = g => prozent(g.an, g.mit);
+  const tr = gesamt.trainDays;
+  const kopf = spalten.map(s => `<span class="zw-tag${s === gewaehlt ? ' gewaehlt' : ''}">${s.label}</span>`).join('');
+  return `<div class="ziel-woche" data-woche="${spalten[0].key}">
+    <div class="zw-raster zw-woche" style="--zw-n:${spalten.length}"><div class="zw-spalten">${flaechen}</div>
+      <h3 class="zw-titel">Ziele</h3>${kopf}<span class="zw-kw">${scopeBadge(sp.symbol)}</span>
+      ${zeile('restHR', 'Ruhepuls', bruch(gesamt.restHR))}
+      ${zeile('hrv', 'HRV', bruch(gesamt.hrv))}
+      ${zeile('sleepTotal', 'Schlaf', bruch(gesamt.sleepTotal))}
+      ${zeile('trainDays', 'Training', prozent(tr.wochenOk, tr.wochen))}
+    </div>
+    ${gewaehlt ? zielAbschnittHTML(gewaehlt, werte[gi]) : ''}
+  </div>`;
+}
+
+// Detail eines Abschnitts: Ø-Wert je Ziel, daneben wie viele Tage im Ziel waren.
+// Grün, wenn der Durchschnitt das Ziel erreicht – beim Training, wenn im Schnitt
+// mindestens 3 Trainingstage pro Woche zusammenkamen.
+function zielAbschnittHTML(spalte, w) {
+  const zelle = (name, wert, einheit, status, klasse) =>
+    `<div class="zt-zelle"><span class="zt-name">${name} · <span class="zt-status ${klasse}">${status}</span></span>` +
+    `<b class="zt-wert">${wert}${einheit && wert !== '—' ? `<small>${einheit}</small>` : ''}</b></div>`;
+  const mess = (key, name, einheit, fmt, wort) => {
+    const g = w[key];
+    if (!g.mit) return zelle(name, '—', '', 'kein Wert', '');
+    return zelle(name, 'Ø ' + fmt(g.oe), einheit, `${g.an}/${g.mit} ${wort}`, zielErfuellt(key, g.oe) ? 'gut' : 'offen');
+  };
+  const tr = w.trainDays;
+  return `<div class="zt" data-tag="${spalte.key}">
+    <div class="zt-kopf">${spalte.titel}</div>
+    <div class="zt-raster">
+      ${mess('restHR', 'Ruhepuls', 'bpm', v => Math.round(v), 'Tage')}
+      ${mess('hrv', 'HRV', 'ms', v => Math.round(v), 'Tage')}
+      ${mess('sleepTotal', 'Schlaf', '', v => alsStdMin(v), 'Nächte')}
+      ${zelle('Training', tr.proWoche == null ? '—' : 'Ø ' + zahl(tr.proWoche, 1), '/ Wo.',
+        `${tr.wochenOk}/${tr.wochen} Wo.`, tr.proWoche != null && tr.proWoche >= ZIELE.trainDays.ziel ? 'gut' : 'offen')}
     </div>
   </div>`;
 }
