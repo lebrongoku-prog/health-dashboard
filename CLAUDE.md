@@ -757,8 +757,40 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   `.zw-spalten`/`.zw-spalte`, `[data-tag]` — sie wählte nur den Tag der Ringe), das
   Hochzählen (`kachelZahl`, `kachelnHochzaehlen`, `_kachelnZaehlen`, `.ti-zahl`), der
   animierte Tabwechsel `zuTabWischen` (nur die Ringe lösten ihn aus) und das
-  Querformat-Raster von `.ov-oben` — die Wochenbilanz steht jetzt in jedem Format
-  allein über die volle Breite. Alles in der Git-Historie.
+  Querformat-Raster von `.ov-oben`. Alles in der Git-Historie.
+  **Den Platz nutzen seither drei Erweiterungen der Karte** (auf Wunsch, 04.11.2026,
+  Vorschläge 1–3):
+  1. **Tagesdetail** (`zielTagHTML`, `.zt`): Tipp auf eine Tagesspalte (wieder über
+     `.zw-spalten`/`.zw-spalte` hinter dem Raster — **nicht ins selbe Raster legen**,
+     dort verdrängten die Flächen die Auto-Platzierung) oder auf ein Feld des
+     5-Wochen-Rasters klappt unter der Woche die vier Werte des Tags auf: Wert, darunter
+     `✓ Ziel` (grün) bzw. `5 zu tief` / `31m zu kurz` (orange), Training mit Dauer und
+     `Woche n/3`. Zweiter Tipp auf denselben Tag schliesst. Zustand `_bilanzTag`
+     (**Datum**); liegt es nach dem Blättern nicht mehr in den gezeigten 5 Wochen,
+     bleibt das Detail zu. „Heute" setzt zurück. Knapp verfehlt (Ruhepuls 60.3) zeigen
+     Wert und Abstand eine Nachkommastelle (`_ztWert`/`_ztAbstand`), sonst stünde
+     „60 · 0 zu hoch" da. Neuaufbau nur von `.ov-oben` (`ovObenNeu`), Detail wächst
+     auf, die helle Spalte gleitet. `[data-tag]` steht in der Ausnahmeliste des
+     Hintergrund-Tipps; Enter/Leertaste lösen aus.
+  2. **Trend je Ziel** (`_zielTrend`, `_trendHTML`): rechts unter `2/3` ein `Ø 1.7`
+     mit Pfeil, Spaltenkopf „vs. 4 Wo.". Vergleich mit den **28 Tagen vor** der
+     angezeigten Woche, **auf dieselbe Basis umgerechnet**, damit eine angebrochene
+     Woche fair ist: Messwerte → Trefferquote der 4 Wochen × Tage mit Wert dieser Woche;
+     Training → Ø Trainingstage je Woche × vergangene Tage ÷ 7. Pfeil ab 0.5 Tagen
+     Unterschied (`ZW_TREND_SCHWELLE`); ↑ = mehr Tage im Ziel (grün, auch beim
+     Ruhepuls), ↓ orange. Unter 7 Vergleichstagen mit Wert bzw. ohne Daten vor dem
+     Fenster: keine Angabe. Spalte rechts dafür 3rem statt 2.6rem.
+  3. **Letzte 5 Wochen** (`zielMonatHTML`, `.zm`): je Woche eine Zeile `KW nn`, je
+     Tag ein Feld in denselben Spalten wie die Woche darüber, Grün je heller desto
+     mehr der vier Ziele (`.n0`–`.n4`), rechts `Ø` Ziele pro Tag, Legende `0 … 4 Ziele`.
+     **Dieselben Regeln wie „Zielerreichung"**: fehlender Messwert = nicht erreicht,
+     Training an jedem Tag einer Woche mit erreichtem Wochenziel. Tage ohne
+     Health-Zeile und Zukunft blass. Unterste Zeile = angezeigte Woche (folgt 7T).
+  **Querformat:** Woche links, Tagesdetail und 5 Wochen rechts (Raster an
+  `.ziel-woche`; gemessen 812 × 375: je 367 px). Hochformat untereinander.
+  Nachgerechnet (Prüfstand, KW 45, aus den Rohzeilen): Trend Ruhepuls 2/3 Ø 2.79,
+  HRV 1/3 Ø 2.25, Schlaf 1/3 Ø 1.71, Training 1 Ø 1.39; 5-Wochen-Felder und Ø
+  3.29/2.14/3.43/2.14/1.33 — alle identisch. Bei 360 px ragt nichts aus der Karte.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im

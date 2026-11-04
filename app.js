@@ -2188,7 +2188,8 @@ function zielLinie(key, laenge, achse) {
 // ── Ziele der Übersicht: Wochenbilanz (auf Wunsch, 30.09.2026) ──────────────────
 // Zeigt je Ziel die Tage einer Kalenderwoche (Mo–So) als Punkte; liest ZIELE und
 // zielErfuellt – keine eigenen Schwellen. Die Ziel-Ringe darunter (Tageswerte) sind
-// am 04.11.2026 auf Wunsch entfallen, mit ihnen die Tagesauswahl in der Wochenbilanz.
+// am 04.11.2026 auf Wunsch entfallen; ihren Platz nehmen Trend, Tagesdetail und das
+// Raster der letzten 5 Wochen ein.
 // Trainingstage: ein Tag mit mindestens einer Einheit im Workout-Blatt
 // (durationMin > 0) – dieselbe Regel wie überall in der App.
 // Montag bis Sonntag der laufenden Woche (nach dem heutigen Datum, nicht dem neuesten
@@ -2205,19 +2206,40 @@ function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
 function wocheVon(ds) { const mo = getWeekMonday(ds); return Array.from({ length: 7 }, (_, i) => addDays(mo, i)); }
 
+// ── Gewählter Tag (Tagesdetail, auf Wunsch 04.11.2026) ───────────────────────────
+// Ein Tipp auf eine Tagesspalte der Wochenbilanz oder ein Feld im 5-Wochen-Raster
+// klappt unter der Wochenbilanz die Werte dieses Tags auf; ein zweiter Tipp auf
+// denselben Tag schliesst sie. Gemerkt wird das DATUM: liegt es nach dem Blättern
+// nicht mehr im gezeigten Bereich, bleibt das Detail zu. „Heute" setzt es zurück.
+let _bilanzTag = null;
+
 function ovObenHTML() {
   if (!allData.length) return '';
   return `<div class="ov-oben">${zielWocheHTML(bilanzWoche())}</div>`;
 }
+function ovObenNeu() {
+  const el = document.querySelector('#screen-overview .ov-oben');
+  if (!el) return;
+  const vorher = ovObenMerken();
+  el.outerHTML = ovObenHTML();
+  ovObenAnimieren(vorher);
+}
 
 // ── Animation der Wochenbilanz (auf Wunsch, 30.09.2026) ─────────────────────────
 // Woche wechseln (Pfeile/Wisch bei 7T, Bereichswechsel) → die Punkte gleiten
-// spaltenweise aus der Richtung herein, aus der die Woche kommt. Vorher/nachher wird
-// am DOM gemessen: `ovObenMerken()` VOR dem Neuaufbau, `ovObenAnimieren()` danach.
+// spaltenweise aus der Richtung herein, aus der die Woche kommt. Tag wählen → das
+// Tagesdetail wächst auf bzw. die helle Fläche gleitet zur neuen Spalte. Vorher/nachher
+// wird am DOM gemessen: `ovObenMerken()` VOR dem Neuaufbau, `ovObenAnimieren()` danach.
 const OV_DAUER = 260;
 function ovObenMerken() {
   const ob = document.querySelector('#screen-overview .ov-oben');
-  return ob ? { woche: ob.querySelector('.ziel-woche')?.dataset.woche } : null;
+  if (!ob) return null;
+  const mark = ob.querySelector('.zw-spalte.gewaehlt');
+  return {
+    woche: ob.querySelector('.ziel-woche')?.dataset.woche,
+    detail: ob.querySelector('.zt')?.dataset.tag,
+    markLinks: mark ? mark.getBoundingClientRect().left : null
+  };
 }
 // WAAPI mit Rückfall: eine nicht gezeichnete Seite hielte sonst das erste Bild fest
 // (Deckkraft 0) – dieselbe Falle wie bei `_ausklappAnimieren`.
@@ -2229,51 +2251,193 @@ function _ovAnim(el, frames, opt) {
 function ovObenAnimieren(vorher) {
   const ob = document.querySelector('#screen-overview .ov-oben');
   if (!vorher || !ob || bewegungAus() || currentScreen !== 'overview') return;
-  const woche = ob.querySelector('.ziel-woche')?.dataset.woche;
-  if (!woche || !vorher.woche || woche === vorher.woche) return;
   const easing = 'cubic-bezier(.22,.8,.3,1)';
-  // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
-  const r = woche > vorher.woche ? 1 : -1;
-  ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
-    [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
-    { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
-  ob.querySelectorAll('.zw-zahl, .zw-rechts').forEach(el => _ovAnim(el,
-    [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
+  const woche = ob.querySelector('.ziel-woche')?.dataset.woche;
+  if (woche && vorher.woche && woche !== vorher.woche) {
+    // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
+    const r = woche > vorher.woche ? 1 : -1;
+    ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
+      [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
+    ob.querySelectorAll('.zw-zahl, .zw-rechts, .zm-raster').forEach(el => _ovAnim(el,
+      [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
+    return;
+  }
+  // Tagesdetail: neu → wächst auf; anderer Tag → Inhalt blendet über.
+  const zt = ob.querySelector('.zt');
+  if (zt && !vorher.detail) {
+    const h = zt.offsetHeight;
+    zt.style.overflow = 'hidden';
+    _ovAnim(zt, [{ height: '0px', opacity: 0, marginTop: '0px' }, { height: h + 'px', opacity: 1 }],
+      { duration: OV_DAUER, easing });
+    setTimeout(() => { zt.style.overflow = ''; }, OV_DAUER + 140);
+  } else if (zt && vorher.detail !== zt.dataset.tag) {
+    _ovAnim(zt, [{ opacity: .3 }, { opacity: 1 }], { duration: OV_DAUER, easing });
+  }
+  const mark = ob.querySelector('.zw-spalte.gewaehlt');
+  if (mark && vorher.markLinks != null) {
+    const dx = vorher.markLinks - mark.getBoundingClientRect().left;
+    if (Math.abs(dx) > .5) _ovAnim(mark, [{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
+      { duration: OV_DAUER, easing });
+  } else if (mark) {
+    _ovAnim(mark, [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing });
+  }
+}
+
+// Ist das Wochenziel Training in der Woche von `ds` erreicht? Dieselbe Regel wie im
+// Diagramm „Zielerreichung": erreicht an JEDEM Tag einer Woche mit ≥ 3 Trainingstagen.
+function _trainingswocheErreicht(ds) { return !!zielErfuellt('trainDays', wocheVon(ds).filter(istTrainingstag).length); }
+
+// ── Trend je Ziel (auf Wunsch, 04.11.2026) ───────────────────────────────────────
+// Vergleicht die angezeigte Woche mit den 4 Wochen (28 Tagen) DAVOR. Damit eine
+// angebrochene Woche fair verglichen wird, rechnet der Ø auf DIESELBE Basis um:
+// Messwerte → Trefferquote der 4 Wochen × Tage mit Wert in dieser Woche („2/3" gegen
+// „Ø 1.7"); Training → Ø Trainingstage je Woche × vergangene Tage dieser Woche ÷ 7.
+// Pfeil erst ab 0.5 Tagen Unterschied; ↑ heisst immer „mehr Tage im Ziel" (auch beim
+// Ruhepuls), daher grün, ↓ orange. Zu wenig Vergleichsdaten → keine Angabe.
+const ZW_TREND_SCHWELLE = .5;
+function _zielTrend(key, tage, byDate) {
+  const heute = toLocalDateStr(new Date());
+  const vorTage = Array.from({ length: 28 }, (_, i) => addDays(tage[0], i - 28));
+  if (key === 'trainDays') {
+    if (!allData.length || allData[0].date > vorTage[0]) return null;
+    const vergangen = tage.filter(d => d <= heute).length;
+    if (!vergangen) return null;
+    const oe = vorTage.filter(istTrainingstag).length / 4 * vergangen / 7;
+    return { oe, ist: tage.filter(istTrainingstag).length };
+  }
+  const zaehle = ds => {
+    let an = 0, mit = 0;
+    ds.forEach(d => { const v = byDate[d]?.[key]; if (v == null) return; mit++; if (zielErfuellt(key, v)) an++; });
+    return { an, mit };
+  };
+  const jetzt = zaehle(tage), vor = zaehle(vorTage);
+  if (!jetzt.mit || vor.mit < 7) return null;
+  return { oe: vor.an / vor.mit * jetzt.mit, ist: jetzt.an };
+}
+function _trendHTML(t) {
+  if (!t) return '';
+  const d = t.ist - t.oe;
+  const pfeil = d >= ZW_TREND_SCHWELLE ? '<i class="zw-pfeil gut">↑</i>'
+    : d <= -ZW_TREND_SCHWELLE ? '<i class="zw-pfeil offen">↓</i>' : '';
+  return `<small class="zw-trend">Ø ${zahl(t.oe, 1)}${pfeil}</small>`;
 }
 
 // Wochenbilanz: je Ziel sieben Punkte (Mo … So, siehe bilanzWoche), gefüllt = Ziel
 // erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
-// blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
-// die Trainingstage gegen das Wochenziel.
+// blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl
+// erreichter Tage von denen mit Messwert (beim Training die Trainingstage gegen das
+// Wochenziel), darunter der Trend gegen die 4 Wochen davor (`_zielTrend`).
+// Darunter das Tagesdetail (`zielTagHTML`, nur mit gewähltem Tag) und das Raster der
+// letzten 5 Wochen (`zielMonatHTML`).
 // `tage`: die sieben Tage der angezeigten Woche.
 function zielWocheHTML(tage) {
   const heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
-  // EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl.
+  const wochen = Array.from({ length: 5 }, (_, i) => addDays(tage[0], (i - 4) * 7));
+  const gewaehlt = _bilanzTag && _bilanzTag >= wochen[0] && _bilanzTag <= tage[6] ? _bilanzTag : null;
+  // EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Dahinter liegt ein
+  // zweites Raster mit denselben Spalten (`.zw-spalten`): je Tag eine Fläche über alle
+  // Zeilen – die Tippfläche (auch zwischen den Punkten) und die Hervorhebung des
+  // gewählten Tags. Im selben Raster verdrängten die Flächen die übrigen Zellen.
+  const spalten = tage.map((d, i) => d > heute
+    ? `<span class="zw-spalte zukunft" style="grid-column:${i + 2}"></span>`
+    : `<span class="zw-spalte${d === gewaehlt ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${d}" role="button" tabindex="0"` +
+      ` aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)}: Werte zeigen"${d === gewaehlt ? ' aria-pressed="true"' : ''}></span>`).join('');
   const punkte = zustaende => zustaende.map(z => `<span class="zw-punkt"><i class="${z}"></i></span>`).join('');
-  const zeile = (name, zustaende, zahl, farbe) =>
+  const zeile = (name, zustaende, zahl, farbe, trend) =>
     `<span class="zw-name">${name}</span>${punkte(zustaende)}` +
-    `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>`;
+    `<span class="zw-zahl"><b${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>${_trendHTML(trend)}</span>`;
   const messZeile = (key, name) => {
     const z = tage.map(d => { const v = byDate[d]?.[key]; return v == null ? 'leer' : zielErfuellt(key, v) ? 'an' : 'aus'; });
     const mit = z.filter(x => x !== 'leer').length;
-    return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—');
+    return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—', null, _zielTrend(key, tage, byDate));
   };
   const training = tage.map(d => istTrainingstag(d) ? 'an' : d > heute ? 'leer' : 'aus');
   const nTraining = training.filter(x => x === 'an').length;
   // Wie viele Wochen liegt die angezeigte vor der laufenden?
   const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
-  const kopfTage = tage.map(d => `<span class="zw-tag">${wochentagKurz(d)}</span>`).join('');
+  const kopfTage = tage.map(d => `<span class="zw-tag${d === gewaehlt ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
   return `<div class="ziel-woche" data-woche="${tage[0]}">
     <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
-    <div class="zw-raster">
-      <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
+    <div class="zw-raster"><div class="zw-spalten">${spalten}</div>
+      <span class="zw-name"></span>${kopfTage}<span class="zw-zahl zw-zahl-kopf">vs. 4 Wo.</span>
       ${messZeile('restHR', 'Ruhepuls')}
       ${messZeile('hrv', 'HRV')}
       ${messZeile('sleepTotal', 'Schlaf')}
       ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
-        zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
+        zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)', _zielTrend('trainDays', tage, byDate))}
     </div>
+    ${gewaehlt ? zielTagHTML(gewaehlt, byDate) : ''}
+    ${zielMonatHTML(wochen, gewaehlt, byDate)}
+  </div>`;
+}
+
+// Knapp verfehlt (Ruhepuls 60.4 bei Ziel 60): gerundet stünde „60 · 0 zu hoch" da. Dann
+// Wert und Abstand mit einer Nachkommastelle.
+function _ztWert(v, ziel) { return Math.round(v) === ziel ? zahl(v, 1) : Math.round(v); }
+function _ztAbstand(d) { return d < 1 ? zahl(d, 1) : Math.round(d); }
+// Tagesdetail: die vier Werte des gewählten Tags mit ihrem Abstand zum Ziel.
+// Training ist ein Wochenziel – hier steht die Dauer des Tags und darunter der Stand
+// seiner Woche („Woche 2/3").
+function zielTagHTML(tag, byDate) {
+  const r = byDate[tag] || {};
+  const zelle = (name, wert, einheit, status, klasse) =>
+    `<div class="zt-zelle"><span class="zt-name">${name}</span>` +
+    `<b class="zt-wert">${wert}${einheit && wert !== '—' ? `<small>${einheit}</small>` : ''}</b>` +
+    `<span class="zt-status ${klasse}">${status}</span></div>`;
+  const mess = (key, name, einheit, wertText, abstand) => {
+    const v = r[key];
+    if (v == null) return zelle(name, '—', '', 'kein Wert', '');
+    return zielErfuellt(key, v) ? zelle(name, wertText(v), einheit, '✓ Ziel', 'gut')
+      : zelle(name, wertText(v), einheit, abstand(v), 'offen');
+  };
+  const min = workoutData[tag]?.durationMin;
+  const nWoche = wocheVon(tag).filter(istTrainingstag).length;
+  const wocheOk = zielErfuellt('trainDays', nWoche);
+  const titel = `${WOCHENTAG_LANG[new Date(tag + 'T00:00:00').getDay()]}, ${tag.slice(8, 10)}.${tag.slice(5, 7)}.${tag.slice(0, 4)}`;
+  return `<div class="zt" data-tag="${tag}">
+    <div class="zt-kopf">${titel}</div>
+    <div class="zt-raster">
+      ${mess('restHR', 'Ruhepuls', 'bpm', v => _ztWert(v, ZIELE.restHR.ziel), v => `${_ztAbstand(v - ZIELE.restHR.ziel)} zu hoch`)}
+      ${mess('hrv', 'HRV', 'ms', v => _ztWert(v, ZIELE.hrv.ziel), v => `${_ztAbstand(ZIELE.hrv.ziel - v)} zu tief`)}
+      ${mess('sleepTotal', 'Schlaf', '', v => alsStdMin(v), v => `${alsStdMin(ZIELE.sleepTotal.ziel - v).replace(/^0h 0?/, '').replace(/^0m$/, '<1m')} zu kurz`)}
+      ${zelle('Training', min > 0 ? fmtMin(min).replace(' min', '') : '—', min > 0 && min < 60 ? 'min' : '',
+        `Woche ${nWoche}/${ZIELE.trainDays.ziel}`, wocheOk ? 'gut' : 'offen')}
+    </div>
+  </div>`;
+}
+
+// ── Letzte 5 Wochen (auf Wunsch, 04.11.2026) ─────────────────────────────────────
+// Je Woche eine Zeile, je Tag ein Feld: wie viele der vier Ziele erreicht sind (0–4,
+// je heller grün, desto mehr). Dieselben Regeln wie das Diagramm „Zielerreichung":
+// ein fehlender Messwert gilt als nicht erreicht, Training zählt an jedem Tag einer
+// Woche mit erreichtem Wochenziel. Tage ohne jede Zeile im Health-Blatt und Tage in
+// der Zukunft sind blass. Dieselben Spalten wie die Wochenbilanz darüber – die Tage
+// stehen genau untereinander. Rechts der Schnitt pro Tag der Woche.
+// Die unterste Zeile ist die angezeigte Woche; jedes Feld wählt seinen Tag.
+function zielMonatHTML(wochen, gewaehlt, byDate) {
+  const heute = toLocalDateStr(new Date());
+  const zeilen = wochen.map(mo => {
+    const tage = Array.from({ length: 7 }, (_, i) => addDays(mo, i));
+    const trainingOk = _trainingswocheErreicht(mo);
+    const werte = [];
+    const felder = tage.map(d => {
+      const r = byDate[d];
+      if (d > heute || !r) return `<span class="zm-zelle leer"></span>`;
+      const n = ['restHR', 'hrv', 'sleepTotal'].filter(k => zielErfuellt(k, r[k])).length + (trainingOk ? 1 : 0);
+      werte.push(n);
+      return `<span class="zm-zelle n${n}${d === gewaehlt ? ' gewaehlt' : ''}" data-tag="${d}" role="button" tabindex="0"` +
+        ` aria-label="${fmtWeek(d)}: ${n} von 4 Zielen"></span>`;
+    }).join('');
+    const oe = mittelArr(werte);
+    return `<span class="zw-name zm-kw${mo === wochen[4] ? ' aktuell' : ''}">KW ${isoKW(mo)}</span>${felder}` +
+      `<span class="zw-zahl zm-oe">${oe == null ? '—' : 'Ø ' + zahl(oe, 1)}</span>`;
+  }).join('');
+  const legende = [0, 1, 2, 3, 4].map(n => `<span class="zm-zelle n${n}"></span>`).join('');
+  return `<div class="zm">
+    <div class="zm-kopf"><span>Letzte 5 Wochen</span><span class="zm-legende">0${legende}4 Ziele</span></div>
+    <div class="zw-raster zm-raster">${zeilen}</div>
   </div>`;
 }
 
@@ -4924,6 +5088,7 @@ function filterTitelTeil() {
 // wer am neuesten Tag steht, will beim naechsten Nachladen mitgezogen werden.
 function aufHeuteSpringen() {
   if (!allData.length) return;
+  _bilanzTag = null;   // das Tagesdetail der Wochenbilanz schliesst
   referenceDate = allData[allData.length-1].date;
   _datumSelbstGewaehlt = false;
 }
@@ -5440,7 +5605,7 @@ function initScrollHideNav() {
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
     // Alles, was selbst etwas auslöst, ausnehmen: Bedienelemente, Diagramme (Markierung),
     // Kartentitel (Datenbeschriftung) und Tooltip-Anker.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, ' + TT_TAP_SELECTOR)) return;
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-tag], ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
@@ -5573,6 +5738,14 @@ document.body.addEventListener('click', (e) => {
 // innerHTML ersetzt werden.
 document.body.addEventListener('click', (e) => {
   const t = e.target;
+  // Tipp auf einen Tag der Wochenbilanz oder des 5-Wochen-Rasters: Tagesdetail auf/zu.
+  const _bilanzZelle = t.closest('.ziel-woche [data-tag]');
+  if (_bilanzZelle && !_bilanzZelle.classList.contains('zt')) {
+    const d = _bilanzZelle.dataset.tag;
+    _bilanzTag = _bilanzTag === d ? null : d;
+    ovObenNeu();
+    return;
+  }
   // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
   // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
   // ist dort null und der Zweig greift gar nicht.
@@ -5675,6 +5848,15 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
     }
     showScreen(tab);
   });
+});
+
+// Die Tage der Wochenbilanz sind per `role="button"` Knoepfe – Enter und Leertaste gehoeren dazu.
+document.body.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const k = e.target.closest && e.target.closest('.ziel-woche [role="button"][data-tag]');
+  if (!k || e.target !== k) return;
+  e.preventDefault();
+  k.click();
 });
 
 // ── Transparenz-Modus (02.10.2026, auf Wunsch, 1:1 aus FitTracks Glas-Modus) ──────
