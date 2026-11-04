@@ -807,9 +807,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     sonst standen grosse Leerräume in der Karte. **Training**: ein Punkt je
     Tag mit Einheit (`istTrainingstag`: `durationMin > 0`, jede Trainingsart, dieselbe
     Regel wie das Ziel), rechts `n/3` gegen das Wochenziel, farbig.
-  - Durchscheinend auf dem Verlauf, weisse Schrift; die Farben
-    `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
-    wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
+  - **Normal- und Transparenz-Modus wie jede Karte** (auf Wunsch, 04.11.2026; vorher
+    immer durchscheinend mit fester weisser Schrift): normal weiss mit `--shadow`,
+    Schrift über `--txt`/`--txt2`, `--zw-gut` `#10B981` / `--zw-offen` `#D97706`
+    (kräftige Töne wie in den übrigen Karten); im Glas-Modus steht `.ziel-woche` in der
+    Liste der Glas-Karten (12-%-Weiss, Tokens weiss) und
+    `html.glas .screen .ziel-woche` setzt die eigenen Variablen auf die hellen Töne
+    (`#34D399`/`#FBBF24`) und weissen Flächen um: `--zw-hohl` (Rand verfehlter Punkte),
+    `--zw-leer` (Punkt ohne Wert), `--zw-wahl` (gewählte Spalte), `--zw-detail`
+    (Tagesdetail). **Wer eine Farbe in der Zielkarte einführt, nimmt einen Token oder
+    eine dieser Variablen — kein festes Weiss.** Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
   - **„vor N W"** im KW-Symbol statt der Kalenderwoche, sobald die Wochenbilanz nicht
     die laufende Woche zeigt (nur bei 7T möglich).
@@ -1420,8 +1427,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `.warn-sig`. **Wer eine neue Karte oder eine feste Farbe in einer Karte einführt,
     ergänzt sie dort.**
   - **Bleibt weiss:** Einstellungen-Seite (liegt ausserhalb von `.screen`, wie
-    FitTracks „Mehr"), Zeitleiste, Tableiste, Tooltips. Die Wochenbilanz ist
-    ohnehin für den Verlauf gebaut.
+    FitTracks „Mehr"), Zeitleiste, Tableiste, Tooltips. Die Zielkarte der Übersicht
+    folgt dem Modus seit 04.11.2026 über CSS-Variablen (siehe „Ziele der Übersicht");
+    `glasHtmlAnpassen` lässt `.ov-oben` deshalb weiterhin aus.
   - **Hellere Datenfarben** (auf Wunsch statt FitTracks Weiss — die Farben tragen
     Bedeutung): `hellerFarbe()` mischt jede Farbe zu `GLAS_AUFHELLUNG` (35 %) mit Weiss,
     Deckkraft bleibt. **Eine** Funktion für Diagramme UND HTML, damit Legendenpunkt und

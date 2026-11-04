@@ -5873,8 +5873,8 @@ function _glasDiagramm(cfg) {
   });
 }
 // Inline-Farben im HTML eines Tabs (Fusszeilen-Signale, Legendenpunkte, Kartenkanten,
-// Einblicke) ebenso aufhellen. Die Wochenbilanz ist schon fuer den Verlauf
-// gebaut und bleiben aussen vor.
+// Einblicke) ebenso aufhellen. Die Zielkarte (`.ov-oben`) bleibt aussen vor: sie
+// wechselt ihre Farben ueber CSS-Variablen (`html.glas .screen .ziel-woche`).
 function glasHtmlAnpassen(root) {
   if (!glasAktiv() || !root) return;
   root.querySelectorAll('[style]').forEach(el => {
