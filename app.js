@@ -2801,7 +2801,7 @@ function pgOverview() {
 
   const _ovVorher = ovObenMerken();
   document.getElementById("screen-overview").innerHTML = `
-    ${pgBanner('📊','Übersicht')}
+    ${pgBanner('Übersicht')}
     <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber dem Kartenpaar:
          eine Warnung gehoert nach oben. -->
     ${warnSig ? `<div class="warn-card">
@@ -2981,7 +2981,7 @@ function pgHerz() {
   const hrMaL=tdL.align('restHR'); const hvMaL=tdL.align('hrv');
 
   document.getElementById("screen-herz").innerHTML=`
-    ${pgBanner('❤️','Herz')}
+    ${pgBanner('Herz')}
     <div class="chart-card">
       <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
@@ -3594,7 +3594,7 @@ function pgSchlaf() {
   const slEndArr=schlafzeitReihe(D, tKeys, tKeyTyp, 'sleepEnd', false);
 
   document.getElementById("screen-schlaf").innerHTML=`
-    ${pgBanner('🌙','Schlaf')}
+    ${pgBanner('Schlaf')}
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
       <div class="chart-card">
@@ -3797,7 +3797,7 @@ async function pgTraining() {
     : workoutLoadError;
   if(woProblem){
     document.getElementById("screen-training").innerHTML=`
-      ${pgBanner('🏃','Training')}
+      ${pgBanner('Training')}
       <div class="no-data">
         <strong>Workout-Daten nicht verfügbar</strong>
         ${esc(woProblem)}
@@ -3913,7 +3913,7 @@ async function pgTraining() {
   const vo2 = vo2Abschnitt(D);
 
   document.getElementById("screen-training").innerHTML=`
-    ${pgBanner('🏃','Training')}
+    ${pgBanner('Training')}
       <div class="chart-card">
         <h3>Laufstrecke</h3>
         <div class="chart-legend"><div class="cl-item"><span class="cl-dot" style="background:#FB923C"></span>${is7D()||timeRange==='1m'?'pro Tag':ist1Y()?'pro Jahr':'pro Monat'}</div>${hlLegende('c-tot-strecke|oe','Ø','#FB923C')}</div>
@@ -4933,14 +4933,15 @@ const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTrain
 const GLAS_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="13" height="13" rx="3"/><rect x="8" y="9" width="13" height="11" rx="3"/></svg>`;
 // Titelzeile eines Tabs: Emoji + Name, rechtsbündig Zahnrad (nur Übersicht) und
 // Transparenz-Knopf. Die Tab-Hintergründe sitzen auf .screen, nicht hier.
-function pgBanner(icon,title){
+// Nur der Tabname – das Emoji davor ist auf Wunsch entfallen (04.11.2026).
+function pgBanner(title){
   // Zahnrad NUR in der Uebersicht, in der durchscheinenden Optik der uebrigen `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
     ? `<button class="pg-act einst-act" title="Einstellungen" aria-label="Einstellungen">
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><span class="pg-banner-icon">${icon}</span><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button></div></div>`;
+  return`<div class="pg-banner"><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button></div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav

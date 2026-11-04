@@ -258,7 +258,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 ## UI-/Namens-Konventionen
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
-- **Tab-Titel:** `pgBanner(icon, titel)` zeigt **nur** Emoji und Tabnamen — der
+- **Tab-Titel:** `pgBanner(titel)` zeigt **nur** den Tabnamen (das Emoji davor samt
+  `.pg-banner-icon` ist am 04.11.2026 auf Wunsch entfallen; die Bannerhöhe hält die
+  Knopfreihe rechts, gemessen unverändert 62 px) — der
   erklärende Untertitel und die Zeile „Daten bis … · geladen …" sind entfernt. Der
   Untertitel wiederholte den Tabnamen, der Daten-Stand stand fünfmal identisch da;
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
@@ -283,7 +285,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   von 2026, nicht zur KW 53 von 2025). Das 7T-Fenster läuft ohnehin Montag bis
   Sonntag (`weekDays7()` über `getWeekMonday()`) und ist damit genau eine ISO-Woche.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
-- **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
+- **Emojis nur an zwei Stellen** (die Tab-Titel tragen seit 04.11.2026 keine mehr): die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
   Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Die
   früheren Minikacheln trugen bis 30.09.2026 welche; die Wochenbilanz trägt keine. Titel, Überschriften (auch die
   Abschnittstitel der Einblicke), Status- und
