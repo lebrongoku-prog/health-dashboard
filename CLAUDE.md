@@ -777,6 +777,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   2. **Letzte 5 Wochen** (`zielMonatHTML`, `.zm`): je Woche eine Zeile `KW nn`, je
      Tag ein Feld in denselben Spalten wie die Woche darüber, Grün je heller desto
      mehr der vier Ziele (`.n0`–`.n4`), rechts `Ø` Ziele pro Tag, Legende `0 … 4 Ziele`.
+     **Abstufung markant** (auf Wunsch, 04.11.2026): leer 4 % Weiss, 0 → 10 % Weiss,
+     1 → 25 % Grün, 2 → 55 % Grün, 3 → volles Grün `#34D399`, 4 → helles Mint
+     `#C6F7E2` — die Helligkeit steigt mit jeder Stufe. Vorher 38/58/80/100 % desselben
+     Grüns, auf dem Teal-Verlauf kaum zu unterscheiden.
      **Dieselben Regeln wie „Zielerreichung"**: fehlender Messwert = nicht erreicht,
      Training an jedem Tag einer Woche mit erreichtem Wochenziel. Tage ohne
      Health-Zeile und Zukunft blass. Unterste Zeile = angezeigte Woche (folgt 7T).
@@ -800,11 +804,11 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   der Karte, Innenrand des Tagesdetails und jede Lücke zwischen den Teilen (`gap` der
   Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen mit
   negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
-  **Querformat:** Woche links, 5 Wochen rechts (gleich hoch, also bündig), Tagesdetail
-  darunter über die volle Breite (`grid-template-areas` an `.ziel-woche`).
+  **Querformat: alles untereinander wie im Hochformat** (auf Wunsch, 04.11.2026; kurz
+  standen Woche und 5 Wochen nebeneinander). Nur das Tagesdetail zeigt dort seine vier
+  Werte in einer Zeile statt 2 × 2.
   Gemessen (Prüfstand): 375 × 812 und 360 × 780 Raster je 160 px, Innenrand und alle
-  Lücken 16 px, mit und ohne Detail; 812 × 375 Raster je 160 px nebeneinander, beide
-  16 px unter der Kartenoberkante; Titel, Wochentage und Symbol auf derselben Mitte;
+  Lücken 16 px, mit und ohne Detail; 812 × 375 und 1000 × 460 je 160 px untereinander; Titel, Wochentage und Symbol auf derselben Mitte;
   360 px nichts ragt heraus.
   **Schriftgrössen der ganzen Karte = die der Wochenbilanz** (auf Wunsch, 04.11.2026),
   genau drei: 1.15rem Titel „Ziele", **1rem** für Namen, Zahlen und Werte (Zielnamen,
