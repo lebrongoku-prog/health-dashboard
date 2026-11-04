@@ -238,19 +238,18 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Rendering:** `_renderTab(name)` → Seiten-Funktion `pgOverview`/`pgHerz`/`pgSchlaf`/
   `pgTraining` setzt `#screen-<name>`.innerHTML und erzeugt Charts via
   `zeichneDiagramm(id,cfg)`; danach `_tabNachbereiten(name)` → `_zeitraumEinsetzen`
-  (Zeitraum in die Kartentitel), `balkenFuellen`, `kachelnHochzaehlen`, `updateNavUI`.
+  (Zeitraum in die Kartentitel), `balkenFuellen`, `updateNavUI`.
 - **Chart-Registry:** `charts` (Instanzen nach Canvas-ID), `tabCharts` (IDs pro Tab, für
   Destroy beim Re-Render).
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','training']` (4 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
-- **Übersicht (`pgOverview`):** Wochenbilanz → Ziel-Ringe → (ausgeklappt)
+- **Übersicht (`pgOverview`):** Wochenbilanz → (ausgeklappt)
   Zielerreichung (seit 23.10.2026 statt Verlaufs-Chart) → Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
   eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
   `.refresh-btn`/`.glas-toggle`/`.zl-pille`/`.zl-opt`/`.einst-act`/`.us-zurueck`/
-  `.zr[data-ziel-tab]` (Ziel-Ring → Tab, dazu `keydown` für Enter/Leertaste)
   (alle click — der frühere
   `change`-Listener für das Auswahlfeld ist mit ihm entfallen). Jede State-Änderung
   → `_refreshAfterStateChange()`.
@@ -285,7 +284,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Ein Jahr steht nicht dabei — die Zeitachse trägt bei 7T die Datumsangaben.
 - **Emojis nur an drei Stellen:** Tab-Titel (`pgBanner`), die Karten unter „Muster & Zusammenhänge" und — dieselbe Kartenart — die
   Einblicke in Training (seit 18.09.2026), Herz und Schlaf (seit 19.09.2026). Die
-  früheren Minikacheln trugen bis 30.09.2026 welche; die Ringe tragen keine. Titel, Überschriften (auch die
+  früheren Minikacheln trugen bis 30.09.2026 welche; die Wochenbilanz trägt keine. Titel, Überschriften (auch die
   Abschnittstitel der Einblicke), Status- und
   Warnzeilen tragen keine. Die Banner-Knöpfe tragen inzwischen SVG-Symbole (Zahnrad,
   Kontrast) statt Emojis.
@@ -742,78 +741,51 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   die Angabe machte den Wert nur unnötig fett. Gleiches gilt für den Fall „kein
   Signal" — dann `null` übergeben, nicht eine graue Farbe.
 - **Schritte sind KEINE Zielmetrik mehr** (auf Wunsch entfernt): weder in `ZIELE`
-  noch in den Ziel-Ringen bzw. der Wochenbilanz noch als Minikachel. Die vierte
+  noch in der Wochenbilanz noch als Minikachel. Die vierte
   Minikachel zeigt an Trainingstagen die Dauer der Einheit und sonst die **Zahl der
   Trainingstage im Siebentagefenster** (`+N vs. Vorwoche`). Die Schritte-Reihe im
   Muster-Insights zu Schritten bleiben davon unberührt (der Verlauf mit der
   Schritte-Reihe ist am 23.10.2026 entfallen) —
   dort sind sie Messwert, nicht Ziel.
-- **Ziele der Übersicht: Ringe + Wochenbilanz** (auf Wunsch, 30.09.2026, Varianten B
-  und D aus den Mockups). Ersetzen die frühere weisse Ziel-Karte (`zielUebersichtHTML`,
-  `.ziel-karte`, `--ziel`, `ZIELE.*.fmtZiel` — alle entfallen): sie wiederholte drei
-  Kachelwerte und passte optisch nicht zu den Kacheln auf dem Verlauf.
-  - **Ringe** (`zielRingeHTML()`, `ZIEL_RINGE`) **ersetzen die Minikacheln**: 2 × 2,
-    `--ring` 128 px (quer 92 px), Reihenfolge Ruhepuls, HRV, Schlaf, Training. In der
-    Mitte der Wert des gewählten Tags (Training: Trainingstage seiner Woche
-    `/ 3 Tage`), lange Werte wie „7h 22m" kleiner (`.zr-zahl.lang`). Füllung aus
-    `zielAnteil()` — bei „weniger ist besser" erreicht = voll, sonst Ziel ÷ Wert.
-    Darunter Name und Zielzeile (`✓ Ziel ≤ 60`, `8m unter Ziel`), grün erreicht /
-    gelb-orange offen. Antippbar, siehe „Ziel-Ringe führen per Tipp in ihren Tab".
+- **Ziele der Übersicht: Wochenbilanz** (auf Wunsch, 30.09.2026, Variante D aus den
+  Mockups). Ersetzt die frühere weisse Ziel-Karte (`zielUebersichtHTML`, `.ziel-karte`,
+  `--ziel`, `ZIELE.*.fmtZiel` — alle entfallen).
+  **Die Ziel-Ringe darunter sind am 04.11.2026 auf Wunsch entfallen** (Tageswerte von
+  Ruhepuls, HRV, Schlaf, Training als 2 × 2 Ringe). Mit ihnen gingen `zielRingeHTML`,
+  `ZIEL_RINGE`, `zielAnteil`, `.ziel-ringe`/`.zr*`, die **Tagesauswahl** in der
+  Wochenbilanz (`_bilanzWochentag`, `standardTag`, `gewaehlterTag`, `ovObenNeu`,
+  `.zw-spalten`/`.zw-spalte`, `[data-tag]` — sie wählte nur den Tag der Ringe), das
+  Hochzählen (`kachelZahl`, `kachelnHochzaehlen`, `_kachelnZaehlen`, `.ti-zahl`), der
+  animierte Tabwechsel `zuTabWischen` (nur die Ringe lösten ihn aus) und das
+  Querformat-Raster von `.ov-oben` — die Wochenbilanz steht jetzt in jedem Format
+  allein über die volle Breite. Alles in der Git-Historie.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im
     Zeitfilter **7T** die angezeigte Woche (`weekDays7()`, die Pfeile ‹ › blättern sie
     mit), in allen anderen Bereichen die laufende (`aktuelleWoche()`, nach dem heutigen
-    Datum, nicht dem neuesten Datentag). Etikett `KW 40`. Die Ringe folgen dem
-    Zeitfilter NICHT (letzter Tag bzw. laufende Woche). Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
+    Datum, nicht dem neuesten Datentag). Etikett `KW 40`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
     liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
     der Trainingszeile und keine Kontur um die Karte (beides auf Wunsch entfernt).
     Die Punkte füllen die Breite (7 gleiche Rasterspalten, Punkte 20 px, Schrift 1rem),
     sonst standen grosse Leerräume in der Karte. **Training**: ein Punkt je
     Tag mit Einheit (`istTrainingstag`: `durationMin > 0`, jede Trainingsart, dieselbe
     Regel wie das Ziel), rechts `n/3` gegen das Wochenziel, farbig.
-  - Beide durchscheinend bzw. direkt auf dem Verlauf, weisse Schrift; die Farben
+  - Durchscheinend auf dem Verlauf, weisse Schrift; die Farben
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
-  - **Tag antippen** (auf Wunsch, 30.09.2026): jede Tagesspalte wählt den Tag, dessen
-    Werte die **Ringe** zeigen — **die ganze Spalte**, auch zwischen den Punkten. Dafür
-    liegt hinter dem Raster `.zw-raster` ein zweites mit denselben Spalten
-    (`.zw-spalten`, absolut, Variable `--zw-spalten`): je Tag eine Fläche `.zw-spalte`
-    über alle Zeilen mit `data-tag` (nicht für Tage in der Zukunft); Punkte und
-    Beschriftungen tragen `pointer-events:none`. **Nicht ins selbe Raster legen:** mit
-    `grid-row:1/-1` verdrängten die Flächen die Auto-Platzierung der übrigen Zellen.
-    Der gewählte Tag ist eine helle **Fläche** hinter der Spalte (`.zw-spalte.gewaehlt`),
-    keine Umrandung der Punkte.
-    Gemerkt wird der **Wochentag** (`_bilanzWochentag`, 0 = Mo, null = Standard), nicht
-    das Datum: beim Blättern (7T) bleibt er stehen. `gewaehlterTag(tage)` liefert den
-    Tag in der angezeigten Woche; ohne Auswahl `standardTag()` = heute bzw. der neueste
-    Datentag, solange heute noch kein Export da ist; läge der Tag in der Zukunft
-    (Sonntag gewählt, zurück in der laufenden Woche), ebenfalls der Standardtag.
-    Der Trainingsring zählt die Woche des gewählten Tags (`diese Woche` bzw. `KW 36`).
-    Ein Tipp baut nur `.ov-oben` neu (`ovObenNeu()`). „Heute" setzt die Auswahl zurück.
-    `[data-tag]` steht in der Ausnahmeliste des Hintergrund-Tipps.
-  - **Titel über den Ringen** (`.zr-titel`): der gewählte Tag, `Dienstag, 22.09.2026`.
-    Ersetzt die blassen Ringe, die bis 30.09.2026 abends anzeigten, dass die Ringe
-    nicht zur angezeigten Woche gehören (auf Wunsch entfernt).
   - **„vor N Wochen"** links neben `KW nn` (`.zw-vor`), sobald die Wochenbilanz nicht
     die laufende Woche zeigt (nur bei 7T möglich).
   - **Animiert** (auf Wunsch, 30.09.2026, 260 ms, `OV_DAUER`): **Woche wechseln** →
     die Punkte gleiten spaltenweise (18 ms versetzt) aus der Richtung herein, aus der
-    die Woche kommt (neuere von rechts), Zahlen rechts und KW blenden ein. **Tag
-    wählen** → die helle Fläche gleitet von der alten zur neuen Spalte. In beiden Fällen
-    laufen die **Ringe** vom alten auf den neuen Stand (Füllung über `data-anteil`, Zahl
-    zählt). Der **Titel** blendet schlicht aus und wieder ein (je 65 ms, seit 30.09.2026 doppelt so schnell; altes Datum
-    aus, neues ein, **ohne** senkrechte Bewegung — auf Wunsch). Gemessen wird am DOM: `ovObenMerken()` VOR dem
-    Neuaufbau, `ovObenAnimieren()` danach — in `ovObenNeu()` (Tipp) und in
+    die Woche kommt (neuere von rechts), Zahlen rechts und KW blenden ein. Gemessen
+    wird am DOM: `ovObenMerken()` VOR dem Neuaufbau, `ovObenAnimieren()` danach — in
     `pgOverview()` (Blättern, Bereichswechsel). Nur im sichtbaren Übersicht-Tab, nicht
     bei `prefers-reduced-motion`. WAAPI über `_ovAnim` mit Rückfall-`finish()` (sonst
     blieben die Punkte im nicht gezeichneten Pane auf Deckkraft 0).
-  - **Layout** (`.ov-oben`): Hochformat Wochenbilanz → Ringe. Querformat
-    Raster-Bereiche: Wochenbilanz links, Ringe rechts (gemessen 812 × 375: Woche
-    202 px, Ringe 296 px).
   Geprüft (Prüfstand): Punkte aller vier Zeilen identisch mit den Rohdaten der letzten
-  7 Tage; `nodata` → Ringe `—`, Woche nur Tage mit Wert.
+  7 Tage; `nodata` → Woche nur Tage mit Wert.
 - **Diagramm „Zielerreichung“ in der Übersicht** (auf Wunsch, 23.10.2026, Variante A
   aus den Mockups) — **ersetzt den „Verlauf“** (Schlaf, Puls, HRV, Training/Schritte
   auf zwei Achsen samt `_wocheTooltipLabel`; entfallen). Canvas-ID bleibt `c-woche`,
@@ -837,7 +809,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Transparenz-Modus mit hellen Farben.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
-  Ziel-Ringe und Wochenbilanz der Übersicht. Neue Schwellen gehören dorthin,
+  Wochenbilanz und Zielerreichung der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
@@ -1371,47 +1343,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   setzt `margin-bottom: 0`, sonst stünde der Kartenabstand im Querformat zusätzlich
   zwischen den Spalten und verfälschte die Zeilenhöhe — dieselbe Falle wie bei
   `.ov-oben`. Gemessen bei 900 px: Spalten 281 px, Lücke 11 px.
-- **Übersicht im Querformat:** Wochenbilanz links, Ringe rechts (siehe „Ziele der
-  Übersicht"). Die Warnkarte steht **über** dem Raster.
+- **Übersicht im Querformat:** Wochenbilanz über die volle Breite, die Warnkarte
+  darüber.
 - **Minikacheln der Übersicht: entfallen** (30.09.2026, auf Wunsch) — ersetzt durch
-  die grossen Ziel-Ringe (siehe „Ziele der Übersicht"). Mit ihnen gingen `.ti-metric*`,
+  die grossen Ziel-Ringe (selbst seit 04.11.2026 entfallen). Mit ihnen gingen `.ti-metric*`,
   `.ti-metrics`, `.ov-combo-card`, `--kachel`, `KACHEL_SCHLEIER`, `kachelStil`,
-  `tageswertKacheln`, `trainingsKachel`, `ERKLAERUNG_MINI`/`infoMini`. Geblieben sind
-  `kachelZahl`/`kachelnHochzaehlen` (die Zahl in der Ringmitte zählt wie früher hoch)
-  und `.ti-zahl`. Die „vs. Ø"-Abweichung der Kacheln gibt es in der Übersicht nicht mehr.
-- **Ziel-Ringe führen per Tipp in ihren Tab** (seit 13.09.2026 bei den Kacheln, seit
-  30.09.2026 bei den Ringen): Ruhepuls und HRV → Herz, Schlaf → Schlaf, Training →
-  Training — **mit Wisch-Animation**. Das Ziel steht als `data-ziel-tab` am Ring
-  (`.zr`, dazu `role="button"`, `tabindex="0"`, `aria-label`); **Ringe ohne Messwert
-  bekommen es nicht**. Enter/Leertaste lösen ebenfalls aus.
-  `zuTabWischen(name)` animiert `scrollLeft` des Tab-Scrollers — also genau das, was
-  auch der Finger bewegt. Hintergrund-Verlauf, Tabfarbe, Tableisten-Markierung und
-  passive Zeitleiste laufen dadurch über den vorhandenen Scroll-Sync mit und sehen
-  aus wie ein Wisch. Die Tableiste wechselt über `showScreen()` weiterhin sprunghaft.
-  Dauer 380 ms für einen Tab, +110 ms je weiteren (Übersicht → Training 600 ms),
-  easeInOutCubic; bei `prefers-reduced-motion` Sprung.
-  **Fünf Dinge, die daran hängen:**
-  1. **`scroll-snap-type` ist während der Animation aus** (Inline-Stil `none`, danach
-     wieder leer). Mit `x mandatory` rastet Safari jeden Zwischenschritt auf den
-     nächsten Tab ein. Am Ende steht `scrollLeft` exakt auf dem Ziel.
-  2. **Der Endzustand wird ausdrücklich gesetzt** (`currentScreen`,
-     `setTabBackgroundInstant`, `_applyTabState`) — nur wenn die Animation bis zum
-     Ende lief. Der Scroll-Sync allein reicht nicht als Beleg: der verdeckte
-     Vorschau-Pane feuert keine `scroll`-Events, und dort blieben Tabfarbe und
-     Markierung auf „Übersicht" stehen, obwohl die Seite schon auf „Herz" stand. Mit
-     gesetztem `currentScreen` überspringt der Settle-Timer des Syncs seinen Aufruf.
-     Geprüft mit **und** ohne simulierte Scroll-Events: beide Wege enden gleich.
-  3. **Eine Berührung bricht ab** (`touchstart`/`pointerdown` am Container) — dann gilt
-     das native Einrasten, und kein Tab wird erzwungen. Gemessen: Abbruch bei 0.31 →
-     rastet zurück auf die Übersicht.
-  4. `[data-ziel-tab]` steht in der Ausnahmeliste des Hintergrund-Tipps, sonst
-     schaltete derselbe Tipp zusätzlich die Tableiste um.
-  5. **Druck-Rückmeldung NUR über Deckkraft** (`:active{opacity:.7}`), ohne
-     `transform` wie bei Knöpfen: die Ringe liegen im waagrecht und senkrecht
-     scrollenden Bereich, und ein transform während `:active` bricht auf iOS die
-     Wischgeste ab (siehe „Tipp-Animation").
-  Ein noch nicht gebauter Ziel-Tab wird **vor** dem Start gebaut, sonst wischte eine
-  leere Seite herein.
+  `tageswertKacheln`, `trainingsKachel`, `ERKLAERUNG_MINI`/`infoMini`. Die „vs. Ø"-Abweichung der Kacheln gibt es in der Übersicht nicht mehr.
 - **Bezugszeitraum:** Kacheln, die dem globalen Zeitfilter **nicht** folgen, tragen ein
   `scopeBadge('…')` (z. B. `heute`, `letzte 14 Nächte`, `gesamter Datenbestand`).
 - **Namensgebung:** ausgeschriebene Namen statt Kürzel — `mittel()` statt `av()`,
@@ -1445,7 +1382,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `.warn-sig`. **Wer eine neue Karte oder eine feste Farbe in einer Karte einführt,
     ergänzt sie dort.**
   - **Bleibt weiss:** Einstellungen-Seite (liegt ausserhalb von `.screen`, wie
-    FitTracks „Mehr"), Zeitleiste, Tableiste, Tooltips. Wochenbilanz und Ringe sind
+    FitTracks „Mehr"), Zeitleiste, Tableiste, Tooltips. Die Wochenbilanz ist
     ohnehin für den Verlauf gebaut.
   - **Hellere Datenfarben** (auf Wunsch statt FitTracks Weiss — die Farben tragen
     Bedeutung): `hellerFarbe()` mischt jede Farbe zu `GLAS_AUFHELLUNG` (35 %) mit Weiss,
@@ -1660,17 +1597,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      der alte Stand) und auch dann, wenn der Übergang übersprungen wird — `ready` lehnt
      dann ab und wird abgefangen, sonst stünde die Ablehnung in der Konsole (im
      Vorschau-Pane bei jedem Tipp).
-  9. **Kachel-Zahlen zählen hoch** (`kachelZahl`, `kachelnHochzaehlen`, 450 ms): beim
-     Start von 0, bei neuen Daten vom zuletzt gezeigten Wert auf den neuen. **Nicht**
-     bei jedem Aufbau der Übersicht — ausgelöst über `_kachelnZaehlen`: true beim
-     Start, gesetzt von den drei Wegen, auf denen neue Daten ankommen (stilles
-     Nachladen, „Anzeigen" in der Hinweisleiste, „Daten aktualisieren"), verbraucht vom
-     nächsten Aufbau der Übersicht, der Kacheln hat. Die Schlafdauer zählt in Minuten.
-     Die Zahl sitzt in `.ti-zahl` mit `tabular-nums`, sonst wackelte der zentrierte
-     Wert beim Zählen seitlich. Die Endzahl steht bereits im HTML; der Rückfall-Zeitgeber
-     bringt sie auch ohne gezeichnete Seite ans Ziel. Gemessen: 0 → 55/64/8h 22m/2 in
-     440 ms; nach neuen Daten 55 → 53, 64 → 60, 8h 22m → 7h 22m; Bereichswechsel lässt
-     die Zahlen stehen.
+  9. **Kachel-Zahlen zählen hoch** — mit den Ziel-Ringen am 04.11.2026 entfallen.
   10. **„Daten aktualisieren" bestätigt den Erfolg** (`refreshBestaetigen`): 1.8 s lang
      „Aktualisiert ✓" auf Grün (`.update-btn.ok`), dann wieder der alte Text. Nur bei
      `ergebnis === true`, und erst **nach** `appKarteAuffrischen()` — die baut die

@@ -755,7 +755,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
 /* Der Abstand kommt vom `gap` des Rasters, nicht von den Karten – sonst stuende er im
    Querformat zusaetzlich zwischen den Spalten und verfaelschte die Zeilenhoehe.
-   Dieselbe Ueberlegung wie bei `.ov-oben`. */
+   Dieselbe Ueberlegung wie frueher bei `.ov-oben`. */
 .two-col-eq>*{min-width:0;overflow:visible;margin-bottom:0}
 
 /* Stats rows */
@@ -824,47 +824,21 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 
 /* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
    Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
-/* ── Ziele der Übersicht: Ringe und Wochenbilanz (30.09.2026, auf Wunsch) ─────
-   Beide sitzen wie die Kacheln direkt auf dem dunklen Tab-Verlauf: weisse Schrift,
+/* ── Ziele der Übersicht: Wochenbilanz (30.09.2026, auf Wunsch) ─────
+   Sitzt wie die Kacheln direkt auf dem dunklen Tab-Verlauf: weisse Schrift,
    Grün = erreicht, Gelb-Orange = offen (dieselben hellen Töne wie auf den Kacheln,
    die dunkleren der Karten wären auf dem Verlauf zu schwach). */
 .ov-oben{--zw-gut:#34D399;--zw-offen:#FBBF24}
-/* Ringe ersetzen seit 30.09.2026 die Minikacheln: 2 × 2, gross, Tageswert in der
-   Mitte. `--ring` ist die EINE Grösse – Strich, Schrift und Abstände hängen daran. */
-.ziel-ringe{--ring:128px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem .5rem;margin:0 0 .7rem;text-align:center;color:#fff}
-.zr{display:flex;flex-direction:column;align-items:center;min-width:0;border-radius:var(--r);padding:.3rem 0}
-/* Antippbar (führt in den Tab). Rückmeldung NUR über Deckkraft, ohne transform: die
-   Ringe liegen im waagrecht UND senkrecht scrollenden Bereich, und ein transform
-   während :active bricht auf iOS die laufende Wischgeste ab. */
-.zr[data-ziel-tab]{cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent}
-.zr[data-ziel-tab]:active{opacity:.7}
-.zr[data-ziel-tab]:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:2px}
-.zr-ring{position:relative;width:var(--ring);height:var(--ring)}
-.zr-ring svg{position:absolute;inset:0;width:100%;height:100%}
-.zr-spur{fill:none;stroke:rgba(255,255,255,.2);stroke-width:9}
-.zr-fuell{fill:none;stroke-width:9;stroke-linecap:round}
-.zr-mitte{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
-.zr-zahl{font-size:calc(var(--ring)*.2);font-weight:800;letter-spacing:-.02em;white-space:nowrap}
-/* „7h 22m" ist doppelt so breit wie „53" – kleiner, damit es nicht an den Ring stösst. */
-.zr-zahl.lang{font-size:calc(var(--ring)*.155)}
-.zr-einheit{font-size:calc(var(--ring)*.095);font-weight:600;opacity:.8;white-space:nowrap}
-.zr-name{font-size:1rem;font-weight:700;margin-top:.45rem}
-.zr-wert{font-size:.85rem;font-weight:600;white-space:nowrap;opacity:.9}
-.zr-wert.ok{color:var(--zw-gut);opacity:1}
-.zr-wert.nein{color:var(--zw-offen);opacity:1}
 /* Wochenbilanz: durchscheinende Fläche wie die Kacheln, keine weisse Karte. */
 .ziel-woche{background:rgba(255,255,255,.14);border-radius:var(--r);
   padding:.85rem 1rem;margin-bottom:.7rem;color:#fff}
 .zw-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
 .zw-kopf h3{margin:0;font-size:1.15rem;font-weight:700;color:#fff}
 .ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
-/* EIN Raster für Kopf und alle vier Zeilen: Name | 7 Tage | Zahl. `.zw-spalten` liegt
-   mit denselben Spalten absolut dahinter – im selben Raster hätten die Flächen über
-   alle Zeilen die Auto-Platzierung der übrigen Zellen verdrängt. */
+/* EIN Raster für Kopf und alle vier Zeilen: Name | 7 Tage | Zahl. */
 .zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 2.6rem;display:grid;grid-template-columns:var(--zw-spalten);
-  align-items:center;font-size:1rem;position:relative}
-.zw-spalten{position:absolute;inset:0;display:grid;grid-template-columns:var(--zw-spalten)}
-.zw-raster>:not(.zw-spalten){position:relative;pointer-events:none;padding:.4rem 0}
+  align-items:center;font-size:1rem}
+.zw-raster>*{padding:.4rem 0}
 .zw-name{font-weight:600;padding-right:.5rem!important}
 .zw-zahl{text-align:right;font-weight:700}
 .zw-punkt{display:flex;justify-content:center}
@@ -873,21 +847,8 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-punkt i.aus{border:2.5px solid rgba(255,255,255,.5)}
 .zw-punkt i.leer{background:rgba(255,255,255,.12)}
 .zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);padding:.1rem 0 .2rem!important}
-.zw-tag.gewaehlt{color:#fff;font-weight:800}
-/* Je Tag eine Spalte über alle Zeilen HINTER den Punkten: Tippfläche (auch zwischen
-   den Punkten – Punkte und Beschriftungen lassen Tipps durch) und Hervorhebung des
-   gewählten Tags als Fläche. Rückmeldung nur über Deckkraft (kein transform im
-   scrollenden Bereich, siehe Ringe). */
-.zw-spalte{grid-row:1;margin:0 1px;border-radius:12px;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;transition:background .15s,opacity .15s}
-.zw-spalte:active{opacity:.6}
-.zw-spalte.zukunft{cursor:default}
-.zw-spalte.gewaehlt{background:rgba(255,255,255,.2)}
-.zw-spalte:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:-2px}
 .zw-rechts{display:flex;align-items:center;gap:.5rem}
 .zw-vor{font-size:.8rem;font-weight:600;opacity:.85;white-space:nowrap}
-/* Über den Ringen: der Tag, dessen Werte sie zeigen. */
-.zr-titel{grid-column:1/-1;justify-self:start;margin:0 0 -.4rem;font-size:1.15rem;font-weight:700;color:#fff}
 
 
 /* Letzte Workout Tabelle */
@@ -1072,14 +1033,6 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Wochenbilanz links, Ringe rechts – im Querformat ist Breite da und Hoehe knapp,
-     deshalb dort kleinere Ringe. Der Kartenabstand sitzt am Container, nicht an den
-     Kindern – im Raster verfaelschte er sonst die Zeilenhoehe. */
-  .ov-oben{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"woche ringe";gap:.7rem;align-items:start;margin-bottom:.7rem}
-  .ov-oben>*{margin-bottom:0}
-  .ov-oben>.ziel-ringe{grid-area:ringe;--ring:92px;gap:.5rem}
-  .ov-oben>.ziel-woche{grid-area:woche}
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1240,6 +1193,3 @@ body.hinweis-an .screen{
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: .28s; }
 
-/* Kachel-Zahlen zaehlen hoch (kachelnHochzaehlen). Gleich breite Ziffern, sonst
-   wackelt der zentrierte Wert waehrend des Zaehlens seitlich hin und her. */
-.ti-zahl { font-variant-numeric: tabular-nums; }

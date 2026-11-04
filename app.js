@@ -2185,12 +2185,10 @@ function zielLinie(key, laenge, achse) {
   };
 }
 
-// ── Ziele der Übersicht: Ringe (letzter Tag) und Wochenbilanz (auf Wunsch, 30.09.2026)
-// Ersetzt die frühere weisse Ziel-Karte: sie wiederholte drei Kachelwerte und passte
-// optisch nicht zu den Kacheln. Die RINGE stehen über den Kacheln und zeigen, wie nah
-// der letzte Tag am Ziel ist; die WOCHENBILANZ darunter zeigt je Ziel die letzten
-// Tage der AKTUELLEN Kalenderwoche (Mo–So) als Punkte. Beide lesen ZIELE und
-// zielErfuellt – keine eigenen Schwellen.
+// ── Ziele der Übersicht: Wochenbilanz (auf Wunsch, 30.09.2026) ──────────────────
+// Zeigt je Ziel die Tage einer Kalenderwoche (Mo–So) als Punkte; liest ZIELE und
+// zielErfuellt – keine eigenen Schwellen. Die Ziel-Ringe darunter (Tageswerte) sind
+// am 04.11.2026 auf Wunsch entfallen, mit ihnen die Tagesauswahl in der Wochenbilanz.
 // Trainingstage: ein Tag mit mindestens einer Einheit im Workout-Blatt
 // (durationMin > 0) – dieselbe Regel wie überall in der App.
 // Montag bis Sonntag der laufenden Woche (nach dem heutigen Datum, nicht dem neuesten
@@ -2205,66 +2203,21 @@ function aktuelleWoche() {
 function bilanzWoche() { return is7D() && referenceDate ? weekDays7() : aktuelleWoche(); }
 function istTrainingstag(d) { return workoutData[d]?.durationMin > 0; }
 
-// ── Gewählter Tag der Wochenbilanz (auf Wunsch, 30.09.2026) ─────────────────
-// Ein Tipp auf eine Tagesspalte der Wochenbilanz wählt den Tag; die Ringe zeigen dann
-// seine Werte. Ohne Auswahl (null) gilt der heutige Tag – liegt für heute noch kein
-// Export vor, der neueste Datentag, sonst stünden morgens nur „—" in den Ringen.
-// Gemerkt wird der WOCHENTAG (0 = Mo … 6 = So), nicht das Datum: beim Blättern der
-// Woche bleibt er stehen (auf Wunsch, 30.09.2026). „Heute" setzt ihn zurück.
-let _bilanzWochentag = null;
-function standardTag() {
-  const heute = toLocalDateStr(new Date());
-  const letzter = allData.length ? allData[allData.length - 1].date : heute;
-  return letzter < heute ? letzter : heute;
-}
-function wochentagIndex(ds) { return (new Date(ds + 'T00:00:00').getDay() + 6) % 7; }
-// Der gewählte Tag in der Woche `tage`. Läge er in der Zukunft (Sonntag gewählt, zurück
-// in der laufenden Woche), gilt der Standardtag.
-function gewaehlterTag(tage) {
-  const std = standardTag();
-  const d = tage[_bilanzWochentag ?? wochentagIndex(std)];
-  return d > toLocalDateStr(new Date()) ? std : d;
-}
 function wocheVon(ds) { const mo = getWeekMonday(ds); return Array.from({ length: 7 }, (_, i) => addDays(mo, i)); }
 
-// Beide Teile zusammen – auch für den Neuaufbau nach einem Tipp auf einen Tag, ohne
-// dass die ganze Übersicht (samt Diagramm und Einblicken) neu entsteht.
 function ovObenHTML() {
   if (!allData.length) return '';
-  const tage = bilanzWoche(), tag = gewaehlterTag(tage);
-  return `<div class="ov-oben">${zielWocheHTML(tage, tag)}${zielRingeHTML(tag)}</div>`;
-}
-function ovObenNeu() {
-  const el = document.querySelector('#screen-overview .ov-oben');
-  if (!el) return;
-  const vorher = ovObenMerken();
-  el.outerHTML = ovObenHTML();
-  ovObenAnimieren(vorher);
+  return `<div class="ov-oben">${zielWocheHTML(bilanzWoche())}</div>`;
 }
 
-// ── Animation der Wochenbilanz und der Ringe (auf Wunsch, 30.09.2026) ──────────
-// Zwei Vorgänge: WOCHE wechseln (Pfeile/Wisch bei 7T, Bereichswechsel) → die Punkte
-// gleiten spaltenweise aus der Richtung herein, aus der die Woche kommt; TAG wählen →
-// die helle Fläche gleitet von der alten Spalte zur neuen. In beiden Fällen laufen
-// die Ringe von ihrem alten Stand auf den neuen (Füllung und Zahl) und der Titel
-// blendet über. Vorher/nachher wird am DOM gemessen: `ovObenMerken()` VOR dem
-// Neuaufbau, `ovObenAnimieren()` danach – so braucht keiner der Auslöser (Tipp,
-// Blättern, Neuaufbau der Übersicht) eigenen Code.
+// ── Animation der Wochenbilanz (auf Wunsch, 30.09.2026) ─────────────────────────
+// Woche wechseln (Pfeile/Wisch bei 7T, Bereichswechsel) → die Punkte gleiten
+// spaltenweise aus der Richtung herein, aus der die Woche kommt. Vorher/nachher wird
+// am DOM gemessen: `ovObenMerken()` VOR dem Neuaufbau, `ovObenAnimieren()` danach.
 const OV_DAUER = 260;
 function ovObenMerken() {
   const ob = document.querySelector('#screen-overview .ov-oben');
-  if (!ob) return null;
-  const mark = ob.querySelector('.zw-spalte.gewaehlt');
-  return {
-    woche: ob.querySelector('.ziel-woche')?.dataset.woche,
-    tag: mark?.dataset.tag,
-    markLinks: mark ? mark.getBoundingClientRect().left : null,
-    titel: ob.querySelector('.zr-titel')?.textContent,
-    ringe: [...ob.querySelectorAll('.zr')].map(z => ({
-      anteil: Number(z.querySelector('.zr-fuell')?.dataset.anteil || 0),
-      wert: z.querySelector('.ti-zahl') ? Number(z.querySelector('.ti-zahl').dataset.wert) : null
-    }))
-  };
+  return ob ? { woche: ob.querySelector('.ziel-woche')?.dataset.woche } : null;
 }
 // WAAPI mit Rückfall: eine nicht gezeichnete Seite hielte sonst das erste Bild fest
 // (Deckkraft 0) – dieselbe Falle wie bei `_ausklappAnimieren`.
@@ -2277,142 +2230,27 @@ function ovObenAnimieren(vorher) {
   const ob = document.querySelector('#screen-overview .ov-oben');
   if (!vorher || !ob || bewegungAus() || currentScreen !== 'overview') return;
   const woche = ob.querySelector('.ziel-woche')?.dataset.woche;
-  const mark = ob.querySelector('.zw-spalte.gewaehlt');
-  const tag = mark?.dataset.tag;
+  if (!woche || !vorher.woche || woche === vorher.woche) return;
   const easing = 'cubic-bezier(.22,.8,.3,1)';
-  if (woche && vorher.woche && woche !== vorher.woche) {
-    // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
-    const r = woche > vorher.woche ? 1 : -1;
-    ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
-      [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
-      { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
-    ob.querySelectorAll('.zw-zahl, .zw-rechts').forEach(el => _ovAnim(el,
-      [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
-  }
-  if (mark && vorher.markLinks != null) {
-    const dx = vorher.markLinks - mark.getBoundingClientRect().left;
-    if (Math.abs(dx) > .5) _ovAnim(mark, [{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
-      { duration: OV_DAUER, easing });
-  } else if (mark) {
-    _ovAnim(mark, [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing });
-  }
-  if (tag === vorher.tag) return;
-  // Titel: das alte Datum blendet aus, das neue ein – ohne Bewegung (auf Wunsch).
-  const titel = ob.querySelector('.zr-titel');
-  if (titel && vorher.titel && vorher.titel !== titel.textContent) {
-    const neu = titel.textContent, halb = OV_DAUER / 4;   // je 65 ms (auf Wunsch doppelt so schnell)
-    let getauscht = false;
-    const tauschen = () => {
-      if (getauscht || !titel.isConnected) return; getauscht = true;
-      titel.textContent = neu;
-      _ovAnim(titel, [{ opacity: 0 }, { opacity: 1 }], { duration: halb, easing: 'ease-out' });
-    };
-    titel.textContent = vorher.titel;
-    if (titel.animate) {
-      const a = titel.animate([{ opacity: 1 }, { opacity: 0 }], { duration: halb, easing: 'ease-in', fill: 'forwards' });
-      a.onfinish = () => { tauschen(); a.cancel(); };
-      setTimeout(() => { tauschen(); a.cancel(); }, halb + 120);
-    } else tauschen();
-  }
-  // Ringe: Füllung und Zahl vom alten auf den neuen Stand.
-  const U = 2 * Math.PI * 44;
-  const laeufe = [...ob.querySelectorAll('.zr')].map((z, i) => {
-    const alt = vorher.ringe[i] || {};
-    const kreis = z.querySelector('.zr-fuell'), zahl = z.querySelector('.ti-zahl');
-    const l = { kreis, zahl, von: alt.anteil || 0, bis: kreis ? Number(kreis.dataset.anteil) : 0 };
-    if (zahl) {
-      l.wVon = alt.wert; l.wBis = Number(zahl.dataset.wert); l.form = zahl.dataset.form;
-      _kachelZuletzt[zahl.dataset.feld] = l.wBis;
-    }
-    return l;
-  });
-  const fmt = (v, form) => form === 'std' ? alsStdMin(Math.round(v * 60) / 60) : String(Math.round(v));
-  const schritt = e => laeufe.forEach(l => {
-    if (l.kreis && l.kreis.isConnected)
-      l.kreis.setAttribute('stroke-dasharray', `${((l.von + (l.bis - l.von) * e) * U).toFixed(1)} ${U.toFixed(1)}`);
-    if (l.zahl && l.zahl.isConnected && l.wVon != null && isFinite(l.wVon) && isFinite(l.wBis))
-      l.zahl.textContent = fmt(l.wVon + (l.wBis - l.wVon) * e, l.form);
-  });
-  schritt(0);
-  uebergang(OV_DAUER + 120, schritt);
-}
-
-// Anteil 0..1 am Ziel. Bei „weniger ist besser" (Ruhepuls): erreicht = voll, sonst
-// Ziel ÷ Wert (66 bpm bei Ziel 60 → 91 %).
-function zielAnteil(key, wert) {
-  const z = ZIELE[key];
-  if (wert == null || !z) return null;
-  if (zielErfuellt(key, wert)) return 1;
-  return Math.max(0, Math.min(1, z.richtung === 'hoch' ? wert / z.ziel : z.ziel / wert));
-}
-
-// Die Ringe ersetzen seit 30.09.2026 die Minikacheln (auf Wunsch): in der Mitte der
-// Tageswert (zählt wie früher die Kachelzahl hoch, `kachelZahl`), darunter Name und
-// Zielzeile. Ein Tipp wischt in den Tab der Kennzahl (`zuTabWischen`).
-const ZIEL_RINGE = [
-  { key: 'restHR',     name: 'Ruhepuls', farbe: '#F87171', tab: 'herz',     feld: 'hr',   einheit: 'bpm',
-    zielText: () => `Ziel ≤ ${ZIELE.restHR.ziel}` },
-  { key: 'hrv',        name: 'HRV',      farbe: '#60A5FA', tab: 'herz',     feld: 'hv',   einheit: 'ms',
-    zielText: () => `Ziel ≥ ${ZIELE.hrv.ziel}` },
-  { key: 'sleepTotal', name: 'Schlaf',   farbe: '#A78BFA', tab: 'schlaf',   feld: 'sl',   einheit: '', form: 'std',
-    zielText: v => zielErfuellt('sleepTotal', v) ? `Ziel ${alsStdMin(ZIELE.sleepTotal.ziel)}`
-      : `${alsStdMin(ZIELE.sleepTotal.ziel - v).replace(/^0h 0?/, '')} unter Ziel` },
-  { key: 'trainDays',  name: 'Training', farbe: '#FB923C', tab: 'training', feld: 'tage', einheit: `/ ${ZIELE.trainDays.ziel} Tage`,
-    zielText: (v, tag) => getWeekMonday(tag) === getWeekMonday(toLocalDateStr(new Date())) ? 'diese Woche' : 'KW ' + isoKW(tag) }
-];
-
-// `tag`: der gewählte Tag (Werte von Ruhepuls, HRV, Schlaf); Training zählt die
-// Trainingstage seiner Kalenderwoche. Der Titel nennt den Tag, dessen Werte gezeigt werden.
-function zielRingeHTML(tag) {
-  const zeile = allData.find(r => r.date === tag) || {};
-  const werte = {
-    restHR: zeile.restHR, hrv: zeile.hrv, sleepTotal: zeile.sleepTotal,
-    trainDays: wocheVon(tag).filter(istTrainingstag).length
-  };
-  const U = 2 * Math.PI * 44;   // Umfang des Rings (r = 44 im 100er-Raster)
-  const titel = `${WOCHENTAG_LANG[new Date(tag + 'T00:00:00').getDay()]}, ${tag.slice(8, 10)}.${tag.slice(5, 7)}.${tag.slice(0, 4)}`;
-  return `<div class="ziel-ringe"><h3 class="zr-titel">${titel}</h3>${ZIEL_RINGE.map(r => {
-    const v = werte[r.key], anteil = zielAnteil(r.key, v), ok = zielErfuellt(r.key, v);
-    // Ohne Messwert kein Sprung in den Tab – ein Tipp auf eine leere Stelle soll nicht
-    // überraschend wechseln (wie früher bei den leeren Kacheln).
-    const ziel = v == null ? '' :
-      ` data-ziel-tab="${r.tab}" role="button" tabindex="0" aria-label="${r.name}: ${r.form === 'std' ? alsStdMin(v) : Math.round(v)} ${r.einheit}, Ziel ${ok ? 'erreicht' : 'nicht erreicht'} – zum Tab ${TAB_TITEL[r.tab]}"`;
-    return `<div class="zr"${ziel}>
-      <div class="zr-ring">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="44" class="zr-spur"/>
-          ${anteil ? `<circle cx="50" cy="50" r="44" class="zr-fuell" data-anteil="${anteil}" stroke="${r.farbe}"
-            stroke-dasharray="${(anteil * U).toFixed(1)} ${U.toFixed(1)}" transform="rotate(-90 50 50)"/>` : ''}
-        </svg>
-        <div class="zr-mitte">
-          <span class="zr-zahl${r.form === 'std' ? ' lang' : ''}">${v == null ? '—' : kachelZahl(r.feld, v, r.form)}</span>
-          ${v != null && r.einheit ? `<span class="zr-einheit">${r.einheit}</span>` : ''}
-        </div>
-      </div>
-      <div class="zr-name">${r.name}</div>
-      <div class="zr-wert ${v == null ? '' : ok ? 'ok' : 'nein'}">${v == null ? '—' : (ok ? '✓ ' : '') + r.zielText(v, tag)}</div>
-    </div>`;
-  }).join('')}</div>`;
+  // Neuere Woche kommt von rechts, ältere von links – wie beim Blättern der Diagramme.
+  const r = woche > vorher.woche ? 1 : -1;
+  ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
+    [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+    { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
+  ob.querySelectorAll('.zw-zahl, .zw-rechts').forEach(el => _ovAnim(el,
+    [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
 }
 
 // Wochenbilanz: je Ziel sieben Punkte (Mo … So, siehe bilanzWoche), gefüllt = Ziel
 // erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
 // blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl erreichter Tage von denen mit Messwert; beim Training
 // die Trainingstage gegen das Wochenziel.
-// `tage`: die sieben Tage der angezeigten Woche; `tag`: der gewählte Tag (Spalte
-// hervorgehoben). Jede Spalte bis heute ist antippbar (`data-tag`); künftige nicht.
-function zielWocheHTML(tage, tag) {
+// `tage`: die sieben Tage der angezeigten Woche.
+function zielWocheHTML(tage) {
   const heute = toLocalDateStr(new Date());
   const byDate = {}; allData.forEach(r => { byDate[r.date] = r; });
-  // EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Dahinter liegt ein
-  // zweites Raster mit denselben Spalten (`.zw-spalten`): je Tag eine Fläche über alle
-  // Zeilen – die Tippfläche (auch zwischen den Punkten) und die Hervorhebung des
-  // gewählten Tags. Im selben Raster verdrängten die Flächen die übrigen Zellen.
-  const spalten = tage.map((d, i) => d > heute
-    ? `<span class="zw-spalte zukunft" style="grid-column:${i + 2}"></span>`
-    : `<span class="zw-spalte${d === tag ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${d}" role="button" tabindex="0"` +
-      ` aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)} anzeigen"${d === tag ? ' aria-pressed="true"' : ''}></span>`).join('');
-  const punkte = zustaende => zustaende.map((z, i) => `<span class="zw-punkt${tage[i] === tag ? ' gewaehlt' : ''}"><i class="${z}"></i></span>`).join('');
+  // EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl.
+  const punkte = zustaende => zustaende.map(z => `<span class="zw-punkt"><i class="${z}"></i></span>`).join('');
   const zeile = (name, zustaende, zahl, farbe) =>
     `<span class="zw-name">${name}</span>${punkte(zustaende)}` +
     `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>`;
@@ -2425,10 +2263,10 @@ function zielWocheHTML(tage, tag) {
   const nTraining = training.filter(x => x === 'an').length;
   // Wie viele Wochen liegt die angezeigte vor der laufenden?
   const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
-  const kopfTage = tage.map(d => `<span class="zw-tag${d === tag ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
+  const kopfTage = tage.map(d => `<span class="zw-tag">${wochentagKurz(d)}</span>`).join('');
   return `<div class="ziel-woche" data-woche="${tage[0]}">
     <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
-    <div class="zw-raster"><div class="zw-spalten">${spalten}</div>
+    <div class="zw-raster">
       <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
       ${messZeile('restHR', 'Ruhepuls')}
       ${messZeile('hrv', 'HRV')}
@@ -2831,48 +2669,6 @@ function kpiCard({icon,label,value,unit,delta,deltaLabel,color,sub}={}) {
 }
 
 // ── Übersicht ──────────────────────────────────────────
-const TAB_TITEL = { overview: 'Übersicht', herz: 'Herz', schlaf: 'Schlaf', training: 'Training' };
-
-// ── Zahlen in den Ziel-Ringen zaehlen hoch (auf Wunsch, 18.09.2026, damals Kacheln) ─
-// Beim App-Start von 0 auf den Wert, bei neuen Daten vom zuletzt gezeigten Wert auf
-// den neuen – in 450 ms. NICHT bei jedem Aufbau der Uebersicht (Bereichswechsel,
-// Blaettern, Ausklappen): dort aendern sich die Tageswerte nicht, und eine Zahl, die
-// jedes Mal neu hochzaehlt, nervt. Ausgeloest wird es ueber `_kachelnZaehlen`: true
-// beim Start, gesetzt von den drei Wegen, auf denen neue Daten ankommen (stilles
-// Nachladen, „Anzeigen" in der Hinweisleiste, „Daten aktualisieren"); verbraucht vom
-// naechsten Aufbau der Uebersicht.
-// Die endgueltige Zahl steht bereits im HTML; die Animation setzt sie erst im selben
-// Schritt auf den Startwert zurueck. Der Zeitgeber in `uebergang` sorgt dafuer, dass
-// sie auch ohne gezeichnete Seite am Ziel ankommt.
-// `data-wert` ist eine Zahl aus der Einlese-Pruefung, kein Fremdtext.
-const KACHEL_ZAEHL_DAUER = 450;
-let _kachelnZaehlen = true;
-const _kachelZuletzt = {};
-function kachelZahl(feld, wert, form = 'ganz') {
-  const txt = form === 'std' ? alsStdMin(wert) : String(Math.round(wert));
-  return `<span class="ti-zahl" data-feld="${feld}" data-form="${form}" data-wert="${Number(wert)}">${txt}</span>`;
-}
-function kachelnHochzaehlen() {
-  const felder = [...document.querySelectorAll('#screen-overview .ti-zahl')];
-  if (!felder.length) return;          // noch keine Daten: das Hochzaehlen aufheben
-  const zaehlen = _kachelnZaehlen;
-  _kachelnZaehlen = false;
-  const laeufe = [];
-  felder.forEach(el => {
-    const feld = el.dataset.feld, form = el.dataset.form, ziel = Number(el.dataset.wert);
-    const von = _kachelZuletzt[feld] != null ? _kachelZuletzt[feld] : 0;
-    _kachelZuletzt[feld] = ziel;
-    if (!zaehlen || bewegungAus() || !isFinite(ziel) || von === ziel) return;
-    // Die Stunden-Form zaehlt in Minuten, sonst sprangen die Minuten ungleichmaessig.
-    const fmt = v => form === 'std' ? alsStdMin(Math.round(v * 60) / 60) : String(Math.round(v));
-    laeufe.push({ el, von, ziel, fmt });
-    el.textContent = fmt(von);
-  });
-  if (!laeufe.length) return;
-  uebergang(KACHEL_ZAEHL_DAUER, e => laeufe.forEach(l => {
-    if (l.el.isConnected) l.el.textContent = l.fmt(l.von + (l.ziel - l.von) * e);
-  }));
-}
 
 function pgOverview() {
   const warnSig = detectWarningSignals();
@@ -2885,7 +2681,7 @@ function pgOverview() {
   // Regeln (auf Wunsch): ein Tag OHNE Messwert gilt als NICHT erreicht. Training ist ein
   // Wochenziel – erreicht ist es an einem Tag, wenn seine Woche (Mo–So) das Ziel
   // erreicht; in der laufenden Woche also erst ab dem dritten Trainingstag, dann
-  // rueckwirkend fuer alle ihre Tage. Dieselben Regeln wie Wochenbilanz und Ringe.
+  // rueckwirkend fuer alle ihre Tage.
   const D = filtered();
   const zielRows = D.map(r => {
     const z = {
@@ -2907,8 +2703,7 @@ function pgOverview() {
   document.getElementById("screen-overview").innerHTML = `
     ${pgBanner('📊','Übersicht')}
     <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber dem Kartenpaar:
-         eine Warnung gehoert nach oben, und im Querformat stehen Ziele und Kacheln
-         nebeneinander – dazwischen waere kein Platz fuer sie. -->
+         eine Warnung gehoert nach oben. -->
     ${warnSig ? `<div class="warn-card">
       <div>
         <div class="warn-title">Belastungssignal erkannt ${scopeBadge('letzter Tag')}</div>
@@ -2916,8 +2711,6 @@ function pgOverview() {
         <div class="warn-signals">${warnSig.signals.map(s=>`<span class="warn-sig">${s}</span>`).join('')}</div>
       </div>
     </div>` : ''}
-    <!-- Hochformat: Wochenbilanz über den Ringen. Querformat: Wochenbilanz links,
-         Ringe rechts (Raster-Bereiche in style.css). -->
     ${ovObenHTML()}
     <!-- Verlauf und Muster-Raster: Teil des Ausklapp-Bereichs (seit 08.09.2026). -->
     <div class="chart-card ausklapp-teil" style="margin-bottom:.7rem;${_weitereOffen.overview?'':'display:none'}">
@@ -2966,8 +2759,7 @@ function pgOverview() {
     });
   }
 }
-// Die vier Ziele des Diagramms „Zielerreichung" – Reihenfolge und Farben wie die Ringe
-// und die Wochenbilanz.
+// Die vier Ziele des Diagramms „Zielerreichung" – Reihenfolge wie die Wochenbilanz.
 const ZIEL_REIHEN = [
   { name: 'Ruhepuls', feld: '_zPuls',     farbe: '#EF4444' },
   { name: 'HRV',      feld: '_zHrv',      farbe: '#2563EB' },
@@ -5132,7 +4924,6 @@ function filterTitelTeil() {
 // wer am neuesten Tag steht, will beim naechsten Nachladen mitgezogen werden.
 function aufHeuteSpringen() {
   if (!allData.length) return;
-  _bilanzWochentag = null;   // die Wochenbilanz zeigt wieder den heutigen Tag
   referenceDate = allData[allData.length-1].date;
   _datumSelbstGewaehlt = false;
 }
@@ -5335,7 +5126,6 @@ function _tabNachbereiten(name) {
   _zeitraumEinsetzen(name);
   glasHtmlAnpassen(screenEl);
   balkenFuellen(name);
-  if (name === 'overview') kachelnHochzaehlen();
   updateNavUI();
   // Erst hier steht die endgueltige Hoehe fest – die Zeitraum-Angaben sind gesetzt.
   if (name === currentScreen) blickAnkerWiederherstellen();
@@ -5538,71 +5328,6 @@ function showScreen(name) {
   _applyTabState(name);
 }
 
-// Tabwechsel MIT Wisch-Animation (Tipp auf einen Ziel-Ring der Übersicht, 13.09.2026).
-// Bewegt wird `scrollLeft` des Tab-Scrollers — also genau das, was auch der Finger
-// beim Wischen bewegt. Deshalb laeuft der Rest ueber den vorhandenen Scroll-Sync und
-// sieht aus wie ein Wisch: Hintergrund-Verlauf folgt dem Fortschritt, Tabfarbe und
-// Tableisten-Markierung wechseln unterwegs, die Zeitleiste wird passiv, und 90 ms nach
-// dem letzten Schritt setzt der Settle-Timer `currentScreen` und ruft `_applyTabState`.
-// `showScreen()` bleibt fuer die Tableiste bewusst sprunghaft.
-//
-// Zwei Dinge sind noetig, damit es zuverlaessig laeuft:
-// 1. `scroll-snap-type` ist WAEHREND der Animation aus. Mit `x mandatory` rastet
-//    Safari jeden einzelnen Zwischenschritt wieder auf den naechsten Tab ein, und die
-//    Bewegung ruckelt oder bleibt stehen. Am Ende steht `scrollLeft` exakt auf dem
-//    Ziel, das Wiedereinschalten verschiebt also nichts.
-// 2. Eine Beruehrung bricht ab. Wer mitten in der Animation den Finger auflegt,
-//    uebernimmt — dann gilt wieder das native Einrasten.
-// Ein noch nicht gebauter Ziel-Tab wird VOR dem Start gebaut, sonst wischte eine leere
-// Seite herein und fuellte sich erst am Ende.
-let _tabWischRAF = null;
-function zuTabWischen(name) {
-  if (!TAB_ORDER.includes(name) || name === currentScreen) return;
-  const container = document.getElementById('tab-container');
-  const w = container ? container.clientWidth : 0;
-  if (!w || bewegungAus()) { showScreen(name); return; }
-  if (!_renderedTabs.has(name)) { _renderTab(name); _renderedTabs.add(name); }
-  if (_tabWischRAF) cancelAnimationFrame(_tabWischRAF);
-  const start = container.scrollLeft;
-  const ziel  = TAB_ORDER.indexOf(name) * w;
-  // Ein Tab weit 380 ms, jeder weitere 110 ms dazu – ueber drei Tabs 600 ms. Linear
-  // mit der Strecke waere das zu lang, fest zu hektisch.
-  const dauer = 380 + 110 * Math.max(0, Math.round(Math.abs(ziel - start) / w) - 1);
-  const ease  = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;   // easeInOutCubic
-  container.style.scrollSnapType = 'none';
-  // `fertig` = die Animation ist bis zum Ziel gelaufen. Nur dann wird der Endzustand
-  // ausdruecklich gesetzt. Bei einem Abbruch durch Beruehrung entscheidet das native
-  // Einrasten, wo man landet – dort einen Tab zu erzwingen, waere falsch.
-  // Warum ueberhaupt ausdruecklich: der Scroll-Sync zieht den Zustand nur ueber
-  // `scroll`-Events nach. Die feuern auf dem Geraet zuverlaessig, im verdeckten
-  // Vorschau-Pane aber gar nicht – dort blieben Tabfarbe und Markierung auf dem
-  // Ausgangstab stehen. Mit gesetztem `currentScreen` ueberspringt der Settle-Timer des
-  // Syncs seinen eigenen Aufruf, doppelt laeuft also nichts.
-  const ende = fertig => {
-    if (_tabWischRAF) cancelAnimationFrame(_tabWischRAF);
-    _tabWischRAF = null;
-    container.style.scrollSnapType = '';
-    container.removeEventListener('touchstart', abbruch);
-    container.removeEventListener('pointerdown', abbruch);
-    if (fertig === true && currentScreen !== name) {
-      currentScreen = name;
-      setTabBackgroundInstant(name);
-      _applyTabState(name);
-    }
-  };
-  const abbruch = () => ende(false);
-  container.addEventListener('touchstart', abbruch, { passive: true });
-  container.addEventListener('pointerdown', abbruch, { passive: true });
-  const t0 = performance.now();
-  const schritt = now => {
-    const t = Math.min(1, (now - t0) / dauer);
-    container.scrollLeft = start + (ziel - start) * ease(t);
-    if (t < 1) _tabWischRAF = requestAnimationFrame(schritt);
-    else ende(true);
-  };
-  _tabWischRAF = requestAnimationFrame(schritt);
-}
-
 // State-Change (Filter, Datum, Refresh, Dark-Mode) → alle Tabs invalidieren + aktuellen neu rendern
 function _refreshAfterStateChange() {
   // Alle Charts zerstören (Theme- oder Datenwechsel)
@@ -5714,8 +5439,8 @@ function initScrollHideNav() {
   const _tapContainer = document.getElementById('tab-container');
   if (_tapContainer) _tapContainer.addEventListener('click', (e) => {
     // Alles, was selbst etwas auslöst, ausnehmen: Bedienelemente, Diagramme (Markierung),
-    // Kartentitel (Datenbeschriftung), Ziel-Ringe (Tabwechsel) und Tooltip-Anker.
-    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, [data-ziel-tab], [data-tag], ' + TT_TAP_SELECTOR)) return;
+    // Kartentitel (Datenbeschriftung) und Tooltip-Anker.
+    if (e.target.closest('button, a, input, select, textarea, label, canvas, .chart-card h3, ' + TT_TAP_SELECTOR)) return;
     navAusblenden(nav, !nav.classList.contains('nav-hidden'));
   });
 }
@@ -5848,18 +5573,6 @@ document.body.addEventListener('click', (e) => {
 // innerHTML ersetzt werden.
 document.body.addEventListener('click', (e) => {
   const t = e.target;
-  // Tipp auf einen Ziel-Ring: Wisch in seinen Tab. Ein ⓘ darin bliebe ausgenommen –
-  // es oeffnet weiterhin seine Erklaerung, statt den Tab zu wechseln.
-  // Tipp auf eine Tagesspalte der Wochenbilanz: Tag wählen, Ringe zeigen seine Werte.
-  const _bilanzZelle = t.closest('.ziel-woche [data-tag]');
-  if (_bilanzZelle) {
-    const d = _bilanzZelle.dataset.tag;
-    _bilanzWochentag = d === standardTag() ? null : wochentagIndex(d);
-    ovObenNeu();
-    return;
-  }
-  const _kachel = t.closest('.zr[data-ziel-tab]');
-  if (_kachel && !t.closest(TT_TAP_SELECTOR)) { zuTabWischen(_kachel.dataset.zielTab); return; }
   // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
   // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
   // ist dort null und der Zweig greift gar nicht.
@@ -5964,16 +5677,6 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
   });
 });
 
-// Ziel-Ringe sind per `role="button"` Knoepfe – dann gehoeren Enter und Leertaste dazu.
-document.body.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  const k = e.target.closest && e.target.closest('.zr[data-ziel-tab], .ziel-woche [data-tag]');
-  if (k && k.dataset.tag && e.target === k) { e.preventDefault(); k.click(); return; }
-  if (!k || e.target !== k) return;
-  e.preventDefault();
-  zuTabWischen(k.dataset.zielTab);
-});
-
 // ── Transparenz-Modus (02.10.2026, auf Wunsch, 1:1 aus FitTracks Glas-Modus) ──────
 // Ersetzt den Dunkelmodus. Alle Karten in den vier Tabs werden durchscheinend (12-%-
 // Weiss auf dem Tab-Verlauf), ihre Schrift weiss. Die Einstellungen-Seite, Zeitleiste
@@ -6058,7 +5761,7 @@ function _glasDiagramm(cfg) {
   });
 }
 // Inline-Farben im HTML eines Tabs (Fusszeilen-Signale, Legendenpunkte, Kartenkanten,
-// Einblicke) ebenso aufhellen. Wochenbilanz und Ringe sind schon fuer den Verlauf
+// Einblicke) ebenso aufhellen. Die Wochenbilanz ist schon fuer den Verlauf
 // gebaut und bleiben aussen vor.
 function glasHtmlAnpassen(root) {
   if (!glasAktiv() || !root) return;
@@ -6242,7 +5945,7 @@ function appKarteAuffrischen() {
 }
 document.body.addEventListener('click', (e) => {
   if (!e.target.closest('.hinweis-akt')) return;
-  if (_hinweisZustand === 'neu') { hinweisAus(); _kachelnZaehlen = true; _refreshAfterStateChange(); }
+  if (_hinweisZustand === 'neu') { hinweisAus(); _refreshAfterStateChange(); }
 });
 
 // ── Erste Berührung merken ─────────────────────────────
@@ -6271,7 +5974,6 @@ async function hintergrundLaden() {
     hinweisZeigen('neu', 'Neue Daten geladen', 'Anzeigen');
   } else {
     updateNavUI();
-    _kachelnZaehlen = true;
     _refreshAfterStateChange();
   }
 }
@@ -6318,7 +6020,7 @@ async function refreshData() {
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
   appKarteAuffrischen();
-  if (ergebnis === true) { refreshBestaetigen('Aktualisiert ✓'); _kachelnZaehlen = true; }
+  if (ergebnis === true) refreshBestaetigen('Aktualisiert ✓');
   updateNavUI();
   _refreshAfterStateChange();
 }
