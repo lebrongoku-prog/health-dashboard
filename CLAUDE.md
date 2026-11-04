@@ -758,8 +758,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hochzählen (`kachelZahl`, `kachelnHochzaehlen`, `_kachelnZaehlen`, `.ti-zahl`), der
   animierte Tabwechsel `zuTabWischen` (nur die Ringe lösten ihn aus) und das
   Querformat-Raster von `.ov-oben`. Alles in der Git-Historie.
-  **Den Platz nutzen seither drei Erweiterungen der Karte** (auf Wunsch, 04.11.2026,
-  Vorschläge 1–3):
+  **Den Platz nutzen seither zwei Erweiterungen der Karte** (auf Wunsch, 04.11.2026;
+  ein dritter Teil, der Trend je Ziel gegen die 4 Wochen davor — `Ø 1.7 ↓` unter
+  `2/3`, `_zielTrend` — stand am selben Tag kurz live und ist auf Wunsch wieder
+  entfallen):
   1. **Tagesdetail** (`zielTagHTML`, `.zt`): Tipp auf eine Tagesspalte (wieder über
      `.zw-spalten`/`.zw-spalte` hinter dem Raster — **nicht ins selbe Raster legen**,
      dort verdrängten die Flächen die Auto-Platzierung) oder auf ein Feld des
@@ -772,25 +774,28 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      „60 · 0 zu hoch" da. Neuaufbau nur von `.ov-oben` (`ovObenNeu`), Detail wächst
      auf, die helle Spalte gleitet. `[data-tag]` steht in der Ausnahmeliste des
      Hintergrund-Tipps; Enter/Leertaste lösen aus.
-  2. **Trend je Ziel** (`_zielTrend`, `_trendHTML`): rechts unter `2/3` ein `Ø 1.7`
-     mit Pfeil, Spaltenkopf „vs. 4 Wo.". Vergleich mit den **28 Tagen vor** der
-     angezeigten Woche, **auf dieselbe Basis umgerechnet**, damit eine angebrochene
-     Woche fair ist: Messwerte → Trefferquote der 4 Wochen × Tage mit Wert dieser Woche;
-     Training → Ø Trainingstage je Woche × vergangene Tage ÷ 7. Pfeil ab 0.5 Tagen
-     Unterschied (`ZW_TREND_SCHWELLE`); ↑ = mehr Tage im Ziel (grün, auch beim
-     Ruhepuls), ↓ orange. Unter 7 Vergleichstagen mit Wert bzw. ohne Daten vor dem
-     Fenster: keine Angabe. Spalte rechts dafür 3rem statt 2.6rem.
-  3. **Letzte 5 Wochen** (`zielMonatHTML`, `.zm`): je Woche eine Zeile `KW nn`, je
+  2. **Letzte 5 Wochen** (`zielMonatHTML`, `.zm`): je Woche eine Zeile `KW nn`, je
      Tag ein Feld in denselben Spalten wie die Woche darüber, Grün je heller desto
      mehr der vier Ziele (`.n0`–`.n4`), rechts `Ø` Ziele pro Tag, Legende `0 … 4 Ziele`.
      **Dieselben Regeln wie „Zielerreichung"**: fehlender Messwert = nicht erreicht,
      Training an jedem Tag einer Woche mit erreichtem Wochenziel. Tage ohne
      Health-Zeile und Zukunft blass. Unterste Zeile = angezeigte Woche (folgt 7T).
-  **Querformat:** Woche links, Tagesdetail und 5 Wochen rechts (Raster an
-  `.ziel-woche`; gemessen 812 × 375: je 367 px). Hochformat untereinander.
-  Nachgerechnet (Prüfstand, KW 45, aus den Rohzeilen): Trend Ruhepuls 2/3 Ø 2.79,
-  HRV 1/3 Ø 2.25, Schlaf 1/3 Ø 1.71, Training 1 Ø 1.39; 5-Wochen-Felder und Ø
-  3.29/2.14/3.43/2.14/1.33 — alle identisch. Bei 360 px ragt nichts aus der Karte.
+  **Gleich hoch, einheitliche Abstände** (auf Wunsch, 04.11.2026): Woche und 5 Wochen
+  sind genau gleich hoch. Beide Raster setzen ihre Zeilenhöhen selbst
+  (`grid-template-rows`, keine Innenabstände der Zellen): Kopfzeile `--zw-kopf-h`
+  (Wochentage bzw. „Letzte 5 Wochen", die dafür als erste Zeile IM Raster steht), dann
+  4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. Die Felder füllen ihre Zelle bis
+  auf 3 px rundum. **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
+  der Karte, Innenrand des Tagesdetails und jede Lücke zwischen den Teilen (`gap` der
+  Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen mit
+  negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
+  **Querformat:** Woche links, 5 Wochen rechts (gleich hoch, also bündig), Tagesdetail
+  darunter über die volle Breite (`grid-template-areas` an `.ziel-woche`).
+  Gemessen (Prüfstand): 375 × 812 Raster je 155.2 px, Innenrand und alle Lücken 16 px,
+  mit und ohne Detail; 812 × 375 Raster je 370 × 155 px nebeneinander, Lücken 16 px;
+  360 px Detail-Zellen 63 px, nichts ragt heraus (Status dafür .66rem).
+  Nachgerechnet (KW 45, aus den Rohzeilen): 5-Wochen-Felder und Ø
+  3.29/2.14/3.43/2.14/1.33 — identisch.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im

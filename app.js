@@ -2188,7 +2188,7 @@ function zielLinie(key, laenge, achse) {
 // ── Ziele der Übersicht: Wochenbilanz (auf Wunsch, 30.09.2026) ──────────────────
 // Zeigt je Ziel die Tage einer Kalenderwoche (Mo–So) als Punkte; liest ZIELE und
 // zielErfuellt – keine eigenen Schwellen. Die Ziel-Ringe darunter (Tageswerte) sind
-// am 04.11.2026 auf Wunsch entfallen; ihren Platz nehmen Trend, Tagesdetail und das
+// am 04.11.2026 auf Wunsch entfallen; ihren Platz nehmen das Tagesdetail und das
 // Raster der letzten 5 Wochen ein.
 // Trainingstage: ein Tag mit mindestens einer Einheit im Workout-Blatt
 // (durationMin > 0) – dieselbe Regel wie überall in der App.
@@ -2266,9 +2266,11 @@ function ovObenAnimieren(vorher) {
   // Tagesdetail: neu → wächst auf; anderer Tag → Inhalt blendet über.
   const zt = ob.querySelector('.zt');
   if (zt && !vorher.detail) {
-    const h = zt.offsetHeight;
+    // Die Lücke davor kommt aus dem `gap` der Karte und stünde sofort voll da – der
+    // negative Rand gleicht sie am Anfang aus.
+    const h = zt.offsetHeight, luecke = parseFloat(getComputedStyle(zt.parentElement).rowGap) || 0;
     zt.style.overflow = 'hidden';
-    _ovAnim(zt, [{ height: '0px', opacity: 0, marginTop: '0px' }, { height: h + 'px', opacity: 1 }],
+    _ovAnim(zt, [{ height: '0px', opacity: 0, marginTop: -luecke + 'px' }, { height: h + 'px', opacity: 1, marginTop: '0px' }],
       { duration: OV_DAUER, easing });
     setTimeout(() => { zt.style.overflow = ''; }, OV_DAUER + 140);
   } else if (zt && vorher.detail !== zt.dataset.tag) {
@@ -2288,46 +2290,11 @@ function ovObenAnimieren(vorher) {
 // Diagramm „Zielerreichung": erreicht an JEDEM Tag einer Woche mit ≥ 3 Trainingstagen.
 function _trainingswocheErreicht(ds) { return !!zielErfuellt('trainDays', wocheVon(ds).filter(istTrainingstag).length); }
 
-// ── Trend je Ziel (auf Wunsch, 04.11.2026) ───────────────────────────────────────
-// Vergleicht die angezeigte Woche mit den 4 Wochen (28 Tagen) DAVOR. Damit eine
-// angebrochene Woche fair verglichen wird, rechnet der Ø auf DIESELBE Basis um:
-// Messwerte → Trefferquote der 4 Wochen × Tage mit Wert in dieser Woche („2/3" gegen
-// „Ø 1.7"); Training → Ø Trainingstage je Woche × vergangene Tage dieser Woche ÷ 7.
-// Pfeil erst ab 0.5 Tagen Unterschied; ↑ heisst immer „mehr Tage im Ziel" (auch beim
-// Ruhepuls), daher grün, ↓ orange. Zu wenig Vergleichsdaten → keine Angabe.
-const ZW_TREND_SCHWELLE = .5;
-function _zielTrend(key, tage, byDate) {
-  const heute = toLocalDateStr(new Date());
-  const vorTage = Array.from({ length: 28 }, (_, i) => addDays(tage[0], i - 28));
-  if (key === 'trainDays') {
-    if (!allData.length || allData[0].date > vorTage[0]) return null;
-    const vergangen = tage.filter(d => d <= heute).length;
-    if (!vergangen) return null;
-    const oe = vorTage.filter(istTrainingstag).length / 4 * vergangen / 7;
-    return { oe, ist: tage.filter(istTrainingstag).length };
-  }
-  const zaehle = ds => {
-    let an = 0, mit = 0;
-    ds.forEach(d => { const v = byDate[d]?.[key]; if (v == null) return; mit++; if (zielErfuellt(key, v)) an++; });
-    return { an, mit };
-  };
-  const jetzt = zaehle(tage), vor = zaehle(vorTage);
-  if (!jetzt.mit || vor.mit < 7) return null;
-  return { oe: vor.an / vor.mit * jetzt.mit, ist: jetzt.an };
-}
-function _trendHTML(t) {
-  if (!t) return '';
-  const d = t.ist - t.oe;
-  const pfeil = d >= ZW_TREND_SCHWELLE ? '<i class="zw-pfeil gut">↑</i>'
-    : d <= -ZW_TREND_SCHWELLE ? '<i class="zw-pfeil offen">↓</i>' : '';
-  return `<small class="zw-trend">Ø ${zahl(t.oe, 1)}${pfeil}</small>`;
-}
-
 // Wochenbilanz: je Ziel sieben Punkte (Mo … So, siehe bilanzWoche), gefüllt = Ziel
 // erreicht bzw. beim Training: an diesem Tag trainiert. Hohler Punkt = verfehlt,
 // blasser Punkt = kein Messwert (auch: Tag liegt noch in der Zukunft). Rechts die Zahl
 // erreichter Tage von denen mit Messwert (beim Training die Trainingstage gegen das
-// Wochenziel), darunter der Trend gegen die 4 Wochen davor (`_zielTrend`).
+// Wochenziel).
 // Darunter das Tagesdetail (`zielTagHTML`, nur mit gewähltem Tag) und das Raster der
 // letzten 5 Wochen (`zielMonatHTML`).
 // `tage`: die sieben Tage der angezeigten Woche.
@@ -2345,13 +2312,13 @@ function zielWocheHTML(tage) {
     : `<span class="zw-spalte${d === gewaehlt ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${d}" role="button" tabindex="0"` +
       ` aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)}: Werte zeigen"${d === gewaehlt ? ' aria-pressed="true"' : ''}></span>`).join('');
   const punkte = zustaende => zustaende.map(z => `<span class="zw-punkt"><i class="${z}"></i></span>`).join('');
-  const zeile = (name, zustaende, zahl, farbe, trend) =>
+  const zeile = (name, zustaende, zahl, farbe) =>
     `<span class="zw-name">${name}</span>${punkte(zustaende)}` +
-    `<span class="zw-zahl"><b${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>${_trendHTML(trend)}</span>`;
+    `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>`;
   const messZeile = (key, name) => {
     const z = tage.map(d => { const v = byDate[d]?.[key]; return v == null ? 'leer' : zielErfuellt(key, v) ? 'an' : 'aus'; });
     const mit = z.filter(x => x !== 'leer').length;
-    return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—', null, _zielTrend(key, tage, byDate));
+    return zeile(name, z, mit ? `${z.filter(x => x === 'an').length}/${mit}` : '—');
   };
   const training = tage.map(d => istTrainingstag(d) ? 'an' : d > heute ? 'leer' : 'aus');
   const nTraining = training.filter(x => x === 'an').length;
@@ -2360,13 +2327,13 @@ function zielWocheHTML(tage) {
   const kopfTage = tage.map(d => `<span class="zw-tag${d === gewaehlt ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
   return `<div class="ziel-woche" data-woche="${tage[0]}">
     <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
-    <div class="zw-raster"><div class="zw-spalten">${spalten}</div>
-      <span class="zw-name"></span>${kopfTage}<span class="zw-zahl zw-zahl-kopf">vs. 4 Wo.</span>
+    <div class="zw-raster zw-woche"><div class="zw-spalten">${spalten}</div>
+      <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
       ${messZeile('restHR', 'Ruhepuls')}
       ${messZeile('hrv', 'HRV')}
       ${messZeile('sleepTotal', 'Schlaf')}
       ${zeile('Training', training, `${nTraining}/${ZIELE.trainDays.ziel}`,
-        zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)', _zielTrend('trainDays', tage, byDate))}
+        zielErfuellt('trainDays', nTraining) ? 'var(--zw-gut)' : 'var(--zw-offen)')}
     </div>
     ${gewaehlt ? zielTagHTML(gewaehlt, byDate) : ''}
     ${zielMonatHTML(wochen, gewaehlt, byDate)}
@@ -2435,9 +2402,11 @@ function zielMonatHTML(wochen, gewaehlt, byDate) {
       `<span class="zw-zahl zm-oe">${oe == null ? '—' : 'Ø ' + zahl(oe, 1)}</span>`;
   }).join('');
   const legende = [0, 1, 2, 3, 4].map(n => `<span class="zm-zelle n${n}"></span>`).join('');
-  return `<div class="zm">
+  // Kopfzeile IM Raster (über alle Spalten), wie die Wochentage der Wochenbilanz –
+  // so haben beide Raster denselben Aufbau und dieselbe Höhe (siehe style.css).
+  return `<div class="zw-raster zm-raster">
     <div class="zm-kopf"><span>Letzte 5 Wochen</span><span class="zm-legende">0${legende}4 Ziele</span></div>
-    <div class="zw-raster zm-raster">${zeilen}</div>
+    ${zeilen}
   </div>`;
 }
 

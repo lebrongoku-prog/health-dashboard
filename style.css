@@ -829,36 +829,39 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    Grün = erreicht, Gelb-Orange = offen (dieselben hellen Töne wie auf den Kacheln,
    die dunkleren der Karten wären auf dem Verlauf zu schwach). */
 .ov-oben{--zw-gut:#34D399;--zw-offen:#FBBF24}
-/* Wochenbilanz: durchscheinende Fläche wie die Kacheln, keine weisse Karte. */
-.ziel-woche{background:rgba(255,255,255,.14);border-radius:var(--r);
-  padding:.85rem 1rem;margin-bottom:.7rem;color:#fff}
-.zw-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}
+/* Wochenbilanz: durchscheinende Fläche wie die Kacheln, keine weisse Karte.
+   EIN Abstand für die ganze Karte (auf Wunsch, 04.11.2026): `--zw-abstand` ist der
+   Innenrand UND die Lücke zwischen den Teilen (Kopf, Woche, Tagesdetail, 5 Wochen).
+   Kein Teil trägt eigene Aussenabstände – die Lücken kommen allein aus `gap`.
+   Die Höhen der beiden Raster hängen an zwei Grössen: `--zw-kopf-h` (Zeile mit den
+   Wochentagen bzw. „Letzte 5 Wochen") und `--zw-zeile-h` (eine Zielzeile). Die
+   5-Wochen-Ansicht teilt dieselbe Höhe auf fünf statt vier Zeilen auf – beide sind
+   damit genau gleich hoch. */
+.ziel-woche{--zw-abstand:1rem;--zw-kopf-h:1.3rem;--zw-zeile-h:2.1rem;
+  display:flex;flex-direction:column;gap:var(--zw-abstand);
+  background:rgba(255,255,255,.14);border-radius:var(--r);
+  padding:var(--zw-abstand);margin-bottom:.7rem;color:#fff}
+.zw-kopf{display:flex;justify-content:space-between;align-items:center}
 .zw-kopf h3{margin:0;font-size:1.15rem;font-weight:700;color:#fff}
 .ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
-/* EIN Raster für Kopf und alle vier Zeilen: Name | 7 Tage | Zahl. */
-.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 3rem;display:grid;grid-template-columns:var(--zw-spalten);
+/* EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Die Zeilenhöhen stehen
+   im Raster, nicht als Innenabstand der Zellen. */
+.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 2.6rem;display:grid;grid-template-columns:var(--zw-spalten);
   align-items:center;font-size:1rem;position:relative}
+.zw-woche{grid-template-rows:var(--zw-kopf-h) repeat(4,var(--zw-zeile-h))}
 /* Hinter dem Raster dieselben Spalten noch einmal (`.zw-spalten`): je Tag eine Fläche
    über alle Zeilen – Tippfläche (auch zwischen den Punkten) und Hervorhebung des
    gewählten Tags. Im selben Raster verdrängten die Flächen die übrigen Zellen. */
 .zw-spalten{position:absolute;inset:0;display:grid;grid-template-columns:var(--zw-spalten)}
-.zw-raster>:not(.zw-spalten){position:relative;pointer-events:none;padding:.4rem 0}
-.zw-name{font-weight:600;padding-right:.5rem!important}
-/* Rechts: Wochenstand, darunter der Trend gegen die 4 Wochen davor. Zwei Zeilen
-   passen in die Höhe eines Punkts samt Innenabstand – die Zeile wird nicht höher. */
-.zw-zahl{display:flex;flex-direction:column;align-items:flex-end;text-align:right;line-height:1.1}
-.zw-zahl b{font-weight:700}
-.zw-zahl-kopf{font-size:.62rem;font-weight:600;color:rgba(255,255,255,.7);white-space:nowrap;padding:.1rem 0 .2rem!important}
-.zw-trend{font-size:.68rem;font-weight:600;opacity:.75;white-space:nowrap}
-.zw-pfeil{font-style:normal;font-weight:800;margin-left:.15rem}
-.zw-pfeil.gut{color:var(--zw-gut)}
-.zw-pfeil.offen{color:var(--zw-offen)}
+.zw-raster>:not(.zw-spalten){position:relative;pointer-events:none}
+.zw-name{font-weight:600;padding-right:.5rem}
+.zw-zahl{text-align:right;font-weight:700}
 .zw-punkt{display:flex;justify-content:center}
 .zw-punkt i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
 .zw-punkt i.an{background:var(--zw-gut)}
 .zw-punkt i.aus{border:2.5px solid rgba(255,255,255,.5)}
 .zw-punkt i.leer{background:rgba(255,255,255,.12)}
-.zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7);padding:.1rem 0 .2rem!important}
+.zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:rgba(255,255,255,.7)}
 .zw-tag.gewaehlt{color:#fff;font-weight:800}
 /* Rückmeldung nur über Deckkraft – ein transform während :active bricht auf iOS die
    laufende Wischgeste ab (die Karte liegt im waagrecht scrollenden Tab-Bereich). */
@@ -869,26 +872,27 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-spalte.gewaehlt{background:rgba(255,255,255,.2)}
 .zw-spalte:focus-visible{outline:2px solid rgba(255,255,255,.85);outline-offset:-2px}
 /* Tagesdetail unter der Wochenbilanz (Tipp auf einen Tag). */
-.zt{margin-top:.55rem;padding:.6rem .7rem;border-radius:12px;background:rgba(255,255,255,.12)}
-.zt-kopf{font-size:.85rem;font-weight:700;margin-bottom:.4rem}
+.zt{padding:var(--zw-abstand);border-radius:12px;background:rgba(255,255,255,.12)}
+.zt-kopf{font-size:.85rem;font-weight:700;margin-bottom:.5rem}
 .zt-raster{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
 .zt-zelle{display:flex;flex-direction:column;min-width:0}
 .zt-name{font-size:.7rem;font-weight:600;opacity:.75}
 .zt-wert{font-size:1.05rem;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
 .zt-wert small{font-size:.65rem;font-weight:600;opacity:.75;margin-left:.15rem}
-.zt-status{font-size:.7rem;font-weight:600;white-space:nowrap;opacity:.8}
+.zt-status{font-size:.66rem;font-weight:600;white-space:nowrap;opacity:.8}
 .zt-status.gut{color:var(--zw-gut);opacity:1}
 .zt-status.offen{color:var(--zw-offen);opacity:1}
-/* Letzte 5 Wochen: dieselben Spalten wie die Wochenbilanz, je Tag ein Feld 0–4. */
-.zm{margin-top:.7rem}
-.zm-kopf{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;font-weight:700;margin-bottom:.15rem}
+/* Letzte 5 Wochen: dieselben Spalten wie die Wochenbilanz, je Tag ein Feld 0–4.
+   Kopfzeile + fünf Zeilen à 4/5 einer Zielzeile = genau die Höhe der Woche darüber. */
+.zm-raster{grid-template-rows:var(--zw-kopf-h) repeat(5,calc(var(--zw-zeile-h) * .8))}
+.zm-kopf{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font-size:.72rem;font-weight:700}
 .zm-legende{display:flex;align-items:center;gap:3px;font-size:.62rem;font-weight:600;opacity:.8}
-.zm-legende .zm-zelle{width:10px;height:10px;border-radius:3px;pointer-events:none}
-.zm-raster>:not(.zw-spalten){padding:.18rem 0}
+.zm-legende .zm-zelle{width:10px;height:10px;margin:0;border-radius:3px;pointer-events:none}
 .zm-raster .zm-kw{font-size:.78rem;opacity:.75}
 .zm-raster .zm-kw.aktuell{opacity:1}
 .zm-oe{font-size:.75rem;font-weight:600;opacity:.85}
-.zm-zelle{display:block;height:18px;margin:0 3px;border-radius:5px;background:rgba(255,255,255,.12)}
+/* Die Felder füllen ihre Zelle bis auf 3 px rundum – waagrecht und senkrecht dieselbe Lücke. */
+.zm-zelle{display:block;align-self:stretch;margin:3px;border-radius:5px;background:rgba(255,255,255,.12)}
 .zm-raster .zm-zelle[data-tag]{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
 .zm-raster .zm-zelle[data-tag]:active{opacity:.6}
 .zm-zelle.leer{background:rgba(255,255,255,.05)}
@@ -1085,13 +1089,15 @@ h5,
   .schlaf-block.mit-phasen > * { margin-bottom: 0; }
   .schlaf-block.mit-phasen > .two-col-eq { grid-template-columns: minmax(0, 1fr); }
 
-  /* Zielkarte: Woche links, Tagesdetail und letzte 5 Wochen rechts – über die volle
-     Breite stünden die Punkte bei 812 px fast 90 px auseinander. */
-  .ziel-woche{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:1.4rem;align-items:start}
-  .ziel-woche>.zw-kopf{grid-column:1/-1}
-  .ziel-woche>.zw-raster{grid-column:1;grid-row:2/span 2}
-  .ziel-woche>.zt,.ziel-woche>.zm{grid-column:2;margin-top:0}
-  .ziel-woche>.zt{margin-bottom:.5rem}
+  /* Zielkarte: Woche links, letzte 5 Wochen rechts (gleich hoch, also bündig), das
+     Tagesdetail darunter über die volle Breite – über die volle Breite stünden die
+     Punkte bei 812 px fast 90 px auseinander. Lücken wie im Hochformat aus `gap`. */
+  .ziel-woche{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"kopf kopf" "woche monat" "detail detail"}
+  .ziel-woche>.zw-kopf{grid-area:kopf}
+  .ziel-woche>.zw-woche{grid-area:woche}
+  .ziel-woche>.zm-raster{grid-area:monat}
+  .ziel-woche>.zt{grid-area:detail}
 
 }
 
