@@ -1386,35 +1386,21 @@ function _chartTipp(chart, evt) {
 
 // ── Datenbeschriftungen ueber Balken und Punkten ─────────────────────────────
 // Nur, wo ein Diagramm sie ueber `cfg.__werteFmt` anfordert. Ob sie zu sehen sind,
-// entscheidet `beschriftungAn()` beim ZEICHNEN, nicht beim Aufbau des Tabs: Chart.js
-// zeichnet bei jeder Groessenaenderung ohnehin neu, dadurch kommen und gehen die
-// Zahlen beim Drehen des Geraets von selbst.
+// entscheidet `beschriftungAn()` beim ZEICHNEN, nicht beim Aufbau des Tabs – so wirkt
+// ein Umschalten per `draw()`, ohne Neuaufbau.
 // Ueberlappungen loest das Plugin selbst (belegte Rechtecke, siehe unten) – lieber
 // einzelne Werte auslassen als eine unlesbare Reihe.
-// ── Datenbeschriftungen: Standard und Wunsch des Nutzers ─────────────────────
-// Ein Tipp auf den Kartentitel schaltet die Zahlen eines Diagramms um (auf Wunsch,
-// 08.09.2026) — unabhaengig von Zeitraum und Ausrichtung, und die Wahl bleibt
-// erhalten. Der Zustand liegt AUSSERHALB der Seitenfunktionen, sonst waere er nach
-// jedem Neuaufbau zurueckgesetzt.
-//
-// Fehlender Eintrag heisst „noch nicht entschieden" — dann gilt der Standard.
-// Ein gesetzter Eintrag gewinnt IMMER, auch gegen `__werteNurQuer` und gegen die
-// Hochformat-Regel: der Nutzer hat ausdruecklich gefragt.
-const _beschriftung = {};
-
-// Was ein Diagramm ohne Zutun zeigt.
-function beschriftungStandard(chart) {
-  if (!chart.$werteFmt) return false;
-  if (chart.$werteAus) return false;   // Schlafphasen: nur auf Wunsch
-  // Querformat immer; im Hochformat nur, wo wenige Saeulen nebeneinander stehen:
-  // bei 7T hoechstens sieben, im Jahresvergleich und bei 1Y eine je Jahr. Ab 1M 30+.
-  if (window.innerWidth > window.innerHeight) return true;
-  return (timeRange === '7d' || istYoY() || ist1Y()) && !chart.$nurQuer;
-}
-function beschriftungAn(chart) {
-  const w = _beschriftung[chart.canvas && chart.canvas.id];
-  return w === undefined ? beschriftungStandard(chart) : w;
-}
+// ── Datenbeschriftungen: EIN Schalter für die ganze App ──────────────────────
+// Standardmässig AN, in jedem Diagramm mit `__werteFmt`, in jedem Zeitraum und
+// Format (auf Wunsch, 04.11.2026). Vorher galt je Diagramm ein Standard (Hochformat
+// nur bei 7T/YoY/Y, Ruhepuls & HRV nur quer, Schlafphasen nur auf Wunsch) und der
+// Titel-Tipp schaltete nur das eine Diagramm – im Training-Tab alle vier.
+// Jetzt schaltet ein Tipp auf den Titel IRGENDEINES beschrifteten Diagramms die
+// Zahlen in ALLEN um. Der Zustand liegt ausserhalb der Seitenfunktionen und übersteht
+// Zeitraum-, Tab- und Formatwechsel; dicht stehende Zahlen lässt das Plugin weiterhin
+// selbst weg (belegte Rechtecke, siehe unten).
+let _beschriftungAn = true;
+function beschriftungAn(chart) { return !!chart.$werteFmt && _beschriftungAn; }
 
 // Zeilenhoehe der Beschriftungen – auch die Grundlage fuer die Ueberlappungspruefung
 // und den Abstand mehrzeiliger Texte. Eine Quelle, damit beides zusammenpasst.
@@ -1432,9 +1418,7 @@ const werteLabelPlugin = {
   afterDatasetsDraw(chart) {
     const fmt = chart.$werteFmt;
     if (!fmt) return;
-    // Ob gezeichnet wird, entscheidet beschriftungAn(): Wunsch des Nutzers, sonst
-    // Standard. Die Entscheidung faellt hier beim ZEICHNEN, damit sie beim Drehen
-    // des Geraets von selbst nachzieht.
+    // Ob gezeichnet wird, entscheidet beschriftungAn() – hier beim ZEICHNEN.
     // `$werteBlende` haelt die Zahlen waehrend des Aus-Blendens noch sichtbar
     // (siehe `_werteBlenden`) – `beschriftungAn` ist dann schon false.
     const blende = chart.$werteBlende;
@@ -1473,7 +1457,7 @@ const werteLabelPlugin = {
       // damit beide dasselbe unter "Messwert" verstehen.
       if (!ds || !nurMesswerte({ dataset: ds })) return;
       const meta = chart.getDatasetMeta(di);
-      if (!meta || meta.hidden) return;
+      if (!meta || !chart.isDatasetVisible(di)) return;   // auch `hidden` aus dem Aufbau
       meta.data.forEach((punkt, i) => {
         const wert = ds.data[i];
         if (wert == null || !punkt) return;
@@ -1505,7 +1489,7 @@ const werteLabelPlugin = {
 };
 
 // Titel-Tipp: die Zahlen blenden in 180 ms ein bzw. aus (auf Wunsch, 18.09.2026),
-// statt auf einen Schlag zu erscheinen. Der Zustand (`_beschriftung`) ist beim Aufruf
+// statt auf einen Schlag zu erscheinen. Der Zustand (`_beschriftungAn`) ist beim Aufruf
 // schon gesetzt; `$werteBlende.aus` haelt die Zahlen waehrend des Ausblendens noch im
 // Bild. Ein zweiter Tipp waehrend der Blende bricht die laufende ab und startet neu.
 const WERTE_DAUER = 180;
@@ -1997,8 +1981,6 @@ function zeichneDiagramm(id, cfg) {
   // Ohne __werteFmt bleibt ein Diagramm unbeschriftet – so lassen sich einzelne
   // bewusst ausnehmen, genau wie bei __keys.
   charts[id].$werteFmt = cfg.__werteFmt || null;
-  charts[id].$nurQuer  = !!cfg.__werteNurQuer;
-  charts[id].$werteAus = !!cfg.__werteAusStandard;
   // OHNE Aufbau-Animation zeichnet Chart.js schon im Konstruktor – also BEVOR die
   // Angaben oben am Diagramm haengen. Das erste Bild fehlte dann alles, was an ihnen
   // haengt: Datenbeschriftungen ($werteFmt) und Wochentrenner ($keys). Mit Animation
@@ -2172,6 +2154,21 @@ function zielDatensatz(schluessel, key, laenge, achse) {
   return z ? [z] : [];
 }
 
+// ── Ein-/ausblendbare Messreihen (auf Wunsch, 04.11.2026, Ruhepuls & HRV) ───────
+// Wie die Hilfslinien über die Legende, aber OHNE Neuaufbau: die Reihe ist ein
+// gewöhnlicher Datensatz, Chart.js blendet ihn über `setDatasetVisibility` selbst aus
+// (mit seiner Animation). Mit der Reihe verschwindet auch ihre Ø-Linie (`Ø <Name>`) –
+// eine rote Ø-Linie ohne rote Kurve liesse sich nicht mehr zuordnen. Der Zustand liegt
+// in `_hilfslinie` unter `<canvas-id>|reihe:<Name>`, übersteht also jeden Neuaufbau;
+// beim Aufbau trägt der Datensatz deshalb `hidden: !reiheAn(…)`.
+function reiheAn(id, name) { return hlAn(id + '|reihe:' + name); }
+function reiheLegende(id, name, farbe) {
+  const an = reiheAn(id, name);
+  return `<button type="button" class="cl-item hl-schalter reihe-schalter${an?'':' aus'}" data-reihe="${id}|${name}"
+    aria-pressed="${an?'true':'false'}" title="Reihe ein-/ausblenden"><span
+    class="cl-line" style="background:${farbe}"></span>${name}</button>`;
+}
+
 // Gestrichelte Ziellinie als zusätzlicher Chart-Datensatz.
 function zielLinie(key, laenge, achse) {
   const z = ZIELE[key];
@@ -2304,9 +2301,19 @@ function zielWocheHTML(tage) {
     ? `<span class="zw-spalte zukunft" style="grid-column:${i + 2}"></span>`
     : `<span class="zw-spalte${d === gewaehlt ? ' gewaehlt' : ''}" style="grid-column:${i + 2}" data-tag="${d}" role="button" tabindex="0"` +
       ` aria-label="${WOCHENTAG_LANG[new Date(d + 'T00:00:00').getDay()]}, ${fmtWeek(d)}: Werte zeigen"${d === gewaehlt ? ' aria-pressed="true"' : ''}></span>`).join('');
-  const punkte = zustaende => zustaende.map(z => `<span class="zw-punkt"><i class="${z}"></i></span>`).join('');
+  // Erreichte Tage tragen die Farbe ihrer Kategorie (auf Wunsch, 04.11.2026) – dieselbe
+  // wie in der Legende von „Zielerreichung" (`ZIEL_REIHEN`), im Transparenz-Modus wie
+  // dort aufgehellt. Die Zeile setzt sie als `--zw-an`; `.zw-punkt i.an` liest sie.
+  const reihenFarbe = name => {
+    const f = ZIEL_REIHEN.find(r => r.name === name)?.farbe;
+    return f && glasAktiv() ? hellerFarbe(f) : f;
+  };
+  const punkte = (zustaende, name) => {
+    const f = reihenFarbe(name);
+    return zustaende.map(z => `<span class="zw-punkt"${f ? ` style="--zw-an:${f}"` : ''}><i class="${z}"></i></span>`).join('');
+  };
   const zeile = (name, zustaende, zahl, farbe) =>
-    `<span class="zw-name">${name}</span>${punkte(zustaende)}` +
+    `<span class="zw-name">${name}</span>${punkte(zustaende, name)}` +
     `<b class="zw-zahl"${farbe ? ` style="color:${farbe}"` : ''}>${zahl}</b>`;
   const messZeile = (key, name) => {
     const z = tage.map(d => { const v = byDate[d]?.[key]; return v == null ? 'leer' : zielErfuellt(key, v) ? 'an' : 'aus'; });
@@ -2978,8 +2985,8 @@ function pgHerz() {
     <div class="chart-card">
       <h3>Ruhepuls &amp; HRV</h3>
       <div class="chart-legend">
-        <div class="cl-item"><span class="cl-line" style="background:var(--heart)"></span>Puls</div>
-        <div class="cl-item"><span class="cl-line" style="background:var(--hrv)"></span>HRV</div>
+        ${reiheLegende('c-herz','Ruhepuls','var(--heart)')}
+        ${reiheLegende('c-herz','HRV','var(--hrv)')}
         ${hlLegende('c-herz|oe','Ø','#94A3B8')}
       </div>
       <div class="chart-wrap"><canvas id="c-herz"></canvas></div>
@@ -3066,12 +3073,9 @@ function pgHerz() {
       // Puls in bpm, HRV in ms – beide ganzzahlig, eine Nachkommastelle waere
       // hier Scheingenauigkeit.
       __werteFmt:v=>String(Math.round(v)),
-      // Nur im Querformat (auf Wunsch, 07.09.2026): im Hochformat liegen die beiden
-      // Kurven eng beieinander und kreuzen sich, die Zahlen stiessen dort aneinander.
-      __werteNurQuer:true,
       type:'line',data:{labels:tdL.labels,datasets:[
-      {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL'},
-      {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR'},
+      {label:'Ruhepuls',data:hrMaL,borderColor:'#EF4444',backgroundColor:'rgba(239,68,68,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yL',hidden:!reiheAn('c-herz','Ruhepuls')},
+      {label:'HRV',data:hvMaL,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',tension:.3,fill:true,pointRadius:3,spanGaps:true,yAxisID:'yR',hidden:!reiheAn('c-herz','HRV')},
       // Ø-Linien in der Farbe ihrer Reihe statt der beiden grauen Ziellinien: bei zwei
       // Kurven auf einer Skala liessen sich zwei gleich graue Hilfslinien nicht
       // zuordnen. Die Zielwerte stehen in der Ziel-Karte der Übersicht.
@@ -3080,9 +3084,9 @@ function pgHerz() {
       // will. Der Marker ist deshalb grau statt rot oder blau.
       ...(hlAn('c-herz|oe') ? [
       {label:'Ø Ruhepuls',data:hrMaL.map(()=>hrD),borderColor:'#EF4444',borderDash:[5,4],
-       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yL'},
+       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yL',hidden:!reiheAn('c-herz','Ruhepuls')},
       {label:'Ø HRV',data:hvMaL.map(()=>hvD),borderColor:'#2563EB',borderDash:[5,4],
-       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yR'}] : [])
+       pointRadius:0,borderWidth:1.5,tension:0,fill:false,yAxisID:'yR',hidden:!reiheAn('c-herz','HRV')}] : [])
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
         filter:item=>item.dataset.label==='Ruhepuls'||item.dataset.label==='HRV',
@@ -3759,7 +3763,6 @@ function pgSchlaf() {
         // auf Wunsch): vorher standen hier Dezimalstunden ("1.5") – zwei Einheiten
         // fuer dieselbe Groesse in benachbarten Diagrammen.
         __werteFmt:v=>v>=0.5?stdMinLabel(v):'',
-        __werteAusStandard:true,
         type:'bar',data:{labels:tL,datasets:_phDs},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,itemSort:(a,b)=>b.datasetIndex-a.datasetIndex,callbacks:{
           label:ctx=>{
@@ -5632,6 +5635,28 @@ function ausklappUmschalten(tab) {
     .then(() => { _ausklappLaeuft = false; }, () => { _ausklappLaeuft = false; });
 }
 
+// Messreihen ein-/ausblenden (siehe `reiheLegende`). Vor dem Hilfslinien-Handler:
+// der Schalter trägt dieselbe Optik-Klasse `.hl-schalter`, der dortige Handler muss
+// ihn deshalb überspringen (`[data-hl]`).
+document.body.addEventListener('click', (e) => {
+  const sch = e.target.closest('.reihe-schalter');
+  if (!sch) return;
+  const [id, name] = sch.dataset.reihe.split('|');
+  const an = !reiheAn(id, name);
+  _hilfslinie[id + '|reihe:' + name] = an;
+  sch.classList.toggle('aus', !an);
+  sch.setAttribute('aria-pressed', an ? 'true' : 'false');
+  const c = charts[id];
+  if (!c) return;
+  c.data.datasets.forEach((ds, i) => {
+    if (ds.label === name || ds.label === 'Ø ' + name) c.setDatasetVisibility(i, an);
+  });
+  c.update(bewegungAus() ? 'none' : undefined);
+  // Ein markierter Tag zeigt seinen Tooltip dauerhaft – neu setzen, damit die
+  // ausgeblendete Reihe auch dort verschwindet.
+  try { _tooltipAnMarkierung(c); } catch (_) {}
+});
+
 // Hilfslinien (Ø, Ziel) ein-/ausschalten. Neu aufgebaut wird der ganze Tab: die
 // Linie ist ein Datensatz, kein Sichtbarkeits-Schalter.
 // Seit 18.09.2026 ohne erneutes Wachsen aller Diagramme; nur die Linie blendet
@@ -5639,7 +5664,7 @@ function ausklappUmschalten(tab) {
 // weitere Tipps gesperrt – der Neuaufbau am Ende muss den dann gueltigen Zustand sehen.
 let _hlLaeuft = false;
 document.body.addEventListener('click', (e) => {
-  const sch = e.target.closest('.hl-schalter');
+  const sch = e.target.closest('.hl-schalter[data-hl]');
   if (!sch || _hlLaeuft) return;
   const schluessel = sch.dataset.hl;
   const an = !hlAn(schluessel);
@@ -5684,22 +5709,11 @@ document.body.addEventListener('click', (e) => {
     const _cv = _titel.closest('.chart-card').querySelector('canvas');
     const _ch = _cv && Chart.getChart(_cv);
     if (_ch && _ch.$werteFmt) {
-      const _an = !beschriftungAn(_ch);
-      // Im Training-Tab gilt der Tipp fuer ALLE Diagramme des Tabs (auf Wunsch,
-      // 12.09.2026): dort vergleicht man Strecke, Zeit, Pace und VO2max miteinander,
-      // und vier Titel nacheinander anzutippen ist derselbe Wunsch in vier Schritten.
-      // In den uebrigen Tabs bleibt es beim einzelnen Diagramm.
-      // Welcher Tab es ist, sagt das DOM und NICHT `currentScreen`: alle vier Screens
-      // liegen gleichzeitig im Dokument, und waehrend eines Wischs hinkt
-      // `currentScreen` dem sichtbaren Tab hinterher.
-      const _screen = _titel.closest('.screen');
-      const _tabDia = (_screen && _screen.id === 'screen-training')
-        ? (tabCharts.training || []).map(id => charts[id]).filter(c => c && c.$werteFmt)
-        : [];
-      const _ziele = _tabDia.indexOf(_ch) >= 0 ? _tabDia : [_ch];
-      // Nur neu zeichnen – die Daten aendern sich nicht. Seit 18.09.2026 geblendet.
-      _ziele.forEach(c => { _beschriftung[c.canvas.id] = _an; });
-      _werteBlenden(_ziele, _an);
+      // Gilt für ALLE beschrifteten Diagramme der App (auf Wunsch, 04.11.2026). Geblendet
+      // werden alle vorhandenen; die übrigen Tabs zeichnen beim Aufbau ohnehin neu.
+      _beschriftungAn = !_beschriftungAn;
+      const _ziele = Object.values(charts).filter(c => c && c.$werteFmt);
+      _werteBlenden(_ziele, _beschriftungAn);
       return;
     }
   }

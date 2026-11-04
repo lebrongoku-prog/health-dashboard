@@ -695,6 +695,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      gemeinsam will; der Marker ist deshalb grau statt rot oder blau.
      Umgeschaltet wird über `_renderTab(currentScreen)` — die Schalter stehen inzwischen
      in drei Tabs, ein fest verdrahtetes `'training'` wäre falsch.
+     **Die Reihen selbst sind ebenfalls schaltbar** (auf Wunsch, 04.11.2026): die
+     Legendeneinträge heissen „Ruhepuls" (vorher „Puls") und „HRV" und sind Schalter
+     (`reiheLegende()`, `.reihe-schalter`, Optik `.hl-schalter`). Anders als die
+     Hilfslinien OHNE Neuaufbau: `setDatasetVisibility` + `update()`, Chart.js blendet
+     selbst. Mit der Reihe verschwindet ihre Ø-Linie (`Ø Ruhepuls`/`Ø HRV`). Zustand in
+     `_hilfslinie` unter `c-herz|reihe:<Name>` (`reiheAn()`), beim Aufbau als
+     `hidden` gesetzt. Deshalb fragt das Beschriftungs-Plugin `isDatasetVisible()` statt
+     `meta.hidden` — Letzteres kennt das `hidden` aus dem Aufbau nicht. Der
+     Hilfslinien-Handler hört nur noch auf `.hl-schalter[data-hl]`.
   2. Das Label der Linie ist **`Ø`**, damit `nurMesswerte` sie erkennt. **Bei den
      Datenbeschriftungen genügt das** — das Plugin wendet die Regel selbst an. **Beim
      Tooltip NICHT:** dort muss jedes Diagramm `filter: nurMesswerte` selbst setzen.
@@ -800,7 +809,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im
     Zeitfilter **7T** die angezeigte Woche (`weekDays7()`, die Pfeile ‹ › blättern sie
     mit), in allen anderen Bereichen die laufende (`aktuelleWoche()`, nach dem heutigen
-    Datum, nicht dem neuesten Datentag). Etikett `KW 40` bzw. `vor 1 W`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
+    Datum, nicht dem neuesten Datentag). Etikett `KW 40` bzw. `vor 1 W`. Gefüllt = Ziel erreicht — **in der Farbe der
+    Kategorie** wie in der Legende von „Zielerreichung“ (`ZIEL_REIHEN`, auf Wunsch
+    04.11.2026: Ruhepuls rot, HRV blau, Schlaf violett, Training orange; im
+    Transparenz-Modus über `hellerFarbe()` aufgehellt, als `--zw-an` je Punkt), hohl = verfehlt, blass = kein Messwert bzw. Tag
     liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
     der Trainingszeile und keine Kontur um die Karte (beides auf Wunsch entfernt).
     Die Punkte füllen die Breite (7 gleiche Rasterspalten, Punkte 20 px, Schrift 1rem),
@@ -896,21 +908,17 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hilfslinien zu unterscheiden. Beide stehen ganz oben, **vor** dem ersten
   `Chart.defaults`-Zugriff — `const` wird nicht hochgezogen.
 - **Datenbeschriftungen (`werteLabelPlugin`, 06.09.2026):** Zahlen über Balken und
-  Datenpunkten. **Sichtbar im Querformat immer, im Hochformat nur bei 7T und im
-  Jahresvergleich** (7T seit 07.09.2026, YoY seit 12.09.2026) — dort stehen höchstens
-  sieben Säulen nebeneinander bzw. eine je Jahr, ab 1M wären es über dreissig.
+  Datenpunkten. **Standardmässig AN — in jedem Diagramm mit `__werteFmt`, in jedem
+  Zeitraum und Format** (auf Wunsch, 04.11.2026). Vorher: quer immer, hoch nur bei 7T,
+  YoY und Y, Ruhepuls & HRV nur quer (`__werteNurQuer`), Schlafphasen nur auf Wunsch
+  (`__werteAusStandard`) — alle drei Sonderregeln samt `beschriftungStandard()` sind
+  entfallen. Dicht stehende Zahlen lässt die Rechteck-Prüfung weiterhin weg.
   **Alle neun Diagramme der App** melden inzwischen ein
   `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
   und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
-  **Drei Diagramme weichen ab**, alle auf Wunsch nach einem Zwischenschritt:
-  Das **Verlaufs-Diagramm** (seit 23.10.2026 „Zielerreichung“, ebenfalls ohne) hat gar kein `__werteFmt` — vier Reihen auf zwei Achsen
-  blieben auch nach dem Weglassen von Puls und HRV unruhig; es ist damit als einziges
-  vom Titel-Tipp ausgenommen. Der **Schlafphasen-Verlauf** trägt
-  `__werteAusStandard: true` (Beschriftung gestapelter Balken sitzt mitten im Balken),
-  **Ruhepuls & HRV** trägt `__werteNurQuer: true` (die beiden Kurven liegen im
-  Hochformat eng beieinander und kreuzen sich). Beide lassen sich über den Titel
-  trotzdem einschalten.
+  Das Diagramm **„Zielerreichung“** hat als einziges kein `__werteFmt` (bei gestapelten
+  Balken stünde je Stück eine Zahl) und reagiert deshalb nicht auf den Titel-Tipp.
   Zahlen, die auf `0` gerundet werden, fallen überall weg: an trainingsfreien Tagen
   stünde sonst eine Reihe von `0` auf der Grundlinie.
   **Das Format kommt aus denselben Helfern wie der Rest der App** — `fmtPace()` für
@@ -948,32 +956,16 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Zahl. Das regelt die Rechteck-Prüfung von selbst. Im
   Hochformat ist die Karte halb so breit; dort stünden die Zahlen bei einem
   Monatsfenster als graues Band über den Balken.
-  **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs.** Chart.js
-  zeichnet bei jeder Grössenänderung ohnehin neu, dadurch kommen und gehen die Zahlen
-  beim Drehen von selbst — ohne `_renderTab`, ohne `resize`-Listener.
-  **Ein Tipp auf den Kartentitel schaltet sie je Diagramm um** (auf Wunsch,
-  08.09.2026). `beschriftungStandard()` liefert, was ohne Zutun gilt (die Regeln
-  oben); `_beschriftung[canvasId]` hält den Wunsch des Nutzers und **gewinnt immer** —
-  auch gegen `__werteNurQuer` und gegen die Hochformat-Regel. Der Zustand liegt
-  ausserhalb der Seitenfunktionen und übersteht Zeitraum-, Tab- und Formatwechsel.
-  Umgeschaltet wird mit `chart.draw()`, nicht mit `_renderTab`: die Daten ändern sich
-  nicht, nur was darüber steht. Seit 18.09.2026 **blenden** die Zahlen dabei in 180 ms
-  ein bzw. aus (`_werteBlenden`, siehe „Weitere Animationen").
-  **Im Training-Tab gilt der Tipp für ALLE Diagramme des Tabs** (auf Wunsch,
-  12.09.2026) — dort vergleicht man Strecke, Zeit, Pace und VO₂max miteinander, und
-  vier Titel nacheinander anzutippen wäre derselbe Wunsch in vier Schritten. In Herz
-  und Schlaf bleibt es beim einzelnen Diagramm. Welcher Tab es ist, sagt das **DOM**
-  (`_titel.closest('.screen').id`) und NICHT `currentScreen`: alle vier Screens liegen
-  gleichzeitig im Dokument, und während eines Wischs hinkt `currentScreen` dem
-  sichtbaren Tab hinterher.
-  **Zwei Dinge hängen daran:** `.chart-card h3` musste in die Ausnahmeliste des
-  Hintergrund-Tipps (`initScrollHideNav`), sonst schaltete derselbe Tipp zusätzlich
-  die Bottom-Nav um. Und der **Schlafphasen-Verlauf** hat seinen Formatierer
-  zurückbekommen, jetzt mit `__werteAusStandard: true` — er zeigt nichts, bis man den
-  Titel antippt. Nur so gilt „alle Diagramme ausser dem Verlauf" und bleibt die
-  frühere Entscheidung bestehen, dass seine gestapelten Balken nicht dauerhaft
-  beschriftet sind. Das **Verlaufs-Diagramm** hat weiterhin gar keinen Formatierer und
-  reagiert deshalb nicht auf den Titel-Tipp.
+  **Die Entscheidung fällt beim Zeichnen, nicht beim Aufbau des Tabs**
+  (`beschriftungAn()` im Plugin) — so wirkt ein Umschalten per `draw()`.
+  **Ein Tipp auf den Titel IRGENDEINES beschrifteten Diagramms schaltet die Zahlen in
+  ALLEN Diagrammen der App um** (auf Wunsch, 04.11.2026; vorher je Diagramm, im
+  Training-Tab je Tab). EIN Zustand `_beschriftungAn` (Start `true`), ausserhalb der
+  Seitenfunktionen — übersteht Zeitraum-, Tab- und Formatwechsel. Umgeschaltet wird mit
+  `chart.draw()` an allen vorhandenen Diagrammen (`Object.values(charts)`), die Zahlen
+  **blenden** in 180 ms (`_werteBlenden`, siehe „Weitere Animationen").
+  `.chart-card h3` steht in der Ausnahmeliste des Hintergrund-Tipps
+  (`initScrollHideNav`), sonst schaltete derselbe Tipp zusätzlich die Bottom-Nav um.
   **Überlappungen löst das Plugin selbst:** es merkt sich die belegten **Rechtecke**
   (x *und* y, `measureText` für die Breite) und lässt weg, was in ein bereits
   gesetztes hineinragen würde. Nur die x-Achse zu prüfen reichte nicht: in
@@ -999,8 +991,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      geliefert, also 11 px im Balken.
   **Die einzige Ausnahme ist der Schlafphasen-Verlauf**, und zwar unvermeidlich: dort
   beschriftet jede Zahl ihr eigenes **Segment**, und Segmente liegen nun einmal im
-  Balken. Nur die oberste Zahl steht frei. Das ist der Grund, warum dieses Diagramm
-  als einziges `__werteAusStandard: true` trägt.
+  Balken. Nur die oberste Zahl steht frei.
   **Hilfslinien bleiben unbeschriftet**: dieselbe Regel wie im Tooltip
   (`nurMesswerte`, Label beginnt mit `Ø` oder `Ziel`) — beide müssen dasselbe unter
   „Messwert" verstehen. `__werteFmt` bestimmt zugleich das Format; gibt es `''`

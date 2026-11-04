@@ -867,7 +867,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-zahl{text-align:right;font-weight:700}
 .zw-punkt{display:flex;justify-content:center}
 .zw-punkt i{display:block;width:20px;height:20px;border-radius:50%;box-sizing:border-box}
-.zw-punkt i.an{background:var(--zw-gut)}
+.zw-punkt i.an{background:var(--zw-an,var(--zw-gut))}   /* Kategoriefarbe der Zeile */
 .zw-punkt i.aus{border:2.5px solid var(--zw-hohl)}
 .zw-punkt i.leer{background:var(--zw-leer)}
 .zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:var(--txt2)}
