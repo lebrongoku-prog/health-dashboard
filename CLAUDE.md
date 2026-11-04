@@ -244,8 +244,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Navigation:** `TAB_ORDER = ['overview','herz','schlaf','training']` (4 Tabs).
   Horizontaler Snap-Scroller (`#tab-container`). Hintergrund-Crossfade via `THEME_GRADIENTS`
   + zwei `bg-fade`-Layer.
-- **Übersicht (`pgOverview`):** Wochenbilanz → (ausgeklappt)
-  Zielerreichung (seit 23.10.2026 statt Verlaufs-Chart) → Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
+- **Übersicht (`pgOverview`):** Wochenbilanz (mit Tagesdetail) → Zielerreichung
+  (seit 23.10.2026 statt Verlaufs-Chart, seit 04.11.2026 in der Standardansicht) →
+  (ausgeklappt) Muster-Insights. Die frühere App-Karte am Ende liegt seit 06.09.2026 auf der
   eigenen Seite „Einstellungen" (siehe dort). Gesundheits-Score und Trend-Karte wurden auf Wunsch entfernt; mit ihnen
   entfielen `computeHealthScore`/`scoreCat`, `sparkSVG`, `zielBadge` und `trendKlasse`.
 - **Events:** Delegation auf `document.body` für `.nav-prev`/`.nav-next`/
@@ -758,67 +759,42 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Hochzählen (`kachelZahl`, `kachelnHochzaehlen`, `_kachelnZaehlen`, `.ti-zahl`), der
   animierte Tabwechsel `zuTabWischen` (nur die Ringe lösten ihn aus) und das
   Querformat-Raster von `.ov-oben`. Alles in der Git-Historie.
-  **Den Platz nutzen seither zwei Erweiterungen der Karte** (auf Wunsch, 04.11.2026;
-  ein dritter Teil, der Trend je Ziel gegen die 4 Wochen davor — `Ø 1.7 ↓` unter
-  `2/3`, `_zielTrend` — stand am selben Tag kurz live und ist auf Wunsch wieder
-  entfallen):
-  1. **Tagesdetail** (`zielTagHTML`, `.zt`): Tipp auf eine Tagesspalte (wieder über
-     `.zw-spalten`/`.zw-spalte` hinter dem Raster — **nicht ins selbe Raster legen**,
-     dort verdrängten die Flächen die Auto-Platzierung) oder auf ein Feld des
-     5-Wochen-Rasters klappt unter der Woche die vier Werte des Tags auf: Wert, darunter
-     `✓ Ziel` (grün) bzw. `5 zu tief` / `31m zu kurz` (orange), Training mit Dauer und
-     `Woche n/3`. Zweiter Tipp auf denselben Tag schliesst. Zustand `_bilanzTag`
-     (**Datum**); liegt es nach dem Blättern nicht mehr in den gezeigten 5 Wochen,
-     bleibt das Detail zu. „Heute" setzt zurück. Knapp verfehlt (Ruhepuls 60.3) zeigen
-     Wert und Abstand eine Nachkommastelle (`_ztWert`/`_ztAbstand`), sonst stünde
-     „60 · 0 zu hoch" da. Neuaufbau nur von `.ov-oben` (`ovObenNeu`), Detail wächst
-     auf, die helle Spalte gleitet. `[data-tag]` steht in der Ausnahmeliste des
-     Hintergrund-Tipps; Enter/Leertaste lösen aus.
-  2. **Letzte 5 Wochen** (`zielMonatHTML`, `.zm`): je Woche eine Zeile `KW nn`, je
-     Tag ein Feld in denselben Spalten wie die Woche darüber, Grün je heller desto
-     mehr der vier Ziele (`.n0`–`.n4`), rechts `Ø` Ziele pro Tag, Legende `0 … 4 Ziele`.
-     **Abstufung markant** (auf Wunsch, 04.11.2026): leer 4 % Weiss, 0 → 10 % Weiss,
-     1 → 25 % Grün, 2 → 55 % Grün, 3 → volles Grün `#34D399`, 4 → helles Mint
-     `#C6F7E2` — die Helligkeit steigt mit jeder Stufe. Vorher 38/58/80/100 % desselben
-     Grüns, auf dem Teal-Verlauf kaum zu unterscheiden.
-     **Dieselben Regeln wie „Zielerreichung"**: fehlender Messwert = nicht erreicht,
-     Training an jedem Tag einer Woche mit erreichtem Wochenziel. Tage ohne
-     Health-Zeile und Zukunft blass. Unterste Zeile = angezeigte Woche (folgt 7T).
-  **Gleich hoch, einheitliche Abstände** (auf Wunsch, 04.11.2026): Woche und 5 Wochen
-  sind genau gleich hoch. Beide Raster setzen ihre Zeilenhöhen selbst
-  (`grid-template-rows`, keine Innenabstände der Zellen): Kopfzeile `--zw-kopf-h`
-  (1.6rem), dann 4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. Die Felder
-  (`.zm-zelle i`) füllen ihre Zelle bis auf 3 px rundum (21 × 21 px, 6 px Lücke),
-  getippt wird die ganze Zelle. Ein Versuch mit derselben Lücke wie zwischen den
-  Zielzeilen (13.6 px, Felder dafür nur 13.3 px hoch) wurde am selben Tag auf Wunsch
-  zurückgenommen — beides zugleich geht nur, wenn die 5 Wochen höher werden.
-  **Die Kopfzeile der Woche IST die Wochentag-Zeile** (auf Wunsch, 04.11.2026):
-  Titel „Ziele" (`.zw-titel`) in der Namensspalte, KW-Symbol (`.zw-kw`) in der
-  Zahlenspalte, dazwischen Mo–So. Die frühere eigene Kopfzeile `.zw-kopf` (mit freiem
-  Platz zwischen Titel und Symbol) ist entfallen. In einer früheren Woche (7T) steht
-  im Symbol **„vor 1 W"** statt der Kalenderwoche (auf Wunsch; vorher daneben als
-  „vor 1 Woche", `.zw-vor`, entfallen). Spalten dafür `4.9rem | 7 × 1fr | 3.8rem`:
-  „vor 10 W" (Innenrand des Symbols hier .35rem) passt bei 360 px mit 3 px Luft vor
-  „So", die Punkte haben dort noch 3.5 px Abstand. Die 5 Wochen beginnen mit ihrer
-  Kopfzeile „Letzte 5 Wochen" + Legende (erste Zeile IM Raster). **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
-  der Karte, Innenrand des Tagesdetails und jede Lücke zwischen den Teilen (`gap` der
-  Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen mit
-  negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
-  **Querformat: alles untereinander wie im Hochformat** (auf Wunsch, 04.11.2026; kurz
-  standen Woche und 5 Wochen nebeneinander). Nur das Tagesdetail zeigt dort seine vier
-  Werte in einer Zeile statt 2 × 2.
-  Gemessen (Prüfstand): 375 × 812 und 360 × 780 Raster je 160 px, Innenrand und alle
-  Lücken 16 px, mit und ohne Detail; 812 × 375 und 1000 × 460 je 160 px untereinander; Titel, Wochentage und Symbol auf derselben Mitte;
-  360 px nichts ragt heraus.
-  **Schriftgrössen der ganzen Karte = die der Wochenbilanz** (auf Wunsch, 04.11.2026),
-  genau drei: 1.15rem Titel „Ziele", **1rem** für Namen, Zahlen und Werte (Zielnamen,
-  `2/3`, `KW 41`, `Ø 3.3`, Datum und Werte im Tagesdetail), **.72rem** für
-  Beschriftungen (Wochentage, „Letzte 5 Wochen", Legende, Namen,
-  Status und Einheiten im Tagesdetail). Das Tagesdetail steht dafür als 2 × 2
-  (Querformat 4 nebeneinander), Status in der Beschriftungszeile neben dem Namen
-  (`Schlaf · 31m zu kurz`) — in vier Spalten hätte er bei 360 px keinen Platz.
-  Nachgerechnet (KW 45, aus den Rohzeilen): 5-Wochen-Felder und Ø
-  3.29/2.14/3.43/2.14/1.33 — identisch.
+  **Tagesdetail statt Ringe** (auf Wunsch, 04.11.2026). Am selben Tag kurz live und auf
+  Wunsch wieder entfallen (Git-Historie): ein Trend je Ziel gegen die 4 Wochen davor
+  (`_zielTrend`, `Ø 1.7 ↓` unter `2/3`) und ein Raster der **letzten 5 Wochen**
+  (`zielMonatHTML`, `.zm-*`, je Tag ein Feld 0–4 erreichte Ziele) — an dessen Stelle
+  steht jetzt das Diagramm „Zielerreichung" offen in der Übersicht (siehe dort).
+  - **Tagesdetail** (`zielTagHTML`, `.zt`): Tipp auf eine Tagesspalte (über
+    `.zw-spalten`/`.zw-spalte` hinter dem Raster — **nicht ins selbe Raster legen**,
+    dort verdrängten die Flächen die Auto-Platzierung) klappt unter der Woche die vier
+    Werte des Tags auf; Status neben dem Namen (`Schlaf · 31m zu kurz`, `✓ Ziel` grün,
+    sonst orange), Wert darunter, Training mit Dauer und `Woche n/3`. 2 × 2, im
+    Querformat 4 nebeneinander. Zweiter Tipp auf denselben Tag schliesst. Zustand
+    `_bilanzTag` (**Datum**); liegt es nach dem Blättern nicht in der gezeigten Woche,
+    bleibt das Detail zu. „Heute" setzt zurück. Knapp verfehlt (Ruhepuls 60.3) zeigen
+    Wert und Abstand eine Nachkommastelle (`_ztWert`/`_ztAbstand`), sonst stünde
+    „60 · 0 zu hoch" da. Neuaufbau nur von `.ov-oben` (`ovObenNeu`), Detail wächst
+    auf, die helle Spalte gleitet. `[data-tag]` steht in der Ausnahmeliste des
+    Hintergrund-Tipps; Enter/Leertaste lösen aus.
+  - **Kopfzeile = Wochentag-Zeile** (auf Wunsch, 04.11.2026): Titel „Ziele"
+    (`.zw-titel`) in der Namensspalte, KW-Symbol (`.zw-kw`) in der Zahlenspalte,
+    dazwischen Mo–So; die frühere eigene Kopfzeile `.zw-kopf` ist entfallen. In einer
+    früheren Woche (7T) steht im Symbol **„vor 1 W"** statt der Kalenderwoche (vorher
+    daneben als „vor 1 Woche", `.zw-vor`, entfallen). Spalten `4.9rem | 7 × 1fr |
+    3.8rem`: „vor 10 W" (Innenrand des Symbols hier .35rem) passt bei 360 px mit 3 px
+    Luft vor „So", die Punkte haben dort noch 3.5 px Abstand.
+  - **Raster-Höhen** über `grid-template-rows` (keine Innenabstände der Zellen):
+    Kopfzeile `--zw-kopf-h` (1.6rem), dann 4 × `--zw-zeile-h` (2.1rem) = 160 px.
+  - **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand der Karte,
+    Innenrand des Tagesdetails und die Lücke zwischen Woche und Detail (`gap` der
+    Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen
+    mit negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
+  - **Schriftgrössen** genau drei: 1.15rem Titel „Ziele", **1rem** für Namen, Zahlen
+    und Werte (Zielnamen, `2/3`, Datum und Werte im Tagesdetail), **.72rem** für
+    Beschriftungen (Wochentage, Namen, Status und Einheiten im Tagesdetail).
+  Gemessen (Prüfstand): 375 × 812 und 360 × 780 Raster 160 px, Innenrand und Lücke
+  16 px, Titel, Wochentage und Symbol auf derselben Mitte, bei 360 px ragt nichts
+  heraus.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
     30.09.2026): je Ziel sieben Punkte für eine Kalenderwoche Mo–So, Reihenfolge
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im
@@ -848,8 +824,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   7 Tage; `nodata` → Woche nur Tage mit Wert.
 - **Diagramm „Zielerreichung“ in der Übersicht** (auf Wunsch, 23.10.2026, Variante A
   aus den Mockups) — **ersetzt den „Verlauf“** (Schlaf, Puls, HRV, Training/Schritte
-  auf zwei Achsen samt `_wocheTooltipLabel`; entfallen). Canvas-ID bleibt `c-woche`,
-  Platz im Ausklapp-Bereich unverändert.
+  auf zwei Achsen samt `_wocheTooltipLabel`; entfallen). Canvas-ID bleibt `c-woche`.
+  **Seit 04.11.2026 in der Standardansicht** (auf Wunsch, statt der kurzzeitigen
+  5-Wochen-Übersicht) — nicht mehr hinter dem Ausklapp-Knopf, also ohne
+  `ausklapp-teil`; dort liegt in der Übersicht nur noch das Muster-Raster.
   Gestapelte Balken 0–4: je Tag pro Ziel 0/1 (`zielRows`, Felder `_zPuls`, `_zHrv`,
   `_zSchlaf`, `_zTraining`), über `timeDim` gemittelt — bei 7T/1M je Tag, ab 3M je
   Woche/Monat bzw. 1Y je Jahr der **Schnitt pro Tag**, jedes Farbstück = Anteil der
@@ -1513,9 +1491,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   dort). Die früheren Inhalts-Knöpfe `.weitere-btn`/`.weitere-pfeil` sind samt CSS
   entfallen (27.09.2026 beim Aufräumen, sie hatten keinen Nutzer mehr). Er bedient
   „Weitere Auswertungen" in **allen** Tabs — **alle starten zu**
-  (`_weitereOffen = {overview, herz, schlaf, training}`; `training` seit 14.09.2026). In der Übersicht steckt seit
-  08.09.2026 auch das **Verlaufs-Diagramm** (seit 23.10.2026 „Zielerreichung“) dahinter, nicht mehr nur das
-  Muster-Raster; deshalb heisst der Zustand nicht mehr `_musterOffen` und der
+  (`_weitereOffen = {overview, herz, schlaf, training}`; `training` seit 14.09.2026). In der Übersicht steckte von
+  08.09. bis 04.11.2026 auch das **Verlaufs-Diagramm** (zuletzt „Zielerreichung“) dahinter;
+  seither wieder nur das Muster-Raster. Deshalb heisst der Zustand nicht mehr `_musterOffen` und der
   Knopf nicht mehr „Muster & Zusammenhänge". Die frühere vierte Stelle, die
   App-Karte der Übersicht (`_appOffen`), ist mit dem Umzug auf die
   Einstellungen-Seite entfallen.
