@@ -783,28 +783,36 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   **Gleich hoch, einheitliche Abstände** (auf Wunsch, 04.11.2026): Woche und 5 Wochen
   sind genau gleich hoch. Beide Raster setzen ihre Zeilenhöhen selbst
   (`grid-template-rows`, keine Innenabstände der Zellen): Kopfzeile `--zw-kopf-h`
-  (Wochentage bzw. „Letzte 5 Wochen", die dafür als erste Zeile IM Raster steht), dann
-  4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. **Die Lücke zwischen zwei Wochen
-  ist dieselbe wie zwischen zwei Zielzeilen** (13.6 px = `--zw-zeile-h` − Punkt 20 px;
-  auf Wunsch, 04.11.2026): das sichtbare Feld (`.zm-zelle i`) ist deshalb nur
-  `20px − 0.2 × --zw-zeile-h` ≈ 13.3 px hoch, getippt wird aber die ganze Zelle
-  (26.9 px). Waagrecht 3 px Rand je Seite. **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
+  (1.6rem), dann 4 × `--zw-zeile-h` bzw. 5 × 0.8 × `--zw-zeile-h`. Die Felder
+  (`.zm-zelle i`) füllen ihre Zelle bis auf 3 px rundum (21 × 21 px, 6 px Lücke),
+  getippt wird die ganze Zelle. Ein Versuch mit derselben Lücke wie zwischen den
+  Zielzeilen (13.6 px, Felder dafür nur 13.3 px hoch) wurde am selben Tag auf Wunsch
+  zurückgenommen — beides zugleich geht nur, wenn die 5 Wochen höher werden.
+  **Die Kopfzeile der Woche IST die Wochentag-Zeile** (auf Wunsch, 04.11.2026):
+  Titel „Ziele" (`.zw-titel`) in der Namensspalte, KW-Symbol (`.zw-kw`) in der
+  Zahlenspalte, dazwischen Mo–So. Die frühere eigene Kopfzeile `.zw-kopf` (mit freiem
+  Platz zwischen Titel und Symbol) ist entfallen. In einer früheren Woche (7T) steht
+  im Symbol **„vor 1 W"** statt der Kalenderwoche (auf Wunsch; vorher daneben als
+  „vor 1 Woche", `.zw-vor`, entfallen). Spalten dafür `4.9rem | 7 × 1fr | 3.8rem`:
+  „vor 10 W" (Innenrand des Symbols hier .35rem) passt bei 360 px mit 3 px Luft vor
+  „So", die Punkte haben dort noch 3.5 px Abstand. Die 5 Wochen beginnen mit ihrer
+  Kopfzeile „Letzte 5 Wochen" + Legende (erste Zeile IM Raster). **EIN Abstand für die ganze Karte**, `--zw-abstand` (1rem): Innenrand
   der Karte, Innenrand des Tagesdetails und jede Lücke zwischen den Teilen (`gap` der
   Karte — kein Teil trägt eigene Aussenabstände). Das Detail wächst beim Aufklappen mit
   negativem Rand in Höhe der Lücke an, sonst stünde sie sofort voll da.
   **Querformat:** Woche links, 5 Wochen rechts (gleich hoch, also bündig), Tagesdetail
   darunter über die volle Breite (`grid-template-areas` an `.ziel-woche`).
-  Gemessen (Prüfstand): 375 × 812 Raster je 155.2 px, Innenrand und alle Lücken 16 px,
-  mit und ohne Detail; 812 × 375 Raster je 370 × 155 px nebeneinander, Lücken 16 px;
+  Gemessen (Prüfstand): 375 × 812 und 360 × 780 Raster je 160 px, Innenrand und alle
+  Lücken 16 px, mit und ohne Detail; 812 × 375 Raster je 160 px nebeneinander, beide
+  16 px unter der Kartenoberkante; Titel, Wochentage und Symbol auf derselben Mitte;
   360 px nichts ragt heraus.
   **Schriftgrössen der ganzen Karte = die der Wochenbilanz** (auf Wunsch, 04.11.2026),
   genau drei: 1.15rem Titel „Ziele", **1rem** für Namen, Zahlen und Werte (Zielnamen,
   `2/3`, `KW 41`, `Ø 3.3`, Datum und Werte im Tagesdetail), **.72rem** für
-  Beschriftungen (Wochentage, „Letzte 5 Wochen", Legende, „vor N Wochen", Namen,
+  Beschriftungen (Wochentage, „Letzte 5 Wochen", Legende, Namen,
   Status und Einheiten im Tagesdetail). Das Tagesdetail steht dafür als 2 × 2
   (Querformat 4 nebeneinander), Status in der Beschriftungszeile neben dem Namen
   (`Schlaf · 31m zu kurz`) — in vier Spalten hätte er bei 360 px keinen Platz.
-  Rechte Spalte 3rem für `Ø 3.3` in 1rem.
   Nachgerechnet (KW 45, aus den Rohzeilen): 5-Wochen-Felder und Ø
   3.29/2.14/3.43/2.14/1.33 — identisch.
   - **Wochenbilanz** (`zielWocheHTML()`, `.ziel-woche`) **zuoberst** (auf Wunsch,
@@ -812,7 +820,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Ruhepuls, HRV, Schlaf, Training. **Welche Woche, sagt `bilanzWoche()`:** im
     Zeitfilter **7T** die angezeigte Woche (`weekDays7()`, die Pfeile ‹ › blättern sie
     mit), in allen anderen Bereichen die laufende (`aktuelleWoche()`, nach dem heutigen
-    Datum, nicht dem neuesten Datentag). Etikett `KW 40`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
+    Datum, nicht dem neuesten Datentag). Etikett `KW 40` bzw. `vor 1 W`. Gefüllt = Ziel erreicht, hohl = verfehlt, blass = kein Messwert bzw. Tag
     liegt noch in der Zukunft; rechts `erreicht/Tage mit Wert`. Keine Trennlinie vor
     der Trainingszeile und keine Kontur um die Karte (beides auf Wunsch entfernt).
     Die Punkte füllen die Breite (7 gleiche Rasterspalten, Punkte 20 px, Schrift 1rem),
@@ -823,7 +831,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     `--zw-gut`/`--zw-offen` sind die hellen Töne der Kacheln (die dunkleren der Karten
     wären auf dem Verlauf zu schwach). Keine eigenen Schwellen: alles über `ZIELE` und
     `zielErfuellt`. VO₂max ist nicht dabei (keine Kachel in der Übersicht).
-  - **„vor N Wochen"** links neben `KW nn` (`.zw-vor`), sobald die Wochenbilanz nicht
+  - **„vor N W"** im KW-Symbol statt der Kalenderwoche, sobald die Wochenbilanz nicht
     die laufende Woche zeigt (nur bei 7T möglich).
   - **Animiert** (auf Wunsch, 30.09.2026, 260 ms, `OV_DAUER`): **Woche wechseln** →
     die Punkte gleiten spaltenweise (18 ms versetzt) aus der Richtung herein, aus der

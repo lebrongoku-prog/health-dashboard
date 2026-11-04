@@ -2259,7 +2259,7 @@ function ovObenAnimieren(vorher) {
     ob.querySelectorAll('.zw-punkt').forEach((el, i) => _ovAnim(el,
       [{ transform: `translateX(${r * 18}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
       { duration: OV_DAUER, delay: (r > 0 ? i % 7 : 6 - i % 7) * 18, easing, fill: 'backwards' }));
-    ob.querySelectorAll('.zw-zahl, .zw-rechts, .zm-raster').forEach(el => _ovAnim(el,
+    ob.querySelectorAll('.zw-zahl, .zw-kw, .zm-raster').forEach(el => _ovAnim(el,
       [{ opacity: 0 }, { opacity: 1 }], { duration: OV_DAUER, easing }));
     return;
   }
@@ -2322,13 +2322,14 @@ function zielWocheHTML(tage) {
   };
   const training = tage.map(d => istTrainingstag(d) ? 'an' : d > heute ? 'leer' : 'aus');
   const nTraining = training.filter(x => x === 'an').length;
-  // Wie viele Wochen liegt die angezeigte vor der laufenden?
+  // Wie viele Wochen liegt die angezeigte vor der laufenden? Dann steht das im Symbol
+  // statt der Kalenderwoche (auf Wunsch, 04.11.2026: „vor 1 W"; vorher daneben als
+  // „vor 1 Woche" – in der Wochentag-Zeile ist dafür kein Platz).
   const vor = Math.round((new Date(getWeekMonday(heute) + 'T00:00:00') - new Date(tage[0] + 'T00:00:00')) / 86400000 / 7);
   const kopfTage = tage.map(d => `<span class="zw-tag${d === gewaehlt ? ' gewaehlt' : ''}">${wochentagKurz(d)}</span>`).join('');
   return `<div class="ziel-woche" data-woche="${tage[0]}">
-    <div class="zw-kopf"><h3>Ziele</h3><span class="zw-rechts">${vor > 0 ? `<span class="zw-vor">vor ${vor} ${vor === 1 ? 'Woche' : 'Wochen'}</span>` : ''}${scopeBadge('KW ' + isoKW(tage[0]))}</span></div>
     <div class="zw-raster zw-woche"><div class="zw-spalten">${spalten}</div>
-      <span class="zw-name"></span>${kopfTage}<b class="zw-zahl"></b>
+      <h3 class="zw-titel">Ziele</h3>${kopfTage}<span class="zw-kw">${scopeBadge(vor > 0 ? `vor ${vor} W` : 'KW ' + isoKW(tage[0]))}</span>
       ${messZeile('restHR', 'Ruhepuls')}
       ${messZeile('hrv', 'HRV')}
       ${messZeile('sleepTotal', 'Schlaf')}

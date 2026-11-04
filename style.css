@@ -837,16 +837,21 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    Wochentagen bzw. „Letzte 5 Wochen") und `--zw-zeile-h` (eine Zielzeile). Die
    5-Wochen-Ansicht teilt dieselbe Höhe auf fünf statt vier Zeilen auf – beide sind
    damit genau gleich hoch. */
-.ziel-woche{--zw-abstand:1rem;--zw-kopf-h:1.3rem;--zw-zeile-h:2.1rem;
+.ziel-woche{--zw-abstand:1rem;--zw-kopf-h:1.6rem;--zw-zeile-h:2.1rem;
   display:flex;flex-direction:column;gap:var(--zw-abstand);
   background:rgba(255,255,255,.14);border-radius:var(--r);
   padding:var(--zw-abstand);margin-bottom:.7rem;color:#fff}
-.zw-kopf{display:flex;justify-content:space-between;align-items:center}
-.zw-kopf h3{margin:0;font-size:1.15rem;font-weight:700;color:#fff}
-.ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85}
+/* Kopfzeile = Wochentag-Zeile (auf Wunsch, 04.11.2026): Titel in der Namensspalte,
+   KW-Symbol in der Zahlenspalte – vorher stand beides in einer eigenen Zeile darüber,
+   mit leerem Platz dazwischen. `--zw-kopf-h` ist dafür so hoch wie der Titel. */
+.zw-titel{margin:0;font-size:1.15rem;font-weight:700;color:#fff;white-space:nowrap}
+.zw-kw{justify-self:end;white-space:nowrap}
+.ziel-woche .scope-badge{color:#fff;border-color:rgba(255,255,255,.35);background:transparent;opacity:.85;padding:.14rem .35rem}
 /* EIN Raster für Kopf und alle Zeilen: Name | 7 Tage | Zahl. Die Zeilenhöhen stehen
-   im Raster, nicht als Innenabstand der Zellen. */
-.zw-raster{--zw-spalten:5.2rem repeat(7,minmax(0,1fr)) 3rem;display:grid;grid-template-columns:var(--zw-spalten);
+   im Raster, nicht als Innenabstand der Zellen. Die Zahlenspalte (3.8rem) trägt in der
+   Kopfzeile das KW-Symbol – breit genug für „vor 10 W" (61 px); die Namensspalte
+   (4.9rem) ist so breit wie „Ruhepuls" samt Abstand. */
+.zw-raster{--zw-spalten:4.9rem repeat(7,minmax(0,1fr)) 3.8rem;display:grid;grid-template-columns:var(--zw-spalten);
   align-items:center;font-size:1rem;position:relative}
 .zw-woche{grid-template-rows:var(--zw-kopf-h) repeat(4,var(--zw-zeile-h))}
 /* Hinter dem Raster dieselben Spalten noch einmal (`.zw-spalten`): je Tag eine Fläche
@@ -883,17 +888,15 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zt-status.offen{color:var(--zw-offen)}
 /* Letzte 5 Wochen: dieselben Spalten wie die Wochenbilanz, je Tag ein Feld 0–4.
    Kopfzeile + fünf Zeilen à 4/5 einer Zielzeile = genau die Höhe der Woche darüber.
-   Die LÜCKE zwischen zwei Wochen ist dieselbe wie zwischen zwei Zielzeilen
-   (`--zw-zeile-h` − Punkt 20 px = 13.6 px): das sichtbare Feld `i` ist deshalb nur
-   so hoch, wie die kürzere Zeile übrig lässt (20 px − 0.2 × Zeile ≈ 13.3 px).
-   Getippt wird trotzdem die ganze Zelle (`.zm-zelle`), nicht nur das Feld. */
+   Das Feld `i` füllt die Zelle bis auf 3 px rundum (21 px hoch, auf Wunsch wieder
+   wie vor dem kurzen Versuch mit 13.6 px Wochenabstand); getippt wird die ganze Zelle. */
 .zm-raster{grid-template-rows:var(--zw-kopf-h) repeat(5,calc(var(--zw-zeile-h) * .8))}
 .zm-kopf{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;font-size:.72rem;font-weight:700}
 .zm-legende{display:flex;align-items:center;gap:3px;font-weight:600;opacity:.8}
 .zm-legende .zm-zelle{margin:0}
 .zm-legende .zm-zelle i{width:10px;height:10px;border-radius:3px}
 .zm-zelle{align-self:stretch;display:flex;align-items:center;margin:0 3px}
-.zm-zelle i{display:block;width:100%;height:calc(20px - var(--zw-zeile-h) * .2);border-radius:5px;background:rgba(255,255,255,.12)}
+.zm-zelle i{display:block;width:100%;height:calc(var(--zw-zeile-h) * .8 - 6px);border-radius:5px;background:rgba(255,255,255,.12)}
 .zm-raster .zm-zelle[data-tag]{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
 .zm-raster .zm-zelle[data-tag]:active{opacity:.6}
 .zm-zelle.leer i{background:rgba(255,255,255,.05)}
@@ -905,8 +908,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zm-zelle.gewaehlt i{box-shadow:0 0 0 2px #fff}
 .zm-zelle:focus-visible{outline:none}
 .zm-zelle:focus-visible i{outline:2px solid rgba(255,255,255,.85);outline-offset:1px}
-.zw-rechts{display:flex;align-items:center;gap:.5rem}
-.zw-vor{font-size:.72rem;font-weight:600;opacity:.85;white-space:nowrap}
 
 
 /* Letzte Workout Tabelle */
@@ -1095,8 +1096,7 @@ h5,
      Tagesdetail darunter über die volle Breite – über die volle Breite stünden die
      Punkte bei 812 px fast 90 px auseinander. Lücken wie im Hochformat aus `gap`. */
   .ziel-woche{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"kopf kopf" "woche monat" "detail detail"}
-  .ziel-woche>.zw-kopf{grid-area:kopf}
+    grid-template-areas:"woche monat" "detail detail"}
   .ziel-woche>.zw-woche{grid-area:woche}
   .ziel-woche>.zm-raster{grid-area:monat}
   .ziel-woche>.zt{grid-area:detail}
