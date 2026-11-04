@@ -5881,9 +5881,14 @@ document.body.addEventListener('click', (e) => {
   if (t.closest('.zl-pille')) { zeitleisteAuswahl(!_zlOffen); return; }
   // „Heute" wechselt den Bereich NICHT – es schiebt nur den Ausschnitt ans Ende.
   // Steht man auf 3M im Maerz, bleibt es 3M und zeigt die neuesten drei Monate.
+  // Steht die Ansicht schon am neuesten Tag (Knopf verblasst), schaltet der Tipp
+  // stattdessen auf 7T (auf Wunsch, 04.11.2026) – bei 7T selbst tut er weiter nichts.
   if (t.closest('.zl-heute')) {
     zeitleisteAuswahl(false);
-    if (t.closest('.zl-heute').classList.contains('inaktiv')) return;
+    if (t.closest('.zl-heute').classList.contains('inaktiv')) {
+      if (!is7D()) { blickAnkerMerken(t); _jahrVorher = null; bereichSetzen('7d'); }
+      return;
+    }
     blickAnkerMerken(t);
     aufHeuteSpringen();
     updateNavUI();

@@ -376,6 +376,12 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
      Er **verblasst** (`.inaktiv`, wie die Pfeile — kein `disabled`), wenn
      `referenceDate` schon der neueste Tag ist. Bewusst nicht „wenn › inaktiv ist": bei
      7T kann › schon verblasst sein, während der neueste Tag in der nächsten Woche liegt.
+     **Verblasst ist er trotzdem nicht funktionslos** (auf Wunsch, 04.11.2026): steht die
+     Ansicht schon am neuesten Tag und ist der Bereich NICHT 7T, schaltet ein Tipp auf
+     7T (`bereichSetzen('7d')`, `_jahrVorher` wird verworfen). Bei 7T am neuesten Tag
+     tut er weiterhin nichts. Ist er aktiv (zurückgeblättert), springt er wie immer nur
+     ans Ende und lässt den Bereich stehen. Geprüft: 6M → 7T, YoY → 7T, 6M zurück-
+     geblättert → bleibt 6M (danach verblasst), 7T → unverändert.
      **In der Form der Pille** (auf Wunsch, 18.09.2026): gleiche Schrift (1.14rem,
      fett), gleiche Kapsel, so breit, wie das Gerät es hergibt. Zuerst stand er als
      50-px-Kreis mit .78rem da — gerechnet für das schmalste iPhone und mit exakt
