@@ -814,7 +814,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     Einzeljahr zeigt immer Jan–Dez), **24M Quartale** (`Q1`), **Y und YoY Jahre**.
     Tage aus `moWindow()` (alle Kalendertage), im YoY aus `filtered()`.
     Jeder Punkt ist ein **Füllkreis** (`i.teil`, `--anteil` in %, `conic-gradient` in
-    `--zw-an` im hohlen Ring; 0 % = `aus`, 100 % = `an`, keine Daten/Zukunft = `leer`).
+    `--zw-an` auf der grauen Fläche `--zw-aus`, keine Kontur; 0 % = `aus`, 100 % = `an`, keine Daten/Zukunft = `leer`).
     Anteil je Abschnitt (`zielAbschnitt()`): Ruhepuls, HRV, Schlaf = Tage im Ziel von
     Tagen MIT Messwert (wie die Woche); Training = Tage mit Daten, deren Woche das
     Wochenziel erreicht (Regel von „Zielerreichung“). **Rechts der Anteil in Prozent**
@@ -851,7 +851,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
     (kräftige Töne wie in den übrigen Karten); im Glas-Modus steht `.ziel-woche` in der
     Liste der Glas-Karten (12-%-Weiss, Tokens weiss) und
     `html.glas .screen .ziel-woche` setzt die eigenen Variablen auf die hellen Töne
-    (`#34D399`/`#FBBF24`) und weissen Flächen um: `--zw-hohl` (Rand verfehlter Punkte),
+    (`#34D399`/`#FBBF24`) und weissen Flächen um: `--zw-aus` (Fläche verfehlter Punkte — seit 04.11.2026 ohne Konturen, vorher grauer Ring),
     `--zw-leer` (Punkt ohne Wert), `--zw-wahl` (gewählte Spalte), `--zw-detail`
     (Tagesdetail). **Wer eine Farbe in der Zielkarte einführt, nimmt einen Token oder
     eine dieser Variablen — kein festes Weiss.** Keine eigenen Schwellen: alles über `ZIELE` und

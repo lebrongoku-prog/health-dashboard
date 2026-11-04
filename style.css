@@ -827,7 +827,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    dort in der Liste). Was es nur hier gibt, hängt an eigenen Variablen, die der
    Glas-Modus ebenfalls umsetzt (siehe `html.glas .screen .ziel-woche`):
    `--zw-gut`/`--zw-offen` (erreicht/offen – auf Weiss die kräftigen Töne der übrigen
-   Karten, auf dem Verlauf die hellen), `--zw-hohl` (Rand verfehlter Punkte),
+   Karten, auf dem Verlauf die hellen), `--zw-aus` (Fläche verfehlter Punkte),
    `--zw-leer` (Punkt ohne Wert), `--zw-wahl` (gewählte Tagesspalte), `--zw-detail`
    (Fläche des Tagesdetails).
    EIN Abstand für die ganze Karte (auf Wunsch, 04.11.2026): `--zw-abstand` ist der
@@ -836,7 +836,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
    Die Höhe des Rasters hängt an zwei Grössen: `--zw-kopf-h` (Zeile mit Titel,
    Wochentagen und KW-Symbol) und `--zw-zeile-h` (eine Zielzeile). */
 .ziel-woche{--zw-abstand:1rem;--zw-kopf-h:1.6rem;--zw-zeile-h:2.1rem;
-  --zw-gut:#10B981;--zw-offen:#D97706;--zw-hohl:#CBD5E1;--zw-leer:#EEF2F6;
+  --zw-gut:#10B981;--zw-offen:#D97706;--zw-aus:#DCE2EA;--zw-leer:#F1F4F8;
   --zw-wahl:rgba(15,23,42,.06);--zw-detail:var(--bg);
   display:flex;flex-direction:column;gap:var(--zw-abstand);
   background:var(--card);box-shadow:var(--shadow);border-radius:var(--r);
@@ -863,11 +863,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zw-zahl{text-align:right;font-weight:700}
 .zw-punkt{display:flex;justify-content:center}
 .zw-punkt i{display:block;width:min(20px,calc(100% - 2px));aspect-ratio:1;border-radius:50%;box-sizing:border-box}
-/* Füllkreis ab 1M: Kreisausschnitt in der Kategoriefarbe im hohlen Ring. */
-.zw-punkt i.teil{border:2.5px solid var(--zw-hohl);
-  background:conic-gradient(var(--zw-an) calc(var(--anteil) * 1%), transparent 0)}
+/* Ohne Konturen (auf Wunsch, 04.11.2026): verfehlt = graue Fläche, ohne Wert = noch
+   blassere. Füllkreis ab 1M: Kreisausschnitt in der Kategoriefarbe auf dem Grau. */
+.zw-punkt i.teil{
+  background:conic-gradient(var(--zw-an) calc(var(--anteil) * 1%), var(--zw-aus) 0)}
 .zw-punkt i.an{background:var(--zw-an,var(--zw-gut))}   /* Kategoriefarbe der Zeile */
-.zw-punkt i.aus{border:2.5px solid var(--zw-hohl)}
+.zw-punkt i.aus{background:var(--zw-aus)}
 .zw-punkt i.leer{background:var(--zw-leer)}
 .zw-tag{text-align:center;font-size:.72rem;font-weight:600;color:var(--txt2);white-space:nowrap;overflow:hidden}
 .zw-tag.gewaehlt{color:var(--txt);font-weight:800}
@@ -1197,7 +1198,7 @@ html.glas .screen .goal-bar-bg,
 html.glas .screen .debt-bar-bg{background:rgba(255,255,255,.18)}
 html.glas .screen .warn-sig{background:rgba(251,146,60,.28);color:#FED7AA}
 /* Zielkarte: helle Töne für erreicht/offen und weisse Flächen – bis 04.11.2026 fest. */
-html.glas .screen .ziel-woche{--zw-gut:#34D399;--zw-offen:#FBBF24;--zw-hohl:rgba(255,255,255,.5);
+html.glas .screen .ziel-woche{--zw-gut:#34D399;--zw-offen:#FBBF24;--zw-aus:rgba(255,255,255,.3);
   --zw-leer:rgba(255,255,255,.12);--zw-wahl:rgba(255,255,255,.2);--zw-detail:rgba(255,255,255,.12)}
 
 .weitere-inhalt[hidden]{display:none}
