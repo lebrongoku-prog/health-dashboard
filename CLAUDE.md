@@ -1352,6 +1352,21 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   bis 24M), Laufstrecke/Trainingszeit `· pro Monat` bzw. `· pro Jahr`, Pace
   `· pro Training`, VO₂max `· pro Messung`. **Ein `oeLabel()` ohne Zusatz gibt es
   nicht mehr — wer eine neue Durchschnittszeile baut, nennt den Bezug.**
+- **Median in der ausgeklappten Fusszeile** (auf Wunsch, 09.11.2026) — nur dort, wo
+  Ausreisser den Ø verziehen: **Ruhepuls & HRV** (`Median 6M · pro Tag  55 bpm | 58 ms`,
+  aus den Tageswerten), **Schlafdauer** (`· pro Nacht`), **Laufstrecke** (`· pro Lauf`,
+  je EINHEIT mit Strecke aus `workoutData[d].einheiten`, nicht je Tag — wie „Ø pro
+  Lauf") und **Pace** (`· pro Training`, aus `trendPace`, also je Trainingstag wie die
+  Ø-Zeile). Bewusst NICHT in Trainingszeit (Intervalltrainings drücken ihn, neben
+  „Ø pro Lauf" ohne eigene Aussage), VO₂max (Ø ≈ Median), Schlafphasen, Zielerreichung
+  (0/1) und Schlaf-Score (leer). Steht jeweils als erste Zeile in `fussMehr(…)`, beim
+  Pace mit eigener `fussMehr`-Hülle unter der Ø-Zeile. Im YoY entfällt er wie die
+  Ø-Zeilen. Helfer: `median()` (Funktionsdeklaration, damit sie auch beim Sofortstart
+  schon steht; rechnet über `_ebQuantil`, also gemittelt bei gerader Anzahl) und
+  `medianLabel(zusatz)` (Aufbau wie `oeLabel`).
+  Nachgerechnet (Prüfstand, `?tage=900`, 6M Jun–Nov 26): Ruhepuls 55.4 → 55 bpm,
+  HRV 57.65 → 58 ms, Schlaf 7.59 h = 7h 35m, Lauf 9.76 → 9.8 km, Pace 5'26" — alle
+  identisch mit den Rohzeilen. Bei 360 px und 24M alle Zeilen einzeilig (27 px).
 - **Fusszeilen des Training-Tabs** (auf Wunsch, 18.09.2026):
   **Laufstrecke und Trainingszeit** `Total` → `Ø 6M · pro Monat` → `Ø pro Lauf` →
   `Ø pro Woche` (Letzteres wie bisher erst ab 1M, siehe „Wochenschnitt"); aufgeklappt

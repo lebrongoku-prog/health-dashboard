@@ -3145,7 +3145,8 @@ function pgHerz() {
             { werte: yoyWerte(D, r => r.hrv,    'mittel'), richtung: ZIELE.hrv.richtung }]) : ''}
         ${istYoY() ? '' : statZeile(oeLabel('pro Tag'), `${hrD!=null?zahl(hrD,0)+' bpm':'—'} | ${hvD!=null?zahl(hvD,0)+' ms':'—'}`)}
         ${istYoY() ? '' : fussMehr('herz',
-          statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
+          statZeile(medianLabel('pro Tag'), `${(m => m!=null?zahl(m,0)+' bpm':'—')(median(hrf.map(r=>r.restHR)))} | ${(m => m!=null?zahl(m,0)+' ms':'—')(median(hvf.map(r=>r.hrv)))}`)
+        + statZeile(`Ø Wochentag (Mo–Fr)`, `${hrWeek!=null?zahl(hrWeek,0)+' bpm':'—'} | ${hvWeek!=null?zahl(hvWeek,0)+' ms':'—'}`)
         + statZeile(`Ø Wochenende (Sa–So)`, `${hrWknd!=null?zahl(hrWknd,0)+' bpm':'—'} | ${hvWknd!=null?zahl(hvWknd,0)+' ms':'—'}`))}
       </div>
     </div>
@@ -3756,7 +3757,8 @@ function pgSchlaf() {
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => r.sleepTotal, 'mittel'), richtung: ZIELE.sleepTotal.richtung }]) : ''}
           ${istYoY() ? '' : statZeile(oeLabel('pro Nacht'), `${slD!=null?alsStdMin(slD):'—'}`)}
           ${istYoY() ? '' : fussMehr('schlaf',
-            statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
+            (slRows.length ? statZeile(medianLabel('pro Nacht'), alsStdMin(median(slRows.map(r=>r.sleepTotal)))) : '')
+          + statZeile(`Ø Wochentag (Mo–Fr)`, `${slWeek!=null?alsStdMin(slWeek):'—'}`)
           + statZeile(`Ø Wochenende (Sa–So)`, `${slWknd!=null?alsStdMin(slWknd):'—'}`))}
         </div>`:''}
       </div>
@@ -4046,6 +4048,10 @@ async function pgTraining() {
   const oeStrBalken  = _oeBalken(_balkenStr);
   // Ø-Pace: ebenfalls der Wert der Ø-Linie – Mittel ueber die Einheiten.
   const oePace = mittelArr(trendPace);
+  // Median der Strecke je LAUF (Einheit mit Strecke), nicht je Tag – zwei Läufe am
+  // selben Tag zählen einzeln, wie bei „Ø pro Lauf".
+  const medianLauf = median(trainDates.flatMap(d => (workoutData[d]?.einheiten || [])
+    .filter(e => e.strecke > 0).map(e => e.strecke)));
 
   const hasAny=trainDates.length>0;
 
@@ -4070,7 +4076,8 @@ async function pgTraining() {
           ${distGesamt!=null&&_fensterWochen?`${statZeile(`Ø pro Woche`, `${zahl(distGesamt/_fensterWochen,1)} km`)}`:''}
           ${istYoY() ? yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.distanceKm ?? null, 'summe') }], true) : ''}
           ${istYoY() ? '' : fussMehr('training',
-            (distWkdAvg!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`) : '')
+            (medianLauf!=null ? statZeile(medianLabel('pro Lauf'), `${zahl(medianLauf,1)} km`) : '')
+          + (distWkdAvg!=null ? statZeile(`Ø Wochentag (Mo–Fr)`, `${zahl(distWkdAvg,1)} km`) : '')
           + (distWkndAvg!=null ? statZeile(`Ø Wochenende (Sa–So)`, `${zahl(distWkndAvg,1)} km`) : ''))}
         </div>
       </div>
@@ -4095,11 +4102,13 @@ async function pgTraining() {
       <h3>Pace pro Training ${infoI('pace')}</h3>
       <div class="chart-legend"><div class="cl-item"><span class="cl-line" style="background:#EA580C"></span>Pace</div>${hlLegende('c-tr-pace|oe','Ø','#EA580C')}</div>
       <div class="chart-wrap"><canvas id="c-tr-pace"></canvas></div>
-      <!-- Nur die Durchschnittszeile (18.09.2026, auf Wunsch). Wochentag/Wochenende sind
-           beim Pace ganz entfallen – auch aufgeklappt. Ohne Pace-Werte keine Fusszeile. -->
+      <!-- Die Durchschnittszeile (18.09.2026, auf Wunsch), aufgeklappt dazu der Median
+           (09.11.2026). Wochentag/Wochenende sind beim Pace ganz entfallen. Ohne
+           Pace-Werte keine Fusszeile. -->
       ${istYoY() ? `<div class="stats-list diagramm-fuss">${yoyZeilen([{ werte: yoyWerte(D, r => workoutData[r.date]?.avgSpeedKph > 0 ? paceFromSpeed(workoutData[r.date].avgSpeedKph) : null, 'mittel') }])}</div>`
         : oePace != null ? `<div class="stats-list diagramm-fuss">
         ${statZeile(oeLabel('pro Training'), `${fmtPace(oePace)} min/km`)}
+        ${fussMehr('training', statZeile(medianLabel('pro Training'), `${fmtPace(median(trendPace))} min/km`))}
       </div>` : ''}
     </div>
     ${!hasAny?noDataCard:''}
@@ -5117,6 +5126,12 @@ function oeLabel(zusatz) {
   const basis = 'Ø ' + bereichKurz();
   return zusatz ? basis + ' · ' + zusatz : basis;
 }
+// Median-Zeile der ausgeklappten Fusszeile (auf Wunsch, 09.11.2026) – derselbe Aufbau
+// wie die Durchschnittszeile („Median 6M · pro Tag"). Der Median zeigt den typischen
+// Wert, wo einzelne Ausreisser (kurze Nacht, Erholungslauf, ein langer Lauf) den Ø
+// verziehen. Nur in Ruhepuls & HRV, Schlafdauer, Laufstrecke und Pace.
+function medianLabel(zusatz) { return 'Median ' + bereichKurz() + ' · ' + zusatz; }
+function median(werte) { return _ebQuantil(werte, .5); }
 // Kurzname des aktuellen Bereichs – fuer Pille und Durchschnittszeile: „7T", „YoY", „2025".
 function bereichKurz() {
   if (istYoY()) return 'YoY';
