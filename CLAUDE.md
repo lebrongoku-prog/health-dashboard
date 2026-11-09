@@ -912,6 +912,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   also ist auch die Unterscheidung standardmässig aus. Ein Tipp auf „Ziel" in der
   Legende schaltet beides ein. Geprüft (1M): aus 9 × kräftig, an 8 kräftig + 1 hell,
   wieder aus 9 × kräftig.
+  **Die Färbung blendet GLEICHZEITIG mit der Linie** (auf Wunsch, 09.11.2026), direkt
+  beim Tipp — nicht erst nach deren Ein-/Ausblenden: `_slMixBlenden(chart, von, nach)`
+  führt `chart.$slMix` (0 = keine Unterscheidung, 1 = volle) in `HL_DAUER` über,
+  `_slFarbe` liest ihn (sonst den Linienzustand). Weil Chart.js eine Farbfunktion beim
+  **Update** auswertet, nicht beim Zeichnen, läuft je Bild `update('none')` statt
+  `draw()`. Ausschalten: Blende am alten Diagramm parallel zum Ausblenden der Linie;
+  Einschalten: nach dem Neuaufbau am neuen, parallel zu `_hlEinblenden`. Gemessen
+  (Prüfstand): beim Tipp Mix 0 bzw. 1, nach 110 ms 0.88 bzw. 0.01 (Linie 0.99 bzw.
+  0.01), am Ende 0.32/0.85 Deckkraft der verfehlten Nacht.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
   Farbnaht. Die Legende zeigt seit 23.10.2026 (auf Wunsch, zuerst 11.10. nur bei 1Y)

@@ -1548,6 +1548,15 @@ function _hlEinblenden(c, art) {
     () => { delete c.$hlBlende; try { c.draw(); } catch(_) {} });
 }
 
+// Färbung der Schlafdauer-Balken überblenden (siehe `_slFarbe`). Die Farbe ist eine
+// Funktion, die Chart.js beim UPDATE auswertet, nicht beim Zeichnen – deshalb je Bild
+// `update('none')` statt `draw()`. Gleich lang wie die Linie (HL_DAUER).
+function _slMixBlenden(c, von, nach) {
+  const setzen = m => { c.$slMix = m; try { c.update('none'); } catch(_) {} };
+  setzen(von);
+  uebergang(HL_DAUER, e => setzen(von + (nach - von) * e), () => setzen(nach));
+}
+
 // Neuaufbau OHNE Aufbau-Animation fuer alle Diagramme, die vorher schon SICHTBAR
 // waren – ueberall dort, wo sich die Daten nicht aendern: Hilfslinie umschalten und
 // Aus-/Einklappen. Diagramme, die dabei erst ins Bild kommen (etwa beim Aufklappen),
@@ -3862,8 +3871,14 @@ function pgSchlaf() {
     // eingeblendet ist, werden verfehlte Nächte hell. Ohne Linie tragen alle Balken die
     // kräftige Farbe – eine helle Nacht ohne sichtbare Grenze liesse sich nicht deuten.
     // Die Linie startet ausgeschaltet (siehe `_hilfslinie`).
+    // Wie stark verfehlte Nächte aufhellen, 0 (gar nicht) … 1 (voll): ohne Zutun aus der
+    // Linie, während des Umschaltens aus `$slMix` (`_slMixBlenden`).
     const _slMitZiel = hlAn('c-sl-dur|ziel');
-    const _slFarbe = ctx => !_slMitZiel || _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
+    const _slFarbe = ctx => {
+      if (_slErreicht(ctx.dataIndex)) return 'rgba(124,58,237,.85)';
+      const m = ctx.chart.$slMix ?? (_slMitZiel ? 1 : 0);
+      return `rgba(124,58,237,${(.85 - .53 * m).toFixed(3)})`;
+    };
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
       // "7h 25m" statt "7.4" – dasselbe Format wie in der Ziele-Karte und den
       // Minikacheln, damit dieselbe Nacht ueberall gleich aussieht.
@@ -5849,7 +5864,16 @@ document.body.addEventListener('click', (e) => {
     _hlPlan = an && !bewegungAus() ? { id, art } : null;
     _ruhigRendern(currentScreen);
   };
-  if (an || !alt || bewegungAus()) { neuAufbauen(); return; }
+  // Schlafdauer: an der Ziellinie hängt die helle Färbung verfehlter Nächte. Sie
+  // wechselt GLEICHZEITIG mit dem Ein-/Ausblenden der Linie, direkt beim Tipp (auf
+  // Wunsch, 09.11.2026) – nicht erst, wenn die Linie fertig ist.
+  const slFarbe = id === 'c-sl-dur' && art === 'ziel' && !bewegungAus();
+  if (an || !alt || bewegungAus()) {
+    neuAufbauen();
+    if (an && slFarbe && charts[id]) _slMixBlenden(charts[id], 0, 1);
+    return;
+  }
+  if (slFarbe) _slMixBlenden(alt, 1, 0);
   // Ausschalten: erst die Linie ausblenden, dann ohne sie neu aufbauen. Der Schalter
   // zeigt den neuen Zustand sofort, nicht erst nach der Blende.
   sch.classList.add('aus');
