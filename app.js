@@ -2123,7 +2123,9 @@ const nurMesswerte = item => !_istHilfslinienLabel(item.dataset.label);
 // Schluessel ist '<canvas-id>|<art>' mit art = 'oe' oder 'ziel'. Ein Diagramm kann
 // beide haben (Schlafdauer, VO2max), und zwei Diagramme duerfen sich nicht
 // gegenseitig schalten – deshalb die Canvas-ID im Schluessel.
-const _hilfslinie = {};
+// Ausnahme: die Ziellinie der Schlafdauer startet AUS (auf Wunsch, 09.11.2026) – an ihr
+// hängt die helle Färbung verfehlter Nächte, und die soll standardmässig fehlen.
+const _hilfslinie = { 'c-sl-dur|ziel': false };
 function hlAn(schluessel) { return _hilfslinie[schluessel] !== false; }
 
 // Legendeneintrag zum Ein-/Ausschalten. Ein <button>, damit der Tipp auf den
@@ -3744,7 +3746,7 @@ function pgSchlaf() {
     ${hasScore?`<div class="kpi-grid kpi-grid-1">${kpiCard({icon:'',label:'Ø Schlaf-Score',value:zahl(scD,0),unit:'',delta:prozentDiff(scD,scP),color:'var(--sleep)'})}</div>`:''}
 
       <div class="chart-card">
-        <h3>${is7D()?'Schlafdauer letzte 7 Tage':ist1Y()?'Schlafdauer pro Jahr':'Schlafdauer pro Monat'}</h3>
+        <h3>Schlafdauer</h3>
         <div class="chart-legend">
           <!-- „erreicht/verfehlt" entfaellt in allen Bereichen (auf Wunsch, 11.10. bei 1Y,
                23.10.2026 ueberall) – die Ziellinie zeigt die Grenze. -->
@@ -3856,7 +3858,12 @@ function pgSchlaf() {
     // welche Nächte das Ziel verfehlten. Den Zielwert markiert jetzt die grüne Linie.
     const _slZiel = ZIELE.sleepTotal.ziel;
     const _slErreicht = i => slMa[i]!=null && slMa[i] >= _slZiel;
-    const _slFarbe = ctx => _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
+    // Die Unterscheidung hängt an der Ziellinie (auf Wunsch, 09.11.2026): nur wenn sie
+    // eingeblendet ist, werden verfehlte Nächte hell. Ohne Linie tragen alle Balken die
+    // kräftige Farbe – eine helle Nacht ohne sichtbare Grenze liesse sich nicht deuten.
+    // Die Linie startet ausgeschaltet (siehe `_hilfslinie`).
+    const _slMitZiel = hlAn('c-sl-dur|ziel');
+    const _slFarbe = ctx => !_slMitZiel || _slErreicht(ctx.dataIndex) ? 'rgba(124,58,237,.85)' : 'rgba(124,58,237,.32)';
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
       // "7h 25m" statt "7.4" – dasselbe Format wie in der Ziele-Karte und den
       // Minikacheln, damit dieselbe Nacht ueberall gleich aussieht.
@@ -5095,7 +5102,12 @@ function pgBanner(title){
          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.7 7.7 0 0 0-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.7 7.7 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .8 1.8-3.1Z"/></svg>
        </button>`
     : '';
-  return`<div class="pg-banner"><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button></div></div>`;
+  // Der Transparenz-Knopf steht seit 09.11.2026 (auf Wunsch) ebenfalls NUR in der
+  // Übersicht; der Modus gilt weiterhin für alle Tabs.
+  const glas = _currentRenderingTab === 'overview'
+    ? `<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button>`
+    : '';
+  return`<div class="pg-banner"><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}${glas}</div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav

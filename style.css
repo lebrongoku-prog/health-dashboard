@@ -194,6 +194,9 @@ body.theme-training   { --tab-color: #F97316; }
 .pg-banner-actions {
   margin-left: auto; flex: 0 0 auto;
   display: flex; gap: 8px; align-items: center;
+  /* Knopfhöhe auch ohne Knöpfe (Herz, Schlaf, Training seit 09.11.2026): sonst wäre
+     der Banner dort niedriger und die erste Karte stünde höher als in der Übersicht. */
+  min-height: 38px;
 }
 .pg-act {
   width: 38px; height: 38px; flex-shrink: 0;

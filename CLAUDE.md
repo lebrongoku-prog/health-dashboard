@@ -267,7 +267,10 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   der App-Karte auf der Einstellungen-Seite (`datenStandZeilen()`, ab 2 Tagen
   Rückstand orange).
 - **Bedienelemente:** Rechtsbündig auf der `pg-banner`-Titelzeile (`pgBanner()`) sitzt
-  der **Transparenz-Knopf** (`.glas-toggle`, siehe „Transparenz-Modus"); bis
+  der **Transparenz-Knopf** (`.glas-toggle`, siehe „Transparenz-Modus") — seit
+  09.11.2026 (auf Wunsch) **nur noch in der Übersicht**, wie das Zahnrad; der Modus gilt
+  weiterhin für alle Tabs. `.pg-banner-actions` hat `min-height: 38px`, damit der
+  Banner in Herz, Schlaf und Training ohne Knöpfe gleich hoch bleibt (62 px). Bis
   02.10.2026 stand dort der Dunkel-Schalter. Das
   Neuladen der Daten sitzt **nicht** mehr dort, sondern als Knopf „Daten aktualisieren"
   auf der Einstellungen-Seite — zusammen mit „App-Version aktualisieren" darunter,
@@ -900,6 +903,15 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
   Wochenbilanz und Zielerreichung der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
+  **Schlafdauer: Titel immer „Schlafdauer"** (auf Wunsch, 09.11.2026; vorher je Bereich
+  „… letzte 7 Tage" / „… pro Monat" / „… pro Jahr" — der Zeitraum steht ohnehin rechts
+  im Kartenkopf). **Die helle Färbung verfehlter Nächte hängt an der Ziellinie** (auf
+  Wunsch, 09.11.2026): `_slFarbe` färbt nur hell, wenn `hlAn('c-sl-dur|ziel')`; ohne
+  Linie tragen alle Balken die kräftige Farbe. Die Ziellinie **startet aus**
+  (`_hilfslinie = {'c-sl-dur|ziel': false}` — die einzige Hilfslinie mit Standard aus),
+  also ist auch die Unterscheidung standardmässig aus. Ein Tipp auf „Ziel" in der
+  Legende schaltet beides ein. Geprüft (1M): aus 9 × kräftig, an 8 kräftig + 1 hell,
+  wieder aus 9 × kräftig.
   **Schlafdauer- und Schritte-Diagramm:** dort färbt die Zielerreichung den **ganzen** Balken —
   kräftig wenn Nacht bzw. Tag das Ziel erreicht, hell wenn nicht (`_slFarbe`/`_stFarbe`). Den Zielwert markiert die grüne Linie, nicht mehr eine
   Farbnaht. Die Legende zeigt seit 23.10.2026 (auf Wunsch, zuerst 11.10. nur bei 1Y)
@@ -1452,7 +1464,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 - **Transparenz-Modus** (02.10.2026, auf Wunsch, 1:1 aus FitTracks Glas-Modus) —
   **ersetzt den Dunkelmodus**, der samt `body.dark`, `applyDarkMode`/`setDarkMode`,
   `DARK_SYMBOL` und dem Schlüssel `hcc_dark` entfallen ist (der Schlüssel wird beim
-  Start einmal weggeräumt). Knopf `.glas-toggle` rechts im Banner jedes Tabs, Symbol
+  Start einmal weggeräumt). Knopf `.glas-toggle` rechts im Banner (seit 09.11.2026 nur in der Übersicht), Symbol
   aus FitTrack (zwei überlappende Karten, `GLAS_SYMBOL`), eingeschaltet mit hellerer
   Fläche (`[aria-pressed="true"]`). Zustand `hcc_glas` im `localStorage`,
   `glasAktiv()`, Klasse `glas` am **`<html>`** (`applyGlasModus()`). Standard: aus.
