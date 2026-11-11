@@ -42,17 +42,20 @@
 //
 // Szenarien über ?scenario= :
 //   normal      – vollständige Daten (Standard)
-//   nodata      – letzter Tag ohne Messwerte  → Score muss "—" zeigen
+//   nodata      – letzter Tag ohne Messwerte  → Wochenbilanz zeigt den Tag blass
 //   woerror     – Workout-Sheet wirft Fehler  → Training-Tab muss Fehlerkarte zeigen
-//   stale       – Daten enden vor 3 Tagen     → Banner muss warnen
+//   stale       – Daten enden vor 3 Tagen     → „Daten bis" in den Einstellungen orange
 //   inject      – Zellen enthalten Auszeichnungscode → darf NICHT ausgeführt werden,
 //                 und Zeilen mit unsinnigem Datum müssen verworfen werden
 //   dubletten   – dieselben Tage stehen mehrfach im Sheet (so wie es das Apps-Script
 //                 beim Refresh erzeugen kann) → dürfen nur EINMAL gezählt werden
 //
 // Zusatzschalter ?auth=aus       – kein gueltiger Token: die App muss aus dem
-//                 Zwischenspeicher weiterlaufen und die Hinweisleiste oben zeigen
-//                 (frueher: Login-Screen, gar keine Daten).
+//                 Zwischenspeicher weiterlaufen; der Stand „abgelaufen" steht in den
+//                 Einstellungen (frueher: Login-Screen, gar keine Daten).
+// Zur Laufzeit: window.__netzAus = true laesst jeden Sheets-Abruf scheitern –
+//                 „Daten aktualisieren" darf die App dann NICHT hinter der Fehlerseite
+//                 sperren; der vorhandene Stand bleibt stehen.
 // Zusatzschalter ?cache=behalten – den Datei-Zwischenspeicher NICHT leeren. Erst
 //                 normal laden (schreibt ihn), dann damit neu laden: die App muss
 //                 sofort zeichnen und im Hintergrund nachladen.
@@ -264,6 +267,7 @@ window.fetch = (url, opt = {}) => {
   }
 
   if (u.includes('sheets.googleapis.com')) {
+    if (window.__netzAus) return Promise.reject(new TypeError('Simulierter Netzausfall'));
     const isWorkout = u.includes(WORKOUT_ID);
     const dec = decodeURIComponent(u);
 

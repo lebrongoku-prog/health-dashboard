@@ -37,14 +37,9 @@
   /* Weicher Schatten ohne Haarlinie – die wirkte wie eine Umrandung. Alle Karten (chart-card, kpi, pi-card,
      warn-card, rec-card, no-data, …) lesen diese eine Variable. */
   --shadow: 0 1px 6px rgba(0,0,0,.18);
-  --shadow-hov: 0 8px 24px rgba(0,0,0,.12);
   --sleep: #7C3AED;
   --heart: #EF4444;
   --hrv: #2563EB;
-  --vo2: #D97706;
-  --act: #059669;
-  --rec: #0891B2;
-  --body: #6B7280;
   /* Per-Tab dominant color (swapped via body.theme-*) */
   --tab-color: #0891B2;
 }
@@ -106,11 +101,7 @@ body.theme-herz       { --tab-color: #EF4444; }
 body.theme-schlaf     { --tab-color: #7C3AED; }
 body.theme-training   { --tab-color: #F97316; }
 
-/* ── Topbar pro Tab (inline) ─────────────────────────────
-   Die Topbar wird per JS in jede .screen-Fläche injiziert und scrollt
-   mit dem Inhalt. Kein position:fixed, kein Auto-Hide. */
-
-/* Refresh + Dark-Toggle: deutlich unterscheidbare Tönung gegen versehentliche Verwechslung */
+/* Blätterpfeile – Grundform; Grösse und Fläche in der Zeitleiste siehe `#zeitleiste .nav-arrow`. */
 .nav-arrow {
   width: 36px; height: 36px;
   background: var(--card); border: 1px solid var(--border);
@@ -188,7 +179,7 @@ body.theme-training   { --tab-color: #F97316; }
   color: #fff; font-weight: 800;
   font-size: 20.9px; letter-spacing: -.015em; line-height: 1.2;
 }
-/* Refresh + Dark-Toggle: rechtsbündig auf der Titelzeile, ohne eigene Kachel.
+/* Zahnrad + Transparenz-Knopf (nur Übersicht): rechtsbündig auf der Titelzeile.
    Sitzen auf dem farbigen Banner-Verlauf → halbtransparentes Weiß. */
 .pg-banner-txt { flex: 1 1 auto; min-width: 0; }
 .pg-banner-actions {
@@ -381,12 +372,11 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 #zeitleiste .zl-heute.inaktiv { opacity: .35; cursor: default; }
 #zeitleiste .zl-heute.inaktiv:active { opacity: .35; transform: none; }
 
-/* Ausklapp-Knopf der Tabs – seit 07.09.2026 hier statt in der Kopfzeile: unten links
-   auf der Hoehe der Pille. Er gehoert damit zur Zeitleiste und macht deren aktiven
-   und passiven Zustand mit: gleiche Flaeche, gleiche Deckkraft, gleiche Skalierung.
-   `bottom: 0` setzt ihn auf dieselbe Unterkante wie `.zl-reihe` (die Leiste hat unten
-   kein Padding). Der Skalierungs-Ursprung liegt unten LINKS statt unten mittig —
-   sonst wanderte er beim Schrumpfen von seinem Platz am Rand weg. */
+/* Ausklapp-Knopf der Tabs – seit 07.09.2026 hier statt in der Kopfzeile: unten rechts
+   (seit 08.09.2026, davor kurz links) auf der Hoehe der Pille. Er gehoert damit zur
+   Zeitleiste und macht deren aktiven und passiven Zustand mit: gleiche Flaeche,
+   gleiche Deckkraft, gleiche Skalierung. `bottom: 0` setzt ihn auf dieselbe Unterkante
+   wie `.zl-reihe` (die Leiste hat unten kein Padding). */
 .zl-ausklapp {
   /* Der Knopf teilt sich die Zeile mit der zentrierten Pillenreihe. Seit die Reihe
      20 % groesser ist (08.09.2026), bleibt neben ihr wenig Platz: bei 375 px endet
@@ -450,7 +440,7 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 #zeitleiste .nav-arrow.inaktiv { opacity: .35; cursor: default; }
 
 /* Auswahl ueber der Pille, seit 12.09.2026 in ZWEI Zeilen: oben die Befehle
-   („Heute", „YoY"), darunter die sechs Bereiche. Vorher stand alles in einer Zeile,
+   („YoY" und die Jahres-Knoepfe), darunter die sieben Bereiche. Vorher stand alles in einer Zeile,
    getrennt durch einen senkrechten Strich — die war bei 375 px mit 332 von 332 px
    aber schon randvoll, und der zweite Befehl haette sie an beliebiger Stelle
    umbrechen lassen. Die Trennung nach Zeilen trennt zugleich nach Bedeutung: oben
@@ -552,9 +542,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 }
 .nav-btn.active svg { stroke: var(--tab-color); }
 .nav-btn.active span { color: var(--tab-color); font-weight: 600; }
-/* Sonderfall O₂-Tab: SVG <text> braucht fill statt stroke */
-.nav-btn svg text { fill: var(--txt3); stroke: none; }
-.nav-btn.active svg text { fill: var(--tab-color); }
 
 /* ── Overlay screens (login, loading, error) ────────────── */
 .overlay-screen {
@@ -606,20 +593,17 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 /* Chart cards */
 .chart-card{background:var(--card);border-radius:var(--r);padding:.7rem .75rem;box-shadow:var(--shadow);margin-bottom:.7rem}
 .chart-card h3{font-size:.94rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.35rem;min-width:0;cursor:pointer}
-.chart-card h3>.filter-titel .nav-arrow,.chart-card h3>.filter-titel .zeitraum-text{font-weight:600}
 /* `min-height` = eine Legendenzeile (Schriftgroesse .72rem x Zeilenhoehe 1.4 aus dem
    Type Scale). Sie haelt den Kopfbereich auch dort gleich hoch, wo ein Diagramm
    keine Legende braucht: der Schlaf-Score traegt dafuer eine LEERE `.chart-legend`.
    Ohne sie begann seine Diagrammflaeche 23 px weiter oben als in allen anderen. */
 .chart-legend{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem;min-height:calc(.72rem * 1.4)}
 
-/* "Heute" + Zeitraum rechts in der Titelzeile. Der Titel selbst ist bereits ein
-   Flex-Container; min-width:0 lässt ihn schrumpfen, statt die Knöpfe hinauszudrücken. */
+/* Der angezeigte Zeitraum rechts in der Titelzeile. Der Titel selbst ist bereits ein
+   Flex-Container; min-width:0 lässt ihn schrumpfen, statt den Zeitraum hinauszudrücken. */
 .chart-card h3>.filter-titel{margin-left:auto;flex:0 0 auto}
 .filter-titel{display:flex;align-items:center;gap:.25rem;flex-wrap:nowrap}
 .filter-titel:empty{display:none}
-/* Legendenschalter des Vergleichsdiagramms: sieht aus wie ein Legendeneintrag,
-   ist aber ein Knopf. Ausgeschaltete Reihen treten zurueck, bleiben aber lesbar. */
 .cl-item{display:flex;align-items:center;gap:.28rem;font-size:.73rem;color:var(--txt2)}
 .cl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .cl-line{width:14px;height:3px;border-radius:2px;flex-shrink:0}
@@ -677,11 +661,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
   .chart-wrap{height:calc(var(--diagramm-quer) * .8)}
 }
 
-/* Diagramm-Kopfzeile: Titel links, Zeitfilter-Control rechts – eine Zeile. */
+/* Karten-Kopfzeile: Titel links, Bezugszeitraum-Etikett rechts – eine Zeile. Der
+   Titel darf umbrechen statt abgeschnitten zu werden. */
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem}
-.chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-head > h3{display:block;margin-bottom:0;min-width:0;flex:1 1 auto}
 
-/* ── App-Version + Update (Ende der Übersicht) ───────────
+/* ── App-Version + Update (Einstellungen-Seite) ──────────
    Bewusst unauffällig: eine Wartungsfunktion, die selten gebraucht wird und den
    Blick nicht von den Gesundheitsdaten wegziehen soll. */
 .app-karte .stats-list{margin-bottom:.6rem}
@@ -709,10 +694,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 }
 .chart-head .scope-badge{margin-left:auto}
 
-/* Diagramm-Titel dürfen wieder umbrechen statt abgeschnitten zu werden. */
-.chart-head > h3{white-space:normal;overflow:visible;text-overflow:clip}
-
-/* Statuszeile: beantwortet beim Öffnen "liegt gerade etwas ausserhalb?" */
 /* ── ⓘ-Erklärungen ───────────────────────────────────────
    Beantworten pro Kennzahl: Was ist das, und welche Richtung ist gut? Ohne die
    zweite Angabe lässt sich weder Farbe noch Pfeil deuten. */
@@ -738,17 +719,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .info-i.tt-open .info-tt{opacity:1}
 .info-i:focus-visible{outline:2px solid var(--tab-color,#0891B2);outline-offset:2px}
 
-/* Per-Diagramm Zeitfilter (Bereichs-Dropdown + Mini-Datumsnavigator) */
-/* Eigene Zeile unter dem Diagramm-Titel: volle Breite, dadurch Platz fuer
-   Bedienelemente in Fingergroesse (Pfeile 36 px). */
-/* Angezeigter Zeitraum neben "Heute". Bleibt einzeilig – ein Umbruch zerreisst die
+/* Angezeigter Zeitraum im Kartentitel. Bleibt einzeilig – ein Umbruch zerreisst die
    Titelzeile. */
 .filter-titel .zeitraum-text{font-size:.73rem;font-weight:600;color:var(--txt2);white-space:nowrap;flex:0 0 auto}
 /* Zeitstrahl-Wisch bei Monatsbalken: waehrend des Ziehens steht hier der ZIELzeitraum,
    in der Tabfarbe – die hereinkommenden Monate sind da noch nicht gezeichnet. */
 .filter-titel .zeitraum-text.vorschau{color:var(--tab-color)}
-.filter-titel .nav-arrow{width:29px;height:29px;font-size:1.16rem;border-radius:8px}
-/* "Heute"-Button ist eine Text-Pille, kein quadratischer Pfeil */
 
 /* Multi-column layouts */
 .two-col-eq{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:.7rem}
@@ -810,19 +786,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .chart-card.split2 .stat-lbl{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chart-card.split2 .stat-val{white-space:nowrap;flex:0 0 auto}
 
-/* Health Score tooltip / komponenten */
-
 /* No-data / hints */
 .no-data{background:var(--card);border-radius:var(--r);padding:1.5rem;box-shadow:var(--shadow);text-align:center;color:var(--txt3);font-size:.92rem;line-height:1.7;margin-bottom:.7rem}
 .no-data strong{color:var(--txt2);display:block;margin-bottom:.4rem}
 .field-hint{font-size:.73rem;background:#F8FAFC;border-radius:6px;padding:.5rem .7rem;margin-top:.6rem;text-align:left;color:var(--txt2);line-height:1.8}
 .field-hint code{font-family:monospace;font-size:.8rem;color:var(--accent);background:#EEF2FF;padding:.05rem .25rem;border-radius:3px}
 
-/* Misc */
-.badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:.77rem;font-weight:700}
-
-/* Overview-spezifisch (.ov-*). Die frühere .ov-row-Zweispaltung entfiel mit der
-   Score-Karte – die Tageswerte-Kachel steht jetzt allein über die volle Breite. */
 /* ── Ziele der Übersicht: Wochenbilanz (30.09.2026, auf Wunsch) ─────
    Normal- UND Transparenz-Modus wie jede andere Karte (auf Wunsch, 04.11.2026;
    vorher immer durchscheinend mit fester weisser Schrift): Schrift über die Tokens
@@ -895,15 +864,11 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .zt-status.offen{color:var(--zw-offen)}
 
 
-/* Letzte Workout Tabelle */
-
 /* Recommendation Card */
 .rec-card{background:var(--card);border-radius:var(--r);padding:.9rem 1rem;box-shadow:var(--shadow);border-left:4px solid var(--rec-color,#0891B2);display:flex;flex-direction:column}
 .rec-status{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;font-size:.8rem;font-weight:700;margin-bottom:.5rem}
 .rec-title{font-size:.9rem;font-weight:800;margin-bottom:.3rem}
 .rec-text{font-size:.77rem;color:var(--txt2);line-height:1.6;margin-bottom:.4rem}
-
-/* Score Drivers */
 
 /* Warning Card */
 .warn-card{background:var(--card);border-radius:var(--r);padding:.8rem 1rem;box-shadow:var(--shadow);margin-bottom:.7rem;border-left:4px solid #F97316;display:flex;gap:.7rem;align-items:flex-start}
@@ -911,8 +876,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .warn-text{font-size:.8rem;color:var(--txt2);line-height:1.55}
 .warn-signals{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem}
 .warn-sig{font-size:.7rem;padding:.1rem .4rem;border-radius:999px;background:#FFF7ED;color:#C2410C;font-weight:600}
-
-/* Baseline Comparison */
 
 /* Sleep Debt */
 .debt-bar-wrap{margin:.5rem 0}
@@ -932,9 +895,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .debt-tt-d.pos{color:#10B981}.debt-tt-d.neg{color:#EF4444}
 .debt-tt-wrap:focus-visible{outline:2px solid var(--tab-color,#0891B2);outline-offset:3px;border-radius:6px}
 
-/* Tap-Zustand der reinen CSS-Tooltips – Gegenstück zu den :hover-Regeln,
-   damit sie auch ohne Mauszeiger (iPhone) erreichbar sind. *//* EW Check */
-
 /* Pattern Insights */
 .pi-grid{display:grid;grid-template-columns:1fr;gap:.6rem;margin-bottom:.7rem}
 .pi-grid>*{min-width:0;overflow:hidden}
@@ -945,17 +905,12 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 .pi-text{font-size:.75rem;color:var(--txt2);line-height:1.55}
 /* Einblicke in Training (18.09.2026), Herz und Schlaf (19.09.2026): dieselben Karten
    wie „Muster & Zusammenhaenge", in vier Abschnitten. Die Abschnittstitel stehen auf
-   dem Tab-Verlauf – der ist in beiden Themes dunkel, deshalb Weiss (wie die
-   Minikacheln der Uebersicht). */
+   dem Tab-Verlauf – der ist dunkel, deshalb Weiss. */
 .einblicke{margin-top:.9rem}
 .eb-abschnitt{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;
   margin:.15rem .2rem .45rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;
   text-transform:uppercase;color:rgba(255,255,255,.92)}
 .eb-hinweis{font-size:.64rem;font-weight:600;letter-spacing:0;text-transform:none;color:rgba(255,255,255,.72)}
-
-/* Coaching Hint */
-
-/* Page intro question (kursive Frage) */
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -1023,11 +978,6 @@ h5,
   line-height: 1.4;
 }
 
-/* Tagesdetail im Laufkalender: EINE Groesse fuer alles, was beim Antippen eines
-   Tages erscheint (Wunsch). Vorher standen dort fuenf Abstufungen von .66 bis
-   .79rem nebeneinander. Bezugsgroesse ist die Label-Stufe darueber – die tragen
-   die Wertzeilen (Trainingszeit, Strecke, …), an denen sich das Auge orientiert. */
-
 /* Caption – Uppercase Mini-Labels, Einheiten, Tiny Hints */
 .kpi-lbl,
 .pi-conf,
@@ -1037,8 +987,7 @@ h5,
 .debt-tt-hd,
 .rec-status,
 .warn-sig,
-.warn-signals,
-.badge{
+.warn-signals{
   font-size: .72rem !important;
   line-height: 1.4;
 }
@@ -1052,9 +1001,7 @@ h5,
 /* Chart.js Tooltips und Legenden rendern auf Canvas – CSS hat dort keinen Einfluss */
 
 /* ═══════════════════════════════════════════════════════════
-   Landscape-Modus (Phone gedreht):
-   Topbar zieht sich in eine Zeile zusammen, damit vertikaler
-   Platz nicht doppelt für zwei Topbar-Zeilen draufgeht.
+   Querformat: zwei Spalten, wo im Hochformat eine steht.
    ═══════════════════════════════════════════════════════════ */
 @media (orientation: landscape) {
   /* Zwei Spalten, wo im Hochformat eine steht (auf Wunsch, 08.09.2026). Die Abstaende
@@ -1156,10 +1103,7 @@ h5,
   .chart-wrap { height: calc(var(--diagramm-quer) * 1.35); }
 }
 
-/* Aufklapp-Knopf im Stil von FitTracks Uebungen-Tab (`.ex-sort-btn`): heller Knopf
-   mit Doppel-Chevron in der Tabfarbe – dort ist es die Akzentfarbe, hier folgt sie
-   dem Tab. Masse, Radius, Schatten und Strichstaerke sind von dort uebernommen; er
-   hebt sich damit bewusst von den beiden durchscheinenden Nachbarn (＋, 🌙) ab. */
+/* Zahnrad der Übersicht (zur Einstellungen-Seite). */
 .pg-act.einst-act svg{
   width:20px;height:20px;fill:none;
   stroke:#fff;stroke-width:1.7;
@@ -1200,6 +1144,10 @@ html.glas .screen .stat-row{border-bottom-color:rgba(255,255,255,.1)}
 html.glas .screen .goal-bar-bg,
 html.glas .screen .debt-bar-bg{background:rgba(255,255,255,.18)}
 html.glas .screen .warn-sig{background:rgba(251,146,60,.28);color:#FED7AA}
+/* Hinweiskasten der „Keine Daten"-Karten: seine helle Flaeche traegt im Glas-Modus
+   weisse Schrift (--txt2, --accent) – weiss auf fast weiss. */
+html.glas .screen .field-hint{background:rgba(255,255,255,.12)}
+html.glas .screen .field-hint code{background:rgba(255,255,255,.18)}
 /* Zielkarte: helle Töne für erreicht/offen und weisse Flächen – bis 04.11.2026 fest. */
 html.glas .screen .ziel-woche{--zw-gut:#34D399;--zw-offen:#FBBF24;--zw-aus:rgba(255,255,255,.3);
   --zw-leer:rgba(255,255,255,.12);--zw-wahl:rgba(255,255,255,.2);--zw-detail:rgba(255,255,255,.12)}
@@ -1207,10 +1155,9 @@ html.glas .screen .ziel-woche{--zw-gut:#34D399;--zw-offen:#FBBF24;--zw-aus:rgba(
 .weitere-inhalt[hidden]{display:none}
 
 /* ── Hinweisleiste oben ────────────────────────────────────
-   Zwei Faelle, ein Element: "Anmeldung noetig" (Daten aus dem Zwischenspeicher)
-   und "Neue Daten verfuegbar". Dunkel statt in der Tabfarbe, damit sie ueber
-   jedem der fuenf Tab-Hintergruende gleich gut lesbar bleibt und nicht wie ein
-   Teil des jeweiligen Tabs wirkt.
+   Ein Fall: "Neue Daten geladen" (im Hintergrund geholt, noch nicht eingezeichnet).
+   Dunkel statt in der Tabfarbe, damit sie ueber jedem der vier Tab-Hintergruende
+   gleich gut lesbar bleibt und nicht wie ein Teil des jeweiligen Tabs wirkt.
    Liegt ueber der Bottom-Nav-Ebene (z-index 100), aber unter den Tooltips (9999). */
 #hinweis-oben{
   position:fixed;top:0;left:0;right:0;z-index:200;

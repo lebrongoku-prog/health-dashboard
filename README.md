@@ -1,30 +1,36 @@
 # Health Command Center
 
 Persönliches Health-Dashboard als installierbare **PWA** (iPhone-Homescreen).
-Visualisiert Apple-Health-Daten: Schlaf, Herz (Ruhepuls/HRV), Schritte & Kalorien,
-Training und VO₂max. Oberfläche durchgehend auf Deutsch.
+Visualisiert Apple-Health-Daten: Schlaf, Herz (Ruhepuls/HRV), Training und VO₂max.
+Oberfläche durchgehend auf Deutsch.
 
 **Live:** https://lebrongoku-prog.github.io/health-dashboard/
 
 ## Funktionsumfang
 
-Fünf Tabs, jeder mit eigener Akzentfarbe und eigenem Zeitfilter
-(heute / 7 T / 1 M / 3 M / 6 M / 12 M / 24 M) samt Datumsnavigation:
+Vier Tabs, jeder mit eigener Akzentfarbe. **Ein** Zeitfilter für die ganze App sitzt
+als Zeitleiste am unteren Rand (7T / 1M / 3M / 6M / 12M / 24M / Y, dazu Jahresvergleich
+„YoY" und einzelne Kalenderjahre) samt Blätterpfeilen und „Heute":
 
 | Tab | Inhalt |
 | --- | --- |
-| **Übersicht** | Gewichteter Health-Score (Schlaf 35 / HRV 30 / Ruhepuls 20 / Schritte 15), Tagesempfehlung, Warnsignale, Muster-Insights |
-| **Herz** | Ruhepuls und HRV mit Baseline-Abweichung und Einordnung |
-| **Schlaf** | Dauer, Schlafschuld gegen 7,5 h Ziel, Einschlaf-/Aufwachzeiten, Regelmässigkeit |
-| **Schritte** | Schritte, Kalorien, Serien (Streaks) |
-| **Training** | Workouts, Trainingskalender, Pace, Laufumfang, Leistungstrend, VO₂max |
+| **Übersicht** | Zielkarte (Wochenbilanz bzw. Zeitraum mit Tages-/Abschnittsdetail), Diagramm „Zielerreichung", Belastungswarnung, Muster & Zusammenhänge |
+| **Herz** | Ruhepuls & HRV, Einordnungen, Herz-Kreislauf-Einordnung gegen die 30-Tage-Baseline, Einblicke |
+| **Schlaf** | Schlafdauer gegen 7,5 h Ziel, Verteilung, Schlafschuld, Schlafphasen, Einblicke |
+| **Training** | Laufstrecke, Trainingszeit, Pace, VO₂max, Einblicke (Rekorde, Gewohnheiten, Entwicklung) |
+
+Einstellungen (Daten-Stand, Google-Anmeldung, „Daten aktualisieren",
+„App-Version aktualisieren") liegen auf einer eigenen Seite hinter dem Zahnrad der
+Übersicht. Die App startet aus einer lokalen Kopie des letzten Stands und lädt
+dahinter nach.
 
 ## Technik
 
 - **Vanilla JS**, keine Frameworks, **kein Build-Step** — Dateien werden direkt editiert
 - **Chart.js 4.5.0** über CDN
 - **PWA**: Service Worker (`sw.js`, Cache-First-Shell) + `manifest.json`
-- **Daten**: Google Sheets, befüllt über Google Apps Script; Auth per Google OAuth
+- **Daten**: Google Sheets, befüllt über Google Apps Script (Zeitplan alle 6 Stunden
+  und auf Zuruf aus der App); Auth per Google OAuth, die App liest nur
 
 ## Struktur
 
@@ -65,7 +71,9 @@ python3 .claude/devserver.py
 Startet einen Server auf http://localhost:8124, der `Cache-Control: no-store` mitschickt —
 sonst liefert der Browser beim Prüfen einer Änderung weiter die alte `app.js` aus.
 Google-OAuth funktioniert lokal nicht (die `REDIRECT_URI` zeigt fest auf die Pages-URL),
-es bleibt also beim Login-Screen; für den Konsolen-Check auf Syntax- und Ladefehler
-reicht das aber. Ein Build-Schritt, ein Testframework oder Node.js werden nicht benötigt.
+unter `/` bleibt es also beim Login-Screen. Die Oberfläche selbst prüft der
+Render-Prüfstand mit erfundenen Daten: http://localhost:8124/.claude/_render-test.html
+(Szenarien und Schalter stehen im Kopf der Datei). Ein Build-Schritt, ein
+Testframework oder Node.js werden nicht benötigt.
 
 Weitere Konventionen und Architekturdetails stehen in [`CLAUDE.md`](CLAUDE.md).

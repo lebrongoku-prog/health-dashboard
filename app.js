@@ -94,6 +94,10 @@ function _memo(key, berechnen) {
 let workoutData  = {};      // date → parsed workout row (cached after load)
 let workoutSheetReady = false; // true sobald der Ladeversuch abgeschlossen ist – auch bei Fehlschlag
 let workoutLoadError  = null;  // Fehlertext, falls der Abruf scheiterte (sonst null)
+// Der letzte Abruf hat das Workout-Blatt NICHT bekommen, der alte Stand blieb stehen
+// (siehe loadFromAPI, `behalten`). Nur „Daten aktualisieren" liest das – dort waere
+// „Aktualisiert ✓" sonst die halbe Wahrheit.
+let _workoutTeilfehler = false;
 
 // Wartet begrenzt darauf, dass der Workout-Ladeversuch abgeschlossen ist.
 // Ohne Zeitlimit blieb der Training-Tab bei einem fehlgeschlagenen Sheet-Abruf
@@ -212,8 +216,8 @@ Chart.defaults.font.size = 11;
 // Schlankere Balken in ALLEN Diagrammen (Chart.js-Standard: 0.9 / 0.8).
 // barPercentage      = Breite des Balkens innerhalb seines Slots
 // categoryPercentage = Breite des Slots innerhalb des Kategorie-Abstands
-// maxBarThickness    = Deckel, damit Balken bei wenigen Werten (z. B. Filter "Heute")
-//                      nicht zu klobigen Blöcken aufgehen.
+// maxBarThickness    = Deckel, damit Balken bei wenigen Werten (z. B. YoY mit zwei
+//                      Jahren) nicht zu klobigen Blöcken aufgehen.
 Chart.defaults.datasets.bar.barPercentage      = 0.62;
 Chart.defaults.datasets.bar.categoryPercentage = 0.74;
 Chart.defaults.datasets.bar.maxBarThickness    = 26;
@@ -276,7 +280,7 @@ async function _sheetsAbruf(pfad, fehlertext) {
   const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + pfad,
     { headers: { 'Authorization': 'Bearer ' + accessToken } });
   if (res.status === 401) return { authError: true };
-  if (!res.ok) throw new Error(await fehlertext(res));
+  if (!res.ok) { const e = new Error(await fehlertext(res)); e.status = res.status; throw e; }
   return { json: await res.json() };
 }
 
@@ -293,7 +297,7 @@ function _tabsMerken(sheetId, titel) {
 }
 const _tabsLaeuft = {};   // sheetId → laufende Anfrage; buendelt parallele Aufrufe
 function _tabsHolen(sheetId) {
-  // Ohne Buendelung schickten die fuenf gleichzeitigen Blattabrufe fuenf identische
+  // Ohne Buendelung schickten die gleichzeitigen Blattabrufe identische
   // Namensanfragen los – genau das, was der Zwischenspeicher einsparen soll.
   if (!_tabsLaeuft[sheetId]) {
     _tabsLaeuft[sheetId] = _tabsHolenJetzt(sheetId).finally(() => { delete _tabsLaeuft[sheetId]; });
@@ -324,15 +328,31 @@ async function _fetchSheet(sheetId, blattName) {
   // Blattnamen aus dem Zwischenspeicher; fehlt der gesuchte, einmal frisch holen.
   let titel = _tabsCache[sheetId];
   const gesucht = () => blattName ? (titel.includes(blattName) ? blattName : null) : titel[0];
+  let ausCache = true;
   if (!Array.isArray(titel) || !titel.length || !gesucht()) {
     const frisch = await _tabsHolen(sheetId);
     if (frisch.authError) return { authError: true };
-    titel = frisch.titel;
+    titel = frisch.titel; ausCache = false;
   }
-  const tabName = gesucht();
-  if (!tabName) return { values: [], fehlt: true };   // Blatt gibt es noch nicht
-  const r = await _sheetsAbruf(sheetId + '/values/' + encodeURIComponent(tabName),
+  const werte = name => _sheetsAbruf(sheetId + '/values/' + encodeURIComponent(name),
     res => 'Daten-Abruf fehlgeschlagen: ' + res.status);
+  let tabName = gesucht();
+  if (!tabName) return { values: [], fehlt: true };   // Blatt gibt es noch nicht
+  let r;
+  try { r = await werte(tabName); }
+  catch (e) {
+    // Der gemerkte Blattname kann veraltet sein (Blatt im Sheet umbenannt): Google
+    // antwortet dann mit 400. Ohne diesen zweiten Versuch bliebe die App dauerhaft
+    // haengen – der Zwischenspeicher wurde nur erneuert, wenn ein NAMENTLICH gesuchtes
+    // Blatt fehlte, und „App-Version aktualisieren" leert ihn nicht.
+    if (!ausCache || (e.status !== 400 && e.status !== 404)) throw e;
+    const frisch = await _tabsHolen(sheetId);
+    if (frisch.authError) return { authError: true };
+    titel = frisch.titel;
+    tabName = gesucht();
+    if (!tabName) return { values: [], fehlt: true };
+    r = await werte(tabName);
+  }
   if (r.authError) return r;
   return { values: r.json.values || [] };
 }
@@ -381,10 +401,12 @@ async function loadFromAPI(opt = {}) {
     // Fehlerkarte getauscht worden, obwohl alle Trainings da sind.
     const behalten = still && Object.keys(workoutData).length > 0;
     if (!behalten) workoutLoadError = null;
+    _workoutTeilfehler = false;
     try {
       if (workout.fehler) throw workout.fehler;
       if (workout.authError) {
-        if (!behalten) workoutLoadError = 'Keine gültige Berechtigung für das Workout-Sheet.';
+        if (behalten) _workoutTeilfehler = true;
+        else workoutLoadError = 'Keine gültige Berechtigung für das Workout-Sheet.';
       } else if (workout.values && workout.values.length > 1) {
         const wHeaders = workout.values[0].map(h => h.trim());
         const wRows = workout.values.slice(1).map(row => {
@@ -399,7 +421,7 @@ async function loadFromAPI(opt = {}) {
       }
       // values.length <= 1 → Sheet enthält nur die Kopfzeile: kein Fehler, nur keine Einträge.
     } catch(e) {
-      if (behalten) console.warn('[Daten] Workout-Abruf fehlgeschlagen, alter Stand bleibt:', e.message);
+      if (behalten) { _workoutTeilfehler = true; console.warn('[Daten] Workout-Abruf fehlgeschlagen, alter Stand bleibt:', e.message); }
       else workoutLoadError = e.message || 'Unbekannter Fehler beim Abruf.';
     } finally {
       workoutSheetReady = true;
@@ -856,11 +878,11 @@ function navNext() { _navSchritt(1); }    // vor: Daten wischen nach links
 
 // ── Kurze Uebergaenge (18.09.2026) ──────────────────────────────────────────
 // EIN Helfer fuer die kleinen Zeichen-Animationen (Markierung, Beschriftungen,
-// Hilfslinien, Kachel-Zaehler): ruft `proSchritt(e)` je Bild mit dem geglaetteten
+// Hilfslinien, Spalten): ruft `proSchritt(e)` je Bild mit dem geglaetteten
 // Fortschritt 0..1 (easeOutCubic) und am Ende `fertig()`.
 // Der Zeitgeber ist derselbe Rueckfall wie bei `_ausklappAnimieren`: eine Seite, die
 // nicht gezeichnet wird, liefert kein requestAnimationFrame – ohne ihn bliebe der
-// Zustand auf dem ersten Bild stehen (Beschriftung unsichtbar, Kachel auf 0).
+// Zustand auf dem ersten Bild stehen (etwa: Beschriftung unsichtbar).
 // Rueckgabe: eine Funktion, die abbricht, OHNE `fertig` aufzurufen.
 function bewegungAus() {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -958,8 +980,6 @@ function wochenZwischen(vonDs, bisDs) {
   const tage = Math.round((new Date(bisDs+'T00:00:00') - new Date(vonDs+'T00:00:00')) / 86400000) + 1;
   return tage > 0 ? tage / 7 : null;
 }
-// Wochen eines Kalendermonats aus dem Schluessel 'JJJJ-MM'. Tag 0 des Folgemonats ist
-// der letzte Tag des gesuchten – das kennt auch die Schaltjahre.
 // Wochen eines Kalenderjahrs, geklemmt auf den Datenbestand (fuer 1Y): im laufenden
 // Jahr nur bis zum neuesten Tag, im ersten nur ab dem ersten – sonst teilte der
 // Wochenschnitt durch Wochen ohne Daten.
@@ -969,6 +989,8 @@ function wochenImJahr(jahr) {
   const s = jahr + '-01-01', e = jahr + '-12-31';
   return wochenZwischen(s < erster ? erster : s, e > letzter ? letzter : e);
 }
+// Wochen eines Kalendermonats aus dem Schluessel 'JJJJ-MM'. Tag 0 des Folgemonats ist
+// der letzte Tag des gesuchten – das kennt auch die Schaltjahre.
 function wochenImMonat(monatsKey) {
   const [j, m] = String(monatsKey).split('-').map(Number);
   return (j && m) ? new Date(j, m, 0).getDate() / 7 : null;
@@ -1384,13 +1406,10 @@ function _chartTipp(chart, evt) {
   setMarkierung(chart.$keyTyp === 'monat' ? k + '-01' : chart.$keyTyp === 'jahr' ? k + '-01-01' : k);
 }
 
-// ── Datenbeschriftungen ueber Balken und Punkten ─────────────────────────────
+// ── Datenbeschriftungen ueber Balken und Punkten: EIN Schalter für die ganze App ──
 // Nur, wo ein Diagramm sie ueber `cfg.__werteFmt` anfordert. Ob sie zu sehen sind,
 // entscheidet `beschriftungAn()` beim ZEICHNEN, nicht beim Aufbau des Tabs – so wirkt
 // ein Umschalten per `draw()`, ohne Neuaufbau.
-// Ueberlappungen loest das Plugin selbst (belegte Rechtecke, siehe unten) – lieber
-// einzelne Werte auslassen als eine unlesbare Reihe.
-// ── Datenbeschriftungen: EIN Schalter für die ganze App ──────────────────────
 // Standardmässig AN, in jedem Diagramm mit `__werteFmt`, in jedem Zeitraum und
 // Format (auf Wunsch, 04.11.2026). Vorher galt je Diagramm ein Standard (Hochformat
 // nur bei 7T/YoY/Y, Ruhepuls & HRV nur quer, Schlafphasen nur auf Wunsch) und der
@@ -1513,10 +1532,10 @@ function _werteBlenden(liste, an) {
 // `$hlBlende` = { art: 'oe'|'ziel', alpha } wirkt auf jeden Datensatz dieser Art;
 // in Ruhepuls & HRV schaltet ein Schalter beide Ø-Linien, beide blenden gemeinsam.
 const HL_DAUER = 220;
-// Hilfslinie einer Art: 'ziel' (Label „Ziel …“) oder 'oe' (Label „Ø …“).
 // Hilfslinie ueberhaupt (Ø oder Ziel) – dieselbe Regel fuer Tooltip, Beschriftung
 // und alle Verschiebe-Plugins.
 function _istHilfslinienLabel(l) { return /^(Ø|Ziel)/.test(l || ''); }
+// Hilfslinie einer Art: 'ziel' (Label „Ziel …“) oder 'oe' (Label „Ø …“).
 function _istHilfslinie(ds, art) { return (art === 'ziel' ? /^Ziel/ : /^Ø/).test(ds.label || ''); }
 const hilfslinienBlende = {
   id: 'hilfslinienBlende',
@@ -2108,13 +2127,12 @@ const achseY = {grid:{color:GRID_COLOR},ticks:{color:'#94A3B8',font:{size:10}}};
 // Wer etwas ändern will, ändert es ab jetzt hier – und nur hier.
 //
 //   richtung: 'hoch' = mehr ist besser, 'tief' = weniger ist besser
-//   fmt:      Anzeigeform des Werts (für Ziel-Beschriftungen und Statuszeile)
 const ZIELE = {
-  sleepTotal: { label:'Schlaf',       ziel:7.5,   richtung:'hoch', fmt:v=>alsStdMin(v) },
-  restHR:     { label:'Ruhepuls',     ziel:60,    richtung:'tief', fmt:v=>Math.round(v)+' bpm' },
-  hrv:        { label:'HRV',          ziel:50,    richtung:'hoch', fmt:v=>Math.round(v)+' ms' },
-  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch', fmt:v=>v+' / Woche' },
-  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch', fmt:v=>zahl(v,1) }
+  sleepTotal: { label:'Schlaf',       ziel:7.5,   richtung:'hoch' },
+  restHR:     { label:'Ruhepuls',     ziel:60,    richtung:'tief' },
+  hrv:        { label:'HRV',          ziel:50,    richtung:'hoch' },
+  trainDays:  { label:'Trainingstage',ziel:3,     richtung:'hoch' },
+  vo2max:     { label:'VO₂max',       ziel:45,    richtung:'hoch' }
 };
 // Erfüllt der Wert das Ziel? null, wenn kein Wert vorliegt.
 function zielErfuellt(key, wert) {
@@ -2537,10 +2555,8 @@ function zielAbschnittHTML(spalte, w) {
 // Jede Erklärung beantwortet zwei Fragen: Was ist das, und welche Richtung ist gut?
 // Ohne die zweite Angabe lässt sich keine Farbe und kein Pfeil deuten.
 const ERKLAERUNG = {
-  sleepTotal: 'Tatsächlich geschlafene Zeit pro Nacht (ohne Wachliegen). Mehr ist besser, bis etwa 9 Stunden.',
   restHR:     'Ruhepuls: Herzschläge pro Minute in völliger Ruhe. Weniger ist besser – ein sinkender Ruhepuls zeigt wachsende Ausdauer.',
   hrv:        'Herzratenvariabilität: Schwankung der Abstände zwischen zwei Herzschlägen. Mehr ist besser – hohe Werte stehen für gute Erholung.',
-  trainDays:  'Tage mit einem Eintrag im Workout-Sheet, gezählt über die letzten sieben Tage.',
   vo2max:     'VO₂max: geschätzte maximale Sauerstoffaufnahme – das gängigste Mass für Ausdauerleistung. Mehr ist besser.',
   pace:       'Pace: benötigte Zeit pro Kilometer. Weniger ist besser (schneller).',
   baseline:   'Baseline: dein eigener Durchschnitt der letzten 30 Tage. Verglichen wird also mit dir selbst, nicht mit Richtwerten.'
@@ -2818,7 +2834,7 @@ function _computePatternInsights() {
   // Insight 12: Bester Erholungstag (HRV nach Wochentag)
   const withHRVDate = allData.filter(r=>r.hrv!=null);
   if (withHRVDate.length >= 14) {
-    const dayNames     = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    const dayNames = WOCHENTAG_LANG;
     const byDow = {};
     withHRVDate.forEach(r => {
       const d = new Date(r.date+'T00:00:00').getDay();
@@ -2958,7 +2974,7 @@ function pgOverview() {
   const _ovVorher = ovObenMerken();
   document.getElementById("screen-overview").innerHTML = `
     ${pgBanner('Übersicht')}
-    <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber dem Kartenpaar:
+    <!-- Belastungswarnung (nur wenn ausgelöst). Steht ueber der Zielkarte:
          eine Warnung gehoert nach oben. -->
     ${warnSig ? `<div class="warn-card">
       <div>
@@ -3880,8 +3896,8 @@ function pgSchlaf() {
       return `rgba(124,58,237,${(.85 - .53 * m).toFixed(3)})`;
     };
     zeichneDiagramm('c-sl-dur',{__keys:tKeys,__keyTyp:tKeyTyp,
-      // "7h 25m" statt "7.4" – dasselbe Format wie in der Ziele-Karte und den
-      // Minikacheln, damit dieselbe Nacht ueberall gleich aussieht.
+      // "7:25" statt "7.4" – Stunden:Minuten wie in allen Dauer-Beschriftungen
+      // (stdMinLabel).
       __werteFmt:v=>v?stdMinLabel(v):'',
       type:'bar',data:{labels:tL,datasets:[
       // EIN Balken je Nacht. Frueher waren es zwei gestapelte Segmente ("bis Ziel" /
@@ -3925,9 +3941,8 @@ function pgSchlaf() {
       if(hasAwake) _phDs.push({label:'Wach',data:awMa,backgroundColor:'#F97316',borderRadius:BALKEN_RADIUS,stack:'s'});
       zeichneDiagramm('c-sl-phases',{__keys:tKeys,__keyTyp:tKeyTyp,
         // Bei gestapelten Balken sitzt die Beschriftung auf der Oberkante des
-        // jeweiligen Segments und damit mitten im Balken – das las sich nicht als
-        // Wert, sondern als Stoerung. Deshalb standardmaessig AUS; der Titel-Tipp
-        // holt sie bei Bedarf trotzdem hervor.
+        // jeweiligen Segments und damit mitten im Balken. Segmente unter einer
+        // halben Stunde bleiben deshalb ohne Zahl.
         // Dieselbe Schreibweise wie in Schlafdauer und Trainingszeit (12.09.2026,
         // auf Wunsch): vorher standen hier Dezimalstunden ("1.5") – zwei Einheiten
         // fuer dieselbe Groesse in benachbarten Diagrammen.
@@ -5107,9 +5122,9 @@ function vo2Abschnitt(D) {
 const PAGE_FNS={overview:pgOverview,herz:pgHerz,schlaf:pgSchlaf,training:pgTraining};
 // Symbol des Transparenz-Knopfs: zwei ueberlappende Karten, 1:1 aus FitTrack.
 const GLAS_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="13" height="13" rx="3"/><rect x="8" y="9" width="13" height="11" rx="3"/></svg>`;
-// Titelzeile eines Tabs: Emoji + Name, rechtsbündig Zahnrad (nur Übersicht) und
-// Transparenz-Knopf. Die Tab-Hintergründe sitzen auf .screen, nicht hier.
-// Nur der Tabname – das Emoji davor ist auf Wunsch entfallen (04.11.2026).
+// Titelzeile eines Tabs: nur der Tabname (das Emoji davor ist am 04.11.2026 auf
+// Wunsch entfallen), rechtsbündig – nur in der Übersicht – Zahnrad und
+// Transparenz-Knopf. Die Tab-Hintergründe liegen auf den .bg-fade-layer, nicht hier.
 function pgBanner(title){
   // Zahnrad NUR in der Uebersicht, in der durchscheinenden Optik der uebrigen `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
@@ -5404,7 +5419,7 @@ function _zeitraumEinsetzen(name) {
   });
 }
 
-// Nach dem Aufbau eines Tabs: Zeitraum in die Karten, Balken und Kacheln animieren,
+// Nach dem Aufbau eines Tabs: Zeitraum in die Karten, Balken animieren,
 // Pfeil-Zustand setzen und die Blickposition wiederherstellen.
 function _tabNachbereiten(name) {
   const screenEl = document.getElementById('screen-'+name);
@@ -5614,9 +5629,9 @@ function showScreen(name) {
   _applyTabState(name);
 }
 
-// State-Change (Filter, Datum, Refresh, Dark-Mode) → alle Tabs invalidieren + aktuellen neu rendern
+// State-Change (Filter, Datum, Refresh, Transparenz-Modus) → alle Tabs invalidieren + aktuellen neu rendern
 function _refreshAfterStateChange() {
-  // Alle Charts zerstören (Theme- oder Datenwechsel)
+  // Alle Charts zerstören (Modus- oder Datenwechsel)
   alleDiagrammeZerstoeren();
   TAB_ORDER.forEach(t => { tabCharts[t] = []; });
   _renderedTabs.clear();
@@ -5898,8 +5913,8 @@ document.body.addEventListener('click', (e) => {
     ovObenNeu();
     return;
   }
-  // Tipp auf den Kartentitel schaltet die Datenbeschriftungen dieses Diagramms um.
-  // Das Verlaufs-Diagramm ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
+  // Tipp auf den Kartentitel schaltet die Datenbeschriftungen ALLER Diagramme um.
+  // „Zielerreichung" ist ausgenommen — es hat keinen Formatierer, `$werteFmt`
   // ist dort null und der Zweig greift gar nicht.
   const _titel = t.closest('.chart-card h3');
   if (_titel && !t.closest(TT_TAP_SELECTOR) && !t.closest('button')) {
@@ -6314,11 +6329,7 @@ async function refreshData() {
     // Ohne diese Rueckmeldung passierte auf den Tipp sichtbar gar nichts – die Zeile
     // darueber sagte den Grund zwar, aber nicht als Antwort auf den Druck.
     appKarteAuffrischen();
-    document.querySelectorAll('.refresh-btn').forEach(b => {
-      const alt = b.textContent;
-      b.textContent = 'Anmeldung nötig';
-      setTimeout(() => { if (b.isConnected) b.textContent = alt; }, 2500);
-    });
+    refreshMelden('Anmeldung nötig');
     return;
   }
   // Beschriftung „Lädt…"; der alte Text wird am Element gemerkt und danach zurueckgesetzt.
@@ -6340,17 +6351,34 @@ async function refreshData() {
     refreshBestaetigen('Schon aktuell ✓');
     return;
   }
-  // 3. Daten neu aus dem Sheet laden
-  workoutSheetReady = false; workoutLoadError = null;
-  const ergebnis = await loadFromAPI();
+  // 3. Daten neu aus dem Sheet laden – mit `still`, weil bereits ein Stand auf dem
+  //    Bildschirm steht. Vorher lief der Abruf wie beim allerersten Start: ein
+  //    Netzfehler legte die Fehlerseite ueber die ganze App (sie laesst sich nicht
+  //    schliessen – nur ein Neustart half), eine abgewiesene Anmeldung den Login, und
+  //    `workoutSheetReady` blieb auf false stehen, sodass der Training-Tab nach 10 s
+  //    „nicht rechtzeitig geladen" meldete, obwohl alle Trainings vorlagen.
+  //    Jetzt bleibt bei jedem Fehlschlag der vorhandene Stand stehen, und der Knopf
+  //    sagt, was los ist.
+  const ergebnis = await loadFromAPI({ still: true });
   knoepfeZurueck();
-  if (ergebnis === 'auth') { appKarteAuffrischen(); return; }
+  appKarteAuffrischen();
+  if (ergebnis === 'auth') { refreshMelden('Anmeldung nötig'); return; }
+  if (ergebnis !== true)   { refreshMelden('Laden fehlgeschlagen'); return; }
   // Auf ausdruecklichen Wunsch geladen → immer sofort zeichnen, nie nur ankuendigen.
   if (_hinweisZustand) hinweisAus();
-  appKarteAuffrischen();
-  if (ergebnis === true) refreshBestaetigen('Aktualisiert ✓');
+  if (_workoutTeilfehler) refreshMelden('Trainingsdaten nicht geladen');
+  else refreshBestaetigen('Aktualisiert ✓');
   updateNavUI();
   _refreshAfterStateChange();
+}
+// Kurze Antwort am Knopf, wenn das Laden NICHT (ganz) geklappt hat – ohne Gruen.
+// Wie `refreshBestaetigen` erst NACH `appKarteAuffrischen()` aufrufen.
+function refreshMelden(text) {
+  document.querySelectorAll('.refresh-btn').forEach(b => {
+    const alt = b.textContent;
+    b.textContent = text;
+    setTimeout(() => { if (b.isConnected && b.textContent === text) b.textContent = alt; }, 2500);
+  });
 }
 
 // Import im Apps Script ausloesen und seinen Bericht lesen:
@@ -6401,7 +6429,6 @@ function refreshBestaetigen(text) {
     }, 1800);
   });
 }
-// Gespeicherte Hell/Dunkel-Präferenz laden
 // Der Dunkelmodus ist entfallen (02.10.2026) – sein Schluessel wird einmal weggeraeumt.
 try { localStorage.removeItem('hcc_dark'); } catch(e) {}
 applyGlasModus();

@@ -221,6 +221,20 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   „Übersicht → Einstellungen". **Schreiben ist dann gesperrt**
   (`_schreibenErlaubt()`) — seit der Umstellung schon deshalb, weil die App ohne
   Anmeldung gar nicht mehr ins Sheet schreiben kann.
+- **„Daten aktualisieren" sperrt die App nie** (11.11.2026): `refreshData` lädt mit
+  `loadFromAPI({ still: true })`. Vorher lief der Abruf wie beim allerersten Start —
+  ein Netzfehler legte `#err-screen` über die ganze App (nicht schliessbar), eine
+  abgewiesene Anmeldung den Login, und `workoutSheetReady` blieb false. Jetzt bleibt
+  der Stand stehen und der Knopf antwortet über `refreshMelden()`: „Laden
+  fehlgeschlagen", „Anmeldung nötig" bzw. „Trainingsdaten nicht geladen"
+  (`_workoutTeilfehler`). Prüfen im Prüfstand mit `window.__netzAus = true`.
+  Die Overlays `#err-screen`/`#login-screen` gehören allein dem Start OHNE
+  Zwischenspeicher.
+- **Veralteter Blattname:** scheitert ein Wertabruf mit 400/404 und kam der Name aus
+  `hcc_blattnamen_v1`, holt `_fetchSheet` die Namen einmal frisch und versucht es
+  erneut — sonst hinge die App nach dem Umbenennen eines Blatts dauerhaft.
+- **Chart.js liegt im SW-Cache** (`CDN_HOST` in `sw.js`, beim ersten Abruf abgelegt) —
+  sonst startet die App offline nicht, obwohl die Messdaten lokal vorliegen.
 - **Teilfehler im Hintergrund ändern nichts.** Scheitert beim stillen Nachladen das
   Workout-Blatt, bleibt der vorhandene Stand stehen (`still &&
   vorhanden` → nur `console.warn`). Sonst hätte eine kurze Netzstörung den
@@ -900,7 +914,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Training 0 bei 2/3 Wochentrainings; 6M Monatsanteile, Fuss 2.8 von 4, 43/176;
   Transparenz-Modus mit hellen Farben.
 - **Zielwerte:** `ZIELE` ist die **einzige** Quelle für Soll-Werte (Wert, Richtung,
-  Anzeigeform). Zugehörig: `zielErfuellt` / `zielText` / `zielLinie` und die
+  Anzeigeform). Zugehörig: `zielErfuellt` / `zielLinie` und die
   Wochenbilanz und Zielerreichung der Übersicht. Neue Schwellen gehören dorthin,
   nicht in die Seitenfunktionen — vorher lagen sie an acht Stellen, teils widersprüchlich.
   **Schlafdauer: Titel immer „Schlafdauer"** (auf Wunsch, 09.11.2026; vorher je Bereich
@@ -966,9 +980,9 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   YoY und Y, Ruhepuls & HRV nur quer (`__werteNurQuer`), Schlafphasen nur auf Wunsch
   (`__werteAusStandard`) — alle drei Sonderregeln samt `beschriftungStandard()` sind
   entfallen. Dicht stehende Zahlen lässt die Rechteck-Prüfung weiterhin weg.
-  **Alle neun Diagramme der App** melden inzwischen ein
-  `cfg.__werteFmt` an: `c-woche`, `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
-  und die vier des Training-Tabs. Der Formatierer bekommt `(wert, datensatz)` — nötig
+  **Acht der neun Diagramme der App** melden ein
+  `cfg.__werteFmt` an: `c-herz`, `c-sl-dur`, `c-sl-phases`, `c-sl-score`
+  und die vier des Training-Tabs (`c-woche` nicht, siehe unten). Der Formatierer bekommt `(wert, datensatz)` — nötig
   für `c-woche`, wo vier Reihen vier verschiedene Einheiten tragen.
   Das Diagramm **„Zielerreichung“** hat als einziges kein `__werteFmt` (bei gestapelten
   Balken stünde je Stück eine Zahl) und reagiert deshalb nicht auf den Titel-Tipp.
@@ -1328,7 +1342,7 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Alle Diagramm-Karten stehen einzeln untereinander — das frühere dreispaltige
   Raster im Training-Tab (`three-col`) und die Klasse `.chart-wrap-flex` sind mit
   der Neusortierung entfallen.
-- **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Schritte Grün, Training Orange.
+- **Farbe pro Tab:** Übersicht Teal, Herz Rot, Schlaf Violett, Training Orange.
   Innerhalb des Training-Tabs sind **alle vier** Diagramme orange (Pace seit
   18.09.2026, vorher Violett — die Farbe des Schlaf-Tabs): Laufstrecke `#FB923C`,
   Trainingszeit `#F97316`, Pace `#EA580C`, VO₂max `#D97706`. Die **Schlaf-Minikachel**

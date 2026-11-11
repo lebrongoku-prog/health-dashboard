@@ -7,7 +7,7 @@
 //    'hcc-v1' → 'hcc-v2' → 'hcc-v3' …
 // ═══════════════════════════════════════════════════════════
 
-const CACHE = 'hcc-v250';
+const CACHE = 'hcc-v251';
 
 // Lokale Shell-Assets, die vorab gecacht werden
 const ASSETS = [
@@ -26,6 +26,12 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/icon-1024.png'
 ];
+
+// Chart.js kommt vom CDN (index.html). Ohne Kopie im Cache startet die App offline
+// nicht: app.js bricht an `Chart.defaults` ab und der Ladekreis bleibt stehen – obwohl
+// die Messdaten im Zwischenspeicher laegen. Die Adresse traegt die Versionsnummer,
+// der Inhalt aendert sich also nie; er wird beim ersten Abruf abgelegt.
+const CDN_HOST = 'cdn.jsdelivr.net';
 
 // Hosts, die NICHT gecacht werden (Auth, Sheets-API, Apps-Script-Refresh)
 const PASS_THROUGH_HOSTS = [
@@ -66,8 +72,9 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        // Nur GETs mit Status 200 cachen, und nur same-origin Requests
-        if (res && res.status === 200 && e.request.method === 'GET' && url.origin === self.location.origin) {
+        // Nur GETs mit Status 200 cachen: same-origin und Chart.js vom CDN
+        if (res && res.status === 200 && e.request.method === 'GET'
+            && (url.origin === self.location.origin || url.hostname === CDN_HOST)) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }

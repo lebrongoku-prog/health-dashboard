@@ -35,10 +35,9 @@
 <div class="bg-fade-layer" id="bg-fade-a"></div>
 <div class="bg-fade-layer" id="bg-fade-b"></div>
 
-<!-- Hinweisleiste am oberen Rand. EIN Element fuer zwei Faelle: "Anmeldung noetig"
-     (Daten stammen aus dem Zwischenspeicher) und "Neue Daten verfuegbar" (im
-     Hintergrund geladen, aber noch nicht eingezeichnet). Die Beschriftung setzt
-     hinweisZeigen() in app.js; body.hinweis-an schafft den Platz darueber. -->
+<!-- Hinweisleiste am oberen Rand: "Neue Daten geladen" (im Hintergrund geholt, aber
+     noch nicht eingezeichnet). Die Beschriftung setzt hinweisZeigen() in app.js;
+     body.hinweis-an schafft den Platz darunter. -->
 <div id="hinweis-oben" hidden>
   <span class="hinweis-txt"></span>
   <button type="button" class="hinweis-akt"></button>
@@ -70,10 +69,9 @@
   <p class="err-msg" id="err-txt"></p>
 </div>
 
-<!-- App-Bereich: horizontaler Snap-Scroller mit allen Tabs nebeneinander.
-     Die Topbar (Datums-Nav, Refresh, Dark-Toggle, Zeitfilter) wird per JS
-     pro Tab in die jeweilige .screen-Fläche injiziert und scrollt mit dem
-     Inhalt mit – kein globales position:fixed mehr. -->
+<!-- App-Bereich: horizontaler Snap-Scroller mit allen Tabs nebeneinander. Die
+     Titelzeile jedes Tabs erzeugt pgBanner() in app.js; der Zeitfilter sitzt als
+     Zeitleiste (#zeitleiste, von app.js eingesetzt) fest am unteren Rand. -->
 <div id="app">
   <div id="tab-container">
     <section id="screen-overview"   class="screen"></section>
@@ -88,7 +86,7 @@
      Inhalt wird in pgEinstellungen() erzeugt, damit er beim Oeffnen frisch ist. -->
 <section id="seite-einstellungen" class="unterseite" hidden aria-label="Einstellungen"></section>
 
-<!-- Bottom-Nav: 5 Tabs mit SVG-Icons -->
+<!-- Bottom-Nav: 4 Tabs mit SVG-Icons -->
 <nav id="bottom-nav" aria-label="Hauptnavigation">
   <button class="nav-btn active" id="nav-overview" data-tab="overview" aria-label="Übersicht">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12 12 4l9 8v8a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z"/></svg>
