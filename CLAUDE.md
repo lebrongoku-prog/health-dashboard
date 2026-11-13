@@ -1495,15 +1495,23 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   aus FitTrack (zwei überlappende Karten, `GLAS_SYMBOL`), eingeschaltet mit hellerer
   Fläche (`[aria-pressed="true"]`). Zustand `hcc_glas` im `localStorage`,
   `glasAktiv()`, Klasse `glas` am **`<html>`** (`applyGlasModus()`). Standard: aus.
+  - **Drei Stufen** (auf Wunsch, 13.11.2026), ein Tipp auf den Knopf schaltet weiter:
+    **0 deckend** → **1 halb transparent** (Klasse `glas`, Karten 12-%-Weiss mit
+    Schatten) → **2 ganz transparent** (zusätzlich `glas-voll`: keine Fläche, kein
+    Schatten, Kanten transparent mit `!important`, weil die farbige Oberkante der
+    Muster-Karten inline steht; Innenabstände bleiben) → 0. `glasStufe()` liest
+    `hcc_glas` ('0'/'1'/'2'; der alte Wert '1' ist Stufe 1), `glasAktiv()` heisst
+    „Stufe ≥ 1" — Datenfarben und Schrift sind in beiden transparenten Stufen gleich,
+    nur die Kartenfläche unterscheidet sie. Knopf: `aria-pressed` false/mixed/true,
+    Fläche 16/28/48 % Weiss, `title` aus `GLAS_TITEL`. Geprüft: 2 → 0 → 1 → 2.
   - **CSS** (`html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card,
-    .no-data, .kpi, .ziel-woche)`): **seit 13.11.2026 ohne Kartenfläche** (auf Wunsch)
-    — `background: transparent`, kein Schatten, Kanten transparent (`!important`, weil
-    die farbige Oberkante der Muster-Karten inline steht); die Inhalte stehen direkt
-    auf dem Tab-Verlauf, Innenabstände bleiben. Vorher 12-%-Weiss mit Schatten. Die
+    .no-data, .kpi, .ziel-woche)`): 12-%-Weiss, gleicher Schatten; für Stufe 2
+    `html.glas.glas-voll …` transparent. Die
     Farbtokens `--txt`,
     `--txt2`, `--txt3`, `--card`, `--border`, `--bg`, `--accent` werden **auf den
     Karten** neu gesetzt (weiss bzw. halbweiss), nicht auf `:root` — so erben nur deren
-    Inhalte die hellen Farben. Dazu Einzelregeln für fest gesetzte Farben: Trennlinie `.stat-row`, Balkenspur `.goal-bar-bg`/`.debt-bar-bg`,
+    Inhalte die hellen Farben. Dazu Einzelregeln für fest gesetzte Farben: Kante der
+    `.pi-card`, Trennlinie `.stat-row`, Balkenspur `.goal-bar-bg`/`.debt-bar-bg`,
     `.warn-sig`. **Wer eine neue Karte oder eine feste Farbe in einer Karte einführt,
     ergänzt sie dort.**
   - **Bleibt weiss:** Einstellungen-Seite (liegt ausserhalb von `.screen`, wie

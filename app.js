@@ -5144,7 +5144,7 @@ function pgBanner(title){
   // Der Transparenz-Knopf steht seit 09.11.2026 (auf Wunsch) ebenfalls NUR in der
   // Übersicht; der Modus gilt weiterhin für alle Tabs.
   const glas = _currentRenderingTab === 'overview'
-    ? `<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button>`
+    ? `<button class="pg-act glas-toggle" title="${GLAS_TITEL[glasStufe()]}" aria-label="Transparenz der Karten: weiterschalten" aria-pressed="${['false','mixed','true'][glasStufe()]}">${GLAS_SYMBOL}</button>`
     : '';
   // Statt des Namens das Symbol der Tableiste, 20 % grösser (`.pg-banner-symbol`); der
   // Name bleibt als Überschrift für Screenreader (`aria-label`).
@@ -6038,13 +6038,26 @@ document.body.addEventListener('keydown', (e) => {
 // Der Zustand liegt nur auf dem Geraet (`hcc_glas`), die Klasse `glas` am <html>.
 // Diagramme und Inline-Farben haengen an JS (`_glasDiagramm`, `glasHtmlAnpassen`),
 // deshalb baut der Wechsel die Tabs neu auf.
+// DREI Stufen (auf Wunsch, 13.11.2026), ein Tipp schaltet weiter: 0 = Karten weiss,
+// 1 = halb transparent (12-%-Weiss mit Schatten, Klasse `glas`), 2 = ganz transparent
+// ohne Kartenfläche (zusätzlich `glas-voll`). `glasAktiv()` heisst „Stufe 1 oder 2" –
+// helle Datenfarben und weisse Schrift gelten in beiden. Der gespeicherte Wert '1'
+// aus der Zeit mit zwei Zuständen ist Stufe 1.
 const GLAS_KEY = 'hcc_glas';
-function glasAktiv() { try { return localStorage.getItem(GLAS_KEY) === '1'; } catch (_) { return false; } }
+function glasStufe() {
+  try { const v = +localStorage.getItem(GLAS_KEY); return v === 1 || v === 2 ? v : 0; } catch (_) { return 0; }
+}
+function glasAktiv() { return glasStufe() > 0; }
+const GLAS_TITEL = ['Karten: deckend', 'Karten: halb transparent', 'Karten: ganz transparent'];
 function applyGlasModus() {
-  const an = glasAktiv();
-  document.documentElement.classList.toggle('glas', an);
-  document.querySelectorAll('.glas-toggle').forEach(b => b.setAttribute('aria-pressed', an ? 'true' : 'false'));
-  Chart.defaults.color = an ? GLAS_TEXT : '#94A3B8';
+  const stufe = glasStufe();
+  document.documentElement.classList.toggle('glas', stufe > 0);
+  document.documentElement.classList.toggle('glas-voll', stufe === 2);
+  document.querySelectorAll('.glas-toggle').forEach(b => {
+    b.setAttribute('aria-pressed', stufe === 2 ? 'true' : stufe === 1 ? 'mixed' : 'false');
+    b.title = GLAS_TITEL[stufe];
+  });
+  Chart.defaults.color = stufe > 0 ? GLAS_TEXT : '#94A3B8';
 }
 // Ueberblendung des ganzen Bildschirms (View Transitions, Dauer im CSS unter
 // `::view-transition-*`) wie vorher beim Dunkelmodus. `ready` lehnt ab, wenn der
@@ -6052,7 +6065,7 @@ function applyGlasModus() {
 // der Konsole. Ohne die API oder bei „Bewegung reduzieren" springt es.
 function glasUmschalten() {
   const umschalten = () => {
-    try { localStorage.setItem(GLAS_KEY, glasAktiv() ? '0' : '1'); } catch (_) {}
+    try { localStorage.setItem(GLAS_KEY, String((glasStufe() + 1) % 3)); } catch (_) {}
     applyGlasModus();
     // Neu aufbauen, OHNE Aufbau-Animation – die Daten aendern sich nicht.
     _navSliding = true;

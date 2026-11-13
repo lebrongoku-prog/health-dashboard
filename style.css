@@ -1116,7 +1116,9 @@ h5,
   width:20px;height:20px;fill:none;
   stroke:#fff;stroke-width:1.7;stroke-linejoin:round;
 }
-.pg-act.glas-toggle[aria-pressed="true"]{background:rgba(255,255,255,.42)}
+/* Halb transparent: leicht aufgehellt, ganz transparent: deutlich. */
+.pg-act.glas-toggle[aria-pressed="mixed"]{background:rgba(255,255,255,.28)}
+.pg-act.glas-toggle[aria-pressed="true"]{background:rgba(255,255,255,.48)}
 
 /* ═══════════════════════════════════════════════════════════
    Transparenz-Modus (02.10.2026, auf Wunsch, aus FitTracks Glas-Modus)
@@ -1126,14 +1128,12 @@ h5,
    und bleibt weiss (wie FitTracks „Mehr"). Datenfarben und Inline-Farben hellt das JS
    auf (`_glasDiagramm`, `glasHtmlAnpassen`).
    ═══════════════════════════════════════════════════════════ */
-/* Ohne Kartenfläche (auf Wunsch, 13.11.2026): keine Fläche, kein Schatten, keine
-   Kante – die Inhalte stehen direkt auf dem Tab-Verlauf. Vorher 12-%-Weiss mit
-   Schatten. Innenabstände bleiben, damit die Inhalte nicht an den Rand rücken. */
+/* Zwei Stufen (auf Wunsch, 13.11.2026): `html.glas` = halb transparent, 12-%-Weiss mit
+   Schatten; `html.glas.glas-voll` = ganz transparent, ohne Fläche, Schatten und Kante
+   (Regel weiter unten). Farben und Schrift sind in beiden Stufen dieselben. */
 html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .kpi, .ziel-woche){
-  background:transparent;
-  box-shadow:none;
-  /* !important: die farbige Oberkante der Muster-Karten steht inline (`style`). */
-  border-color:transparent !important;
+  background:rgba(255,255,255,.12);
+  box-shadow:0 1px 6px rgba(0,0,0,.18);
   --txt:#fff;
   --txt2:rgba(255,255,255,.85);
   --txt3:rgba(255,255,255,.65);
@@ -1143,7 +1143,16 @@ html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .k
   --accent:#fff;
   color:var(--txt);
 }
+/* Ganz transparent: die Inhalte stehen direkt auf dem Tab-Verlauf, Innenabstände
+   bleiben. !important an der Kante: die farbige Oberkante der Muster-Karten steht
+   inline (`style`). */
+html.glas.glas-voll .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .kpi, .ziel-woche){
+  background:transparent;
+  box-shadow:none;
+  border-color:transparent !important;
+}
 /* Fest gesetzte helle Flaechen und Kanten in den Karten. */
+html.glas .screen .pi-card{border-top-color:rgba(255,255,255,.24)}
 html.glas .screen .stat-row{border-bottom-color:rgba(255,255,255,.1)}
 html.glas .screen .goal-bar-bg,
 html.glas .screen .debt-bar-bg{background:rgba(255,255,255,.18)}
