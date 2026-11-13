@@ -175,9 +175,13 @@ body.theme-training   { --tab-color: #F97316; }
   padding: 6px 4px 18px;
   background: transparent !important;
 }
-.pg-banner-title {
-  color: #fff; font-weight: 800;
-  font-size: 20.9px; letter-spacing: -.015em; line-height: 1.2;
+/* Tab-Symbol statt Tabname (auf Wunsch, 13.11.2026): das Symbol der Tableiste, 20 %
+   grösser (24 → 28.8 px), weiss auf dem Tab-Verlauf. */
+.pg-banner-symbol { margin: 0; display: flex; line-height: 0; }
+.pg-banner-symbol svg {
+  width: 28.8px; height: 28.8px;
+  stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  fill: none;
 }
 /* Zahnrad + Transparenz-Knopf (nur Übersicht): rechtsbündig auf der Titelzeile.
    Sitzen auf dem farbigen Banner-Verlauf → halbtransparentes Weiß. */
@@ -938,10 +942,6 @@ body.nav-weg #zeitleiste { bottom: calc(var(--safe-b) + 8px); }
 }
 
 /* Display M – Banner-Titel, Score-Kategorie */
-.pg-banner-title{
-  font-size: 1.32rem !important;
-  line-height: 1.2;
-}
 /* Title – Card-Titel und H3 in den Sections */
 h1,
 h2,
@@ -1126,9 +1126,14 @@ h5,
    und bleibt weiss (wie FitTracks „Mehr"). Datenfarben und Inline-Farben hellt das JS
    auf (`_glasDiagramm`, `glasHtmlAnpassen`).
    ═══════════════════════════════════════════════════════════ */
+/* Ohne Kartenfläche (auf Wunsch, 13.11.2026): keine Fläche, kein Schatten, keine
+   Kante – die Inhalte stehen direkt auf dem Tab-Verlauf. Vorher 12-%-Weiss mit
+   Schatten. Innenabstände bleiben, damit die Inhalte nicht an den Rand rücken. */
 html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .kpi, .ziel-woche){
-  background:rgba(255,255,255,.12);
-  box-shadow:0 1px 6px rgba(0,0,0,.18);
+  background:transparent;
+  box-shadow:none;
+  /* !important: die farbige Oberkante der Muster-Karten steht inline (`style`). */
+  border-color:transparent !important;
   --txt:#fff;
   --txt2:rgba(255,255,255,.85);
   --txt3:rgba(255,255,255,.65);
@@ -1139,7 +1144,6 @@ html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card, .no-data, .k
   color:var(--txt);
 }
 /* Fest gesetzte helle Flaechen und Kanten in den Karten. */
-html.glas .screen .pi-card{border-top-color:rgba(255,255,255,.24)}
 html.glas .screen .stat-row{border-bottom-color:rgba(255,255,255,.1)}
 html.glas .screen .goal-bar-bg,
 html.glas .screen .debt-bar-bg{background:rgba(255,255,255,.18)}

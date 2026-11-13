@@ -5125,6 +5125,15 @@ const GLAS_SYMBOL = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="
 // Titelzeile eines Tabs: nur der Tabname (das Emoji davor ist am 04.11.2026 auf
 // Wunsch entfallen), rechtsbündig – nur in der Übersicht – Zahnrad und
 // Transparenz-Knopf. Die Tab-Hintergründe liegen auf den .bg-fade-layer, nicht hier.
+// Symbole der Tableiste – dieselben Pfade wie in `index.html` (`#bottom-nav`). Seit
+// 13.11.2026 (auf Wunsch) stehen sie statt der Tabnamen im Banner; wer ein Symbol
+// ändert, ändert es an beiden Stellen.
+const TAB_SYMBOL = {
+  'Übersicht': '<path d="M3 12 12 4l9 8v8a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z"/>',
+  'Herz':      '<path d="M12 21s-7-4.5-9.5-9C1 9 2.5 5 6.5 5c2 0 3.5 1 5.5 3.5C14 6 15.5 5 17.5 5c4 0 5.5 4 4 7-2.5 4.5-9.5 9-9.5 9Z"/>',
+  'Schlaf':    '<path d="M20 14.5A8 8 0 1 1 9.5 4c0 5.5 4.5 10 10.5 10.5Z"/>',
+  'Training':  '<path d="M3 13c2-4 5-4 7 0s5 4 7 0 4-2 4-2"/>'
+};
 function pgBanner(title){
   // Zahnrad NUR in der Uebersicht, in der durchscheinenden Optik der uebrigen `.pg-act`.
   const einst = _currentRenderingTab === 'overview'
@@ -5137,7 +5146,9 @@ function pgBanner(title){
   const glas = _currentRenderingTab === 'overview'
     ? `<button class="pg-act glas-toggle" title="Durchsichtige Karten" aria-label="Durchsichtige Karten ein-/ausschalten" aria-pressed="${glasAktiv()?'true':'false'}">${GLAS_SYMBOL}</button>`
     : '';
-  return`<div class="pg-banner"><div class="pg-banner-txt"><div class="pg-banner-title">${title}</div></div><div class="pg-banner-actions">${einst}${glas}</div></div>`;
+  // Statt des Namens das Symbol der Tableiste, 20 % grösser (`.pg-banner-symbol`); der
+  // Name bleibt als Überschrift für Screenreader (`aria-label`).
+  return`<div class="pg-banner"><div class="pg-banner-txt"><h1 class="pg-banner-symbol" aria-label="${title}"><svg viewBox="0 0 24 24" aria-hidden="true">${TAB_SYMBOL[title] || ''}</svg></h1></div><div class="pg-banner-actions">${einst}${glas}</div></div>`;
 }
 // ═══════════════════════════════════════════════════════════
 // Tab-Navigation: horizontaler Snap-Scroller + Bottom-Nav

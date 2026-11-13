@@ -272,9 +272,13 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
 ## UI-/Namens-Konventionen
 - **Keine IDs in wiederholten Komponenten** — Klassen nutzen (bis zu 5 Screen-Instanzen im
   DOM). State-Updates iterieren per `querySelectorAll().forEach`.
-- **Tab-Titel:** `pgBanner(titel)` zeigt **nur** den Tabnamen (das Emoji davor samt
-  `.pg-banner-icon` ist am 04.11.2026 auf Wunsch entfallen; die Bannerhöhe hält die
-  Knopfreihe rechts, gemessen unverändert 62 px) — der
+- **Tab-Titel:** `pgBanner(titel)` zeigt seit 13.11.2026 (auf Wunsch) **statt des
+  Tabnamens das Symbol der Tableiste**, 20 % grösser (24 → 28.8 px, weiss,
+  `.pg-banner-symbol` als `<h1 aria-label="Herz">`). Die Pfade stehen in
+  `TAB_SYMBOL` (app.js) **und** in `index.html` (`#bottom-nav`) — wer ein Symbol
+  ändert, ändert beide. Davor stand der Name (`.pg-banner-title`, entfallen), davor
+  bis 04.11.2026 zusätzlich ein Emoji. Die Bannerhöhe hält die Knopfreihe rechts,
+  gemessen unverändert 62 px in allen vier Tabs — der
   erklärende Untertitel und die Zeile „Daten bis … · geladen …" sind entfernt. Der
   Untertitel wiederholte den Tabnamen, der Daten-Stand stand fünfmal identisch da;
   er steht jetzt einmal als zwei Zeilen („Daten bis", „Zuletzt geladen") zuoberst in
@@ -1492,11 +1496,14 @@ Wichtig: **`sw.js` immer mitcommitten** — sie löst den Cache-Refresh aus.
   Fläche (`[aria-pressed="true"]`). Zustand `hcc_glas` im `localStorage`,
   `glasAktiv()`, Klasse `glas` am **`<html>`** (`applyGlasModus()`). Standard: aus.
   - **CSS** (`html.glas .screen :is(.chart-card, .pi-card, .rec-card, .warn-card,
-    .no-data, .kpi)`): 12-%-Weiss, gleicher Schatten, und die Farbtokens `--txt`,
+    .no-data, .kpi, .ziel-woche)`): **seit 13.11.2026 ohne Kartenfläche** (auf Wunsch)
+    — `background: transparent`, kein Schatten, Kanten transparent (`!important`, weil
+    die farbige Oberkante der Muster-Karten inline steht); die Inhalte stehen direkt
+    auf dem Tab-Verlauf, Innenabstände bleiben. Vorher 12-%-Weiss mit Schatten. Die
+    Farbtokens `--txt`,
     `--txt2`, `--txt3`, `--card`, `--border`, `--bg`, `--accent` werden **auf den
     Karten** neu gesetzt (weiss bzw. halbweiss), nicht auf `:root` — so erben nur deren
-    Inhalte die hellen Farben. Dazu Einzelregeln für fest gesetzte Farben: Kante der
-    `.pi-card`, Trennlinie `.stat-row`, Balkenspur `.goal-bar-bg`/`.debt-bar-bg`,
+    Inhalte die hellen Farben. Dazu Einzelregeln für fest gesetzte Farben: Trennlinie `.stat-row`, Balkenspur `.goal-bar-bg`/`.debt-bar-bg`,
     `.warn-sig`. **Wer eine neue Karte oder eine feste Farbe in einer Karte einführt,
     ergänzt sie dort.**
   - **Bleibt weiss:** Einstellungen-Seite (liegt ausserhalb von `.screen`, wie
